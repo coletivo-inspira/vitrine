@@ -8,7 +8,7 @@
 
 ## Entrevista de decisões — uma por vez
 
-1. Em discussão: finalidade comercial versus restrição GitHub Pages. Recomendação: outro host para produção; usuário pediu discutir antes de escolher.
+1. Resolvida em 2026-11-07: Cloudflare escolhida para hospedagem; GitHub para código e automações. Produto Cloudflare e topologia ainda serão avaliados.
 2. Depois: cada usuário é dono individual ou existe equipe por negócio? Recomendação: workspace com um dono inicial e estrutura para membros; testar pessoa com duas pizzarias e funcionário com acesso a apenas uma.
 3. Depois: Supabase gerenciado versus Apps Script/Sheets ou Workers/D1? Recomendação inicial: Supabase; validar pausa, OAuth e recuperação de conta.
 4. Depois: repositório por vitrine é requisito de propriedade/exportação ou apenas mecanismo imaginado de deploy? Recomendação: código de templates central, artefatos separados; avaliar custo e acesso antes de mudar o requisito.
@@ -22,4 +22,4 @@
 4. Job automatizado e subdomínio. Aceite: duplo clique não duplica recurso; disputa por slug tem um vencedor; falhas de DNS/TLS/build não apagam site ativo; retry limitado e credenciais restritas.
 5. Piloto com alertas de cota, exportação/restauração e rotina de remoção. Aceite: exercício de restauração e revogação de acesso; nenhuma dependência de plano gratuito tratada como SLA.
 
-Não ativar deploy automático nem criar recursos de clientes até resolver a primeira decisão e validar autorização real. Esta entrega não é um portal operacional.
+Antes de ativar deploy automático ou criar recursos de clientes, definir conta, domínio, produto Cloudflare e validar autorização real. Esta entrega não é um portal operacional.

@@ -1,6 +1,6 @@
 # Arquitetura proposta — 7 de novembro de 2026
 
-Status: estudo e fundação; escolhas de fornecedor e hospedagem não aprovadas. O usuário pediu discussão sobre a restrição do Pages antes de decidir. Não interpretar esta documentação como aprovação final do plano.
+Status: estudo e fundação. Cloudflare aprovada para hospedagem em 2026-11-07 (ADR 0001). Backend de autenticação/persistência, produto Cloudflare e topologia ainda são propostas; a escolha de hospedagem não aprova o plano completo.
 
 ## Fronteiras
 

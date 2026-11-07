@@ -18,7 +18,7 @@ implementa o produto.
 
 `docs/architecture.md` é a proposta transversal; `docs/backend-research.md` guarda
 fontes; `docs/roadmap.md` lista decisões; `CONTEXT.md` contém só vocabulário.
-Specs devem referenciar esses documentos e registrar divergências. A constituição
+Specs devem referenciar esses documentos e registrar divergências. Cloudflare foi escolhida para hospedagem; backend e produto específico seguem pendentes. A constituição
 0.1.0 é proposta, sem ratificação. Spec Kit não concede autorização para deploy.
 
 Configuração original: `specify init --here --integration codex --script ps --force`.

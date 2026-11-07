@@ -1,6 +1,6 @@
 ---
-status: proposed
+status: accepted
 ---
 # Hospedagem comercial fora do GitHub Pages
 
-O plano original automatizava Pages por vitrine. A restrição oficial a hospedagem de negócios, transações comerciais e SaaS conflita com a finalidade descrita; recomendamos GitHub como fonte de código e Cloudflare como candidato à hospedagem. O usuário pediu discutir essa restrição antes de decidir: nenhum fornecedor foi aprovado e nenhum deploy será ativado por esta proposta. Alternativas: limitar Pages a demonstrações elegíveis ou escolher outro host comercial. Consulte a pesquisa de limites e fontes em `docs/backend-research.md`.
+Em 2026-11-07, o usuário escolheu Cloudflare para hospedar o portal e as vitrines. GitHub permanece como fonte de código e automações. A restrição comercial de GitHub Pages e o foco em baixo custo motivaram a escolha frente a Pages e Vercel. O produto específico da Cloudflare, a topologia de publicação e o backend de autenticação/persistência ainda serão definidos; esta decisão não provisiona serviços. Consulte fontes e limites em `docs/backend-research.md`.

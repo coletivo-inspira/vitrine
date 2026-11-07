@@ -14,4 +14,4 @@ Leia [arquitetura](docs/architecture.md), [comparação de backend e limites](do
 
 O desenvolvimento usa [Spec Kit](docs/development.md), com integração Codex/PowerShell e princípios em `.specify/memory/constitution.md`.
 
-A hospedagem está em discussão: GitHub Pages tem restrições para negócios, transações comerciais e SaaS. Cloudflare é uma alternativa proposta, ainda não aprovada. Não há workflow de deploy nesta branch.
+Cloudflare foi escolhida para hospedagem em 2026-11-07. GitHub permanece para código e automações. Backend de autenticação/persistência e configuração de publicação ainda serão definidos. Não há workflow de deploy nesta branch.

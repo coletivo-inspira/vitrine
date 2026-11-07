@@ -18,7 +18,7 @@ dinâmica têm modelos de consumo distintos. Cotas, serviços adicionais e escal
 podem exigir pagamento. [Static Assets](https://developers.cloudflare.com/workers/static-assets/),
 [preços Workers](https://developers.cloudflare.com/workers/platform/pricing/).
 
-Comparação é recomendação, não aprovação de fornecedor pelo usuário.
+Atualização: em 2026-11-07 o usuário escolheu Cloudflare para hospedagem. Backend e produto específico Cloudflare continuam pendentes.
 
 ## Comparação de backend
 
@@ -42,4 +42,4 @@ GitHub Pages: restrição explícita a hospedagem gratuita de negócios, sites d
 
 GitHub Actions: uso de runners padrão em repositórios públicos é gratuito; repositórios privados e recursos adicionais têm franquias/cobrança conforme plano. Não extrapolar essa gratuidade a qualquer runner. REST API tem limites primários e secundários: tokens de instalação geralmente começam em 5.000 requisições/hora; filas devem respeitar headers e backoff. Não fazer build por tecla do editor: publicar explicitamente e agrupar alterações. [Cobrança](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
 
-Recomendação de engenharia, ainda proposta: Supabase para identidade/persistência e servidor para publicação, com artefatos públicos desacoplados do banco administrativo. Hospedagem Cloudflare depende da discussão solicitada. Custo zero é meta de piloto limitado, sem garantia de SLA; domínio, SMTP, armazenamento, backups e crescimento podem exigir pagamento. Monitorar consumo em 70% e 90% das cotas como política proposta; bloquear novas publicações quando faltar orçamento, preservando a versão ativa.
+Recomendação de engenharia, ainda proposta: Supabase para identidade/persistência e servidor para publicação, com artefatos públicos desacoplados do banco administrativo. Cloudflare foi escolhida para hospedagem; produto específico e configuração seguem pendentes. Custo zero é meta de piloto limitado, sem garantia de SLA; domínio, SMTP, armazenamento, backups e crescimento podem exigir pagamento. Monitorar consumo em 70% e 90% das cotas como política proposta; bloquear novas publicações quando faltar orçamento, preservando a versão ativa.
