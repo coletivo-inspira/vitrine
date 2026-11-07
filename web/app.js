@@ -1,4 +1,4 @@
-import { quoteContactLink } from '/assets/portfolio.mjs';
+import { quoteContactLink } from './assets/portfolio.mjs';
 
 const menuButton = document.querySelector('.menu-toggle');
 const nav = document.querySelector('#site-nav');
@@ -44,7 +44,7 @@ async function json(path) {
 }
 
 async function loadContent() {
-  const [contactResult, casesResult] = await Promise.allSettled([json('/data/contact.json'), json('/data/portfolio.json')]);
+  const [contactResult, casesResult] = await Promise.allSettled([json(new URL('./data/contact.json', import.meta.url)), json(new URL('./data/portfolio.json', import.meta.url))]);
   const contact = contactResult.status === 'fulfilled' ? safeContactUrl(contactResult.value?.href) : null;
   if (contact) {
     const link = document.createElement('a');

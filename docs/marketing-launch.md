@@ -1,7 +1,21 @@
 # Divulgação: executar e publicar
 
-Estado: página implementada e validada localmente; nenhum deploy remoto ou DNS
-alterado. Não inclui painel, Auth integrado, editor ou backend público.
+Estado: página implementada e validada localmente. GitHub Pages preparado como
+prévia pública; Cloudflare continua como destino definitivo planejado. Não inclui
+painel, Auth integrado, editor ou backend público.
+
+## Prévia pública no GitHub Pages
+
+O workflow publica somente `dist/` em https://coletivo-inspira.github.io/vitrine/
+após pushes em `main` e pode ser executado manualmente nessa branch. Ele executa
+auditoria, testes e build antes do deploy, sem token adicional. O endereço só estará
+disponível após a execução bem-sucedida; conferir Actions e HTTPS depois do merge.
+`SITE_BASE_PATH=/vitrine/` configura a página 404 para caminhos aninhados; o build
+padrão usa `/` para prévia local e Cloudflare. Nenhum DNS é alterado.
+
+O GitHub Pages não aplica o arquivo `_headers`: os cabeçalhos de segurança nele
+declarados são específicos da Cloudflare e não devem ser considerados ativos na
+prévia do Pages.
 
 ## Ambiente e prévia
 
