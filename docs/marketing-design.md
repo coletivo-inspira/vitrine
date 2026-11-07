@@ -1,6 +1,6 @@
 # Modelagem do site de divulgação
 
-Status: proposta de front-end; não é implementação nem publicação. Escopo confirmado
+Status: direção aprovada e interface de divulgação implementada; sem publicação remota. Escopo confirmado
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
 
@@ -125,6 +125,7 @@ fontes e sem imagem de mockup usada como substituto da página inteira.
    final limitada; teclado, contraste, redução de movimento e fallback de material.
 5. Publicação separada: preview Cloudflare, validar e depois conectar o hostname.
 
-Esta modelagem não cria DESIGN.md definitivo, não publica o site e não altera DNS.
+A implementação gerou DESIGN.md e .impeccable/design.json a partir do código.
+Não publicou o site nem alterou DNS; evidências em docs/design/marketing-qa.md.
 Antes de publicar: confirmar responsável pela conta/zona, contato comercial,
 cases autorizados, conteúdo de privacidade e o estado real da oferta.

@@ -24,4 +24,5 @@ Para rascunhos privados, usar outro local até existir o painel de operadores.
 `publishedPortfolio` valida e projeta somente cases publicados, ordenando por order.
 Não busca sites nem gera imagens. `quoteContactLink` precisa do número comercial
 da equipe em formato internacional, sem símbolos; sem ele retorna null.
-Ainda não há interface de edição ou exibição integrada ao site.
+A exibição de cases publicados está integrada à divulgação. A edição continua pelo
+catálogo no repositório; ainda não há painel de edição.

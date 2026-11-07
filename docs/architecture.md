@@ -48,5 +48,9 @@ Testada em PostgreSQL embarcado com auth.uid() simulado; ainda não aplicada em
 Supabase. Não há portal, sessão integrada, fila ou publicação real. Link wa.me abre
 conversa e depende da ação do visitante; não envia mensagens automaticamente.
 Cadastro/publicação ainda precisarão impor limites de custo do ADR 0005.
-Catálogo e projeção de portfólio também implementados, sem interface. Proposta
+Catálogo e projeção de portfólio implementados, com exibição condicional na página
+de divulgação; painel de edição ainda inexistente. Proposta
 comercial e fluxo de orçamento em docs/commercial-offer.md; preços não publicados.
+
+A página de divulgação foi implementada em web/; não é o portal autenticado.
+Configuração estática Cloudflare validada sem deploy; ver docs/marketing-launch.md.

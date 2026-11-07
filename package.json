@@ -7,7 +7,9 @@
   },
   "scripts": {
     "test": "node --test",
-    "demo": "node examples/publish-menu.mjs"
+    "demo": "node examples/publish-menu.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.15"

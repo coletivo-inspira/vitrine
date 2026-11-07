@@ -6,8 +6,8 @@ sem necessidade de Docker para a suíte embarcada.
 1. `npm ci`
 2. `npm test`
 
-Suíte atual: 22 testes contabilizados (agrupador, 10 cenários de banco, 5 de projeção
-e 6 de portfólio). Resultados e runtime verificados em docs/runtime-security.md.
+Suíte atual: 23 testes contabilizados (agrupador, 10 cenários de banco, 5 de projeção,
+6 de portfólio e 1 de empacotamento da divulgação). Resultados e runtime verificados em docs/runtime-security.md.
 A suíte executa a migração real `supabase/migrations/202611070001_site_access.sql`
 em Postgres embarcado, com roles authenticated/anon e auth.uid() simulado apenas
 no teste. Cobre leitura/edição isolada, revisão esperada, owner imutável, inserção

@@ -4,10 +4,11 @@ Portal multiusuário e multivitrine para criar sites a partir de templates. Prim
 
 ## Estado atual
 
-Fundação local com migração SQL e testes de acesso; sem login integrado, banco remoto, interface ou publicação real. O repositório original tinha somente este README. Nenhum serviço foi provisionado e nenhum segredo é necessário para executar esta entrega.
+Site de divulgação implementado em HTML/CSS/JS e validado localmente. Inclui migração SQL e testes de acesso para a base futura; sem painel, login integrado, banco remoto ou publicação real. O repositório original tinha somente este README. Nenhum serviço foi provisionado e nenhum segredo é necessário para executar esta entrega.
 
 - `npm ci`: instala exatamente as dependências do lockfile.
-- `npm test`: valida projeção pública, portfólio, links e isolamento do banco em Postgres embarcado.
+- `npm test`: valida projeção pública, portfólio, links, isolamento SQL e empacotamento seguro.
+- `npm run build` e `npm run preview`: geram a divulgação em dist/ e abrem servidor local em http://127.0.0.1:4173.
 - `npm audit`: consulta vulnerabilidades conhecidas das dependências npm.
 - `npm run demo`: imprime um cardápio público de exemplo e um link; não publica nem envia mensagens.
 - Node.js **24 LTS**, no mínimo **24.22.2**, usando as correções mais recentes da linha 24. A instalação recusa outras linhas e versões abaixo do mínimo; PGlite é dependência apenas de desenvolvimento/testes.
@@ -26,6 +27,8 @@ Endereços planejados: `vitrine.inspira.dev.br` para divulgação, `/loja1` ness
 
 Oferta gratuita, assinaturas opcionais e customizações: [proposta comercial](docs/commercial-offer.md). Análise do export fornecido: [DNS](docs/dns-review.md). Cadastro inicial de exemplos em [content/portfolio.json](content/portfolio.json), com instruções em [content/README.md](content/README.md); ainda sem painel de portfólio.
 
-Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com prioridade ao brandbook do Coletivo Inspira e Liquid Glass como detalhe complementar. Esta proposta visual abrange somente a divulgação; implementação e publicação seguem pendentes.
+Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com prioridade ao brandbook do Coletivo Inspira e Liquid Glass como detalhe complementar. Interface implementada somente para divulgação; publicação remota pendente. Sistema efetivo em [DESIGN.md](DESIGN.md).
 
 Direção visual escolhida: [A — Laranja pontual](docs/design/palette-exploration.md), preservando a distribuição aprovada, com fundo neutro, texto carvão e ações em laranja. As demais variantes permanecem como estudos.
+
+Execução e publicação: [guia da divulgação](docs/marketing-launch.md). [Verificação visual e técnica](docs/design/marketing-qa.md). O telefone comercial em content/contact.json ainda está vazio; o atendimento aparece em preparação.

@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T14:34:55.499487+00:00",
+  "title": "Design System: Vitrine Inspira — divulgação",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Laranja pontual",
+        "canonical": "#C74414",
+        "tonalRamp": [
+          "oklch(15% 0.15 36)",
+          "oklch(27% 0.15 36)",
+          "oklch(38% 0.15 36)",
+          "oklch(49% 0.15 36)",
+          "oklch(61% 0.15 36)",
+          "oklch(72% 0.15 36)",
+          "oklch(84% 0.15 36)",
+          "oklch(95% 0.15 36)"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Laranja profundo",
+        "canonical": "#A9360E",
+        "tonalRamp": [
+          "oklch(15% 0.15 36)",
+          "oklch(27% 0.15 36)",
+          "oklch(38% 0.15 36)",
+          "oklch(49% 0.15 36)",
+          "oklch(61% 0.15 36)",
+          "oklch(72% 0.15 36)",
+          "oklch(84% 0.15 36)",
+          "oklch(95% 0.15 36)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel claro",
+        "canonical": "#F7F7F4",
+        "tonalRamp": [
+          "oklch(15% 0.005 100)",
+          "oklch(27% 0.005 100)",
+          "oklch(38% 0.005 100)",
+          "oklch(49% 0.005 100)",
+          "oklch(61% 0.005 100)",
+          "oklch(72% 0.005 100)",
+          "oklch(84% 0.005 100)",
+          "oklch(95% 0.005 100)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Carvão vegetal",
+        "canonical": "#27322E",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(27% 0.015 160)",
+          "oklch(38% 0.015 160)",
+          "oklch(49% 0.015 160)",
+          "oklch(61% 0.015 160)",
+          "oklch(72% 0.015 160)",
+          "oklch(84% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Carvão suave",
+        "canonical": "#56615B",
+        "tonalRamp": [
+          "oklch(15% 0.015 155)",
+          "oklch(27% 0.015 155)",
+          "oklch(38% 0.015 155)",
+          "oklch(49% 0.015 155)",
+          "oklch(61% 0.015 155)",
+          "oklch(72% 0.015 155)",
+          "oklch(84% 0.015 155)",
+          "oklch(95% 0.015 155)"
+        ]
+      },
+      "apricot": {
+        "role": "neutral",
+        "displayName": "Damasco leve",
+        "canonical": "#FBEDE5",
+        "tonalRamp": [
+          "oklch(15% 0.025 55)",
+          "oklch(27% 0.025 55)",
+          "oklch(38% 0.025 55)",
+          "oklch(49% 0.025 55)",
+          "oklch(61% 0.025 55)",
+          "oklch(72% 0.025 55)",
+          "oklch(84% 0.025 55)",
+          "oklch(95% 0.025 55)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Linha mineral",
+        "canonical": "#DDDCD6",
+        "tonalRamp": [
+          "oklch(15% 0.008 100)",
+          "oklch(27% 0.008 100)",
+          "oklch(38% 0.008 100)",
+          "oklch(49% 0.008 100)",
+          "oklch(61% 0.008 100)",
+          "oklch(72% 0.008 100)",
+          "oklch(84% 0.008 100)",
+          "oklch(95% 0.008 100)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Branco",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "offer-surface": {
+        "role": "neutral",
+        "displayName": "Areia de oferta",
+        "canonical": "#F0EFE9",
+        "tonalRamp": [
+          "oklch(15% 0.01 95)",
+          "oklch(27% 0.01 95)",
+          "oklch(38% 0.01 95)",
+          "oklch(49% 0.01 95)",
+          "oklch(61% 0.01 95)",
+          "oklch(72% 0.01 95)",
+          "oklch(84% 0.01 95)",
+          "oklch(95% 0.01 95)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Chamada principal da divulgação."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de seção."
+      }
+    },
+    "shadows": [
+      {
+        "name": "preview",
+        "value": "0 18px 42px -18px #49372935",
+        "purpose": "Moldura demonstrativa."
+      },
+      {
+        "name": "miniature",
+        "value": "0 5px 18px -10px #49372935",
+        "purpose": "Prévias ilustradas."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Deslocamento breve dos botões."
+      },
+      {
+        "name": "control-duration",
+        "value": "0.2s",
+        "purpose": "Botões e indicador da FAQ; removido com movimento reduzido."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1100px"
+      },
+      {
+        "name": "mobile-navigation",
+        "value": "800px"
+      },
+      {
+        "name": "small-mobile",
+        "value": "520px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ação principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Link de ação principal da divulgação.",
+      "html": "<a class=\"ds-button\" href=\"#possibilidades\">Ver possibilidades <span aria-hidden=\"true\">→</span></a>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-button{display:inline-flex;align-items:center;justify-content:center;gap:22px;min-height:52px;padding:13px 24px;border:0;border-radius:7px;background:var(--orange);color:var(--white);font-size:16px;font-weight:700;line-height:1.5;text-decoration:none;transition:background .2s,transform .2s var(--ease)}.ds-button:hover{background:var(--orange-hover);transform:translateY(-1px)}.ds-button:active{transform:translateY(0)}.ds-button span{font-size:23px;line-height:1}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}"
+    },
+    {
+      "name": "Ação pequena",
+      "kind": "button",
+      "refersTo": "button-small",
+      "description": "Variante da navegação.",
+      "html": "<a class=\"ds-button ds-small\" href=\"#contato\">Pedir orçamento</a>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-button{display:inline-flex;align-items:center;justify-content:center;gap:22px;min-height:52px;padding:13px 24px;border:0;border-radius:7px;background:var(--orange);color:var(--white);font-size:16px;font-weight:700;line-height:1.5;text-decoration:none;transition:background .2s,transform .2s var(--ease)}.ds-button:hover{background:var(--orange-hover);transform:translateY(-1px)}.ds-button:active{transform:translateY(0)}.ds-small{min-height:44px;padding:10px 21px;font-size:14px}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}"
+    },
+    {
+      "name": "Link secundário",
+      "kind": "button",
+      "refersTo": "text-link",
+      "description": "Ação textual sublinhada.",
+      "html": "<a class=\"ds-link\" href=\"#como-funciona\">Como funciona</a>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-link{display:inline-flex;align-items:center;gap:8px;font-weight:600;text-decoration-color:#c7441466;text-decoration-thickness:1px}.ds-link:hover{text-decoration-color:var(--orange);color:var(--orange)}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}.ds-link{color:var(--ink);text-underline-offset:5px}"
+    },
+    {
+      "name": "Navegação",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Links desktop; o menu móvel é descrito em DESIGN.md.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Navegação\"><a href=\"#como-funciona\">Como funciona</a><a href=\"#possibilidades\">Possibilidades</a><a href=\"#planos\">Planos</a></nav>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-nav{display:flex;align-items:center;gap:32px}.ds-nav>a:not(.ds-button){text-decoration:none;font-size:14px;font-weight:600}.ds-nav>a:not(.ds-button):hover{color:var(--orange)}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}.ds-nav a{color:inherit}"
+    },
+    {
+      "name": "Estado de preparação",
+      "kind": "chip",
+      "refersTo": "status",
+      "description": "Indicador informativo sem ação.",
+      "html": "<p class=\"ds-status\"><span class=\"ds-dot\" aria-hidden=\"true\"></span>Em preparação</p>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-status{margin-top:25px;display:inline-flex;gap:8px;align-items:center;font-size:12px;font-weight:600;background:var(--apricot);padding:4px 10px;border-radius:4px}.ds-dot{width:6px;height:6px;border-radius:50%;background:var(--orange)}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}.ds-status{margin:0}"
+    },
+    {
+      "name": "Oferta aberta",
+      "kind": "card",
+      "refersTo": "offer",
+      "description": "Coluna de oferta com divisória, sem sombra.",
+      "html": "<article class=\"ds-offer\"><h3>O essencial</h3><p class=\"ds-emphasis\">Vitrine básica</p><p>Um modelo para apresentar o seu negócio.</p><span class=\"ds-state\">Gratuita, prevista para o lançamento</span></article>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-offer{padding-top:26px;border-top:1px solid #c8c8be;display:flex;flex-direction:column;align-items:flex-start}.ds-offer h3{font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--ink-soft)}.ds-emphasis{font:600 25px/1.2 var(--font-display);letter-spacing:-.025em;margin-top:12px}.ds-offer>p:not(.ds-emphasis){margin-top:18px;font-size:14px;color:var(--ink-soft);max-width:34ch}.ds-state{font-size:12px;color:var(--ink-soft);margin-top:auto}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}.ds-offer{max-width:340px}.ds-offer p,.ds-offer h3{margin-bottom:0}"
+    },
+    {
+      "name": "Pergunta frequente",
+      "kind": "custom",
+      "refersTo": "faq",
+      "description": "Divisória e expansão nativa.",
+      "html": "<div class=\"ds-faq\"><details><summary>Já posso criar a minha vitrine?<span aria-hidden=\"true\">+</span></summary><p>Ainda não. Estamos preparando a primeira versão.</p></details></div>",
+      "css": ":host{--paper:#f7f7f4;--ink:#27322e;--ink-soft:#56615b;--orange:#c74414;--orange-hover:#a9360e;--apricot:#fbede5;--line:#dddcd6;--white:#fff;--radius:12px;--font-body:\"DM Sans\",sans-serif;--font-display:Syne,sans-serif;--ease:cubic-bezier(.16,1,.3,1);font-family:var(--font-body);color:var(--ink)}.ds-faq details{border-bottom:1px solid var(--line)}.ds-faq summary{min-height:70px;display:flex;justify-content:space-between;gap:25px;align-items:center;list-style:none;font-weight:600;font-size:16px}.ds-faq summary::-webkit-details-marker{display:none}.ds-faq summary span{font-size:24px;font-weight:400;transition:transform .2s}.ds-faq details[open] summary span{transform:rotate(45deg)}.ds-faq details p{font-size:14px;color:var(--ink-soft);padding-bottom:22px;max-width:65ch}:focus-visible{outline:3px solid var(--orange,#c74414);outline-offset:5px}.ds-faq{width:min(100%,550px)}.ds-faq summary{cursor:pointer}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Uma vitrine com espaço para respirar",
+    "overview": "A direção aprovada A — Laranja pontual combina superfícies claras, texto carvão e ações quentes. A personalidade vem da Syne, do espaço generoso e da assinatura oficial do Coletivo Inspira. O laranja orienta a atenção sem transformar toda a página em uma área saturada.\n\nEste registro descreve o HTML/CSS do site de divulgação, não um sistema do painel ou dos sites de clientes. O usuário rejeitou o excesso de verde, as grandes áreas de cor intensa e as sombras fortes do estudo anterior. Logo e Orb oficiais preservam suas cores e proporções; o tratamento da Vitrine não modifica o brandbook global.",
+    "keyCharacteristics": [
+      "Base neutra e cor concentrada nas ações.",
+      "Títulos expressivos e leitura simples.",
+      "Divisórias finas e profundidade discreta.",
+      "Demonstrações identificadas como ilustrações."
+    ],
+    "rules": [
+      {
+        "name": "The Laranja Pontual Rule",
+        "body": "Concentre a cor de ação nos controles e detalhes; preserve o predomínio neutro aprovado.",
+        "section": "colors"
+      },
+      {
+        "name": "The Profundidade Discreta Rule",
+        "body": "Preserve sombras suaves nas demonstrações; não reinstale as sombras fortes rejeitadas.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** preservar a base neutra, a Syne/DM Sans e o laranja pontual aprovado.",
+      "**Do** usar os arquivos oficiais da marca e reservar espaço para a Orb.",
+      "**Do** manter foco visível, navegação sem JavaScript e respeito a movimento reduzido.",
+      "**Do** identificar as prévias como ilustrações e separar seus estilos dos controles reais."
+    ],
+    "donts": [
+      "**Don't** retomar grandes campos verde/lima, cor intensa ou sombras fortes rejeitadas.",
+      "**Don't** tratar o estilo das miniaturas como sistema do futuro painel.",
+      "**Don't** inventar campos, checkout ou estados de conta que não existem nesta superfície.",
+      "**Don't** apresentar este registro de código como validação em navegadores ou evidência de conversão."
+    ]
+  }
+}
