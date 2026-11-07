@@ -4,6 +4,12 @@ Status: proposta de front-end; não é implementação nem publicação. Escopo 
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
 
+[Estudo visual desktop/mobile](design/marketing-liquid-glass-concept.png), gerado
+como mockup conceitual. É referência de composição, não screenshot de interface
+implementada. Nomes de negócios e imagens dentro dos previews são demonstrativos,
+não cases; a marca gráfica desenhada também é provisória. O arquivo não deve ser
+usado como imagem única para simular uma página funcional.
+
 ## Trabalho da página
 
 Modo: Persuade. Ajudar a pessoa de um pequeno negócio a entender o produto, ver
