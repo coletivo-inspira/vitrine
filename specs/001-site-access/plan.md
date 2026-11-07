@@ -57,3 +57,9 @@ Não criar abstração de workspace que dê acesso global aos sites do dono.
 
 Função privilegiada privada justificada pela prevenção de recursão de RLS;
 escopo restrito, identidade da sessão e teste de grants são obrigatórios.
+
+## Login aprovado para integração posterior
+
+Google via Supabase Auth (ADR 0004). Preparação e critérios de callback em
+`docs/google-auth-setup.md`. Esta fatia ainda valida autorização com identidades
+de teste e não implementa a interface de login.

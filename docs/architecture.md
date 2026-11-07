@@ -1,6 +1,6 @@
 # Arquitetura proposta — 7 de novembro de 2026
 
-Status: estudo e fundação. Cloudflare aprovada para hospedagem (ADR 0001) e Supabase Auth/Postgres para backend (ADR 0003), em 2026-11-07. Produto Cloudflare, método de login e topologia ainda são propostas; essas escolhas não aprovam o plano completo.
+Status: estudo e fundação. Cloudflare aprovada para hospedagem (ADR 0001) e Supabase Auth/Postgres para backend (ADR 0003), em 2026-11-07. Login Google via Supabase Auth aprovado (ADR 0004). Produto Cloudflare e topologia ainda são propostas; essas escolhas não aprovam o plano completo.
 
 ## Fronteiras
 
@@ -22,7 +22,7 @@ Cada consulta deve verificar propriedade ou associação à vitrine específica 
 
 ## Autenticação e segurança
 
-Usar provedor mantido; não armazenar senhas em Sheets ou repositórios. Proposta: login OAuth Google inicialmente, sujeito à aprovação. Validar assinatura, emissor, audiência e expiração do token; expirar/revogar sessões. Se usar cookies: HttpOnly, Secure, SameSite e proteção CSRF nas mutações. CORS com origem explícita não substitui autorização. Não compartilhar cookies com subdomínios de clientes; preferir domínio separado para conteúdo publicado. No MVP, sem HTML/JS customizado: texto renderizado com escape, CSP restritiva e links validados. Texto da projeção JSON não é HTML sanitizado.
+Usar provedor mantido; não armazenar senhas em Sheets ou repositórios. Login inicial aprovado: Google via Supabase Auth (ADR 0004). Validar assinatura, emissor, audiência e expiração do token; expirar/revogar sessões. Se usar cookies: HttpOnly, Secure, SameSite e proteção CSRF nas mutações. CORS com origem explícita não substitui autorização. Não compartilhar cookies com subdomínios de clientes; preferir domínio separado para conteúdo publicado. No MVP, sem HTML/JS customizado: texto renderizado com escape, CSP restritiva e links validados. Texto da projeção JSON não é HTML sanitizado.
 
 Tokens GitHub e Cloudflare só no servidor/secret store; nenhum prefixo de variável pública, log, artefato, URL ou bundle. Preferir GitHub App com installation tokens temporários e permissões mínimas. Validar se a automação precisa criar repositórios e quais permissões organizacionais isso requer; GITHUB_TOKEN do workflow não é uma credencial geral da organização. Cloudflare API token restrito à zona e às operações necessárias; separar DNS e deploy. O servidor determina organização, repositório e zona por configuração; não aceita destinos arbitrários do navegador.
 

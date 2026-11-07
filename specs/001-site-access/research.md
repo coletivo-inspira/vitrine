@@ -19,6 +19,6 @@ Fontes oficiais: [RLS](https://supabase.com/docs/guides/database/postgres/row-le
 [JWT](https://supabase.com/docs/guides/auth/jwts),
 [desenvolvimento local](https://supabase.com/docs/guides/local-development).
 
-Método de login e UX de convites não são necessários para desenhar esta camada:
-o teste usará identidades e vínculos de preparação. Serão definidos antes de
+Login Google via Supabase Auth aprovado (ADR 0004). UX de convites não integra esta camada:
+o teste usará identidades e vínculos de preparação. Configuração OAuth e convites serão validados antes de
 liberar cadastro e equipe no portal. Não há evidência de RLS executada ainda.

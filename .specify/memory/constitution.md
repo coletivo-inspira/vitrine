@@ -2,7 +2,7 @@
 Added: security boundaries, cost constraints and workflow.
 plan-template.md and tasks-template.md updated; spec-template.md compatible.
 No templates/commands directory installed. README and AGENTS updated.
-Deferred: user ratification, Cloudflare product, login method and detailed member permissions. -->
+Deferred: user ratification, Cloudflare product, auth configuration and detailed member permissions. -->
 # Vitrine Inspira Constitution
 
 Status: proposta baseada no escopo solicitado; não aprova fornecedores.
@@ -35,8 +35,8 @@ Funcionalidades planejadas NÃO DEVEM ser descritas como implementadas.
 ## Delivery Constraints
 MVP: pizzaria, cardápio e contato WhatsApp. Link não equivale a envio automático
 ou confirmação de pedido. Cloudflare foi escolhida para hospedagem e Supabase
-Auth/Postgres para backend. Equipe é por vitrine. Produto Cloudflare, método de
-login, permissões e política de repositórios continuam em discussão em docs/roadmap.md.
+Auth/Postgres para backend. Equipe é por vitrine. Login inicial será Google via Supabase Auth. Produto Cloudflare, configuração,
+permissões e política de repositórios continuam em discussão em docs/roadmap.md.
 Deploy permanece pendente.
 
 ## Development Workflow
