@@ -1,6 +1,6 @@
 # Arquitetura proposta — 7 de novembro de 2026
 
-Status: estudo e fundação. Cloudflare aprovada para hospedagem (ADR 0001) e Supabase Auth/Postgres para backend (ADR 0003), em 2026-11-07. Login Google via Supabase Auth aprovado (ADR 0004). Produto Cloudflare e topologia ainda são propostas; essas escolhas não aprovam o plano completo.
+Status: estudo e fundação. Cloudflare aprovada para hospedagem (ADR 0001) e Supabase Auth/Postgres para backend (ADR 0003), em 2026-11-07. Login Google via Supabase Auth aprovado (ADR 0004). Workers Free com Static Assets e templates centralizados adotados para o piloto (ADR 0005); a configuração real ainda está pendente; essas escolhas não aprovam o plano completo.
 
 ## Fronteiras
 
@@ -30,10 +30,19 @@ Tokens GitHub e Cloudflare só no servidor/secret store; nenhum prefixo de vari�
 
 Proposta de job: autenticar → autorizar → reservar slug → capturar revisão → validar/projetar → gerar artefato sem executar conteúdo do usuário → publicar → configurar domínio → verificar DNS/TLS/HTTP → marcar ativo. Estados sugeridos: queued, building, deploying, verifying, active, failed. Persistir resultado de cada etapa e chave de idempotência por site/revisão; retries limitados com backoff para 429/5xx. Retry reutiliza repositório/projeto/registro existentes. Falha conserva a última versão ativa; rollback aponta para artefato anterior.
 
-Um repositório por vitrine foi solicitado, mas não é necessário para isolamento de dados. Comparar seu custo operacional com um único repositório de templates e artefatos separados. Não criar repositórios até resolver essa escolha. Em repositórios públicos, conteúdo antigo permanece no histórico mesmo após ocultar um item: preferir não versionar dados de clientes. Não confundir retirar da nova publicação com apagar caches e histórico.
+Templates ficam no repositório central; publicações serão artefatos separados, sem
+criar repositório por cliente (ADR 0005). Dados privados não são versionados. Ocultar
+um item não equivale a apagar cópias ou caches existentes. O piloto usará caminhos
+no endereço gratuito do provedor, sem promessa de subdomínio próprio gratuito.
+
 
 Domínio raiz precisa existir e ter zona sob controle autorizado; registro/renovação não são gratuitos por haver DNS grátis. Validar slug e propriedade do domínio; criar registro específico, verificar associação no provedor de hospedagem e TLS antes de liberar. DNS sozinho não configura hostname nem certificado da aplicação. Evitar wildcard inicialmente; remoção deve desfazer associação/registro de forma coordenada para evitar takeover. Reserva concorrente deve ter constraint única. Não assumir suporte a wildcard no Cloudflare Pages.
 
 ## Implementado e limites
 
-Somente biblioteca de projeção, demonstração e testes. Não há API, RLS aplicada, banco, sessão, fila ou integração real. Link wa.me abre conversa com texto preenchido; depende da ação do visitante, não envia mensagens via WhatsApp Business API. Sem checkout, confirmação automática de pedido ou cobrança. Testes futuros de isolamento, concorrência e falhas são critérios de liberação, não resultados já obtidos.
+Biblioteca de projeção, demonstração, migração SQL e testes locais implementados.
+A migração contém RLS/grants por vitrine, proprietário protegido e revisão de drafts.
+Testada em PostgreSQL embarcado com auth.uid() simulado; ainda não aplicada em
+Supabase. Não há portal, sessão integrada, fila ou publicação real. Link wa.me abre
+conversa e depende da ação do visitante; não envia mensagens automaticamente.
+Cadastro/publicação ainda precisarão impor limites de custo do ADR 0005.

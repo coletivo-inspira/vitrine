@@ -18,7 +18,7 @@ implementa o produto.
 
 `docs/architecture.md` é a proposta transversal; `docs/backend-research.md` guarda
 fontes; `docs/roadmap.md` lista decisões; `CONTEXT.md` contém só vocabulário.
-Specs devem referenciar esses documentos e registrar divergências. Cloudflare foi escolhida para hospedagem e Supabase Auth/Postgres para backend; login Google via Supabase Auth foi aprovado; configuração e produto Cloudflare seguem pendentes. A constituição
+Specs devem referenciar esses documentos e registrar divergências. Cloudflare foi escolhida para hospedagem e Supabase Auth/Postgres para backend; login Google via Supabase Auth foi aprovado; Workers Free com Static Assets adotado; configuração segue pendente. A constituição
 0.1.0 é proposta, sem ratificação. Spec Kit não concede autorização para deploy.
 
 Configuração original: `specify init --here --integration codex --script ps --force`.

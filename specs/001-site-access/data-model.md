@@ -22,3 +22,10 @@ owner, id e site_id. Não usar metadados editáveis do usuário para determinar 
 
 Assunção técnica conservadora: leitura para membros até decisão sobre permissões
 de edição. Não tratar esta limitação como aprovação do desenho completo de equipe.
+
+## Implementação local
+
+Migração em supabase/migrations/202611070001_site_access.sql e testes em
+test/database/site-access.test.mjs. Slug/template ficam imutáveis após criar;
+name é a única coluna editável de sites. Drafts têm limite de 256 KiB e trigger
+de revisão. Estes limites não substituem o futuro teto de itens e vitrines do piloto.

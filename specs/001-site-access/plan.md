@@ -13,10 +13,10 @@ portal; não precisa ser provisionada para testar RLS.
 
 **Language/Version**: PostgreSQL compatível com o ambiente Supabase escolhido;
 Node 22+ para a biblioteca existente. Fixar versões CLI/banco antes das migrações.
-**Primary Dependencies**: Supabase Auth, Postgres, Data API e CLI local.
+**Primary Dependencies**: Supabase Auth/Postgres alvo; PGlite 0.5.15 para testes locais sem Docker.
 **Storage**: sites, site_memberships e drafts; auth.users gerenciado.
 **Testing**: testes de banco/RLS e requisições com identidades distintas; node --test existente.
-**Target Platform**: Supabase local para aceite; remoto somente após configuração.
+**Target Platform**: Postgres embarcado para SQL; Supabase local/staging para aceite integrado futuro.
 **Project Type**: camada de persistência e autorização, sem nova UI.
 **Performance Goals**: índices para owner e memberships; sem alegar SLA ainda.
 **Constraints**: sem segredo no cliente, sem escrita pública de vínculos ou owner,
@@ -63,3 +63,9 @@ escopo restrito, identidade da sessão e teste de grants são obrigatórios.
 Google via Supabase Auth (ADR 0004). Preparação e critérios de callback em
 `docs/google-auth-setup.md`. Esta fatia ainda valida autorização com identidades
 de teste e não implementa a interface de login.
+
+## Execução inicial
+
+Migração e testes em `supabase/migrations/` e `test/database/` implementados.
+Não foi criado config.toml: nenhum stack Supabase local foi inicializado.
+Ver quickstart.md para resultados e diferenças do ambiente alvo.

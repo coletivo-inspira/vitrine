@@ -18,7 +18,7 @@ dinâmica têm modelos de consumo distintos. Cotas, serviços adicionais e escal
 podem exigir pagamento. [Static Assets](https://developers.cloudflare.com/workers/static-assets/),
 [preços Workers](https://developers.cloudflare.com/workers/platform/pricing/).
 
-Atualização: em 2026-11-07 o usuário escolheu Cloudflare para hospedagem e Supabase Auth/Postgres para backend. Login Google via Supabase Auth também foi aprovado; produto específico Cloudflare e configuração seguem pendentes.
+Atualização: em 2026-11-07 o usuário escolheu Cloudflare para hospedagem e Supabase Auth/Postgres para backend. Login Google via Supabase Auth também foi aprovado; Workers Free com Static Assets foi adotado para o piloto; configuração segue pendente.
 
 ## Comparação de backend
 
@@ -42,4 +42,6 @@ GitHub Pages: restrição explícita a hospedagem gratuita de negócios, sites d
 
 GitHub Actions: uso de runners padrão em repositórios públicos é gratuito; repositórios privados e recursos adicionais têm franquias/cobrança conforme plano. Não extrapolar essa gratuidade a qualquer runner. REST API tem limites primários e secundários: tokens de instalação geralmente começam em 5.000 requisições/hora; filas devem respeitar headers e backoff. Não fazer build por tecla do editor: publicar explicitamente e agrupar alterações. [Cobrança](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
 
-Recomendação de engenharia, ainda proposta: Supabase para identidade/persistência e servidor para publicação, com artefatos públicos desacoplados do banco administrativo. Cloudflare foi escolhida para hospedagem; produto específico e configuração seguem pendentes. Custo zero é meta de piloto limitado, sem garantia de SLA; domínio, SMTP, armazenamento, backups e crescimento podem exigir pagamento. Monitorar consumo em 70% e 90% das cotas como política proposta; bloquear novas publicações quando faltar orçamento, preservando a versão ativa.
+Desenho adotado: Supabase para identidade/persistência e artefatos públicos desacoplados do banco administrativo. Cloudflare foi escolhida para hospedagem; Workers Free com Static Assets adotado para o piloto e configuração pendente. Custo zero é meta de piloto limitado, sem garantia de SLA; domínio, SMTP, armazenamento, backups e crescimento podem exigir pagamento. Monitorar consumo em 70% e 90% das cotas como política proposta; bloquear novas publicações quando faltar orçamento, preservando a versão ativa.
+
+Política de custo do usuário: não contratar excedentes ou upgrades. Se os limites gratuitos forem insuficientes, limitar o piloto. Decisões em ADR 0005. Alertas e bloqueios de publicação descritos acima ainda não foram implementados.

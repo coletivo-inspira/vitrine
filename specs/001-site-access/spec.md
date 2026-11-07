@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-07
 
-**Status**: Draft — limite de acesso confirmado; implementação não iniciada.
+**Status**: Camada SQL implementada e validada localmente; integração Supabase pendente.
 
 **Input**: Uma pessoa administra várias vitrines, cada uma com sua própria equipe;
 um funcionário pode acessar apenas uma das pizzarias do mesmo proprietário.

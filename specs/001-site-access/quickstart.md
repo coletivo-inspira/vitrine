@@ -1,23 +1,21 @@
-# Guia de validação planejada
+# Validação da camada de acesso
 
-Estado: projeto remoto e migrações ainda inexistentes; este guia descreve o aceite
-da próxima implementação, não comandos de banco já disponíveis.
+Executado em 2026-11-07: Node 24 local e PGlite 0.5.15, sem Docker ativo.
 
-Agora: Node 22+; `npm test` executa os cinco testes da projeção pública.
+1. `npm ci`
+2. `npm test`
 
-Na implementação:
+Resultado local: 16 testes passaram (agrupador, 10 cenários de banco e 5 de projeção).
+A suíte executa a migração real `supabase/migrations/202611070001_site_access.sql`
+em Postgres embarcado, com roles authenticated/anon e auth.uid() simulado apenas
+no teste. Cobre leitura/edição isolada, revisão esperada, owner imutável, inserção
+inválida, autoassociação negada, falta de identidade e revogação de vínculo.
 
-1. Preparar ambiente Supabase local conforme documentação oficial; registrar a
-   versão do CLI e runtime usados. Não vincular produção nos testes.
-2. Criar migrações e testes em `supabase/migrations/` e `supabase/tests/`.
-3. Preparar dono D com sites A/B, membro M só de A, usuário externo E e visitante.
-4. Executar as operações do contrato com os papéis/sessões reais D, M, E e anon.
-   Não usar service role como cliente dos testes de autorização.
-5. Verificar listagem, leitura direta, edição, alteração de owner/site_id, autoassociação,
-   remoção de vínculo e token ausente/expirado. Incluir troca manual de identificador.
-6. Validar duas edições concorrentes com a mesma revisão: uma vence; outra não
-   sobrescreve e recebe indicação de conflito.
-7. Registrar comandos efetivos, resultados e limitações; liberar só após a matriz passar.
+PGlite tem conexão exclusiva: o teste de revisão verifica segunda escrita obsoleta,
+não corrida real com duas conexões. JWT expirado, Google OAuth, gateway e PostgREST
+não são simulados por esta suíte. Aplicar em Supabase local/staging Free e testar
+sessões reais antes de liberar a interface. Conferir schema private não exposto,
+proprietário da função e grants herdados. Não usar service role nas chamadas de usuário.
 
-Ver [contrato](contracts/access.md) e [modelo](data-model.md). Autenticação de interface,
-cadastro e deploy não estão incluídos nesta validação da camada de acesso.
+Consultar `supabase/README.md`, [contrato](contracts/access.md) e [modelo](data-model.md).
+Backup e restauração, cadastro, convites e publicação continuam como etapas futuras.
