@@ -2,7 +2,7 @@
 
 Data: 2026-11-07. O usuário aprovou a distribuição da proposta e rejeitou o excesso
 de verde e intensidade. Solicitou testes de outras paletas, citando laranja como
-possibilidade. Nenhuma variante foi escolhida como direção definitiva.
+possibilidade. Após comparar os estudos, escolheu explicitamente a opção **A — Laranja pontual**.
 
 ## O que permanece
 
@@ -37,9 +37,8 @@ Solar/mostarda; C reduz drasticamente a área ocupada pela menta. Derivações c
 são tratamentos propostos para esta superfície, não cores oficiais adicionais.
 Logo e Orb não são recoloridos para combinar com cada alternativa.
 
-Recomendação de design inicial: **A**, pelo interesse explícito do usuário em
-laranja e por diferenciar a ação do restante da página sem grandes campos de cor.
-**C** é alternativa se o usuário preferir frescor e menor presença de cor quente.
+Direção aprovada: **A — Laranja pontual**, com base neutra, texto carvão e laranja
+concentrado nas ações. B e C permanecem apenas como estudos históricos.
 Não há resultados de teste com visitantes que provem superioridade de uma opção.
 
 ## Estudos visuais

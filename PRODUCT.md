@@ -50,7 +50,8 @@ e deve respeitar a Orb +INSPIRA e as regras do coletivo. Escopo somente divulga�
 
 Retorno posterior: o usuário aprovou a distribuição, mas rejeitou o excesso de
 verde e cor intensa. Autorizou explorar outras paletas, inclusive laranja, com
-tratamento mais discreto. Não há nova paleta final escolhida.
+tratamento mais discreto. Escolheu a opção A — Laranja pontual: base neutra, texto
+carvão e ações em laranja. Preservar Syne/DM Sans, logo e Orb oficiais.
 
 ## Evidence on Hand
 

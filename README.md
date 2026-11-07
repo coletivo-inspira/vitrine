@@ -28,4 +28,4 @@ Oferta gratuita, assinaturas opcionais e customizações: [proposta comercial](d
 
 Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com prioridade ao brandbook do Coletivo Inspira e Liquid Glass como detalhe complementar. Esta proposta visual abrange somente a divulgação; implementação e publicação seguem pendentes.
 
-Revisão visual solicitada: [três paletas mais discretas](docs/design/palette-exploration.md), preservando a distribuição aprovada e reduzindo o excesso de verde, blocos saturados e sombras fortes. Nenhuma variante está definida como final.
+Direção visual escolhida: [A — Laranja pontual](docs/design/palette-exploration.md), preservando a distribuição aprovada, com fundo neutro, texto carvão e ações em laranja. As demais variantes permanecem como estudos.

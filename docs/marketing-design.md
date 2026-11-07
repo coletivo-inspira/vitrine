@@ -4,18 +4,18 @@ Status: proposta de front-end; não é implementação nem publicação. Escopo 
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
 
-**Revisão de cor em andamento:** o usuário preserva a distribuição e rejeita o
-excesso de verde/lima e peso visual do estudo abaixo. Comparações em
-[palette-exploration.md](design/palette-exploration.md). Não implementar a paleta
-saturada anterior nem assumir uma das novas opções como já escolhida.
+**Direção aprovada: A — Laranja pontual.** Distribuição preservada, fundo neutro,
+texto carvão e laranja nas ações; sem os campos verde/lima e sombras fortes do
+estudo anterior. [Paleta e critérios](design/palette-exploration.md).
 
-[Estudo visual desktop/mobile alinhado ao brandbook](design/marketing-brandbook-concept.png), gerado
+[Estudo visual desktop/mobile aprovado — A](design/marketing-palette-orange.png), gerado
 como mockup conceitual. É referência de composição, não screenshot de interface
 implementada. Nomes de negócios e imagens dentro dos previews são demonstrativos,
 não cases; o logotipo de produção deve vir dos vetores oficiais. O arquivo não deve ser
 usado como imagem única para simular uma página funcional.
 
-O estudo anterior `marketing-liquid-glass-concept.png` foi superado pela orientação
+Os estudos anteriores `marketing-liquid-glass-concept.png` e
+`marketing-brandbook-concept.png` foram superados pela orientação
 do usuário de priorizar o brandbook; permanece apenas como histórico, sem autoridade
 para implementação.
 
@@ -31,11 +31,12 @@ Extração da marca em [brandbook-reference.md](design/brandbook-reference.md).
 
 ## Direção proposta
 
-Uma vitrine do Coletivo Inspira: off-white #F7F7F4 pontilhado, floresta #133824 na
-tipografia e estrutura, lima #BAFF29 no foco de ação e menta #A3E5C2 nos módulos.
-Syne nos títulos, DM Sans no corpo. Composição modular, blocos nítidos e superfícies
-estáveis. Usar os vetores oficiais sem redesenho. Efeito de vidro sobretudo na Orb,
-sem a atmosfera azul-clara, cápsulas brilhantes ou botões esmeralda do estudo inicial.
+Uma vitrine do Coletivo Inspira com tratamento A aprovado: fundo #F7F7F4,
+texto #27322E, superfície suave #FBEDE5, ação #C74414 com texto branco e borda
+#DDDCD6. Syne nos títulos, DM Sans no corpo; malha pontilhada discreta, bordas
+finas e sombras suaves. Preservar a distribuição do estudo. Logo e Orb oficiais
+mantêm suas cores e proporções; a variação pertence ao produto, não altera o
+brandbook global. Liquid Glass permanece complementar.
 
 Referência secundária: [Apple — Materials](https://developer.apple.com/design/human-interface-guidelines/materials).
 Usar transparência, profundidade e movimento somente onde o brandbook permite, sem
