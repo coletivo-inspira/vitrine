@@ -188,6 +188,23 @@
         "value": "520px"
       }
     ],
+    "dotTrail": {
+      "source": "web/assets/brand/dot-trail.js",
+      "officialSource": "https://brandbook.inspira.dev.br/assets/js/dot-trail.js?v=2",
+      "gridPx": 22,
+      "nodeMaxPx": 8,
+      "barMaxPx": 3,
+      "maxSegments": 40,
+      "lifetimeMs": 700,
+      "maxDevicePixelRatio": 2,
+      "light": { "color": "#A3E5C2", "blendMode": "multiply" },
+      "dark": { "color": "#BAFF29", "blendMode": "screen" },
+      "disabledFor": ["prefers-reduced-motion: reduce", "touch", "pen"],
+      "clearsOn": ["blur", "visibilitychange", "resize", "mouseleave"],
+      "canvas": { "position": "fixed", "pointerEvents": "none", "ariaHidden": true },
+      "path": "grid-snapped orthogonal connections; jumps over 12 cells start a new trail",
+      "rendering": "requestAnimationFrame only while segments remain"
+    },
     "theme": {
       "source": "web/theme.js",
       "selector": ":root[data-theme=\"dark\"]",

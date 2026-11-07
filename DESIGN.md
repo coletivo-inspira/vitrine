@@ -154,6 +154,16 @@ Controles têm cantos suaves; painéis e moldura usam o raio de superfície do f
 
 ## Components
 
+### Trilha do ponteiro
+
+Rastro decorativo derivado do DotTrail oficial do brandbook, carregado localmente.
+Grade de 22 px, nós de até 8 px e conexões ortogonais de até 3 px, até 40 segmentos,
+desaparecimento em 700 ms. Menta #A3E5C2 com multiply no claro e lima #BAFF29 com
+screen no escuro. Canvas fixo, sem eventos de clique e oculto da acessibilidade.
+Desativado com movimento reduzido, toque e caneta; limpa ao sair da janela,
+perder foco, ocultar aba e redimensionar. Densidade do canvas limitada a DPR 2.
+Sem loop de renderização quando vazio.
+
 ### Buttons
 
 Ações claras e compactas. O botão principal usa laranja com texto branco, peso 700 e intervalo interno de 22px. A altura é mínima, permitindo expansão do conteúdo. Hover escurece o fundo e sobe 1px; active retorna à posição inicial. A variante pequena usa texto de 14px e altura mínima de 44px. Não há botão secundário preenchido: a segunda ação é um link sublinhado.

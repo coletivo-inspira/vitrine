@@ -1,5 +1,12 @@
 # Origem dos ativos
 
+- brand/dot-trail.js: adaptado do script oficial
+  https://brandbook.inspira.dev.br/assets/js/dot-trail.js?v=2 em 2026-11-07.
+  Grade de 22 px, nós quadrados e conexões ortogonais, duração de 700 ms.
+  Menta/multiply no claro; lima/screen no escuro. Sem efeito para toque/caneta
+  ou movimento reduzido; limpa ao perder foco/visibilidade e limita DPR a 2.
+  Sem requests externos, captura de cliques, armazenamento ou telemetria.
+
 - brand/vitrine-animated-inverse.svg: versão para tema escuro, mesma animação
   e movimento reduzido; lettering/endosso branco quebrado, V floresta e caixa lima.
   A versão inversa estática segue a mesma regra.

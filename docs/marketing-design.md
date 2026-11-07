@@ -1,5 +1,9 @@
 # Modelagem do site de divulgação
 
+Rastro do mouse solicitado: base oficial DotTrail do brandbook, nós quadrados e
+conexões ortogonais na grade de 22 px. Menta no tema claro e lima no escuro;
+movimento reduzido e toque sem efeito. Ativo local, sem requisições ou telemetria.
+
 ## Categorias dos exemplos reais — revisão solicitada
 
 Agrupamento por função do site, não por profissão:

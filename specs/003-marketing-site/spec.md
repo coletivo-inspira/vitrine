@@ -14,6 +14,10 @@ Escopo exclusivo: divulgação pública. Painel, login, editor e cobrança ficam
 
 ## Requisitos
 
+Revisão solicitada: incluir rastro do mouse conforme brandbook/coletivo, com
+cor adaptada ao tema. Não bloquear interações; omitir para toque/caneta e
+movimento reduzido. Remover o rastro após breve inatividade e ao ocultar a aba.
+
 FR-001: composição A, marca e fontes oficiais; desktop e celular.
 FR-002: menu utilizável com teclado, foco visível, Escape e FAQ expansível.
 FR-003: contato configurável por content/contact.json; cases por catálogo revisado.
