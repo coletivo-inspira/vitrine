@@ -1,5 +1,11 @@
 # Marca Vitrine — implementação aprovada
 
+Revisão solicitada após publicação: endosso “coletivo inspira” pequeno sob
+“vitrine”, alinhado à direita e em verde-floresta. Letras em curvas no SVG;
+posição conforme referência enviada pelo usuário. Aplicado às assinaturas
+estática, animada e inversa, preservando o ícone sem texto. Testes, build e
+checagem Chromium 1440/390 px repetidos com sucesso; movimento reduzido preservado.
+
 2026-11-07. Opção A aprovada pelo usuário: V na caixa verde-lima e apenas
 “vitrine”, com lettering firme e proporções naturais do estudo. O nome do projeto
 e o endosso do Coletivo Inspira permanecem no conteúdo da página.

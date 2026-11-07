@@ -218,7 +218,13 @@
         "iterations": 1,
         "reducedMotion": "static"
       },
-      "lettering": "outlined from approved Segoe UI Bold study; no font runtime dependency"
+      "lettering": "outlined from approved Segoe UI Bold study; no font runtime dependency",
+      "endorsement": {
+        "text": "coletivo inspira",
+        "position": "below wordmark, right aligned",
+        "color": "#133824",
+        "outlined": true
+      }
     }
   },
   "components": [

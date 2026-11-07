@@ -160,7 +160,8 @@ O estado “Em preparação” combina superfície damasco, indicador laranja, t
 ### Official Signature and Illustrations
 
 A marca própria aprovada da Vitrine é a opção A: V de duas lâminas na caixa
-verde-lima, seguido somente de “vitrine”. Letras em curvas derivadas do estudo
+verde-lima, seguido de “vitrine” e endosso pequeno “coletivo inspira” abaixo,
+alinhado à direita em verde-floresta. Letras em curvas derivadas do estudo
 Segoe UI Bold, sem fonte adicional no navegador ou alongamento horizontal.
 `vitrine.svg` é estática; `vitrine-animated.svg` abre as lâminas uma única vez em
 700 ms com desaceleração e permanece estática com `prefers-reduced-motion: reduce`.
