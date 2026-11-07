@@ -129,3 +129,37 @@ A implementação gerou DESIGN.md e .impeccable/design.json a partir do código.
 Não publicou o site nem alterou DNS; evidências em docs/design/marketing-qa.md.
 Antes de publicar: confirmar responsável pela conta/zona, contato comercial,
 cases autorizados, conteúdo de privacidade e o estado real da oferta.
+
+## Revisão: vitrines reais e movimento
+
+Os links indicados pelo usuário em 2026-11-07 foram autorizados como exemplos
+reais e conferidos por navegação (HTTP 200). Capturas locais em
+`web/assets/showcase/` evitam iframes, trackers e dependência dos sites externos
+para renderizar a divulgação. As listas preservam a classificação indicada pelo
+usuário; não afirmam autoria, resultados comerciais ou disponibilidade de templates.
+Dani Braga aparece em duas categorias por solicitação.
+
+O hero usa quatro folhas: Pastus, Nathália Verri, Dani Braga e Nexa. A folha da
+frente sai lateralmente e retorna ao fundo. Intervalo de 5 s; pausa em hover,
+foco, aba oculta e fora do viewport. Movimento reduzido desativa autoplay;
+próxima vitrine permanece acessível por botão e gesto horizontal. Sem JavaScript,
+a primeira prévia e todos os links de exemplos continuam visíveis.
+
+A Orb oficial fica fixa no canto inferior esquerdo, usando o comportamento
+original do script, sem `data-mount`. O rodapé tem duas colunas e uma linha de
+apoio, empilhadas no celular. A identidade A e as fontes locais são preservadas.
+
+### Critérios de sucesso e medição
+
+Decisão: verificar se exemplos reais ajudam o visitante a encontrar uma referência
+para sua ideia. KPI futuro: taxa de exploração = sessões que abrem ao menos um
+exemplo / sessões que visualizam Possibilidades. Driver: distribuição dos exemplos
+abertos por categoria, para revisar organização e escolha das prévias. São proxies
+de interesse, não pedidos ou receita. Não há baseline nem meta de conversão: primeiro
+seria necessário aprovar instrumentação e medir um período inicial comparável.
+Nenhum rastreamento foi adicionado nesta revisão.
+
+Guardrails verificáveis agora: todos os destinos e recursos carregam; zero erros
+JavaScript e overflow horizontal nos tamanhos de QA; pausa e movimento reduzido
+funcionam; links acessíveis por teclado; autoplay não continua fora da tela.
+Alvos técnicos são critérios de aceite, não resultados comerciais medidos.

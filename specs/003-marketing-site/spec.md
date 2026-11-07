@@ -27,3 +27,13 @@ FR-007: build e configuração de publicação Cloudflare sem provisionar recurs
 Sem overflow a 390 px e 1440 px, imagens/fontes carregadas, menu/FAQ funcionais,
 portfólio vazio oculto, contato ausente explicado e pacote público validado.
 Incluir contraste, redução de movimento e revisão visual no registro de QA.
+
+## Revisão de exemplos reais — 2026-11-07
+
+- Apresentar os dez sites fornecidos pelo usuário nas categorias marcadas, com
+  capturas locais e links externos identificados; preservar Dani em duas categorias.
+- Hero: pilha de quatro vitrines, saída lateral da primeira e retorno ao fundo;
+  pausa/avanço acessíveis, autoplay suspenso fora da tela e com movimento reduzido.
+- Orb oficial fixa inferior esquerda; rodapé reorganizado responsivamente.
+- Aceite: recursos carregados, navegação por teclado, pausa, movimento reduzido,
+  sem overflow a 390/1440 px e nenhuma instrumentação de analytics adicional.

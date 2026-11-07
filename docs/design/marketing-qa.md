@@ -47,3 +47,14 @@ Sem WhatsApp comercial informado, a página não gera pedidos de orçamento por
 esse canal. Sem cases autorizados, não mostra a seção de portfólio real. Publicação
 e teste de headers no domínio Cloudflare ainda pendentes. Nenhum dado administrativo,
 cadastro, assinatura ou publicação de vitrine faz parte desta interface.
+
+## Revisão de exemplos reais (2026-11-07)
+
+QA em Chromium headless, 1440x950 e 390x950: sem erros de JavaScript,
+sem overflow horizontal e sem imagens ausentes. Avanço manual mostrou a próxima
+vitrine; mudança de prefers-reduced-motion pausou autoplay. Orb com position
+fixed a aproximadamente 14 px das bordas inferior e esquerda. Corrigida altura
+das capturas das categorias após primeira inspeção; confirmação desktop/mobile
+concluída. npm test: 23 aprovados; build concluído. Detector executado: aumentada
+fonte da barra de contexto para 11 px; avisos de layout e tokens revisados contra
+a composição real e a identidade existente. Sem medição de conversão ou analytics.

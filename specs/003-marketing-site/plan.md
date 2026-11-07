@@ -15,3 +15,9 @@ não permite inline/eval. Tokens de Cloudflare não entram no build.
 
 CI valida pacote, npm audit, testes e build. Telefone e cases continuam não
 configurados; publicação remota e DNS ficam separados da entrega de código.
+
+Revisão de exemplos reais: capturas JPEG locais em web/assets/showcase, links
+estáticos nas categorias indicadas, pilha com CSS transform e JS sem dependências.
+Capturas não são iframes. Orb usa posicionamento fixo nativo do script oficial;
+rodapé responsivo preserva paleta e fontes. Critérios de medição e limites em
+docs/marketing-design.md. npm test e build continuam obrigatórios.

@@ -82,3 +82,60 @@ async function loadContent() {
 }
 // Static marketing content remains useful even when optional data cannot be loaded.
 loadContent().catch(() => {});
+
+// A sheet leaves the front, then settles behind the other real sites.
+const showcase = document.querySelector('.showcase');
+if (showcase) {
+  const stack = showcase.querySelector('.showcase-stack');
+  let sheets = [...stack.querySelectorAll('.showcase-sheet')];
+  const next = showcase.querySelector('.showcase-next');
+  const pause = showcase.querySelector('.showcase-pause');
+  const link = showcase.querySelector('.showcase-link');
+  const count = showcase.querySelector('.showcase-count');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let paused = reduced.matches, busy = false, visible = false, timer;
+  const original = [...sheets];
+  showcase.querySelector('.showcase-controls').hidden = false;
+  function syncPause() {
+    pause.setAttribute('aria-pressed', String(paused));
+    pause.setAttribute('aria-label', paused ? 'Retomar troca automática' : 'Pausar troca automática');
+  }
+  function schedule() {
+    clearTimeout(timer);
+    if (!paused && !reduced.matches && visible && !document.hidden && !showcase.matches(':hover, :focus-within')) timer = setTimeout(advance, 5000);
+  }
+  async function advance() {
+    if (busy) return;
+    busy = true;
+    clearTimeout(timer);
+    const front = sheets[0];
+    if (!reduced.matches) {
+      front.classList.add('is-leaving');
+      await new Promise(resolve => setTimeout(resolve, 360));
+    }
+    sheets.push(sheets.shift());
+    sheets.forEach((sheet, depth) => { sheet.dataset.depth = depth; sheet.setAttribute('aria-hidden', String(depth !== 0)); });
+    front.classList.remove('is-leaving');
+    const current = sheets[0];
+    link.href = current.dataset.url;
+    link.firstChild.textContent = current.dataset.title;
+    count.textContent = `${String(original.indexOf(current) + 1).padStart(2, '0')} / 04`;
+    if (!reduced.matches) await new Promise(resolve => setTimeout(resolve, 650));
+    busy = false;
+    schedule();
+  }
+  next.addEventListener('click', advance);
+  pause.addEventListener('click', () => { paused = !paused; syncPause(); schedule(); });
+  showcase.addEventListener('mouseenter', () => clearTimeout(timer));
+  showcase.addEventListener('mouseleave', schedule);
+  showcase.addEventListener('focusin', () => clearTimeout(timer));
+  showcase.addEventListener('focusout', () => setTimeout(schedule, 0));
+  document.addEventListener('visibilitychange', schedule);
+  reduced.addEventListener('change', () => { paused = reduced.matches; syncPause(); schedule(); });
+  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; schedule(); }, { threshold: .25 }).observe(showcase);
+  let startX;
+  stack.addEventListener('pointerdown', event => { startX = event.clientX; });
+  stack.addEventListener('pointerup', event => { if (startX !== undefined && Math.abs(event.clientX - startX) > 45) advance(); startX = undefined; });
+  stack.addEventListener('pointercancel', () => { startX = undefined; });
+  syncPause();
+}

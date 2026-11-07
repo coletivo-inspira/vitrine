@@ -174,3 +174,11 @@ O navegador de pizzaria e os mini-sites são conteúdo demonstrativo, com paleta
 - **Don't** tratar o estilo das miniaturas como sistema do futuro painel.
 - **Don't** inventar campos, checkout ou estados de conta que não existem nesta superfície.
 - **Don't** apresentar este registro de código como validação em navegadores ou evidência de conversão.
+
+### Revisão de vitrines reais
+
+Prévias reais locais substituem as ilustrações nas possibilidades. O hero reúne
+quatro capturas em uma pilha de folhas com controles de pausa e avanço. O rodapé
+usa superfície neutra com duas colunas e linha de apoio; a Orb oficial fica fixa
+no canto inferior esquerdo, conforme solicitação posterior do usuário. Este
+registro substitui a orientação anterior de montar a Orb dentro do rodapé.
