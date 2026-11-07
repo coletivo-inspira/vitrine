@@ -25,3 +25,5 @@ Restrição de custo: planos Free, templates centralizados e nenhuma contrataç�
 Endereços planejados: `vitrine.inspira.dev.br` para divulgação, `/loja1` nesse domínio para vitrines públicas e `painel.inspira.dev.br` para administração. Ver [decisão de endereços](docs/adr/0006-public-addresses.md). DNS e publicação ainda não configurados.
 
 Oferta gratuita, assinaturas opcionais e customizações: [proposta comercial](docs/commercial-offer.md). Análise do export fornecido: [DNS](docs/dns-review.md). Cadastro inicial de exemplos em [content/portfolio.json](content/portfolio.json), com instruções em [content/README.md](content/README.md); ainda sem painel de portfólio.
+
+Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com referência Liquid Glass. Esta proposta visual abrange somente a divulgação; implementação e publicação seguem pendentes.
