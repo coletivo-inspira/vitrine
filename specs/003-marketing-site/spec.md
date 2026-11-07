@@ -40,6 +40,11 @@ Incluir contraste, redução de movimento e revisão visual no registro de QA.
 
 ## Revisão de exemplos reais — 2026-11-07
 
+Correção de classificação solicitada: cardápios = Pastus e Bar da Cácia;
+serviços = Felipe, Nexa, Sara, Cássio e Dani; portfólio = Nathália, Dani,
+Aldeia MIX e Fantaze. Prévias precisam representar sua própria coluna. Permitir
+um mesmo site em mais de uma função, explicando isso na nota da seção.
+
 - Apresentar os dez sites fornecidos pelo usuário nas categorias marcadas, com
   capturas locais e links externos identificados; preservar Dani em duas categorias.
 - Hero: pilha de quatro vitrines, saída lateral da primeira e retorno ao fundo;

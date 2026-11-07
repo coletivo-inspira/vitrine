@@ -1,5 +1,23 @@
 # Modelagem do site de divulgação
 
+## Categorias dos exemplos reais — revisão solicitada
+
+Agrupamento por função do site, não por profissão:
+
+| Tipo | Exemplos |
+| --- | --- |
+| Cardápio digital | Pastus Fogo & Parrilla; Bar da Cácia |
+| Serviços | Felipe Carvalho; Nexa Enfermagem; Sara Coutinho; Cássio Bragança; Dani Braga Design |
+| Portfólio | Nathália Verri; Dani Braga Design; Aldeia MIX; Fantaze |
+
+Dani aparece nas duas funções por orientação do usuário. Prévias de coluna:
+Pastus, Felipe e Nathália, respectivamente. Preservar nomes e links existentes;
+não inferir especialidades profissionais a partir da categoria. Os exemplos
+são trabalhos reais e não modelos disponíveis para contratação. Este agrupamento
+substitui as listas anteriores de exemplos nas colunas Portfólio/Serviços.
+Verificação: 23 testes e build passaram; ambos os temas em 1440/390 px sem
+overflow ou erros, menu e controle de tema funcionais.
+
 Tema claro/escuro solicitado e implementado: alternância sol/lua sempre visível
 no cabeçalho com JavaScript, preferência inicial do sistema e escolha explícita
 salva no navegador. No escuro, base floresta/carvão, texto branco quebrado e ações
