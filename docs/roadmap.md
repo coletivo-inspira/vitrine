@@ -9,7 +9,7 @@
 ## Entrevista de decisões — uma por vez
 
 1. Resolvida em 2026-11-07: Cloudflare escolhida para hospedagem; GitHub para código e automações. Produto Cloudflare e topologia ainda serão avaliados.
-2. Depois: cada usuário é dono individual ou existe equipe por negócio? Recomendação: workspace com um dono inicial e estrutura para membros; testar pessoa com duas pizzarias e funcionário com acesso a apenas uma.
+2. Resolvida em 2026-11-07: uma pessoa pode administrar várias vitrines; cada vitrine pode ter sua própria equipe. Acesso a uma não concede acesso às demais. Fluxo de convites e permissões detalhadas ainda será definido.
 3. Depois: Supabase gerenciado versus Apps Script/Sheets ou Workers/D1? Recomendação inicial: Supabase; validar pausa, OAuth e recuperação de conta.
 4. Depois: repositório por vitrine é requisito de propriedade/exportação ou apenas mecanismo imaginado de deploy? Recomendação: código de templates central, artefatos separados; avaliar custo e acesso antes de mudar o requisito.
 5. Depois: zona/domínio controlado pelo coletivo e limites do piloto. Recomendação: poucos negócios convidados, subdomínio específico por vitrine e teto de publicação.

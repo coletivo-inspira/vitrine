@@ -2,7 +2,7 @@
 Added: security boundaries, cost constraints and workflow.
 plan-template.md and tasks-template.md updated; spec-template.md compatible.
 No templates/commands directory installed. README and AGENTS updated.
-Deferred: user ratification, Cloudflare product, identity provider and ownership model. -->
+Deferred: user ratification, Cloudflare product, identity provider and detailed member permissions. -->
 # Vitrine Inspira Constitution
 
 Status: proposta baseada no escopo solicitado; não aprova fornecedores.
