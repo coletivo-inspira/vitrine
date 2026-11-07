@@ -1,5 +1,11 @@
 # Modelagem do site de divulgação
 
+Tema claro/escuro solicitado e implementado: alternância sol/lua sempre visível
+no cabeçalho com JavaScript, preferência inicial do sistema e escolha explícita
+salva no navegador. No escuro, base floresta/carvão, texto branco quebrado e ações
+pêssego; letras e endosso da logo invertidos, caixa lima/V floresta preservados.
+As capturas dos exemplos mantêm as próprias identidades. Tokens em DESIGN.md.
+
 Revisão de marca aprovada em 2026-11-07: opção A do estudo de logo, V na caixa
 verde-lima e somente “vitrine” em letras de proporção natural. Aplicada em SVG
 no cabeçalho, rodapé e favicon; endosso do coletivo no texto do rodapé e Orb oficial

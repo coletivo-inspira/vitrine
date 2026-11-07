@@ -1,5 +1,9 @@
 # Origem dos ativos
 
+- brand/vitrine-animated-inverse.svg: versão para tema escuro, mesma animação
+  e movimento reduzido; lettering/endosso branco quebrado, V floresta e caixa lima.
+  A versão inversa estática segue a mesma regra.
+
 - brand/vitrine.svg, vitrine-animated.svg, vitrine-icon.svg e vitrine-inverse.svg:
   marca própria do produto, opção A aprovada pelo usuário em 2026-11-07.
   Geometria do V e caixa verde-lima do estudo em docs/design/logo-study;

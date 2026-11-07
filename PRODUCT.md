@@ -43,6 +43,10 @@ checkout nem deve simular cadastro funcional enquanto o painel estiver pendente.
 
 ## Brand Commitments
 
+Tema claro/escuro solicitado em 2026-11-07: preferência inicial do sistema,
+controle acessível no cabeçalho e escolha explícita salva localmente. Logo com
+letras/endosso em branco quebrado no escuro, caixa lima e V floresta preservados.
+
 Revisão aprovada de 2026-11-07: logotipo do produto com V na caixa verde-lima e
 somente “vitrine” em lettering firme de proporção natural (opção A do estudo).
 “Inspira” permanece no nome do projeto e no endosso do coletivo, fora do lettering.

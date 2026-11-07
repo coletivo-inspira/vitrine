@@ -38,3 +38,23 @@
 /* Approved Vitrine wordmark: outlined lettering keeps its natural proportions. */
 .brand .brand-logo{display:block;width:188px;height:58px;max-width:100%}
 @media(max-width:520px){.brand .brand-logo{width:169.2px;height:52.2px}}
+
+/* Theme controls stay available beside the mobile menu. */
+:root{color-scheme:light}
+.site-header>nav{order:2}.header-controls{order:3;display:flex;align-items:center;gap:8px}
+.theme-toggle{display:grid;place-items:center;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--line);border-radius:7px;color:var(--ink);cursor:pointer}
+.theme-toggle:hover{background:var(--apricot);border-color:var(--orange)}
+.theme-sun,.brand .brand-logo-dark{display:none}
+:root[data-theme="dark"]{color-scheme:dark;--paper:#171e1a;--ink:#f7f7f4;--ink-soft:#b9c5bd;--orange:#ffb18a;--orange-hover:#ffc4a7;--apricot:#33291f;--line:#45544a;--white:#222e26;--shadow-preview:0 18px 42px -18px #0009}
+[data-theme="dark"] .brand .brand-logo-light,[data-theme="dark"] .theme-moon{display:none}
+[data-theme="dark"] .brand .brand-logo-dark{display:block}
+[data-theme="dark"] .theme-sun{display:block}
+[data-theme="dark"] ::selection{background:#875033;color:#f7f7f4}
+[data-theme="dark"] .button{color:#231b15}
+[data-theme="dark"] .offers,[data-theme="dark"] .site-footer{background:#202a23}
+[data-theme="dark"] .offer,[data-theme="dark"] .footer-meta{border-color:var(--line)}
+[data-theme="dark"] .contact-content>p,[data-theme="dark"] .contact-unavailable,[data-theme="dark"] .contact-note{color:#e7cdb8}
+[data-theme="dark"] .contact-mark{color:#806046}
+[data-theme="dark"] .text-link{text-decoration-color:#ffb18a88}
+[data-theme="dark"] .hero:before{background-image:radial-gradient(#f7f7f41a .7px,transparent .7px)}
+@media(max-width:800px){.site-header{column-gap:12px}.header-controls{order:2;margin-left:auto}.site-header>nav{order:3}}

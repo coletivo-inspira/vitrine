@@ -5,6 +5,14 @@ colors:
   primary: "#C74414"
   brand-lime: "#BAFF29"
   brand-forest: "#133824"
+  dark-paper: "#171E1A"
+  dark-surface: "#202A23"
+  dark-ink: "#F7F7F4"
+  dark-ink-soft: "#B9C5BD"
+  dark-action: "#FFB18A"
+  dark-action-hover: "#FFC4A7"
+  dark-apricot: "#33291F"
+  dark-line: "#45544A"
   primary-hover: "#A9360E"
   paper: "#F7F7F4"
   ink: "#27322E"
@@ -82,6 +90,17 @@ Este registro descreve o HTML/CSS do site de divulgação, não um sistema do pa
 - Demonstrações identificadas como ilustrações.
 
 ## Colors
+
+Tema claro/escuro: controle sol/lua no cabeçalho, alvo de 44 px. Na primeira
+visita segue `prefers-color-scheme`; a escolha explícita fica em `vitrine-theme`
+no localStorage. Sem acesso ao armazenamento, funciona durante a visita.
+`theme.js` aplica o tema antes do CSS; sem JavaScript, a página continua clara
+e o controle fica oculto. O modo escuro usa os tokens dark do frontmatter,
+com ações em pêssego e texto escuro, painéis floresta e texto branco quebrado.
+Screenshots dos sites de clientes mantêm suas cores originais.
+As letras da logo e o endosso ficam #F7F7F4 no escuro; a caixa lima e o V
+verde-floresta permanecem, assim como a Orb oficial. Versão animada inversa
+no cabeçalho e inversa estática no rodapé.
 
 A paleta normativa está no frontmatter; os nomes abaixo descrevem seu emprego.
 
@@ -168,7 +187,9 @@ Segoe UI Bold, sem fonte adicional no navegador ou alongamento horizontal.
 Cabeçalho usa a versão animada; rodapé usa a estática e mantém o endosso textual
 do coletivo; favicon usa `vitrine-icon.svg`. Proporção 470:145, 188×58 px no desktop
 e 169.2×52.2 px em larguras até 520 px, pela regra `.brand .brand-logo`.
-`vitrine-inverse.svg` fica disponível como variante de reserva, sem uso nesta página.
+No tema escuro, o cabeçalho usa `vitrine-animated-inverse.svg` e o rodapé usa
+`vitrine-inverse.svg`; letras e endosso ficam em branco quebrado, preservando
+a caixa lima e o V verde-floresta.
 O novo símbolo pertence ao produto e não modifica
 a marca oficial do coletivo. Títulos do site continuam Syne; corpo continua DM Sans.
 

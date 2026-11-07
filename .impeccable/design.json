@@ -188,6 +188,41 @@
         "value": "520px"
       }
     ],
+    "theme": {
+      "source": "web/theme.js",
+      "selector": ":root[data-theme=\"dark\"]",
+      "colorScheme": "light or dark, matching the applied theme",
+      "default": "system prefers-color-scheme; follows system changes until an explicit choice",
+      "storageKey": "vitrine-theme",
+      "storedValues": ["light", "dark"],
+      "storageFallback": "in-memory preference for the current visit when localStorage is blocked",
+      "initialApplication": "synchronous script before CSS",
+      "withoutJavaScript": "light theme; control hidden",
+      "control": {
+        "selector": ".theme-toggle",
+        "size": "44px",
+        "icons": "moon in light mode; sun in dark mode",
+        "accessibleLabel": "names the theme activated by the next click"
+      },
+      "darkTokens": {
+        "paper": "{colors.dark-paper}",
+        "surface": "{colors.dark-surface}",
+        "ink": "{colors.dark-ink}",
+        "inkSoft": "{colors.dark-ink-soft}",
+        "action": "{colors.dark-action}",
+        "actionHover": "{colors.dark-action-hover}",
+        "apricot": "{colors.dark-apricot}",
+        "line": "{colors.dark-line}"
+      },
+      "darkCssOverrides": {
+        "--white": "#222e26",
+        "--shadow-preview": "0 18px 42px -18px #0009",
+        "buttonText": "#231b15",
+        "contactText": "#e7cdb8"
+      },
+      "brand": "inverse lettering and endorsement; lime box and forest V preserved",
+      "showcase": "original screenshots preserve their own colors"
+    },
     "vitrineBrand": {
       "approved": "2026-11-07",
       "variant": "A",
@@ -200,7 +235,8 @@
       "animated": "web/assets/brand/vitrine-animated.svg",
       "icon": "web/assets/brand/vitrine-icon.svg",
       "inverse": "web/assets/brand/vitrine-inverse.svg",
-      "inverseUsage": "spare; not used on this page",
+      "animatedInverse": "web/assets/brand/vitrine-animated-inverse.svg",
+      "inverseUsage": "dark-theme footer; animated inverse in dark-theme header",
       "width": 188,
       "height": 58,
       "mobileWidth": 169.2,
@@ -208,8 +244,8 @@
       "mobileMaxWidth": "520px",
       "selector": ".brand .brand-logo",
       "placement": {
-        "header": "animated",
-        "footer": "static; collective endorsement preserved",
+        "header": "animated; animated inverse in dark theme",
+        "footer": "static; inverse in dark theme; collective endorsement preserved",
         "favicon": "icon",
         "orb": "official asset unchanged"
       },

@@ -33,5 +33,6 @@ def svg(body, view, width, height, animated=False):
 for name, animated in [('vitrine.svg', False), ('vitrine-animated.svg', True)]:
     (target/name).write_text(svg(symbol+'<g>'+letters+'</g>', '0 0 470 145', 470, 145, animated), encoding='utf-8')
 (target/'vitrine-icon.svg').write_text(svg(symbol, '10 10 125 125', 125, 125), encoding='utf-8')
-inverse = (symbol+'<g>'+letters+'</g>').replace('#133824','#F7F7F4')
+inverse = symbol+'<g>'+letters.replace('#133824','#F7F7F4')+'</g>'
 (target/'vitrine-inverse.svg').write_text(svg(inverse, '0 0 470 145', 470, 145), encoding='utf-8')
+(target/'vitrine-animated-inverse.svg').write_text(svg(inverse, '0 0 470 145', 470, 145, True), encoding='utf-8')

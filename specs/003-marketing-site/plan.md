@@ -1,5 +1,11 @@
 # Plano: divulgação estática
 
+Tema claro/escuro solicitado: script local síncrono antes do CSS para escolher
+preferência salva ou do sistema; controle no cabeçalho e tokens CSS por
+`data-theme`. SVGs inversos locais para as letras, sem filtros de cor que
+alterem a caixa ou o V. Sem dependências, rede externa ou conta para preferências.
+Validar persistência, sistema, teclado, armazenamento bloqueado e ambas as telas.
+
 Marca revisada em 2026-11-07: exportar o estudo A aprovado para SVG estático,
 animado, ícone e inverso. Lettering em curvas, sem nova fonte no runtime.
 Animação CSS interna de 700 ms nas duas lâminas, uma vez, apenas com preferência

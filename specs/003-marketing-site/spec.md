@@ -22,6 +22,11 @@ FR-005: preservar avisos de preparação, exemplos fictícios e preços não con
 FR-006: ativos locais, sem analytics, chat, dependência de CDN ou serviço pago.
 FR-007: build e configuração de publicação Cloudflare sem provisionar recursos.
 
+FR-008 (solicitado em 2026-11-07): tema claro/escuro com controle acessível no
+cabeçalho, incluindo celular. Seguir o sistema na primeira visita e persistir
+escolha explícita localmente, tolerando armazenamento indisponível. No escuro,
+logo com lettering e endosso branco quebrado e ícone lima/floresta preservado.
+
 Revisão autorizada de FR-001 em 2026-11-07: aplicar a marca própria aprovada A,
 V na caixa verde-lima e apenas “vitrine”, em SVG com letras em curvas. Cabeçalho
 com animação curta e única; rodapé e favicon estáticos. Respeitar movimento
