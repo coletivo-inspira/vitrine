@@ -32,7 +32,7 @@ jobs:
       - run: npm run build
         env:
           SITE_BASE_PATH: /vitrine/
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
