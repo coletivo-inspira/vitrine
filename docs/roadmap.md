@@ -31,4 +31,4 @@ Antes de ativar deploy automático ou criar recursos de clientes, definir conta,
 
 ## Evidência da camada de acesso
 
-Migração SQL implementada e testada em PGlite com roles de usuário. `npm test`: 16 testes aprovados (inclui agrupador e 10 cenários de banco). Supabase Auth/Data API e OAuth ainda não testados de ponta a ponta; sem liberação pública.
+Migração SQL implementada e testada em PGlite com roles de usuário. Suíte atual: 22 testes contabilizados (agrupador, 10 cenários de banco, 5 de projeção e 6 de portfólio). Evidência de runtime e dependências em docs/runtime-security.md. Supabase Auth/Data API e OAuth ainda não testados de ponta a ponta; sem liberação pública.

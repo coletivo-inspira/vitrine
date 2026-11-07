@@ -12,7 +12,8 @@ portal; não precisa ser provisionada para testar RLS.
 ## Technical Context
 
 **Language/Version**: PostgreSQL compatível com o ambiente Supabase escolhido;
-Node 22+ para a biblioteca existente. Fixar versões CLI/banco antes das migrações.
+Node 24 LTS (mínimo 24.22.2) para biblioteca/testes. PGlite 0.5.15 no lockfile;
+fixar versão do ambiente Supabase antes do aceite integrado.
 **Primary Dependencies**: Supabase Auth/Postgres alvo; PGlite 0.5.15 para testes locais sem Docker.
 **Storage**: sites, site_memberships e drafts; auth.users gerenciado.
 **Testing**: testes de banco/RLS e requisições com identidades distintas; node --test existente.
@@ -38,11 +39,12 @@ convites e publicação seguem fora da fatia.
 ## Project Structure
 
 Documentação: spec.md, plan.md, research.md, data-model.md, contracts/access.md e
-quickstart.md nesta pasta. Próximo passo do Spec Kit: gerar tasks.md e analisar
-coerência antes de executar.
+quickstart.md e tasks.md nesta pasta. A primeira execução está documentada;
+o próximo passo é o aceite integrado no Supabase antes da interface.
 
-Arquivos previstos na implementação: supabase/config.toml,
-supabase/migrations/ e supabase/tests/. Reaproveitar src/public-menu.mjs e test/.
+Arquivos implementados: supabase/migrations/ e test/database/.
+supabase/config.toml será necessário apenas quando inicializar o stack local.
+Reaproveitar src/public-menu.mjs e test/.
 Não criar abstração de workspace que dê acesso global aos sites do dono.
 
 ## Sequência técnica

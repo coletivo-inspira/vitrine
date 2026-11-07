@@ -6,9 +6,13 @@ Portal multiusuário e multivitrine para criar sites a partir de templates. Prim
 
 Fundação local com migração SQL e testes de acesso; sem login integrado, banco remoto, interface ou publicação real. O repositório original tinha somente este README. Nenhum serviço foi provisionado e nenhum segredo é necessário para executar esta entrega.
 
-- `npm ci` e `npm test`: validam projeção pública, links e isolamento do banco em Postgres embarcado.
+- `npm ci`: instala exatamente as dependências do lockfile.
+- `npm test`: valida projeção pública, portfólio, links e isolamento do banco em Postgres embarcado.
+- `npm audit`: consulta vulnerabilidades conhecidas das dependências npm.
 - `npm run demo`: imprime um cardápio público de exemplo e um link; não publica nem envia mensagens.
-- Node.js 22 ou superior; PGlite é dependência apenas de desenvolvimento/testes.
+- Node.js **24 LTS**, no mínimo **24.22.2**, usando as correções mais recentes da linha 24. A instalação recusa outras linhas e versões abaixo do mínimo; PGlite é dependência apenas de desenvolvimento/testes.
+
+Consulte a [revisão de Node, dependências e segurança](docs/runtime-security.md) para resultados, manutenção e limitações dos testes. Node é usado no desenvolvimento e CI; Cloudflare Workers usa seu próprio runtime.
 
 Leia [arquitetura](docs/architecture.md), [comparação de backend e limites](docs/backend-research.md), [roadmap](docs/roadmap.md) e [vocabulário](CONTEXT.md).
 

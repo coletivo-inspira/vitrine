@@ -21,11 +21,13 @@ comprar nem renovar domínio automaticamente. Não prometer um subdomínio gratu
 independente por cliente em workers.dev. Antes da publicação, validar o vínculo
 host/caminho → vitrine sem consultar tabelas administrativas anonimamente.
 
-Limites iniciais de produto propostos: 10 vitrines no piloto, 100 itens por vitrine,
+Limites técnicos iniciais propostos: 10 vitrines no piloto, teto de 100 itens por vitrine,
 sem upload de vídeo ou imagens; texto e conteúdo próprio do template. Esses limites
 deverão ser aplicados no servidor ao implementar cadastro e publicação. Não estão
 implementados por este ADR. Monitorar cotas nos painéis gratuitos; sem promessa de
-serviço ilimitado ou SLA. Backup exportado para armazenamento local privado.
+serviço ilimitado ou SLA. A proposta comercial posterior reduz a franquia inicial
+a 20 itens ativos, sem alterar o teto técnico (docs/commercial-offer.md).
+Backup exportado para armazenamento local privado é uma rotina planejada, não implementada.
 
 Fonte das cotas e condições: docs/backend-research.md. Nenhuma conta remota foi
 criada ou alterada nesta decisão.

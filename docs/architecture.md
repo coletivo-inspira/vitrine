@@ -18,7 +18,7 @@ não pode conceder acesso implícito a todos os seus sites a um funcionário.
 
 Proposta revisada: `auth.users` gerenciado pelo provedor; `sites(owner_user_id,slug,template)`; `site_memberships(site_id,user_id,role)`; `drafts(site_id,revision,content)`; `publications(site_id,revision,status,artifact_hash)`; `domains(site_id,hostname,status)`; `jobs(publication_id,idempotency_key,attempt,status)`. Workspace passa a ser agrupamento opcional futuro, não fronteira global de acesso.
 
-Cada consulta deve verificar propriedade ou associação à vitrine específica pelo usuário autenticado. RLS habilitada antes de expor tabelas; nenhuma escrita anônima; políticas USING e WITH CHECK para impedir troca de proprietário. Acesso a uma vitrine não autoriza outra. Campos de papel e associação não são editáveis pelo próprio usuário para obter privilégio. Slug/hostname únicos no banco, reservados transacionalmente; a validação local ainda não faz essa reserva. API pública não recebe service role.
+Cada consulta deve verificar propriedade ou associação à vitrine específica pelo usuário autenticado. RLS habilitada antes de expor tabelas; nenhuma escrita anônima; políticas USING e WITH CHECK e grants de coluna protegem o proprietário. Acesso a uma vitrine não autoriza outra. Campos de papel e associação não são editáveis pelo próprio usuário para obter privilégio. Slug já possui constraint única na migração; cadastro e reserva de hostname ainda não foram implementados. API pública não recebe service role.
 
 ## Autenticação e segurança
 
@@ -48,3 +48,5 @@ Testada em PostgreSQL embarcado com auth.uid() simulado; ainda não aplicada em
 Supabase. Não há portal, sessão integrada, fila ou publicação real. Link wa.me abre
 conversa e depende da ação do visitante; não envia mensagens automaticamente.
 Cadastro/publicação ainda precisarão impor limites de custo do ADR 0005.
+Catálogo e projeção de portfólio também implementados, sem interface. Proposta
+comercial e fluxo de orçamento em docs/commercial-offer.md; preços não publicados.

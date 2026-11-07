@@ -4,7 +4,8 @@ Migração: `migrations/202611070001_site_access.sql`. Não aplicada remotamente
 O administrador da migração deve poder criar funções e contornar RLS; em Supabase,
 usar o fluxo de migração do projeto, nunca uma chamada pública de usuário.
 
-`npm ci` e `npm test` executam a migração em PostgreSQL embarcado PGlite 0.5.15,
+Com Node 24 LTS atualizado, `npm ci` instala o lockfile e `npm test` executa a
+migração em PostgreSQL embarcado PGlite 0.5.15,
 com roles authenticated/anon e um auth.uid() de teste. Não executam Google OAuth,
 gateway JWT, PostgREST ou serviços do Supabase. O shim existe só no teste e NÃO
 deve ser aplicado no projeto real. A migração presume auth.users/auth.uid() reais.
