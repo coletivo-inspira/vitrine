@@ -12,4 +12,6 @@ Fundação local, sem login, banco, interface ou publicação real. O repositór
 
 Leia [arquitetura](docs/architecture.md), [comparação de backend e limites](docs/backend-research.md), [roadmap](docs/roadmap.md) e [vocabulário](CONTEXT.md).
 
+O desenvolvimento usa [Spec Kit](docs/development.md), com integração Codex/PowerShell e princípios em `.specify/memory/constitution.md`.
+
 A hospedagem está em discussão: GitHub Pages tem restrições para negócios, transações comerciais e SaaS. Cloudflare é uma alternativa proposta, ainda não aprovada. Não há workflow de deploy nesta branch.

@@ -1,5 +1,27 @@
 # Backend e publicação — pesquisa de 7 de novembro de 2026
 
+## Vercel versus Cloudflare
+
+Recomendação para este escopo: Cloudflare, pelo objetivo de baixo custo e pela
+combinação de arquivos estáticos, API e DNS. Para projeto novo, avaliar Workers
+Static Assets antes de escolher Pages. Roteamento por hostname e publicação de
+artefatos precisam de validação; evitar um projeto por cliente como padrão.
+
+Vercel é alternativa se aceitarmos plano pago e priorizarmos seu fluxo de
+desenvolvimento. Hobby restringe uso a projetos pessoais não comerciais. Pro tem
+taxa de US$ 20/mês com um assento de deploy e US$ 20 em crédito de uso; excedentes
+e assentos adicionais podem gerar cobrança. Crédito não elimina a taxa mensal.
+[Hobby](https://vercel.com/docs/plans/hobby), [Pro](https://vercel.com/docs/plans/pro-plan).
+
+Cloudflare tem plano gratuito Workers; entrega de arquivos estáticos e execução
+dinâmica têm modelos de consumo distintos. Cotas, serviços adicionais e escala
+podem exigir pagamento. [Static Assets](https://developers.cloudflare.com/workers/static-assets/),
+[preços Workers](https://developers.cloudflare.com/workers/platform/pricing/).
+
+Comparação é recomendação, não aprovação de fornecedor pelo usuário.
+
+## Comparação de backend
+
 Valores de planos são limites consultados nesta data, não promessa de custo zero permanente. Confirmar uso comercial, cotas da conta e custos externos antes de contratar ou publicar.
 
 | Alternativa | Benefício | Trabalho e risco | Indicação proposta |
