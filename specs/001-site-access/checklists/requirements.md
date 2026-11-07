@@ -22,6 +22,6 @@
 
 - [x] Cada requisito tem cobertura nos cenários e casos extremos.
 - [x] Critérios de sucesso verificáveis pela matriz de aceite.
-- [ ] Plano técnico: depende da decisão de autenticação/persistência.
+- [x] Plano técnico inicial documentado com Supabase Auth/Postgres aprovado.
 
 Revisão documental concluída; caixas marcadas não significam testes executados.

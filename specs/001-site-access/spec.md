@@ -91,6 +91,6 @@ A e tem negada qualquer consulta administrativa a B.
 - Para o aceite, vínculos de membros são previamente preparados; a experiência
   de concessão, revogação e recuperação será especificada antes da liberação pública.
 - Papéis detalhados, transferência e múltiplos proprietários estão fora desta fatia.
-- Implementação depende da escolha do provedor de autenticação e persistência.
+- Supabase Auth + Postgres foi escolhido; configuração real e implementação seguem pendentes.
 - Cloudflare foi escolhida para hospedagem; não determina o provedor de identidade.
 - Base transversal: docs/architecture.md, docs/roadmap.md e ADR 0002.

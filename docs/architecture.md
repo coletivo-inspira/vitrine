@@ -1,6 +1,6 @@
 # Arquitetura proposta — 7 de novembro de 2026
 
-Status: estudo e fundação. Cloudflare aprovada para hospedagem em 2026-11-07 (ADR 0001). Backend de autenticação/persistência, produto Cloudflare e topologia ainda são propostas; a escolha de hospedagem não aprova o plano completo.
+Status: estudo e fundação. Cloudflare aprovada para hospedagem (ADR 0001) e Supabase Auth/Postgres para backend (ADR 0003), em 2026-11-07. Produto Cloudflare, método de login e topologia ainda são propostas; essas escolhas não aprovam o plano completo.
 
 ## Fronteiras
 
@@ -8,7 +8,7 @@ Portal autenticado → API autorizada → dados privados de vitrines e rascunhos
 Publicador no servidor → projeção pública validada → artefato imutável → hospedagem estática → visitante.
 Provedor de identidade → sessão verificada no servidor; nunca identidade fornecida pelo formulário.
 
-Recomendação para discussão: Supabase Auth/Postgres com RLS; Worker para orquestração; hospedagem comercial Cloudflare, após confirmar condições e volume. Acesso público deve consumir apenas versões publicadas, sem consultar tabelas administrativas. Identidade, sessão, email, custos internos e credenciais não entram no artefato. O telefone comercial será público, com ciência do proprietário. `src/public-menu.mjs` implementa apenas essa projeção explícita; não implementa autorização.
+Backend aprovado: Supabase Auth/Postgres com RLS. Worker para orquestração permanece proposta; hospedagem Cloudflare escolhida, com configuração e volume a validar. Acesso público deve consumir apenas versões publicadas, sem consultar tabelas administrativas. Identidade, sessão, email, custos internos e credenciais não entram no artefato. O telefone comercial será público, com ciência do proprietário. `src/public-menu.mjs` implementa apenas essa projeção explícita; não implementa autorização.
 
 ## Modelo de persistência a validar
 

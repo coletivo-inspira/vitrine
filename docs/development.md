@@ -13,12 +13,12 @@ Inicializado com Specify CLI 0.11.3, integração Codex e scripts PowerShell em
 6. `speckit-implement`: executar tarefas, testar e atualizar o PR.
 
 Integrações em `.agents/skills/`; a descoberta pode exigir reabrir o projeto no
-agente. Não há ainda `specs/` nem plano de funcionalidade aprovado. O setup não
+agente. Especificação e plano inicial em `specs/001-site-access/`. O setup não
 implementa o produto.
 
 `docs/architecture.md` é a proposta transversal; `docs/backend-research.md` guarda
 fontes; `docs/roadmap.md` lista decisões; `CONTEXT.md` contém só vocabulário.
-Specs devem referenciar esses documentos e registrar divergências. Cloudflare foi escolhida para hospedagem; backend e produto específico seguem pendentes. A constituição
+Specs devem referenciar esses documentos e registrar divergências. Cloudflare foi escolhida para hospedagem e Supabase Auth/Postgres para backend; método de login e produto Cloudflare seguem pendentes. A constituição
 0.1.0 é proposta, sem ratificação. Spec Kit não concede autorização para deploy.
 
 Configuração original: `specify init --here --integration codex --script ps --force`.

@@ -18,7 +18,7 @@ dinâmica têm modelos de consumo distintos. Cotas, serviços adicionais e escal
 podem exigir pagamento. [Static Assets](https://developers.cloudflare.com/workers/static-assets/),
 [preços Workers](https://developers.cloudflare.com/workers/platform/pricing/).
 
-Atualização: em 2026-11-07 o usuário escolheu Cloudflare para hospedagem. Backend e produto específico Cloudflare continuam pendentes.
+Atualização: em 2026-11-07 o usuário escolheu Cloudflare para hospedagem e Supabase Auth/Postgres para backend. Produto específico Cloudflare e método de login continuam pendentes.
 
 ## Comparação de backend
 
