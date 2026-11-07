@@ -14,8 +14,9 @@ usuário; os scripts e exemplos da página não foram executados no projeto.
 | Corpo | DM Sans, entrelinha confortável |
 | Composição | Módulos claros; proporção de referência 60/30/10 |
 
-Solar, Pop e Tropical existem como variações, mas a divulgação da Vitrine seguirá
-a base do hub. A referência Apple não substitui esses papéis, fontes ou geometria.
+Solar, Pop e Tropical existem como variações. A base do hub orientou o primeiro
+estudo; após o usuário rejeitar sua saturação, outras paletas estão em exploração
+para a divulgação, preservando logo, fontes e assinatura. Ver palette-exploration.md.
 
 Preservar o logotipo vetorial e seu respiro; não deformar, rotacionar, sombrear ou
 trocar seus traços. Na implementação, usar arquivos oficiais da seção Logotipo,

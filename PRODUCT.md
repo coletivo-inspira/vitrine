@@ -48,6 +48,10 @@ títulos e DM Sans no corpo; estrutura modular e malha pontilhada. Usar os vetor
 oficiais da marca, sem redesenho do logotipo. A referência Liquid Glass é secundária
 e deve respeitar a Orb +INSPIRA e as regras do coletivo. Escopo somente divulgação.
 
+Retorno posterior: o usuário aprovou a distribuição, mas rejeitou o excesso de
+verde e cor intensa. Autorizou explorar outras paletas, inclusive laranja, com
+tratamento mais discreto. Não há nova paleta final escolhida.
+
 ## Evidence on Hand
 
 docs/commercial-offer.md contém proposta comercial; content/portfolio.json contém

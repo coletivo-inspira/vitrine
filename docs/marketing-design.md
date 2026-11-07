@@ -4,6 +4,11 @@ Status: proposta de front-end; não é implementação nem publicação. Escopo 
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
 
+**Revisão de cor em andamento:** o usuário preserva a distribuição e rejeita o
+excesso de verde/lima e peso visual do estudo abaixo. Comparações em
+[palette-exploration.md](design/palette-exploration.md). Não implementar a paleta
+saturada anterior nem assumir uma das novas opções como já escolhida.
+
 [Estudo visual desktop/mobile alinhado ao brandbook](design/marketing-brandbook-concept.png), gerado
 como mockup conceitual. É referência de composição, não screenshot de interface
 implementada. Nomes de negócios e imagens dentro dos previews são demonstrativos,
