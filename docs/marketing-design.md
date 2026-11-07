@@ -4,11 +4,15 @@ Status: proposta de front-end; não é implementação nem publicação. Escopo 
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
 
-[Estudo visual desktop/mobile](design/marketing-liquid-glass-concept.png), gerado
+[Estudo visual desktop/mobile alinhado ao brandbook](design/marketing-brandbook-concept.png), gerado
 como mockup conceitual. É referência de composição, não screenshot de interface
 implementada. Nomes de negócios e imagens dentro dos previews são demonstrativos,
-não cases; a marca gráfica desenhada também é provisória. O arquivo não deve ser
+não cases; o logotipo de produção deve vir dos vetores oficiais. O arquivo não deve ser
 usado como imagem única para simular uma página funcional.
+
+O estudo anterior `marketing-liquid-glass-concept.png` foi superado pela orientação
+do usuário de priorizar o brandbook; permanece apenas como histórico, sem autoridade
+para implementação.
 
 ## Trabalho da página
 
@@ -16,29 +20,32 @@ Modo: Persuade. Ajudar a pessoa de um pequeno negócio a entender o produto, ver
 uma possibilidade concreta e iniciar conversa sobre sua vitrine. O resultado
 esperado é compreensão e contato qualificado, não um cadastro simulado.
 
-Contexto de produto em PRODUCT.md. Direção Liquid Glass solicitada pelo usuário;
-recomendações de composição delegadas ao agente. Nenhuma marca, logo ou paleta
-oficial adicional foi fornecida.
+Contexto de produto em PRODUCT.md. Autoridade principal: brandbook do coletivo,
+fornecido pelo usuário após o estudo inicial. Liquid Glass é referência secundária.
+Extração da marca em [brandbook-reference.md](design/brandbook-reference.md).
 
 ## Direção proposta
 
-Uma vitrine luminosa: base branca com luz azul-clara e verde suave, texto escuro,
-um acento verde para ação e vidro concentrado na navegação e controles. O conteúdo
-principal fica sobre superfícies estáveis. A demonstração do produto é o foco;
-efeitos óticos não substituem demonstração nem explicação.
+Uma vitrine do Coletivo Inspira: off-white #F7F7F4 pontilhado, floresta #133824 na
+tipografia e estrutura, lima #BAFF29 no foco de ação e menta #A3E5C2 nos módulos.
+Syne nos títulos, DM Sans no corpo. Composição modular, blocos nítidos e superfícies
+estáveis. Usar os vetores oficiais sem redesenho. Efeito de vidro sobretudo na Orb,
+sem a atmosfera azul-clara, cápsulas brilhantes ou botões esmeralda do estudo inicial.
 
-Referência: [Apple — Materials](https://developer.apple.com/design/human-interface-guidelines/materials).
-Traduzir a linguagem de transparência, profundidade e movimento para a web, sem
+Referência secundária: [Apple — Materials](https://developer.apple.com/design/human-interface-guidelines/materials).
+Usar transparência, profundidade e movimento somente onde o brandbook permite, sem
 alegar uso do componente nativo Apple. Materiais distintos, leitura e preferências
 de acessibilidade precisam continuar funcionando sem blur.
 
 Não haverá vidro em todos os blocos, textos sobre fotografia difícil de ler,
 refratores WebGL, partículas ou animação contínua de fundo. Começar com CSS leve,
-tipografia de sistema bem ajustada e movimento breve; sem fonte ou biblioteca paga.
+Syne/DM Sans com arquivos e licença conferidos e movimento breve; sem biblioteca paga.
+Orb conforme a referência oficial: uma por página, canto inferior esquerdo ou
+rodapé, link para o hub; não trocar por CTA de orçamento, logotipo ou decoração do hero.
 
 ## Primeiro viewport
 
-- Cabeçalho flutuante: marca, Como funciona, Possibilidades, Planos e contato.
+- Cabeçalho claro, modular: marca oficial, Como funciona, Possibilidades, Planos e contato.
 - Chamada: **Seu negócio, em vitrine.**
 - Apoio: **Um site com a sua cara. Comece com um modelo e personalize quando precisar.**
 - Ação principal: **Ver possibilidades**, leva à seção demonstrativa.
@@ -83,7 +90,8 @@ raios e superfícies; tokens definitivos serão registrados com a implementaçã
 
 No celular: título e ação primeiro, demonstração abaixo; navegação compacta,
 fluxo vertical, sem rolagem lateral. Evitar fundo desfocado de tela inteira ou
-camadas fixas sobrepostas. Touch targets com pelo menos 44 px como meta de projeto.
+camadas fixas sobrepostas. Reservar espaço para a Orb sem encostar em controles;
+usar rodapé quando o canto estiver ocupado. Touch targets com pelo menos 44 px como meta de projeto.
 
 Prever: menu fechado/aberto, foco de teclado, hover sem dependência para leitura,
 case sem imagem, portfólio vazio, link externo, contato indisponível e FAQ

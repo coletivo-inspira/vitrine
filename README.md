@@ -26,4 +26,4 @@ Endereços planejados: `vitrine.inspira.dev.br` para divulgação, `/loja1` ness
 
 Oferta gratuita, assinaturas opcionais e customizações: [proposta comercial](docs/commercial-offer.md). Análise do export fornecido: [DNS](docs/dns-review.md). Cadastro inicial de exemplos em [content/portfolio.json](content/portfolio.json), com instruções em [content/README.md](content/README.md); ainda sem painel de portfólio.
 
-Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com referência Liquid Glass. Esta proposta visual abrange somente a divulgação; implementação e publicação seguem pendentes.
+Design: [contexto de produto](PRODUCT.md) e [modelagem do site de divulgação](docs/marketing-design.md), com prioridade ao brandbook do Coletivo Inspira e Liquid Glass como detalhe complementar. Esta proposta visual abrange somente a divulgação; implementação e publicação seguem pendentes.

@@ -42,9 +42,11 @@ checkout nem deve simular cadastro funcional enquanto o painel estiver pendente.
 
 ## Brand Commitments
 
-Nome: Vitrine Inspira. Referência solicitada pelo usuário: Liquid Glass da Apple.
-Não há logo, paleta ou tipografia oficial fornecida neste projeto. Direção visual
-será modelada para web; não pressupõe componentes nativos de plataformas Apple.
+Nome: Vitrine Inspira. O usuário definiu o [brandbook do Coletivo Inspira](https://brandbook.inspira.dev.br/)
+como autoridade principal. Paleta base off-white, floresta, lima e menta; Syne em
+títulos e DM Sans no corpo; estrutura modular e malha pontilhada. Usar os vetores
+oficiais da marca, sem redesenho do logotipo. A referência Liquid Glass é secundária
+e deve respeitar a Orb +INSPIRA e as regras do coletivo. Escopo somente divulgação.
 
 ## Evidence on Hand
 
