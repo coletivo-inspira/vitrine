@@ -16,6 +16,11 @@
 
 ## Fatias seguintes, dependentes das decisões
 
+Novo escopo solicitado: oferta gratuita com endereço básico, assinaturas opcionais
+de endereço e customizações sob orçamento; portfólio mantido pela equipe Inspira.
+Ver docs/commercial-offer.md e ADR 0007 (preços ainda propostos). Conteúdo inicial
+editável em content/portfolio.json; interface administrativa ainda será criada.
+
 1. Auth + criar vitrine + rascunho persistido. Aceite: usuário A não lê/escreve dados de B, inclusive por requisição direta; associação e papel protegidos; logout/revogação testados.
 2. Editor pizzaria + prévia. Capturar contexto PRODUCT e direção visual com Impeccable antes de criar UI. Portal em modo Operate; cardápio para consulta e contato. Aceite: teclado, erros e salvamento, mobile/desktop, preço em centavos, estado vazio, item oculto e feedback de alterações não publicadas.
 3. Publicação manual em staging no host escolhido. Aceite: só campos públicos, conteúdo escapado no renderizador, sem segredos em bundle/histórico, artefato reproduzível e rollback.

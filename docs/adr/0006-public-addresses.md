@@ -13,6 +13,10 @@ para decidir pelo menor custo, adotamos inicialmente:
 | `vitrine.inspira.dev.br/loja1` | Vitrine pública do negócio, identificada pelo slug |
 | `painel.inspira.dev.br` | Login e administração das vitrines |
 
+Atualização comercial: ver ADR 0007 (proposto). Endereços premium ativos poderão
+ser canônicos e o caminho básico redirecionará para eles; isso substitui somente
+a direção de redirecionamento prevista no parágrafo abaixo.
+
 `loja1.inspira.dev.br` é uma alternativa compatível para depois, como alias que
 redireciona ao endereço canônico por caminho. Não manter duas cópias indexáveis
 do mesmo conteúdo. Caminhos dispensam configurar DNS por loja e reduzem a

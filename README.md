@@ -19,3 +19,5 @@ Cloudflare foi escolhida para hospedagem em 2026-11-07. GitHub permanece para c�
 Restrição de custo: planos Free, templates centralizados e nenhuma contratação automática. Ver [decisões do piloto](docs/adr/0005-zero-cost-mvp.md) e [camada de acesso](supabase/README.md).
 
 Endereços planejados: `vitrine.inspira.dev.br` para divulgação, `/loja1` nesse domínio para vitrines públicas e `painel.inspira.dev.br` para administração. Ver [decisão de endereços](docs/adr/0006-public-addresses.md). DNS e publicação ainda não configurados.
+
+Oferta gratuita, assinaturas opcionais e customizações: [proposta comercial](docs/commercial-offer.md). Análise do export fornecido: [DNS](docs/dns-review.md). Cadastro inicial de exemplos em [content/portfolio.json](content/portfolio.json), com instruções em [content/README.md](content/README.md); ainda sem painel de portfólio.

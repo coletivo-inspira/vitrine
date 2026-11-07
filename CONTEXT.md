@@ -28,3 +28,13 @@ _Evitar_: negócio para designar o modelo.
 **Publicação**: Versão do conteúdo disponibilizada aos visitantes.
 
 **Item ativo**: Item do cardápio selecionado para aparecer na próxima publicação.
+
+**Assinatura**: Contratação periódica de benefícios para uma vitrine, como endereço personalizado; não equivale à compra de um domínio.
+
+**Vínculo de domínio**: Associação de um endereço verificado à vitrine, sem transferência de propriedade do domínio.
+
+**Customização**: Alteração específica de apresentação ou funcionalidade contratada com escopo próprio.
+
+**Case**: Exemplo autorizado de um trabalho realizado, publicado no portfólio da Inspira.
+
+**Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento e benefícios comerciais; não se confunde com proprietário de vitrine.
