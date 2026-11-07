@@ -14,6 +14,13 @@ Escopo exclusivo: divulgação pública. Painel, login, editor e cobrança ficam
 
 ## Requisitos
 
+Revisão visual solicitada após as categorias por formato: substituir apenas o v
+do hero por símbolo bicolor sem caixa; agrupar exemplos por Alimentação,
+Arte & design, Fotografia & mídia, Saúde e Tecnologia com as cores do estudo.
+Não inventar exemplos para área vazia. Simplificar rodapé ao copyright
+“© 2026 Coletivo Inspira. Todos os direitos reservados.” com link ao coletivo.
+Manter marca do cabeçalho, Orb, temas e demais funções.
+
 Revisão solicitada: incluir rastro do mouse conforme brandbook/coletivo, com
 cor adaptada ao tema. Não bloquear interações; omitir para toque/caneta e
 movimento reduzido. Remover o rastro após breve inatividade e ao ocultar a aba.

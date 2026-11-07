@@ -154,6 +154,28 @@ Controles têm cantos suaves; painéis e moldura usam o raio de superfície do f
 
 ## Components
 
+### Revisão de abertura, áreas e rodapé
+
+Na chamada “Seu negócio, em vitrine.”, apenas o primeiro v de vitrine é o símbolo
+de duas lâminas sem caixa: floresta/menta no claro, lima/menta no escuro. A marca
+do cabeçalho continua na caixa aprovada. SVG inline decorativo, letra v disponível
+à leitura assistiva; dimensões .63em×.59em, alinhado à linha de base.
+
+Possibilidades agora usa cinco seletores de área com V bicolor: Alimentação
+(laranja/mostarda), Arte & design (rosa/mostarda), Fotografia & mídia
+(floresta/lima), Saúde (floresta/menta) e Tecnologia (azul/ciano, extensão do produto).
+No escuro, floresta dos símbolos de fotografia/saúde vira menta; saúde usa
+branco quebrado na segunda lâmina. Grade de cinco seletores no desktop e dois
+em até 520 px; exemplos em três colunas, duas em até 800 px e uma em até 520 px.
+São três exemplos de alimentação, dois de arte, um de fotografia/mídia e quatro
+de saúde. Seleção por botão aria-pressed em grupo rotulado;
+sem JS todos os grupos ficam visíveis. Tecnologia tem estado vazio, sem case fictício.
+
+Rodapé compacto substitui a composição anterior: somente copyright de 2026,
+link do coletivo e respiro à esquerda para a Orb fixa. Sem voltar ao início,
+“Sobre esta página” ou slogan. Estas regras substituem as descrições anteriores
+de navegação no rodapé e de três categorias por formato.
+
 ### Trilha do ponteiro
 
 Rastro decorativo derivado do DotTrail oficial do brandbook, carregado localmente.

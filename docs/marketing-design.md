@@ -1,5 +1,27 @@
 # Modelagem do site de divulgação
 
+## Revisão por áreas e composição — solicitação atual
+
+Esta revisão substitui a classificação anterior por tipo de site.
+
+| Área | Exemplos reais |
+| --- | --- |
+| Alimentação | Pastus Fogo & Parrilla; Bar da Cácia; Aldeia MIX |
+| Arte & design | Dani Braga Design; Fantaze |
+| Fotografia & mídia | Nathália Verri (comunicação/produção de conteúdo) |
+| Saúde | Felipe Carvalho; Nexa Enfermagem; Sara Coutinho; Cássio Bragança |
+| Tecnologia | Sem exemplo publicado; estado vazio explícito |
+
+As dez referências permanecem acessíveis por seletores com V bicolor conforme
+o estudo enviado pelo usuário. Não atribuir clientes de outras áreas à tecnologia
+para preencher uma coluna. As capturas locais confirmam psicologia em Sara/Cássio,
+comunicação em Nathália e gastronomia/cultura em Aldeia MIX.
+
+Hero usa V bicolor sem caixa apenas na palavra “vitrine”; marca de cabeçalho
+permanece. Rodapé reduzido ao copyright solicitado e link https://inspira.dev.br/.
+QA: testes23/build, filtros em1440/836/390 claro/escuro, sem overflow/erro JS;
+sem JS todos os grupos aparecem. Evidência em `.impeccable/review/refinements/`.
+
 Rastro do mouse solicitado: base oficial DotTrail do brandbook, nós quadrados e
 conexões ortogonais na grade de 22 px. Menta no tema claro e lima no escuro;
 movimento reduzido e toque sem efeito. Ativo local, sem requisições ou telemetria.

@@ -188,6 +188,43 @@
         "value": "520px"
       }
     ],
+    "marketingRefinements": {
+      "sources": ["web/index.html", "web/styles.css", "web/categories.js"],
+      "heroSymbol": {
+        "selector": ".branded-word>.split-v",
+        "usage": "unboxed two-blade V replaces only the initial v of vitrine; boxed header logo preserved",
+        "size": ".63em by .59em; baseline aligned",
+        "light": ["#133824", "#A3E5C2"],
+        "dark": ["#BAFF29", "#A3E5C2"],
+        "accessibility": "decorative inline SVG; initial v remains available to assistive reading"
+      },
+      "categories": {
+        "control": "five buttons in a labelled group, aria-pressed and aria-controls",
+        "selection": "food initially selected; inactive panels hidden by JavaScript",
+        "withoutJavaScript": "controls hidden; all panels visible",
+        "exampleCounts": { "food": 3, "art": 2, "photo": 1, "health": 4, "tech": 0 },
+        "lightColors": {
+          "food": ["#F05D23", "#E5A93C"],
+          "art": ["#E5007C", "#E5A93C"],
+          "photo": ["#133824", "#BAFF29"],
+          "health": ["#133824", "#A3E5C2"],
+          "tech": ["#2454FF", "#00A9CC"]
+        },
+        "darkColorOverrides": {
+          "photo": ["#A3E5C2", "#BAFF29"],
+          "health": ["#A3E5C2", "#F7F7F4"]
+        },
+        "selectorColumns": "5 by default; 2 at max-width 520px",
+        "exampleColumns": "3 by default; 2 at max-width 800px; 1 at max-width 520px",
+        "emptyState": "technology has no published example; contact link instead of an invented case"
+      },
+      "compactFooter": {
+        "selector": ".compact-footer",
+        "content": "copyright 2026; Coletivo Inspira linked to https://inspira.dev.br/",
+        "orbClearance": "left padding 72px; 56px at max-width 520px",
+        "supersedes": "previous footer navigation, details, back-to-top and slogan"
+      }
+    },
     "dotTrail": {
       "source": "web/assets/brand/dot-trail.js",
       "officialSource": "https://brandbook.inspira.dev.br/assets/js/dot-trail.js?v=2",
