@@ -1,5 +1,13 @@
 # Origem dos ativos
 
+- brand/vitrine.svg, vitrine-animated.svg, vitrine-icon.svg e vitrine-inverse.svg:
+  marca própria do produto, opção A aprovada pelo usuário em 2026-11-07.
+  Geometria do V e caixa verde-lima do estudo em docs/design/logo-study;
+  lettering do estudo Segoe UI Bold convertido em curvas, sem distribuição
+  de arquivo de fonte. Exportação reproduzível em scripts/create-vitrine-brand.py
+  (Python padrão). Animação CSS local: abertura das lâminas em 700 ms, uma vez;
+  estática com movimento reduzido. Nenhum script, imagem raster ou URL remota no SVG.
+
 - brand/plus.svg e brand/coletivo-inspira.svg: vetores oficiais em
   https://brandbook.inspira.dev.br/assets/logo/, fornecidos como identidade pelo usuário.
 - brand/inspira-orb.js: cópia sem alteração de

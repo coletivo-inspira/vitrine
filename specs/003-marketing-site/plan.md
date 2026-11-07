@@ -1,5 +1,12 @@
 # Plano: divulgação estática
 
+Marca revisada em 2026-11-07: exportar o estudo A aprovado para SVG estático,
+animado, ícone e inverso. Lettering em curvas, sem nova fonte no runtime.
+Animação CSS interna de 700 ms nas duas lâminas, uma vez, apenas com preferência
+de movimento normal. Cabeçalho animado, rodapé estático, favicon próprio.
+Validar desktop/celular e preferência reduzida antes de publicar pela prévia
+GitHub Pages já configurada; nenhuma alteração de DNS ou recurso Cloudflare.
+
 HTML semântico, CSS com tokens A e JavaScript modular sem framework. Fontes
 Syne/DM Sans locais com OFL, vetores e Orb do brandbook preservados. Imagem de
 pizza gerada para demonstração e comprimida em WebP, sem representar cliente.

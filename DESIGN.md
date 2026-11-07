@@ -3,6 +3,8 @@ name: Vitrine Inspira — divulgação
 description: Base neutra, tipografia expressiva e laranja pontual.
 colors:
   primary: "#C74414"
+  brand-lime: "#BAFF29"
+  brand-forest: "#133824"
   primary-hover: "#A9360E"
   paper: "#F7F7F4"
   ink: "#27322E"
@@ -157,7 +159,19 @@ O estado “Em preparação” combina superfície damasco, indicador laranja, t
 
 ### Official Signature and Illustrations
 
-O símbolo oficial `plus.svg` acompanha o nome na marca. A Orb oficial é montada uma vez no rodapé, em espaço reservado, com link ao hub. Não redesenhar ou recolorir esses ativos.
+A marca própria aprovada da Vitrine é a opção A: V de duas lâminas na caixa
+verde-lima, seguido somente de “vitrine”. Letras em curvas derivadas do estudo
+Segoe UI Bold, sem fonte adicional no navegador ou alongamento horizontal.
+`vitrine.svg` é estática; `vitrine-animated.svg` abre as lâminas uma única vez em
+700 ms com desaceleração e permanece estática com `prefers-reduced-motion: reduce`.
+Cabeçalho usa a versão animada; rodapé usa a estática e mantém o endosso textual
+do coletivo; favicon usa `vitrine-icon.svg`. Proporção 470:145, 188×58 px no desktop
+e 169.2×52.2 px em larguras até 520 px, pela regra `.brand .brand-logo`.
+`vitrine-inverse.svg` fica disponível como variante de reserva, sem uso nesta página.
+O novo símbolo pertence ao produto e não modifica
+a marca oficial do coletivo. Títulos do site continuam Syne; corpo continua DM Sans.
+
+O símbolo oficial `plus.svg` permanece preservado como ativo do coletivo. A Orb oficial permanece como assinatura fixa inferior esquerda, com link ao hub. Não redesenhar ou recolorir esses ativos.
 
 O navegador de pizzaria e os mini-sites são conteúdo demonstrativo, com paletas próprias e até Georgia nos títulos. Seus falsos controles não são componentes do produto nem modelos já disponíveis. Não há inputs, formulário, checkout ou painel implementados para documentar.
 

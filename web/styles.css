@@ -34,3 +34,7 @@
 .example-preview>img{height:auto}
 @media(max-width:520px){.showcase-note{margin-left:72px;max-width:28ch}}
 .sheet-bar{font-size:11px}
+
+/* Approved Vitrine wordmark: outlined lettering keeps its natural proportions. */
+.brand .brand-logo{display:block;width:188px;height:58px;max-width:100%}
+@media(max-width:520px){.brand .brand-logo{width:169.2px;height:52.2px}}

@@ -187,7 +187,39 @@
         "name": "small-mobile",
         "value": "520px"
       }
-    ]
+    ],
+    "vitrineBrand": {
+      "approved": "2026-11-07",
+      "variant": "A",
+      "label": "vitrine",
+      "colors": {
+        "box": "#BAFF29",
+        "lettering": "#133824"
+      },
+      "wordmark": "web/assets/brand/vitrine.svg",
+      "animated": "web/assets/brand/vitrine-animated.svg",
+      "icon": "web/assets/brand/vitrine-icon.svg",
+      "inverse": "web/assets/brand/vitrine-inverse.svg",
+      "inverseUsage": "spare; not used on this page",
+      "width": 188,
+      "height": 58,
+      "mobileWidth": 169.2,
+      "mobileHeight": 52.2,
+      "mobileMaxWidth": "520px",
+      "selector": ".brand .brand-logo",
+      "placement": {
+        "header": "animated",
+        "footer": "static; collective endorsement preserved",
+        "favicon": "icon",
+        "orb": "official asset unchanged"
+      },
+      "motion": {
+        "durationMs": 700,
+        "iterations": 1,
+        "reducedMotion": "static"
+      },
+      "lettering": "outlined from approved Segoe UI Bold study; no font runtime dependency"
+    }
   },
   "components": [
     {

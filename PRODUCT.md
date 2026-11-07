@@ -43,6 +43,13 @@ checkout nem deve simular cadastro funcional enquanto o painel estiver pendente.
 
 ## Brand Commitments
 
+Revisão aprovada de 2026-11-07: logotipo do produto com V na caixa verde-lima e
+somente “vitrine” em lettering firme de proporção natural (opção A do estudo).
+“Inspira” permanece no nome do projeto e no endosso do coletivo, fora do lettering.
+Marca própria em SVG; animação curta de abertura, com alternativa estática.
+Essa aprovação substitui o uso do mais oficial junto ao nome do produto;
+o símbolo e a Orb do coletivo continuam preservados.
+
 Nome: Vitrine Inspira. O usuário definiu o [brandbook do Coletivo Inspira](https://brandbook.inspira.dev.br/)
 como autoridade principal. Paleta base off-white, floresta, lima e menta; Syne em
 títulos e DM Sans no corpo; estrutura modular e malha pontilhada. Usar os vetores

@@ -1,5 +1,12 @@
 # Modelagem do site de divulgação
 
+Revisão de marca aprovada em 2026-11-07: opção A do estudo de logo, V na caixa
+verde-lima e somente “vitrine” em letras de proporção natural. Aplicada em SVG
+no cabeçalho, rodapé e favicon; endosso do coletivo no texto do rodapé e Orb oficial
+preservada. Animação única de abertura de 700 ms, sem movimento no modo reduzido.
+Essa decisão substitui a assinatura anterior do produto; Syne/DM Sans da página,
+paleta laranja pontual e restante da composição permanecem.
+
 Status: direção aprovada e interface de divulgação implementada; sem publicação remota. Escopo confirmado
 pelo usuário em 2026-11-07: somente `vitrine.inspira.dev.br`. Painel, login, editor,
 cardápio funcional e checkout não fazem parte desta entrega visual.
