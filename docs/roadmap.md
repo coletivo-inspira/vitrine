@@ -12,7 +12,7 @@
 2. Resolvida em 2026-11-07: uma pessoa pode administrar várias vitrines; cada vitrine pode ter sua própria equipe. Acesso a uma não concede acesso às demais. Fluxo de convites e permissões detalhadas ainda será definido.
 3. Resolvida em 2026-11-07: Supabase Auth + Postgres aprovados para o MVP. Login inicial aprovado: Google via Supabase Auth. Recuperação de acesso ao negócio e configuração continuam pendentes.
 4. Resolvida por autorização geral em 2026-11-07: templates centralizados e artefatos separados, sem repositório por cliente (ADR 0005).
-5. Definida por autorização geral: piloto de até 10 vitrines, 100 itens cada e sem uploads; usar endereço gratuito do provedor com caminhos. Subdomínio próprio depende de domínio já existente; nenhum domínio será comprado. Limites serão aplicados ao implementar cadastro/publicação.
+5. Definida por autorização geral: piloto de até 10 vitrines, 100 itens cada e sem uploads; usar vitrine.inspira.dev.br para divulgação, caminhos /loja1 para negócios e painel.inspira.dev.br para administração (ADR 0006). Confirmar controle da zona antes de publicar; nenhum domínio será comprado. Limites serão aplicados ao implementar cadastro/publicação.
 
 ## Fatias seguintes, dependentes das decisões
 

@@ -32,8 +32,10 @@ Proposta de job: autenticar → autorizar → reservar slug → capturar revisã
 
 Templates ficam no repositório central; publicações serão artefatos separados, sem
 criar repositório por cliente (ADR 0005). Dados privados não são versionados. Ocultar
-um item não equivale a apagar cópias ou caches existentes. O piloto usará caminhos
-no endereço gratuito do provedor, sem promessa de subdomínio próprio gratuito.
+um item não equivale a apagar cópias ou caches existentes. Produção planejada em
+`vitrine.inspira.dev.br` para divulgação e `/loja1` para vitrines públicas;
+`painel.inspira.dev.br` para administração. Ver ADR 0006: domínio informado,
+mas controle da zona e configuração ainda não verificados. workers.dev fica como staging.
 
 
 Domínio raiz precisa existir e ter zona sob controle autorizado; registro/renovação não são gratuitos por haver DNS grátis. Validar slug e propriedade do domínio; criar registro específico, verificar associação no provedor de hospedagem e TLS antes de liberar. DNS sozinho não configura hostname nem certificado da aplicação. Evitar wildcard inicialmente; remoção deve desfazer associação/registro de forma coordenada para evitar takeover. Reserva concorrente deve ter constraint única. Não assumir suporte a wildcard no Cloudflare Pages.

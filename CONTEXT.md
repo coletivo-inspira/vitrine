@@ -4,6 +4,10 @@ Portal no qual pessoas administram suas vitrines e visitantes consultam sites pu
 
 ## Linguagem
 
+**Site de divulgação**: Site público que apresenta a Vitrine Inspira e explica o produto; não é a vitrine de um negócio.
+
+**Painel**: Área autenticada do portal onde as pessoas administram suas vitrines.
+
 **Portal**: Ambiente central onde uma pessoa acessa e administra suas vitrines.
 _Evitar_: vitrine para designar o ambiente administrativo.
 

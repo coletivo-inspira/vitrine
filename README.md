@@ -17,3 +17,5 @@ O desenvolvimento usa [Spec Kit](docs/development.md), com integração Codex/Po
 Cloudflare foi escolhida para hospedagem em 2026-11-07. GitHub permanece para código e automações. Supabase Auth + Postgres foi escolhido para autenticação/persistência. Login inicial aprovado: Entrar com Google via Supabase Auth. Configuração e publicação ainda serão feitas. Não há workflow de deploy nesta branch.
 
 Restrição de custo: planos Free, templates centralizados e nenhuma contratação automática. Ver [decisões do piloto](docs/adr/0005-zero-cost-mvp.md) e [camada de acesso](supabase/README.md).
+
+Endereços planejados: `vitrine.inspira.dev.br` para divulgação, `/loja1` nesse domínio para vitrines públicas e `painel.inspira.dev.br` para administração. Ver [decisão de endereços](docs/adr/0006-public-addresses.md). DNS e publicação ainda não configurados.

@@ -14,7 +14,8 @@ R2, filas pagas ou SMTP contratado. Os limites gratuitos podem interromper uso;
 aceitamos limitar o piloto em vez de contratar excedentes. Não contornar pausa
 do Supabase com tráfego artificial.
 
-Primeira publicação usará endereço gratuito do provedor e caminhos por vitrine.
+Atualizado pelo ADR 0006: produção planejada no domínio existente inspira.dev.br,
+com caminhos por vitrine; endereço gratuito do provedor fica para staging.
 Subdomínios próprios só com domínio já existente sob controle do coletivo; não
 comprar nem renovar domínio automaticamente. Não prometer um subdomínio gratuito
 independente por cliente em workers.dev. Antes da publicação, validar o vínculo
