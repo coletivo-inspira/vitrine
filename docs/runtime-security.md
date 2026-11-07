@@ -59,8 +59,8 @@ Node 24 internamente. [checkout](https://github.com/actions/checkout/releases/ta
 ## Validação e manutenção
 
 Com Node 24.22.2 e npm 11.19.1: `npm ci`, `npm audit`, `npm test` e `npm run demo`.
-Suíte: 22 testes contabilizados (um agrupador, dez cenários de banco, cinco de
-projeção e seis de portfólio). A auditoria npm é consulta pontual ao registro.
+Suíte atual: 23 testes contabilizados (um agrupador, dez cenários de banco, cinco de
+projeção, seis de portfólio e um de empacotamento da divulgação). A auditoria npm é consulta pontual ao registro.
 
 CI usa permissão de leitura, ações fixadas por SHA, instalação pelo lockfile,
 auditoria que bloqueia vulnerabilidades altas/críticas e testes. npm ci também
