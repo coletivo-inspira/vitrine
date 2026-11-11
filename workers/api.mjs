@@ -164,8 +164,15 @@ function base64UrlToUint8Array(base64Url) {
   return bytes;
 }
 
-export async function verifyJwtHs256(token, secret, nowSeconds = Math.floor(Date.now() / 1000)) {
-  if (typeof token !== 'string' || typeof secret !== 'string' || !secret) {
+export const JWKS_CACHE_TTL_MS = 10 * 60 * 1000;
+const jwksIsolateCache = new Map();
+
+export function clearJwksCache() {
+  jwksIsolateCache.clear();
+}
+
+function parseJwtHeader(token) {
+  if (typeof token !== 'string' || !token) {
     return null;
   }
   const parts = token.split('.');
@@ -174,9 +181,197 @@ export async function verifyJwtHs256(token, secret, nowSeconds = Math.floor(Date
   }
   try {
     const header = JSON.parse(utf8Decoder.decode(base64UrlToUint8Array(parts[0])));
-    if (!header || header.alg !== 'HS256') {
+    if (!header || typeof header !== 'object' || Array.isArray(header)) {
       return null;
     }
+    return { header, parts };
+  } catch {
+    return null;
+  }
+}
+
+function isAudienceAuthenticated(aud) {
+  if (aud === 'authenticated') {
+    return true;
+  }
+  if (Array.isArray(aud)) {
+    return aud.includes('authenticated');
+  }
+  return false;
+}
+
+function resolveVerificationContext(nowSeconds, options, jwks) {
+  const resolvedOptions =
+    typeof nowSeconds === 'object' && nowSeconds !== null
+      ? nowSeconds
+      : typeof options === 'string'
+        ? { expectedIssuer: options }
+        : (options ?? {});
+  const effectiveNow =
+    typeof nowSeconds === 'number'
+      ? nowSeconds
+      : (resolvedOptions.nowSeconds ?? Math.floor(Date.now() / 1000));
+  const rawBaseUrl =
+    resolvedOptions.supabaseUrl ?? jwks?.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL;
+  const baseUrl = String(rawBaseUrl).replace(/\/+$/, '');
+  const expectedIssuer =
+    resolvedOptions.expectedIssuer ??
+    resolvedOptions.issuer ??
+    jwks?.issuer ??
+    `${baseUrl}/auth/v1`;
+  return { effectiveNow, baseUrl, expectedIssuer };
+}
+
+function extractJwkList(jwks) {
+  if (Array.isArray(jwks)) {
+    return jwks;
+  }
+  if (jwks && typeof jwks === 'object' && Array.isArray(jwks.keys)) {
+    return jwks.keys;
+  }
+  return [];
+}
+
+export async function verifyJwtEs256(
+  token,
+  jwks,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  options = {}
+) {
+  const parsed = parseJwtHeader(token);
+  if (!parsed) {
+    return null;
+  }
+  const { header, parts } = parsed;
+  if (header.alg !== 'ES256') {
+    return null;
+  }
+  const kid = typeof header.kid === 'string' && header.kid.trim() ? header.kid.trim() : null;
+  if (!kid) {
+    return null;
+  }
+
+  const keys = extractJwkList(jwks);
+  const matchedJwk = keys.find(
+    (entry) => entry && typeof entry === 'object' && entry.kid === kid
+  );
+  if (!matchedJwk) {
+    return null;
+  }
+  if (
+    matchedJwk.kty !== 'EC' ||
+    matchedJwk.crv !== 'P-256' ||
+    typeof matchedJwk.x !== 'string' ||
+    !matchedJwk.x ||
+    typeof matchedJwk.y !== 'string' ||
+    !matchedJwk.y
+  ) {
+    return null;
+  }
+  if (matchedJwk.alg !== undefined && matchedJwk.alg !== 'ES256') {
+    return null;
+  }
+  if (matchedJwk.use !== undefined && matchedJwk.use !== 'sig') {
+    return null;
+  }
+
+  try {
+    const signature = base64UrlToUint8Array(parts[2]);
+    if (signature.byteLength !== 64) {
+      return null;
+    }
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'jwk',
+      {
+        kty: 'EC',
+        crv: 'P-256',
+        x: matchedJwk.x,
+        y: matchedJwk.y,
+        ext: true
+      },
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['verify']
+    );
+
+    const data = utf8Encoder.encode(`${parts[0]}.${parts[1]}`);
+    const valid = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      cryptoKey,
+      signature,
+      data
+    );
+    if (!valid) {
+      return null;
+    }
+
+    const payload = JSON.parse(utf8Decoder.decode(base64UrlToUint8Array(parts[1])));
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return null;
+    }
+
+    const { effectiveNow, expectedIssuer } = resolveVerificationContext(
+      nowSeconds,
+      options,
+      jwks
+    );
+
+    if (
+      typeof payload.exp !== 'number' ||
+      !Number.isFinite(payload.exp) ||
+      payload.exp <= effectiveNow
+    ) {
+      return null;
+    }
+    if (typeof payload.nbf === 'number' && payload.nbf > effectiveNow) {
+      return null;
+    }
+    if (typeof payload.iss !== 'string' || payload.iss !== expectedIssuer) {
+      return null;
+    }
+    if (!isAudienceAuthenticated(payload.aud)) {
+      return null;
+    }
+    if (payload.role !== 'authenticated') {
+      return null;
+    }
+
+    const userId =
+      typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub.trim() : null;
+    if (!userId) {
+      return null;
+    }
+
+    return {
+      id: userId,
+      role: payload.role,
+      iss: payload.iss,
+      aud: payload.aud
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function verifyJwtHs256(
+  token,
+  secret,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  options = {}
+) {
+  if (typeof token !== 'string' || typeof secret !== 'string' || !secret) {
+    return null;
+  }
+  const parsed = parseJwtHeader(token);
+  if (!parsed) {
+    return null;
+  }
+  const { header, parts } = parsed;
+  if (header.alg !== 'HS256') {
+    return null;
+  }
+  try {
     const key = await crypto.subtle.importKey(
       'raw',
       utf8Encoder.encode(secret),
@@ -191,10 +386,27 @@ export async function verifyJwtHs256(token, secret, nowSeconds = Math.floor(Date
       return null;
     }
     const payload = JSON.parse(utf8Decoder.decode(base64UrlToUint8Array(parts[1])));
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       return null;
     }
-    if (typeof payload.exp === 'number' && payload.exp <= nowSeconds) {
+    const { effectiveNow, expectedIssuer } = resolveVerificationContext(
+      nowSeconds,
+      options,
+      null
+    );
+    if (typeof payload.exp === 'number' && payload.exp <= effectiveNow) {
+      return null;
+    }
+    if (typeof payload.nbf === 'number' && payload.nbf > effectiveNow) {
+      return null;
+    }
+    if (payload.iss !== undefined && payload.iss !== expectedIssuer) {
+      return null;
+    }
+    if (payload.aud !== undefined && !isAudienceAuthenticated(payload.aud)) {
+      return null;
+    }
+    if (payload.role !== undefined && payload.role !== 'authenticated') {
       return null;
     }
     const userId = typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub.trim() : null;
@@ -205,6 +417,114 @@ export async function verifyJwtHs256(token, secret, nowSeconds = Math.floor(Date
   } catch {
     return null;
   }
+}
+
+async function fetchJwksForProject(baseUrl, fetchImpl, { forceRefresh = false, nowMs = Date.now() } = {}) {
+  const normalizedBaseUrl = String(baseUrl || SUPABASE_PUBLIC_PROJECT_URL).replace(/\/+$/, '');
+  const jwksUrl = `${normalizedBaseUrl}/auth/v1/.well-known/jwks.json`;
+  const cached = jwksIsolateCache.get(jwksUrl);
+  if (!forceRefresh && cached && nowMs - cached.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return { jwks: cached.jwks, fromCache: true };
+  }
+  if (typeof fetchImpl !== 'function') {
+    return { jwks: null, fromCache: false };
+  }
+  try {
+    const response = await fetchImpl(jwksUrl, {
+      method: 'GET',
+      headers: { accept: 'application/json' }
+    });
+    if (!response || !response.ok) {
+      return { jwks: null, fromCache: false };
+    }
+    const data = await response.json();
+    if (!data || typeof data !== 'object' || !Array.isArray(data.keys)) {
+      return { jwks: null, fromCache: false };
+    }
+    jwksIsolateCache.set(jwksUrl, { jwks: data, fetchedAt: nowMs });
+    return { jwks: data, fromCache: false };
+  } catch {
+    return { jwks: null, fromCache: false };
+  }
+}
+
+export async function resolveJwtSession(token, env = {}, deps = {}) {
+  const parsed = parseJwtHeader(token);
+  if (!parsed) {
+    return null;
+  }
+  const { header } = parsed;
+  const alg = header.alg;
+  if (!alg || alg === 'none') {
+    return null;
+  }
+
+  const nowSeconds =
+    typeof deps?.nowSeconds === 'function'
+      ? deps.nowSeconds()
+      : (deps?.nowSeconds ?? Math.floor(Date.now() / 1000));
+  const nowMs = nowSeconds * 1000;
+  const baseUrl = String(
+    env?.SUPABASE_URL ?? deps?.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL
+  ).replace(/\/+$/, '');
+
+  if (alg === 'ES256') {
+    const kid = typeof header.kid === 'string' && header.kid.trim() ? header.kid.trim() : null;
+    if (!kid) {
+      return null;
+    }
+
+    const injectedJwks = deps?.jwks ?? env?.SUPABASE_JWKS ?? null;
+    if (injectedJwks) {
+      let resolvedJwks =
+        typeof injectedJwks === 'function'
+          ? await injectedJwks({ kid, forceRefresh: false })
+          : injectedJwks;
+      const keys = extractJwkList(resolvedJwks);
+      if (
+        typeof injectedJwks === 'function' &&
+        !keys.some((k) => k && k.kid === kid)
+      ) {
+        resolvedJwks = await injectedJwks({ kid, forceRefresh: true });
+      }
+      return verifyJwtEs256(token, resolvedJwks, nowSeconds, { supabaseUrl: baseUrl });
+    }
+
+    const fetchImpl = deps?.fetch ?? env?.fetch ?? globalThis.fetch;
+    const initial = await fetchJwksForProject(baseUrl, fetchImpl, {
+      forceRefresh: false,
+      nowMs
+    });
+    if (!initial.jwks) {
+      return null;
+    }
+
+    let activeJwks = initial.jwks;
+    const hasKid = extractJwkList(activeJwks).some((k) => k && k.kid === kid);
+    if (!hasKid && initial.fromCache) {
+      const refreshed = await fetchJwksForProject(baseUrl, fetchImpl, {
+        forceRefresh: true,
+        nowMs
+      });
+      if (!refreshed.jwks) {
+        return null;
+      }
+      activeJwks = refreshed.jwks;
+    }
+
+    return verifyJwtEs256(token, activeJwks, nowSeconds, { supabaseUrl: baseUrl });
+  }
+
+  if (alg === 'HS256') {
+    if (typeof env?.SUPABASE_JWT_SECRET !== 'string' || !env.SUPABASE_JWT_SECRET.trim()) {
+      return null;
+    }
+    return verifyJwtHs256(token, env.SUPABASE_JWT_SECRET, nowSeconds, {
+      supabaseUrl: baseUrl
+    });
+  }
+
+  return null;
 }
 
 export function extractSessionToken(request) {
@@ -357,37 +677,20 @@ async function resolveSessionUser(request, env, deps) {
     }
   }
 
-  if (env?.SUPABASE_JWT_SECRET) {
-    const verified = await verifyJwtHs256(token, env.SUPABASE_JWT_SECRET);
-    return normalizeVerifiedUser(verified, token);
-  }
+  const hasSupabaseAuthConfig = Boolean(
+    env?.SUPABASE_URL ||
+    env?.SUPABASE_JWT_SECRET ||
+    env?.SUPABASE_JWKS ||
+    deps?.jwks ||
+    deps?.supabaseUrl
+  );
 
-  if (env?.SUPABASE_URL && env?.SUPABASE_ANON_KEY) {
-    const fetchImpl = deps.fetch ?? globalThis.fetch;
-    try {
-      const baseUrl = String(env.SUPABASE_URL).replace(/\/+$/, '');
-      const response = await fetchImpl(`${baseUrl}/auth/v1/user`, {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${token}`,
-          apikey: String(env.SUPABASE_ANON_KEY)
-        }
-      });
-      if (!response.ok) {
-        return null;
-      }
-      const data = await response.json();
-      return normalizeVerifiedUser(data, token);
-    } catch {
-      return null;
-    }
-  }
-
-  if (Object.hasOwn(HARNESS_TOKENS, token)) {
+  if (!hasSupabaseAuthConfig && Object.hasOwn(HARNESS_TOKENS, token)) {
     return { id: HARNESS_TOKENS[token], token };
   }
 
-  return null;
+  const verified = await resolveJwtSession(token, env, deps);
+  return normalizeVerifiedUser(verified, token);
 }
 
 export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {

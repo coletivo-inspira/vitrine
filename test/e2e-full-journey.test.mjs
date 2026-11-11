@@ -10,7 +10,8 @@ import worker, {
   IMMUTABLE_CACHE_CONTROL,
   PORTAL_CSP_HEADER,
   STOREFRONT_CACHE_CONTROL,
-  STRICT_CSP_HEADER
+  STRICT_CSP_HEADER,
+  clearJwksCache
 } from '../workers/api.mjs';
 import { publicMenu, whatsappLink } from '../src/public-menu.mjs';
 import { computeSha256Hex, FORBIDDEN_PUBLIC_KEYS } from '../src/publication-engine.mjs';
@@ -62,6 +63,44 @@ async function signHs256Jwt(payload, secret = E2E_JWT_SECRET) {
   return `${signingInput}.${toBase64Url(new Uint8Array(sig))}`;
 }
 
+async function generateEs256KeyPair(kid = 'e2e-es256-kid-1') {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+  return {
+    kid,
+    privateKey: keyPair.privateKey,
+    publicKey: keyPair.publicKey,
+    jwk: {
+      kty: publicJwk.kty,
+      crv: publicJwk.crv,
+      x: publicJwk.x,
+      y: publicJwk.y,
+      kid,
+      use: 'sig',
+      alg: 'ES256'
+    }
+  };
+}
+
+async function signEs256Jwt(payload, privateKey, kid = 'e2e-es256-kid-1') {
+  const encoder = new TextEncoder();
+  const headerB64 = toBase64Url(
+    encoder.encode(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }))
+  );
+  const payloadB64 = toBase64Url(encoder.encode(JSON.stringify(payload)));
+  const signingInput = `${headerB64}.${payloadB64}`;
+  const sig = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    privateKey,
+    encoder.encode(signingInput)
+  );
+  return `${signingInput}.${toBase64Url(new Uint8Array(sig))}`;
+}
+
 function decodeJwtSub(authHeader) {
   if (typeof authHeader !== 'string') return '';
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
@@ -97,6 +136,8 @@ async function createPgliteSupabaseHarness() {
 
   await db.query('insert into auth.users (id) values ($1)', [USER_AURORA_ID]);
 
+  const es256Primary = await generateEs256KeyPair('supabase-e2e-es256-kid-1');
+  let activeJwks = { keys: [es256Primary.jwk] };
   let dbQueryCount = 0;
 
   async function runAsJwtRole(request, fn) {
@@ -122,6 +163,12 @@ async function createPgliteSupabaseHarness() {
     const method = (request.method || 'GET').toUpperCase();
 
     try {
+      if (url.pathname === '/auth/v1/.well-known/jwks.json' && method === 'GET') {
+        return new Response(JSON.stringify(activeJwks), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.pathname === '/rest/v1/sites') {
         if (method === 'GET') {
           const idFilter = url.searchParams.get('id');
@@ -225,6 +272,10 @@ async function createPgliteSupabaseHarness() {
 
   return {
     db,
+    es256Primary,
+    setJwks(nextJwks) {
+      activeJwks = nextJwks;
+    },
     postgrestFetch,
     getQueryCount: () => dbQueryCount,
     resetQueryCount: () => {
@@ -298,21 +349,39 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
   };
 
   t.after(async () => {
+    clearJwksCache();
     globalThis.fetch = originalFetch;
     await pgHarness.db.close();
   });
 
+  clearJwksCache();
   const env = {
     SUPABASE_URL: E2E_SUPABASE_URL,
     SUPABASE_ANON_KEY: E2E_SUPABASE_ANON_KEY,
-    SUPABASE_JWT_SECRET: E2E_JWT_SECRET,
     ASSETS: assetsBinding
   };
+  const envWithLegacyHs256 = {
+    ...env,
+    SUPABASE_JWT_SECRET: E2E_JWT_SECRET
+  };
 
-  const auroraJwt = await signHs256Jwt({
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expectedIssuer = `${E2E_SUPABASE_URL}/auth/v1`;
+  const auroraJwt = await signEs256Jwt(
+    {
+      sub: USER_AURORA_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    pgHarness.es256Primary.privateKey,
+    pgHarness.es256Primary.kid
+  );
+  const auroraLegacyHs256Jwt = await signHs256Jwt({
     sub: USER_AURORA_ID,
     role: 'authenticated',
-    exp: Math.floor(Date.now() / 1000) + 3600
+    exp: nowSec + 3600
   });
 
   let createdSiteId = null;
@@ -398,6 +467,102 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
     const bearerBody = await bearerRes.json();
     assert.equal(bearerBody.authenticated, true);
     assert.equal(bearerBody.user.id, USER_AURORA_ID);
+
+    // Casos negativos ES256: kid desconhecido, assinatura adulterada, expirado, iss/aud errados e alg:none
+    const attackerKeyPair = await generateEs256KeyPair(pgHarness.es256Primary.kid);
+    const unknownKidJwt = await signEs256Jwt(
+      {
+        sub: USER_AURORA_ID,
+        iss: expectedIssuer,
+        aud: 'authenticated',
+        role: 'authenticated',
+        exp: nowSec + 3600
+      },
+      pgHarness.es256Primary.privateKey,
+      'kid-inexistente-e2e'
+    );
+    const tamperedEs256Jwt = await signEs256Jwt(
+      {
+        sub: USER_AURORA_ID,
+        iss: expectedIssuer,
+        aud: 'authenticated',
+        role: 'authenticated',
+        exp: nowSec + 3600
+      },
+      attackerKeyPair.privateKey,
+      pgHarness.es256Primary.kid
+    );
+    const expiredEs256Jwt = await signEs256Jwt(
+      {
+        sub: USER_AURORA_ID,
+        iss: expectedIssuer,
+        aud: 'authenticated',
+        role: 'authenticated',
+        exp: nowSec - 120
+      },
+      pgHarness.es256Primary.privateKey,
+      pgHarness.es256Primary.kid
+    );
+    const wrongIssEs256Jwt = await signEs256Jwt(
+      {
+        sub: USER_AURORA_ID,
+        iss: 'https://outro-projeto.supabase.co/auth/v1',
+        aud: 'authenticated',
+        role: 'authenticated',
+        exp: nowSec + 3600
+      },
+      pgHarness.es256Primary.privateKey,
+      pgHarness.es256Primary.kid
+    );
+    const wrongAudEs256Jwt = await signEs256Jwt(
+      {
+        sub: USER_AURORA_ID,
+        iss: expectedIssuer,
+        aud: 'anon',
+        role: 'authenticated',
+        exp: nowSec + 3600
+      },
+      pgHarness.es256Primary.privateKey,
+      pgHarness.es256Primary.kid
+    );
+    const algNoneJwt = `${toBase64Url(Buffer.from('{"alg":"none","typ":"JWT"}'))}.${toBase64Url(
+      Buffer.from(
+        JSON.stringify({
+          sub: USER_AURORA_ID,
+          iss: expectedIssuer,
+          aud: 'authenticated',
+          role: 'authenticated',
+          exp: nowSec + 3600
+        })
+      )
+    )}.`;
+
+    for (const invalidJwt of [
+      unknownKidJwt,
+      tamperedEs256Jwt,
+      expiredEs256Jwt,
+      wrongIssEs256Jwt,
+      wrongAudEs256Jwt,
+      algNoneJwt
+    ]) {
+      const badRes = await worker.fetch(
+        new Request('https://painel.inspira.dev.br/api/auth/session', {
+          headers: { Authorization: `Bearer ${invalidJwt}` }
+        }),
+        env
+      );
+      assert.equal(badRes.status, 401);
+    }
+
+    // Caminho HS256 legado: continua passando quando SUPABASE_JWT_SECRET está configurado
+    const legacyHs256Res = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${auroraLegacyHs256Jwt}` }
+      }),
+      envWithLegacyHs256
+    );
+    assert.equal(legacyHs256Res.status, 200);
+    assert.equal((await legacyHs256Res.json()).user.id, USER_AURORA_ID);
   });
 
   await t.test('3. Criação de Vitrine (pizzaria-aurora), listagem, edição de cardápio com centavos inteiros, revisão 1 -> 2 e conflito 409', async () => {
