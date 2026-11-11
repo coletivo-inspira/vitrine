@@ -810,6 +810,31 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
         `Script dist/${scriptRel} não deve injetar estilos inline via element.style.*`
       );
     }
+
+    // Verifica separação estrita de CSP entre /portal/* (connect-src com projeto Supabase público) e rotas públicas (connect-src 'self')
+    const distHeadersText = await readFile(resolve(distDir, '_headers'), 'utf8');
+    assert.match(
+      distHeadersText,
+      /\/\*\s+Content-Security-Policy:[^\n]*connect-src 'self';/,
+      'Regra global /* em dist/_headers deve manter estritamente connect-src \'self\''
+    );
+    assert.match(
+      distHeadersText,
+      /\/portal\*\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;|\/portal\/?\*\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/,
+      'Regra /portal/* em dist/_headers deve liberar connect-src para https://qawlpsrfewosxsfgmmpm.supabase.co'
+    );
+    assert.match(
+      jsContentsByPath.get('portal/portal.js') || '',
+      /https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co/,
+      'dist/portal/portal.js deve referenciar a URL pública canônica do projeto Supabase'
+    );
+    for (const publicOnlyRel of ['app.js', 'vitrine/vitrine.js']) {
+      assert.doesNotMatch(
+        jsContentsByPath.get(publicOnlyRel) || '',
+        /supabase\.co/i,
+        `Script público dist/${publicOnlyRel} jamais deve referenciar o Supabase`
+      );
+    }
   });
 
   await t.test('5. Auditoria Forense de Integridade da Suíte de Testes (test/**/*.test.mjs)', async () => {

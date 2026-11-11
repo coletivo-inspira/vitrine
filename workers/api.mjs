@@ -17,8 +17,11 @@ import {
 
 const SESSION_COOKIE_NAME = '__Host-vitrine_session';
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
+export const SUPABASE_PUBLIC_PROJECT_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 export const STRICT_CSP_HEADER =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+export const PORTAL_CSP_HEADER =
+  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const STOREFRONT_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
@@ -1053,11 +1056,16 @@ export function createApiHandler(deps = {}) {
       if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
         const assetRes = await assetsFetcher.fetch(request);
         const headers = new Headers(assetRes.headers);
+        const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
         for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) {
           if (!headers.has(k)) {
             headers.set(k, v);
           }
         }
+        headers.set(
+          'content-security-policy',
+          isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER
+        );
         return new Response(method === 'HEAD' ? null : assetRes.body, {
           status: assetRes.status,
           statusText: assetRes.statusText,

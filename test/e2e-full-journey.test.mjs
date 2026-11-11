@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import worker, {
   IMMUTABLE_CACHE_CONTROL,
+  PORTAL_CSP_HEADER,
   STOREFRONT_CACHE_CONTROL,
   STRICT_CSP_HEADER
 } from '../workers/api.mjs';
@@ -324,13 +325,27 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
     assert.equal(homeRes.status, 200);
     assert.match(homeRes.headers.get('content-type') || '', /text\/html/i);
     const csp = homeRes.headers.get('content-security-policy') || '';
+    assert.equal(csp, STRICT_CSP_HEADER);
     assert.match(csp, /default-src 'self'/);
     assert.match(csp, /script-src 'self'/);
+    assert.match(csp, /connect-src 'self';/);
+    assert.doesNotMatch(csp, /qawlpsrfewosxsfgmmpm\.supabase\.co/);
     assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);
     assert.match(csp, /frame-ancestors 'none'/);
     assert.match(csp, /form-action 'none'/);
     assert.equal(homeRes.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(homeRes.headers.get('x-frame-options'), 'DENY');
+
+    const portalPageRes = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/portal/'),
+      env
+    );
+    assert.equal(portalPageRes.status, 200);
+    assert.equal(portalPageRes.headers.get('content-security-policy'), PORTAL_CSP_HEADER);
+    assert.match(
+      portalPageRes.headers.get('content-security-policy') || '',
+      /connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/
+    );
 
     const homeHtml = await homeRes.text();
     assert.match(homeHtml, /Vitrine Inspira/);
