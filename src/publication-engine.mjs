@@ -158,9 +158,21 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     );
   }
 
+  if (
+    site?.slug &&
+    draftContent.slug !== undefined &&
+    String(draftContent.slug).trim() !== String(site.slug).trim()
+  ) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_SLUG',
+      'O slug do rascunho diverge do identificador da vitrine.'
+    );
+  }
+
   const normalizedContent = {
     ...draftContent,
-    slug: draftContent.slug ?? site.slug,
+    slug: site.slug ?? draftContent.slug,
     businessName: draftContent.businessName ?? draftContent.name ?? site.name,
     template: draftContent.template ?? site.template ?? DEFAULT_TEMPLATE
   };

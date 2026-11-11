@@ -865,6 +865,20 @@ svg {
   padding-block: 8px;
 }
 
+.pizza-item-row.is-inactive {
+  opacity: 0.5;
+}
+
+.pizza-empty-msg {
+  padding-block: 24px;
+}
+
+.pizza-no-items {
+  font-size: 12px;
+  color: #7a5d4d;
+  font-style: italic;
+}
+
 .pizza-item-info {
   display: flex;
   flex-direction: column;

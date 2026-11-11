@@ -1,10 +1,11 @@
 import { PGlite } from '@electric-sql/pglite';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = fileURLToPath(new URL('../', import.meta.url));
-const MIGRATION_PATH = resolve(ROOT_DIR, 'supabase/migrations/202611070001_site_access.sql');
+const MIGRATIONS_DIR = resolve(ROOT_DIR, 'supabase/migrations');
+const MIGRATION_PATH = resolve(MIGRATIONS_DIR, '202611070001_site_access.sql');
 const PROTECTED_TABLES = ['sites', 'site_memberships', 'drafts'];
 
 export function redactSecrets(input, extraSecrets = []) {
@@ -97,8 +98,18 @@ export async function runLocalSelfTest(migrationPath = MIGRATION_PATH) {
       grant execute on function auth.uid() to authenticated, anon;
     `);
 
-    const migrationSql = await readFile(migrationPath, 'utf8');
-    await db.exec(migrationSql);
+    if (migrationPath === MIGRATION_PATH) {
+      const migrationFiles = (await readdir(MIGRATIONS_DIR))
+        .filter(f => f.endsWith('.sql'))
+        .sort();
+      for (const file of migrationFiles) {
+        const sql = await readFile(resolve(MIGRATIONS_DIR, file), 'utf8');
+        await db.exec(sql);
+      }
+    } else {
+      const migrationSql = await readFile(migrationPath, 'utf8');
+      await db.exec(migrationSql);
+    }
 
     const ownerId = '10000000-0000-0000-0000-000000000001';
     const memberId = '10000000-0000-0000-0000-000000000002';

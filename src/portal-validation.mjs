@@ -25,7 +25,57 @@ export const DRAFT_MAX_BYTES = MAX_DRAFT_BYTES;
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const WHATSAPP_PATTERN = /^[1-9]\d{7,14}$/;
+const DANGEROUS_SCHEME_OR_TAG_PATTERN =
+  /\b(?:javascript|vbscript|data)\s*:|\bhttp:\/\/|\bhttps?:\/\/[^/\s:@]+:[^/\s@]*@|<\s*\/?\s*(?:script|iframe|object|embed|svg|img|style|link|meta)\b|\bon[a-z]+\s*=/i;
+const OPTIONAL_URL_FIELDS = Object.freeze(['url', 'imageUrl', 'logoUrl', 'website', 'href']);
 const utf8Encoder = new TextEncoder();
+
+export function validateSafePublicHttpsUrl(rawUrl, errorStatus = 422) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim() || rawUrl.length > 2048) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_URL',
+      'Use uma URL HTTPS pública válida sem credenciais embutidas.'
+    );
+  }
+  let parsed;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_URL',
+      'Use uma URL HTTPS pública válida sem credenciais embutidas.'
+    );
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_URL',
+      'Use uma URL HTTPS pública válida sem credenciais embutidas.'
+    );
+  }
+  return parsed.href;
+}
+
+export function assertNoDangerousTextPayload(value, errorStatus = 422, errorCode = 'INVALID_PAYLOAD') {
+  if (typeof value === 'string' && DANGEROUS_SCHEME_OR_TAG_PATTERN.test(value)) {
+    throw new PortalValidationError(
+      errorStatus,
+      errorCode,
+      'Conteúdo rejeitado por conter protocolo inseguro, credenciais em URL ou marcação executável.'
+    );
+  }
+}
+
+function validateOptionalUrlFields(target, errorStatus = 422) {
+  if (!target || typeof target !== 'object') return;
+  for (const field of OPTIONAL_URL_FIELDS) {
+    if (target[field] !== undefined && target[field] !== null) {
+      validateSafePublicHttpsUrl(target[field], errorStatus);
+    }
+  }
+}
 
 export class PortalValidationError extends Error {
   constructor(status, code, message, extra = {}) {
@@ -70,18 +120,19 @@ export function validateSlug(slug) {
   return slug;
 }
 
-export function validateSiteName(name) {
+export function validateSiteName(name, errorStatus = 400) {
   if (typeof name !== 'string') {
-    throw new PortalValidationError(400, 'INVALID_NAME', 'Informe um nome válido para a vitrine.');
+    throw new PortalValidationError(errorStatus, 'INVALID_NAME', 'Informe um nome válido para a vitrine.');
   }
   const trimmed = name.trim();
   if (trimmed.length < 1 || trimmed.length > 160) {
     throw new PortalValidationError(
-      400,
+      errorStatus,
       'INVALID_NAME',
       'O nome da vitrine deve ter entre 1 e 160 caracteres.'
     );
   }
+  assertNoDangerousTextPayload(trimmed, errorStatus, 'INVALID_NAME');
   return trimmed;
 }
 
@@ -193,8 +244,9 @@ export function validateSiteInput(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new PortalValidationError(400, 'INVALID_PAYLOAD', 'Dados de criação da vitrine inválidos.');
   }
+  validateOptionalUrlFields(payload, 400);
   const slug = validateSlug(payload.slug);
-  const name = validateSiteName(payload.name);
+  const name = validateSiteName(payload.name, 400);
   const template = validateTemplate(payload.template, 400);
   const whatsapp =
     payload.whatsapp !== undefined ? validateWhatsapp(payload.whatsapp) : DEFAULT_WHATSAPP;
@@ -290,6 +342,8 @@ export function validateDraftContent(content, options = {}) {
     validateTemplate(content.template, 422);
   }
 
+  validateOptionalUrlFields(content, 422);
+
   if (content.slug !== undefined) {
     if (
       typeof content.slug !== 'string' ||
@@ -311,6 +365,7 @@ export function validateDraftContent(content, options = {}) {
         'O nome do estabelecimento no rascunho deve ter entre 1 e 160 caracteres.'
       );
     }
+    assertNoDangerousTextPayload(rawBusinessName, 422, 'INVALID_NAME');
   }
 
   const hasCategories = content.categories !== undefined;
@@ -337,12 +392,16 @@ export function validateDraftContent(content, options = {}) {
       if (!category || typeof category !== 'object' || Array.isArray(category)) {
         throw new PortalValidationError(422, 'INVALID_CATEGORY', 'Categoria inválida no rascunho.');
       }
+      validateOptionalUrlFields(category, 422);
       if (category.name !== undefined && (typeof category.name !== 'string' || !category.name.trim() || category.name.trim().length > 160)) {
         throw new PortalValidationError(
           422,
           'INVALID_CATEGORY',
           'O nome de cada categoria deve ter entre 1 e 160 caracteres.'
         );
+      }
+      if (category.name !== undefined) {
+        assertNoDangerousTextPayload(category.name, 422, 'INVALID_CATEGORY');
       }
       if (category.items !== undefined && !Array.isArray(category.items)) {
         throw new PortalValidationError(
@@ -363,6 +422,7 @@ export function validateDraftContent(content, options = {}) {
       throw new PortalValidationError(422, 'INVALID_ITEM', 'Item do cardápio inválido.');
     }
 
+    validateOptionalUrlFields(item, 422);
     validatePriceCents(item.priceCents);
 
     if (item.name !== undefined) {
@@ -373,6 +433,18 @@ export function validateDraftContent(content, options = {}) {
           'O nome do item deve ter entre 1 e 160 caracteres.'
         );
       }
+      assertNoDangerousTextPayload(item.name, 422, 'INVALID_ITEM');
+    }
+
+    if (item.description !== undefined && item.description !== null) {
+      if (typeof item.description !== 'string' || item.description.trim().length > 280) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM_DESCRIPTION',
+          'A descrição de cada item deve ter no máximo 280 caracteres.'
+        );
+      }
+      assertNoDangerousTextPayload(item.description, 422, 'INVALID_ITEM');
     }
 
     if (item.id !== undefined) {
@@ -383,6 +455,7 @@ export function validateDraftContent(content, options = {}) {
           'O identificador do item deve ter entre 1 e 64 caracteres.'
         );
       }
+      assertNoDangerousTextPayload(item.id, 422, 'INVALID_ITEM');
       const normalizedId = item.id.trim();
       if (seenIds.has(normalizedId)) {
         throw new PortalValidationError(

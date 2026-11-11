@@ -585,7 +585,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     async updateDraft({ siteId, userId, revision, content }) {
       const site = sites.get(siteId);
       const role = getRoleForSite(site, userId);
-      if (!role) {
+      if (role !== 'owner') {
         return { status: 'not_found' };
       }
       const current = drafts.get(siteId);
@@ -802,7 +802,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       const updatedRows = await updateRes.json();
       if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
         const latest = await this.getDraft(siteId, userId, { token });
-        if (!latest) {
+        if (!latest || latest.revision === revision) {
           return { status: 'not_found' };
         }
         return {
@@ -1051,7 +1051,18 @@ export function createApiHandler(deps = {}) {
         return publicResponse;
       }
       if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
-        return assetsFetcher.fetch(request);
+        const assetRes = await assetsFetcher.fetch(request);
+        const headers = new Headers(assetRes.headers);
+        for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) {
+          if (!headers.has(k)) {
+            headers.set(k, v);
+          }
+        }
+        return new Response(method === 'HEAD' ? null : assetRes.body, {
+          status: assetRes.status,
+          statusText: assetRes.statusText,
+          headers
+        });
       }
       return errorResponse(404, 'NOT_FOUND', 'Recurso não encontrado.');
     }
@@ -1138,6 +1149,14 @@ export function createApiHandler(deps = {}) {
         }
 
         if (method === 'PUT') {
+          let site = null;
+          if (typeof store.getSite === 'function') {
+            site = await store.getSite(siteId, user.id, { token: user.token, env });
+          }
+          if (site && site.role && site.role !== 'owner') {
+            return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+          }
+
           const existingDraft = await store.getDraft(siteId, user.id, { token: user.token, env });
           if (!existingDraft) {
             return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
@@ -1169,6 +1188,19 @@ export function createApiHandler(deps = {}) {
             defaultWhatsapp:
               existingDraft.revision !== revision ? existingDraft.content?.whatsapp : undefined
           });
+
+          const canonicalSlug = site?.slug ?? existingDraft.content?.slug;
+          if (
+            canonicalSlug &&
+            parsed.content?.slug !== undefined &&
+            String(parsed.content.slug).trim() !== String(canonicalSlug).trim()
+          ) {
+            return errorResponse(
+              422,
+              'INVALID_SLUG',
+              'O identificador (slug) do rascunho não pode divergir do slug da vitrine.'
+            );
+          }
 
           const updateResult = await store.updateDraft(
             {
@@ -1224,7 +1256,7 @@ export function createApiHandler(deps = {}) {
           const allSites = await store.listSites(user.id, { token: user.token, env });
           site = allSites.find((entry) => entry.id === siteId) ?? null;
         }
-        if (!site) {
+        if (!site || (site.role && site.role !== 'owner')) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
