@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F7F7F4">
+  <meta name="description" content="Cardápio digital oficial — faça seu pedido direto no WhatsApp.">
+  <title id="storefront-page-title">Cardápio Digital — Vitrine Inspira</title>
+  <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/vitrine/vitrine.css">
+</head>
+<body>
+  <a class="skip-link" href="#cardapio-principal">Pular para o cardápio</a>
+
+  <header class="storefront-topbar wrap">
+    <div class="storefront-brand-meta">
+      <span class="storefront-template-tag">Cardápio Digital</span>
+      <span id="storefront-slug-pill" class="storefront-slug-pill">/loja1</span>
+    </div>
+    <div class="storefront-header-actions">
+      <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+        <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+        <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="cardapio-principal" class="wrap storefront-main">
+    <section class="storefront-hero" aria-labelledby="storefront-name">
+      <div class="storefront-hero-copy">
+        <p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>
+        <h1 id="storefront-name">Carregando cardápio...</h1>
+        <p id="storefront-subtitle" class="storefront-subtitle">
+          Escolha seus itens abaixo e toque em <strong>Pedir no WhatsApp</strong> para enviar seu pedido com mensagem preenchida.
+        </p>
+      </div>
+      <nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio"></nav>
+    </section>
+
+    <div id="storefront-status" class="storefront-status" role="status" aria-live="polite" hidden></div>
+
+    <div id="storefront-catalog" class="storefront-catalog">
+      <!--STATIC_STOREFRONT_CATALOG-->
+    </div>
+  </main>
+
+  <footer class="storefront-footer">
+    <div class="wrap storefront-footer-inner">
+      <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
+        <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+        <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+      </a>
+      <p class="storefront-footer-note">
+        Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
+      </p>
+    </div>
+  </footer>
+
+  <script type="module" src="/vitrine/vitrine.js"></script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F7F7F4">
+  <meta name="description" content="Portal Administrativo - Vitrine Inspira">
+  <title>Painel Administrativo — Vitrine Inspira</title>
+  <link rel="icon" href="../assets/brand/vitrine-icon.svg" type="image/svg+xml">
+  <link rel="preload" href="../assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="../assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
+  <script src="../theme.js"></script>
+  <link rel="stylesheet" href="./portal.css">
+</head>
+<body>
+  <a class="skip-link" href="#conteudo-portal">Pular para o conteúdo</a>
+  
+  <header class="site-header wrap">
+    <a class="brand" href="./" aria-label="Vitrine Inspira — início do painel">
+      <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+      <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+    </a>
+    
+    <div class="header-controls">
+      <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+        <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+        <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+      </button>
+      <button id="logout-button" class="button button-small" type="button" hidden>Sair</button>
+    </div>
+  </header>
+
+  <main id="conteudo-portal" class="wrap">
+    <!-- Feedback Banner / Message Container -->
+    <div id="global-feedback" class="feedback-banner" aria-live="polite" hidden></div>
+
+    <!-- Mode indicator for local evaluation -->
+    <div id="demo-mode-badge" class="demo-badge" hidden>
+      <span class="badge-dot"></span>
+      Modo Local de Demonstração (Offline)
+    </div>
+
+    <!-- Auth Section -->
+    <section id="auth-section" class="portal-card select-none">
+      <h2>Entrar no Painel</h2>
+      <p>Gerencie suas vitrines, edite cardápios e acompanhe as novidades da plataforma.</p>
+      
+      <div class="auth-actions">
+        <button id="google-login-button" class="button button-google" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.71 0 3.27.61 4.5 1.615l2.435-2.435C17.31 1.485 14.91 1 12.24 1c-5.52 0-10 4.48-10 10s4.48 10 10 10c5.77 0 10-4.06 10-10 0-.68-.08-1.33-.2-1.715H12.24Z"/>
+          </svg>
+          Entrar com Google
+        </button>
+      </div>
+
+      <div class="demo-offline-box">
+        <h3>Acesso offline</h3>
+        <p>Sem conexão ou backend configurado? Você pode testar e criar rascunhos salvos no seu navegador.</p>
+        <button id="local-demo-button" class="button button-small button-local" type="button">Acessar Modo Local (Offline)</button>
+      </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <section id="dashboard-section" hidden>
+      <div class="dashboard-header">
+        <h1>Minhas Vitrines</h1>
+        <p class="section-desc">Selecione uma vitrine para gerenciar o cardápio ou crie uma nova abaixo.</p>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- New site Form -->
+        <div class="portal-card">
+          <h2>Nova Vitrine</h2>
+          <form id="create-site-form" novalidate>
+            <div class="form-group">
+              <label for="new-site-name">Nome do Negócio</label>
+              <input type="text" id="new-site-name" name="name" required placeholder="Ex: Pizzaria Bella Itália">
+            </div>
+
+            <div class="form-group">
+              <label for="new-site-slug">Endereço da Vitrine (slug)</label>
+              <input type="text" id="new-site-slug" name="slug" required placeholder="pizzaria-bella">
+              <span id="slug-preview" class="form-help">Endereço: vitrine.inspira.dev.br/loja</span>
+              <span id="slug-validation-error" class="form-error-msg" hidden>O endereço deve conter apenas letras minúsculas, números e hífens.</span>
+            </div>
+
+            <button type="submit" class="button">Criar Vitrine</button>
+          </form>
+        </div>
+
+        <!-- Sites List -->
+        <div class="portal-card">
+          <h2>Suas Vitrines Ativas</h2>
+          <div id="sites-list-container" class="sites-list">
+            <p class="loading-msg">Carregando vitrines...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Editor Section -->
+    <section id="editor-section" hidden>
+      <div class="editor-header-bar">
+        <button id="back-to-dashboard" class="button button-small button-secondary" type="button">← Voltar</button>
+        <div>
+          <h1 id="editor-site-title">Pizzaria Bella</h1>
+          <p id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/pizzaria-bella</p>
+        </div>
+        <div class="editor-save-container">
+          <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
+          <button id="save-draft-button" class="button button-secondary" type="button">Salvar Rascunho</button>
+          <button id="publish-site-button" class="button" type="button">Publicar Vitrine</button>
+        </div>
+      </div>
+
+      <!-- Publication Status Banner -->
+      <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
+        <div class="publication-status-info">
+          <span class="publication-badge">Publicada</span>
+          <span id="publication-status-text">Vitrine publicada com sucesso.</span>
+        </div>
+        <a id="publication-view-link" class="button button-small button-secondary" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine Pública</a>
+      </div>
+
+      <!-- Optimistic Concurrency Alert Banner -->
+      <div id="conflict-banner" class="conflict-banner" hidden>
+        <div class="conflict-content">
+          <h3>⚠️ Alerta de Concorrência</h3>
+          <p>Este rascunho foi atualizado em outra aba ou dispositivo. Recarregue antes de salvar.</p>
+          <div class="conflict-actions">
+            <button id="reload-conflict-button" class="button button-small" type="button">Recarregar rascunho remoto</button>
+            <button id="copy-conflict-button" class="button button-small button-secondary" type="button">Copiar alterações locais</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor Stats & Meters -->
+      <div class="editor-stats-container">
+        <div class="stat-card">
+          <span class="stat-label">Itens Ativos</span>
+          <div class="stat-meter-wrapper">
+            <span id="active-items-count" class="stat-value">0 / 20</span>
+            <progress id="active-items-progress" max="20" value="0"></progress>
+          </div>
+          <span id="active-items-warning" class="stat-warning" hidden>Limite de 20 itens ativos atingido para o plano gratuito.</span>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Total de Itens</span>
+          <div class="stat-meter-wrapper">
+            <span id="total-items-count" class="stat-value">0 / 100</span>
+            <progress id="total-items-progress" max="100" value="0"></progress>
+          </div>
+          <span id="total-items-warning" class="stat-warning" hidden>Limite de 100 itens totais atingido.</span>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Tamanho do Rascunho</span>
+          <div class="stat-meter-wrapper">
+            <span id="draft-size-count" class="stat-value">0 KiB / 256 KiB</span>
+            <progress id="draft-size-progress" max="262144" value="0"></progress>
+          </div>
+          <span id="draft-size-warning" class="stat-warning" hidden>O rascunho excede o limite técnico de 256 KiB.</span>
+        </div>
+      </div>
+
+      <div class="editor-workspace">
+        <!-- Editor Controls (Left Pane) -->
+        <div class="editor-controls-pane portal-card">
+          <h2>Configurações do Cardápio</h2>
+          
+          <form id="editor-settings-form" novalidate>
+            <div class="form-group">
+              <label for="editor-whatsapp">WhatsApp para Pedidos (com código de país, ex: 5511999999999)</label>
+              <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999">
+              <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+            </div>
+          </form>
+
+          <div class="editor-categories-header">
+            <h3>Categorias de Produtos</h3>
+            <button id="add-category-button" class="button button-small" type="button">+ Categoria</button>
+          </div>
+
+          <!-- Categories List Container -->
+          <div id="categories-container" class="categories-list-builder">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Editor Live Preview (Right Pane) -->
+        <div class="editor-preview-pane">
+          <div class="preview-header">
+            <h2>Pré-visualização Instantânea</h2>
+            <span class="preview-badge">Ao Vivo</span>
+          </div>
+          <div id="live-storefront-preview" class="pizza-demo live-preview-box">
+            <!-- Rendered dynamically matching pizzeria-v1 style -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer compact-footer">
+    <div class="wrap">
+      <p>© 2026 <a href="https://inspira.dev.br/">Coletivo Inspira</a>. Todos os direitos reservados.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="./portal.js"></script>
+</body>
+</html>
