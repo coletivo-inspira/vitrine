@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApiHandler } from '../workers/api.mjs';
+import {
+  STRICT_CSP_HEADER,
+  SUPABASE_PUBLIC_PROJECT_URL,
+  isPublishableAnonKey
+} from '../workers/api.mjs';
+import { fetchAuthConfig, startGoogleLogin } from '../web/portal/portal.js';
 
 const ownerId = '10000000-0000-0000-0000-000000000001';
 const siteAId = '20000000-0000-0000-0000-000000000001';
@@ -254,5 +260,140 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
     const bodyConflict = await resConflict.json();
     assert.equal(bodyConflict.error.code, 'REVISION_CONFLICT');
     assert.equal(bodyConflict.error.currentRevision, 2);
+  });
+
+  await t.test('GET /api/auth/config - serve apenas chave pública/anon com no-store e recusa segredos', async () => {
+    const b64url = (obj) =>
+      Buffer.from(JSON.stringify(obj))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    const anonJwt = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ role: 'anon', iss: 'supabase' })}.sig`;
+    const serviceRoleJwt = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ role: 'service_role', iss: 'supabase' })}.sig`;
+
+    assert.equal(isPublishableAnonKey('sb_publishable_live_key_12345'), true);
+    assert.equal(isPublishableAnonKey(anonJwt), true);
+    assert.equal(isPublishableAnonKey(''), false);
+    assert.equal(isPublishableAnonKey('sb_secret_live_key_12345'), false);
+    assert.equal(isPublishableAnonKey('sbp_personal_access_token'), false);
+    assert.equal(isPublishableAnonKey(serviceRoleJwt), false);
+
+    // 1. Sucesso com publishable key (sb_publishable_...)
+    const resPub = await api.fetch(new Request('http://localhost/api/auth/config'), {
+      SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+      SUPABASE_ANON_KEY: 'sb_publishable_vitrine_public_123'
+    });
+    assert.equal(resPub.status, 200);
+    assert.equal(resPub.headers.get('cache-control'), 'no-store');
+    assert.equal(resPub.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+    assert.equal(resPub.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(resPub.headers.get('x-frame-options'), 'DENY');
+    const bodyPub = await resPub.json();
+    assert.deepEqual(bodyPub, {
+      supabaseUrl: SUPABASE_PUBLIC_PROJECT_URL,
+      publishableKey: 'sb_publishable_vitrine_public_123'
+    });
+
+    // 2. Sucesso com chave anon JWT legada (role=anon)
+    const resAnonJwt = await api.fetch(new Request('http://localhost/api/auth/config'), {
+      SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+      SUPABASE_ANON_KEY: anonJwt
+    });
+    assert.equal(resAnonJwt.status, 200);
+    assert.equal((await resAnonJwt.json()).publishableKey, anonJwt);
+
+    // 3. Recusa quando SUPABASE_ANON_KEY está ausente, sb_secret_ ou JWT service_role
+    for (const forbiddenKey of ['', 'sb_secret_do_not_expose_999', 'sbp_token_999', serviceRoleJwt]) {
+      const resRejected = await api.fetch(new Request('http://localhost/api/auth/config'), {
+        SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+        SUPABASE_ANON_KEY: forbiddenKey
+      });
+      assert.equal(resRejected.status, 503);
+      assert.equal(resRejected.headers.get('cache-control'), 'no-store');
+      const rawText = await resRejected.text();
+      if (forbiddenKey) {
+        assert.equal(rawText.includes(forbiddenKey), false, 'Jamais deve vazar chave recusada na resposta');
+      }
+      const errBody = JSON.parse(rawText);
+      assert.equal(errBody.error.code, 'AUTH_CONFIG_UNAVAILABLE');
+    }
+
+    // 4. Método diferente de GET retorna 405
+    const resMethod = await api.fetch(
+      new Request('http://localhost/api/auth/config', { method: 'POST' }),
+      { SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL, SUPABASE_ANON_KEY: 'sb_publishable_vitrine_public_123' }
+    );
+    assert.equal(resMethod.status, 405);
+  });
+
+  await t.test('portal.js startGoogleLogin - busca /api/auth/config antes de montar OAuth PKCE e exibe erro claro sem entrar no modo demo quando ausente', async () => {
+    const storageMap = new Map();
+    const mockSessionStorage = {
+      getItem: (k) => storageMap.get(k) ?? null,
+      setItem: (k, v) => storageMap.set(k, String(v)),
+      removeItem: (k) => storageMap.delete(k)
+    };
+
+    // 1. Quando /api/auth/config retorna configuração válida, monta URL OAuth PKCE e redireciona
+    const navigatedUrls = [];
+    const feedbackCalls = [];
+    const authUrl = await startGoogleLogin({
+      origin: 'https://vitrine-inspira.vitrineinspira.workers.dev',
+      sessionStorage: mockSessionStorage,
+      navigate: (url) => navigatedUrls.push(url),
+      showFeedback: (msg, type) => feedbackCalls.push({ msg, type }),
+      fetch: (input) =>
+        api.fetch(new Request(new URL(input, 'http://localhost')), {
+          SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+          SUPABASE_ANON_KEY: 'sb_publishable_portal_login_key'
+        })
+    });
+
+    assert.equal(feedbackCalls.length, 0);
+    assert.equal(navigatedUrls.length, 1);
+    assert.equal(authUrl, navigatedUrls[0]);
+    const parsedOAuth = new URL(authUrl);
+    assert.equal(parsedOAuth.origin, SUPABASE_PUBLIC_PROJECT_URL);
+    assert.equal(parsedOAuth.pathname, '/auth/v1/authorize');
+    assert.equal(parsedOAuth.searchParams.get('provider'), 'google');
+    assert.equal(parsedOAuth.searchParams.get('code_challenge_method'), 's256');
+    assert.ok((parsedOAuth.searchParams.get('code_challenge') || '').length >= 40);
+    assert.equal(
+      parsedOAuth.searchParams.get('redirect_to'),
+      'https://vitrine-inspira.vitrineinspira.workers.dev/portal/'
+    );
+    assert.ok((storageMap.get('pkce_verifier') || '').length >= 40);
+    assert.equal(storageMap.get('supabase_publishable_key'), 'sb_publishable_portal_login_key');
+    assert.equal(storageMap.has('portal_local_authenticated'), false);
+
+    // 2. Quando /api/auth/config está indisponível (sem SUPABASE_ANON_KEY), exibe erro claro e NÃO entra no modo demo local
+    storageMap.clear();
+    const missingNavigated = [];
+    const missingFeedback = [];
+    const resultMissing = await startGoogleLogin({
+      origin: 'https://vitrine-inspira.vitrineinspira.workers.dev',
+      sessionStorage: mockSessionStorage,
+      navigate: (url) => missingNavigated.push(url),
+      showFeedback: (msg, type) => missingFeedback.push({ msg, type }),
+      fetch: (input) => api.fetch(new Request(new URL(input, 'http://localhost')), {})
+    });
+
+    assert.equal(resultMissing, null);
+    assert.equal(missingNavigated.length, 0);
+    assert.equal(missingFeedback.length, 1);
+    assert.equal(missingFeedback[0].type, 'error');
+    assert.match(missingFeedback[0].msg, /Configuração de autenticação do Supabase ausente ou indisponível/i);
+    assert.doesNotMatch(missingFeedback[0].msg, /Redirecionando para o modo local/i);
+    assert.equal(storageMap.has('portal_local_authenticated'), false);
+
+    // 3. fetchAuthConfig retorna null quando o endpoint recusa chave secreta
+    const refusedConfig = await fetchAuthConfig((input) =>
+      api.fetch(new Request(new URL(input, 'http://localhost')), {
+        SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+        SUPABASE_ANON_KEY: 'sb_secret_never_expose'
+      })
+    );
+    assert.equal(refusedConfig, null);
   });
 });

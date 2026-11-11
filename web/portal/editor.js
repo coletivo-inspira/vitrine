@@ -6,38 +6,38 @@ let currentIsOnline = false;
 let currentDraft = null; // { siteId, revision, updatedAt, content }
 
 // DOM Elements
-const editorSiteTitle = document.getElementById('editor-site-title');
-const editorSiteSlug = document.getElementById('editor-site-slug');
-const editorRevisionIndicator = document.getElementById('editor-revision-indicator');
-const saveDraftButton = document.getElementById('save-draft-button');
-const publishSiteButton = document.getElementById('publish-site-button');
-const publicationStatusBar = document.getElementById('publication-status-bar');
-const publicationStatusText = document.getElementById('publication-status-text');
-const publicationViewLink = document.getElementById('publication-view-link');
-const conflictBanner = document.getElementById('conflict-banner');
-const reloadConflictButton = document.getElementById('reload-conflict-button');
-const copyConflictButton = document.getElementById('copy-conflict-button');
+const editorSiteTitle = globalThis.document?.getElementById('editor-site-title');
+const editorSiteSlug = globalThis.document?.getElementById('editor-site-slug');
+const editorRevisionIndicator = globalThis.document?.getElementById('editor-revision-indicator');
+const saveDraftButton = globalThis.document?.getElementById('save-draft-button');
+const publishSiteButton = globalThis.document?.getElementById('publish-site-button');
+const publicationStatusBar = globalThis.document?.getElementById('publication-status-bar');
+const publicationStatusText = globalThis.document?.getElementById('publication-status-text');
+const publicationViewLink = globalThis.document?.getElementById('publication-view-link');
+const conflictBanner = globalThis.document?.getElementById('conflict-banner');
+const reloadConflictButton = globalThis.document?.getElementById('reload-conflict-button');
+const copyConflictButton = globalThis.document?.getElementById('copy-conflict-button');
 
 // Meters & warnings
-const activeItemsCount = document.getElementById('active-items-count');
-const activeItemsProgress = document.getElementById('active-items-progress');
-const activeItemsWarning = document.getElementById('active-items-warning');
+const activeItemsCount = globalThis.document?.getElementById('active-items-count');
+const activeItemsProgress = globalThis.document?.getElementById('active-items-progress');
+const activeItemsWarning = globalThis.document?.getElementById('active-items-warning');
 
-const totalItemsCount = document.getElementById('total-items-count');
-const totalItemsProgress = document.getElementById('total-items-progress');
-const totalItemsWarning = document.getElementById('total-items-warning');
+const totalItemsCount = globalThis.document?.getElementById('total-items-count');
+const totalItemsProgress = globalThis.document?.getElementById('total-items-progress');
+const totalItemsWarning = globalThis.document?.getElementById('total-items-warning');
 
-const draftSizeCount = document.getElementById('draft-size-count');
-const draftSizeProgress = document.getElementById('draft-size-progress');
-const draftSizeWarning = document.getElementById('draft-size-warning');
+const draftSizeCount = globalThis.document?.getElementById('draft-size-count');
+const draftSizeProgress = globalThis.document?.getElementById('draft-size-progress');
+const draftSizeWarning = globalThis.document?.getElementById('draft-size-warning');
 
 // Form & Container
-const editorSettingsForm = document.getElementById('editor-settings-form');
-const editorWhatsapp = document.getElementById('editor-whatsapp');
-const editorWhatsappError = document.getElementById('editor-whatsapp-error');
-const addCategoryButton = document.getElementById('add-category-button');
-const categoriesContainer = document.getElementById('categories-container');
-const liveStorefrontPreview = document.getElementById('live-storefront-preview');
+const editorSettingsForm = globalThis.document?.getElementById('editor-settings-form');
+const editorWhatsapp = globalThis.document?.getElementById('editor-whatsapp');
+const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp-error');
+const addCategoryButton = globalThis.document?.getElementById('add-category-button');
+const categoriesContainer = globalThis.document?.getElementById('categories-container');
+const liveStorefrontPreview = globalThis.document?.getElementById('live-storefront-preview');
 
 // Entrypoint exported to portal.js
 export async function loadEditor(site, isOnline) {

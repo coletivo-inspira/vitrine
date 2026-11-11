@@ -7,28 +7,28 @@ let sites = [];
 let activeSite = null;
 
 // DOM Elements
-const authSection = document.getElementById('auth-section');
-const dashboardSection = document.getElementById('dashboard-section');
-const editorSection = document.getElementById('editor-section');
-const demoModeBadge = document.getElementById('demo-mode-badge');
-const logoutButton = document.getElementById('logout-button');
-const globalFeedback = document.getElementById('global-feedback');
-const sitesListContainer = document.getElementById('sites-list-container');
-const createSiteForm = document.getElementById('create-site-form');
-const newSiteNameInput = document.getElementById('new-site-name');
-const newSiteSlugInput = document.getElementById('new-site-slug');
-const slugPreview = document.getElementById('slug-preview');
-const slugValidationError = document.getElementById('slug-validation-error');
-const googleLoginButton = document.getElementById('google-login-button');
-const localDemoButton = document.getElementById('local-demo-button');
-const backToDashboardButton = document.getElementById('back-to-dashboard');
+const authSection = globalThis.document?.getElementById('auth-section');
+const dashboardSection = globalThis.document?.getElementById('dashboard-section');
+const editorSection = globalThis.document?.getElementById('editor-section');
+const demoModeBadge = globalThis.document?.getElementById('demo-mode-badge');
+const logoutButton = globalThis.document?.getElementById('logout-button');
+const globalFeedback = globalThis.document?.getElementById('global-feedback');
+const sitesListContainer = globalThis.document?.getElementById('sites-list-container');
+const createSiteForm = globalThis.document?.getElementById('create-site-form');
+const newSiteNameInput = globalThis.document?.getElementById('new-site-name');
+const newSiteSlugInput = globalThis.document?.getElementById('new-site-slug');
+const slugPreview = globalThis.document?.getElementById('slug-preview');
+const slugValidationError = globalThis.document?.getElementById('slug-validation-error');
+const googleLoginButton = globalThis.document?.getElementById('google-login-button');
+const localDemoButton = globalThis.document?.getElementById('local-demo-button');
+const backToDashboardButton = globalThis.document?.getElementById('back-to-dashboard');
 
 // Reserved slugs to block on the client side
 const RESERVED_SLUGS = ['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout'];
 export const DEFAULT_SUPABASE_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 
 // Initialize App
-document.addEventListener('DOMContentLoaded', async () => {
+globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await checkSession();
 });
@@ -40,7 +40,7 @@ function setupEventListeners() {
     try {
       await startGoogleLogin();
     } catch (err) {
-      showFeedback('Erro ao iniciar login com Google. Utilizando modo local.', 'error');
+      showFeedback('Erro ao iniciar login com Google. Tente novamente ou utilize o Modo Local (Offline).', 'error');
     }
   });
 
@@ -122,14 +122,14 @@ function fallbackToLocalIfNoSession() {
 // PKCE Generation helpers
 function generateRandomString(length) {
   const array = new Uint32Array(length / 2);
-  window.crypto.getRandomValues(array);
+  globalThis.crypto.getRandomValues(array);
   return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
 }
 
 async function sha256(plain) {
   const encoder = new TextEncoder();
   const data = encoder.encode(plain);
-  return window.crypto.subtle.digest('SHA-256', data);
+  return globalThis.crypto.subtle.digest('SHA-256', data);
 }
 
 function base64urlencode(a) {
@@ -145,28 +145,83 @@ function base64urlencode(a) {
     .replace(/=+$/, "");
 }
 
-async function startGoogleLogin() {
-  const supabaseUrl = String(window.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/+$/, '');
-  const supabaseAnonKey = window.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    showFeedback('Configuração do Supabase ausente. Redirecionando para o modo local de demonstração...', 'error');
-    setTimeout(() => {
-      enterLocalDemoMode();
-    }, 1500);
-    return;
+export async function fetchAuthConfig(fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl === 'function') {
+    try {
+      const res = await fetchImpl('/api/auth/config', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (res && res.ok) {
+        const data = await res.json();
+        const supabaseUrl = String(
+          data?.supabaseUrl || globalThis.window?.SUPABASE_URL || DEFAULT_SUPABASE_URL
+        )
+          .trim()
+          .replace(/\/+$/, '');
+        const publishableKey =
+          typeof data?.publishableKey === 'string' ? data.publishableKey.trim() : '';
+        if (supabaseUrl && publishableKey) {
+          if (typeof window !== 'undefined') {
+            window.SUPABASE_URL = supabaseUrl;
+            window.SUPABASE_ANON_KEY = publishableKey;
+          }
+          return { supabaseUrl, publishableKey };
+        }
+      }
+    } catch {
+      // Fall through to window fallback check
+    }
   }
 
+  const fallbackUrl = String(globalThis.window?.SUPABASE_URL || DEFAULT_SUPABASE_URL)
+    .trim()
+    .replace(/\/+$/, '');
+  const fallbackKey =
+    typeof globalThis.window?.SUPABASE_ANON_KEY === 'string'
+      ? globalThis.window.SUPABASE_ANON_KEY.trim()
+      : '';
+  if (fallbackUrl && fallbackKey) {
+    return { supabaseUrl: fallbackUrl, publishableKey: fallbackKey };
+  }
+  return null;
+}
+
+export async function startGoogleLogin(deps = {}) {
+  const fetchImpl = deps.fetch ?? globalThis.fetch;
+  const onFeedback = deps.showFeedback ?? showFeedback;
+  const config = await fetchAuthConfig(fetchImpl);
+
+  if (!config || !config.supabaseUrl || !config.publishableKey) {
+    onFeedback(
+      'Configuração de autenticação do Supabase ausente ou indisponível no servidor. Verifique SUPABASE_ANON_KEY ou utilize o Modo Local (Offline).',
+      'error'
+    );
+    return null;
+  }
+
+  const { supabaseUrl, publishableKey } = config;
   const verifier = generateRandomString(56);
-  sessionStorage.setItem('pkce_verifier', verifier);
+  const storage = deps.sessionStorage ?? globalThis.sessionStorage;
+  if (storage && typeof storage.setItem === 'function') {
+    storage.setItem('pkce_verifier', verifier);
+    storage.setItem('supabase_publishable_key', publishableKey);
+  }
 
   const hashed = await sha256(verifier);
   const challenge = base64urlencode(hashed);
 
-  const redirectUrl = `${window.location.origin}/portal/`;
+  const origin = deps.origin ?? globalThis.window?.location?.origin ?? 'http://localhost';
+  const redirectUrl = `${origin}/portal/`;
   const googleAuthUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&code_challenge=${challenge}&code_challenge_method=s256&redirect_to=${encodeURIComponent(redirectUrl)}`;
 
-  window.location.href = googleAuthUrl;
+  if (typeof deps.navigate === 'function') {
+    deps.navigate(googleAuthUrl);
+  } else if (typeof window !== 'undefined' && window.location) {
+    window.location.href = googleAuthUrl;
+  }
+  return googleAuthUrl;
 }
 
 // Enter Local Demo Mode
@@ -213,16 +268,20 @@ function showSection(section) {
 
 // Show Feedback Messages
 export function showFeedback(msg, type = 'success') {
-  globalFeedback.textContent = msg;
-  globalFeedback.className = `feedback-banner ${type}`;
-  globalFeedback.hidden = false;
-  
-  // Auto-scroll to top to let user see feedback
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const feedbackEl = globalFeedback ?? globalThis.document?.getElementById('global-feedback');
+  if (feedbackEl) {
+    feedbackEl.textContent = msg;
+    feedbackEl.className = `feedback-banner ${type}`;
+    feedbackEl.hidden = false;
+    setTimeout(() => {
+      feedbackEl.hidden = true;
+    }, 6000);
+  }
 
-  setTimeout(() => {
-    globalFeedback.hidden = true;
-  }, 6000);
+  // Auto-scroll to top to let user see feedback
+  if (typeof globalThis.window?.scrollTo === 'function') {
+    globalThis.window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 // Slug validation reactive rules

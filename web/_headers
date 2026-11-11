@@ -5,8 +5,10 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-Frame-Options: DENY
 /portal
+  ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' https://qawlpsrfewosxsfgmmpm.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
 /portal/*
+  ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' https://qawlpsrfewosxsfgmmpm.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
 /data/*
   Cache-Control: no-cache
