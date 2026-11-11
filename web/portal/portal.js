@@ -77,44 +77,236 @@ function setupEventListeners() {
   });
 }
 
-// Check session on startup
-async function checkSession() {
+function extractAuthCodeFromUrl(deps = {}) {
+  const href =
+    deps.locationHref ??
+    deps.location?.href ??
+    globalThis.window?.location?.href ??
+    '';
+  if (href) {
+    try {
+      const parsed = new URL(href, 'http://localhost');
+      const code = parsed.searchParams.get('code');
+      if (typeof code === 'string' && code.trim()) {
+        return code.trim();
+      }
+    } catch {
+      // Fall through to search string check
+    }
+  }
+  const search =
+    deps.locationSearch ??
+    deps.location?.search ??
+    globalThis.window?.location?.search ??
+    '';
+  if (search) {
+    const params = new URLSearchParams(search);
+    const code = params.get('code');
+    if (typeof code === 'string' && code.trim()) {
+      return code.trim();
+    }
+  }
+  return null;
+}
+
+function clearAuthCodeFromUrl(deps = {}) {
+  const historyObj = deps.history ?? globalThis.window?.history ?? globalThis.history;
+  if (!historyObj || typeof historyObj.replaceState !== 'function') {
+    return null;
+  }
+  const href =
+    deps.locationHref ??
+    deps.location?.href ??
+    globalThis.window?.location?.href ??
+    'http://localhost/portal/';
   try {
-    const res = await fetch('/api/auth/session');
+    const parsed = new URL(href, 'http://localhost');
+    parsed.searchParams.delete('code');
+    const cleanUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    historyObj.replaceState(null, '', cleanUrl);
+    return cleanUrl;
+  } catch {
+    historyObj.replaceState(null, '', '/portal/');
+    return '/portal/';
+  }
+}
+
+export async function exchangePkceCode(code, deps = {}) {
+  const fetchImpl = deps.fetch ?? globalThis.fetch;
+  const storage = deps.sessionStorage ?? globalThis.sessionStorage;
+  const onFeedback = deps.showFeedback ?? showFeedback;
+  const onSection = deps.showSection ?? showSection;
+  const loadSitesFn = deps.loadSites ?? (() => loadSites(fetchImpl));
+
+  const codeVerifier =
+    typeof storage?.getItem === 'function'
+      ? (storage.getItem('pkce_verifier') || '').trim()
+      : '';
+
+  function cleanupPkceState() {
+    if (typeof storage?.removeItem === 'function') {
+      storage.removeItem('pkce_verifier');
+      storage.removeItem('supabase_publishable_key');
+    }
+    clearAuthCodeFromUrl(deps);
+  }
+
+  function handlePkceFailure(message) {
+    cleanupPkceState();
+    isOnline = true;
+    currentUser = null;
+    if (typeof storage?.removeItem === 'function') {
+      storage.removeItem('portal_local_authenticated');
+    }
+    if (demoModeBadge) demoModeBadge.hidden = true;
+    if (logoutButton) logoutButton.hidden = true;
+    onSection('auth');
+    onFeedback(message, 'error');
+    return { ok: false, error: message };
+  }
+
+  const trimmedCode = typeof code === 'string' ? code.trim() : '';
+  if (!trimmedCode || !codeVerifier) {
+    return handlePkceFailure(
+      'Sessão de login expirada ou verificador PKCE ausente. Inicie o login com Google novamente.'
+    );
+  }
+
+  const config = await fetchAuthConfig(fetchImpl);
+  if (!config || !config.supabaseUrl || !config.publishableKey) {
+    return handlePkceFailure(
+      'Configuração de autenticação do Supabase ausente ou indisponível no servidor.'
+    );
+  }
+
+  let accessToken = '';
+  try {
+    const tokenRes = await fetchImpl(`${config.supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        apikey: config.publishableKey
+      },
+      body: JSON.stringify({
+        auth_code: trimmedCode,
+        code_verifier: codeVerifier
+      })
+    });
+
+    if (!tokenRes || !tokenRes.ok) {
+      return handlePkceFailure(
+        'Não foi possível trocar o código de autorização PKCE no Supabase. Tente entrar com Google novamente.'
+      );
+    }
+
+    const tokenData = await tokenRes.json().catch(() => null);
+    accessToken =
+      typeof tokenData?.access_token === 'string' ? tokenData.access_token.trim() : '';
+  } catch {
+    return handlePkceFailure(
+      'Falha de comunicação ao trocar o código PKCE no Supabase. Tente entrar com Google novamente.'
+    );
+  }
+
+  if (!accessToken) {
+    return handlePkceFailure(
+      'Resposta de autenticação inválida do provedor OAuth. Tente entrar com Google novamente.'
+    );
+  }
+
+  try {
+    const sessionRes = await fetchImpl('/api/auth/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ accessToken })
+    });
+
+    if (!sessionRes || !sessionRes.ok) {
+      return handlePkceFailure(
+        'Falha ao validar o token de sessão no servidor. Tente entrar com Google novamente.'
+      );
+    }
+
+    const sessionData = await sessionRes.json().catch(() => null);
+    if (!sessionData?.authenticated || !sessionData?.user?.id) {
+      return handlePkceFailure(
+        'Sessão retornada pelo servidor é inválida. Tente entrar com Google novamente.'
+      );
+    }
+
+    cleanupPkceState();
+    isOnline = true;
+    currentUser = sessionData.user;
+    if (typeof storage?.removeItem === 'function') {
+      storage.removeItem('portal_local_authenticated');
+    }
+    if (demoModeBadge) demoModeBadge.hidden = true;
+    if (logoutButton) logoutButton.hidden = false;
+    onSection('dashboard');
+    await loadSitesFn();
+    return { ok: true, user: sessionData.user, sites };
+  } catch {
+    return handlePkceFailure(
+      'Erro de rede ao estabelecer a sessão no servidor. Tente entrar com Google novamente.'
+    );
+  }
+}
+
+// Check session on startup
+export async function checkSession(deps = {}) {
+  const authCode = extractAuthCodeFromUrl(deps);
+  if (authCode !== null) {
+    return exchangePkceCode(authCode, deps);
+  }
+
+  const fetchImpl = deps.fetch ?? globalThis.fetch;
+  const onSection = deps.showSection ?? showSection;
+  const loadSitesFn = deps.loadSites ?? (() => loadSites(fetchImpl));
+  try {
+    const res = await fetchImpl('/api/auth/session');
     if (res.ok) {
       const data = await res.json();
       isOnline = true;
       currentUser = data.user;
-      demoModeBadge.hidden = true;
-      logoutButton.hidden = false;
-      showSection('dashboard');
-      await loadSites();
+      if (demoModeBadge) demoModeBadge.hidden = true;
+      if (logoutButton) logoutButton.hidden = false;
+      onSection('dashboard');
+      await loadSitesFn();
+      return { ok: true, user: data.user, sites };
     } else if (res.status === 401) {
       isOnline = true;
-      logoutButton.hidden = true;
-      showSection('auth');
+      if (logoutButton) logoutButton.hidden = true;
+      onSection('auth');
+      return { ok: false, status: 401 };
     } else {
       // Other status (like 404) implies offline static preview
       fallbackToLocalIfNoSession();
+      return { ok: false, status: res.status };
     }
   } catch (err) {
     // Network error implies offline static preview
     fallbackToLocalIfNoSession();
+    return { ok: false, error: 'network_error' };
   }
 }
 
 function fallbackToLocalIfNoSession() {
   isOnline = false;
   // Check if already authenticated in local storage
-  const localAuth = sessionStorage.getItem('portal_local_authenticated') === 'true';
+  const localAuth = globalThis.sessionStorage?.getItem('portal_local_authenticated') === 'true';
   if (localAuth) {
     currentUser = { id: 'local-demo-user' };
-    demoModeBadge.hidden = false;
-    logoutButton.hidden = false;
+    if (demoModeBadge) demoModeBadge.hidden = false;
+    if (logoutButton) logoutButton.hidden = false;
     showSection('dashboard');
     loadLocalSites();
   } else {
-    logoutButton.hidden = true;
+    if (logoutButton) logoutButton.hidden = true;
     showSection('auth');
   }
 }
@@ -247,23 +439,24 @@ async function handleLogout() {
   }
 
   // Clear local state
-  sessionStorage.removeItem('portal_local_authenticated');
-  sessionStorage.removeItem('pkce_verifier');
+  globalThis.sessionStorage?.removeItem('portal_local_authenticated');
+  globalThis.sessionStorage?.removeItem('pkce_verifier');
+  globalThis.sessionStorage?.removeItem('supabase_publishable_key');
   currentUser = null;
   sites = [];
   activeSite = null;
   
-  demoModeBadge.hidden = true;
-  logoutButton.hidden = true;
+  if (demoModeBadge) demoModeBadge.hidden = true;
+  if (logoutButton) logoutButton.hidden = true;
   showFeedback('Sessão encerrada com sucesso.', 'success');
   showSection('auth');
 }
 
 // Section Switching
 function showSection(section) {
-  authSection.hidden = section !== 'auth';
-  dashboardSection.hidden = section !== 'dashboard';
-  editorSection.hidden = section !== 'editor';
+  if (authSection) authSection.hidden = section !== 'auth';
+  if (dashboardSection) dashboardSection.hidden = section !== 'dashboard';
+  if (editorSection) editorSection.hidden = section !== 'editor';
 }
 
 // Show Feedback Messages
@@ -317,14 +510,18 @@ function validateSlug(slug) {
 }
 
 // Load Sites (Online / Offline)
-async function loadSites() {
-  sitesListContainer.innerHTML = '<p class="loading-msg">Carregando vitrines...</p>';
+async function loadSites(fetchImpl = globalThis.fetch) {
+  if (sitesListContainer) {
+    sitesListContainer.innerHTML = '<p class="loading-msg">Carregando vitrines...</p>';
+  }
   try {
-    const res = await fetch('/api/sites');
+    const res = await fetchImpl('/api/sites');
     if (res.ok) {
       const data = await res.json();
       sites = data.sites || [];
-      renderSites();
+      if (sitesListContainer && globalThis.document) {
+        renderSites();
+      }
     } else {
       showFeedback('Erro ao carregar vitrines do servidor.', 'error');
     }

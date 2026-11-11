@@ -16,6 +16,8 @@ import {
 } from '../src/publication-engine.mjs';
 
 const SESSION_COOKIE_NAME = '__Host-vitrine_session';
+const DEFAULT_SESSION_MAX_AGE_SECONDS = 3600;
+const MAX_SESSION_MAX_AGE_SECONDS = 86400;
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
 export const SUPABASE_PUBLIC_PROJECT_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 export const STRICT_CSP_HEADER =
@@ -285,6 +287,33 @@ function parseJwtHeader(token) {
   } catch {
     return null;
   }
+}
+
+function resolveTokenMaxAgeSeconds(token, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const parsed = parseJwtHeader(token);
+  if (!parsed) {
+    return DEFAULT_SESSION_MAX_AGE_SECONDS;
+  }
+  try {
+    const payload = JSON.parse(utf8Decoder.decode(base64UrlToUint8Array(parsed.parts[1])));
+    if (payload && typeof payload.exp === 'number' && Number.isFinite(payload.exp)) {
+      const remaining = Math.floor(payload.exp - nowSeconds);
+      if (remaining > 0) {
+        return Math.min(remaining, MAX_SESSION_MAX_AGE_SECONDS);
+      }
+    }
+  } catch {
+    // Fallback to default session max-age
+  }
+  return DEFAULT_SESSION_MAX_AGE_SECONDS;
+}
+
+export function buildSessionCookieHeader(token, maxAgeSeconds = DEFAULT_SESSION_MAX_AGE_SECONDS) {
+  const safeMaxAge =
+    Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0
+      ? Math.min(Math.floor(maxAgeSeconds), MAX_SESSION_MAX_AGE_SECONDS)
+      : DEFAULT_SESSION_MAX_AGE_SECONDS;
+  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Max-Age=${safeMaxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 
 function isAudienceAuthenticated(aud) {
@@ -1553,19 +1582,99 @@ export function createApiHandler(deps = {}) {
       }
 
       if (pathname === '/api/auth/session') {
-        if (method !== 'GET') {
-          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/session.');
-        }
-        const user = await resolveSessionUser(request, env, deps);
-        if (!user) {
-          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
-        }
-        return jsonResponse(200, {
-          authenticated: true,
-          user: {
-            id: user.id
+        if (method === 'GET') {
+          const user = await resolveSessionUser(request, env, deps);
+          if (!user) {
+            return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
           }
-        });
+          return jsonResponse(200, {
+            authenticated: true,
+            user: {
+              id: user.id
+            }
+          });
+        }
+
+        if (method === 'POST') {
+          let candidateToken = null;
+          let rawBody = '';
+          try {
+            rawBody = await request.text();
+          } catch {
+            throw new PortalValidationError(
+              400,
+              'INVALID_JSON',
+              'Não foi possível ler o corpo da requisição.'
+            );
+          }
+
+          if (rawBody && rawBody.trim()) {
+            let parsed;
+            try {
+              parsed = JSON.parse(rawBody);
+            } catch {
+              throw new PortalValidationError(
+                400,
+                'INVALID_JSON',
+                'O corpo da requisição não contém JSON válido.'
+              );
+            }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+              return errorResponse(400, 'INVALID_PAYLOAD', 'Corpo da requisição inválido.');
+            }
+            const bodyToken = parsed.accessToken ?? parsed.access_token ?? parsed.token;
+            if (typeof bodyToken === 'string' && bodyToken.trim()) {
+              candidateToken = bodyToken.trim();
+            }
+          }
+
+          if (!candidateToken) {
+            const authHeader = request.headers.get('authorization');
+            if (typeof authHeader === 'string') {
+              const match = authHeader.match(/^Bearer\s+(.+)$/i);
+              if (match && match[1].trim()) {
+                candidateToken = match[1].trim();
+              }
+            }
+          }
+
+          if (!candidateToken) {
+            return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+          }
+
+          const verificationHeaders = new Headers();
+          verificationHeaders.set('authorization', `Bearer ${candidateToken}`);
+          const verificationRequest = new Request(request.url, {
+            method: 'GET',
+            headers: verificationHeaders
+          });
+
+          const user = await resolveSessionUser(verificationRequest, env, deps);
+          if (!user) {
+            return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+          }
+
+          const nowSeconds =
+            typeof deps?.nowSeconds === 'function'
+              ? deps.nowSeconds()
+              : (deps?.nowSeconds ?? Math.floor(Date.now() / 1000));
+          const maxAgeSeconds = resolveTokenMaxAgeSeconds(user.token, nowSeconds);
+
+          return jsonResponse(
+            200,
+            {
+              authenticated: true,
+              user: {
+                id: user.id
+              }
+            },
+            {
+              'set-cookie': buildSessionCookieHeader(user.token, maxAgeSeconds)
+            }
+          );
+        }
+
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/session.');
       }
 
       if (pathname === '/api/sites' || pathname === '/api/sites/') {
