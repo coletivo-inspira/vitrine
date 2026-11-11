@@ -4,9 +4,15 @@ import { createApiHandler } from '../workers/api.mjs';
 import {
   STRICT_CSP_HEADER,
   SUPABASE_PUBLIC_PROJECT_URL,
+  clearJwksCache,
   isPublishableAnonKey
 } from '../workers/api.mjs';
-import { fetchAuthConfig, startGoogleLogin } from '../web/portal/portal.js';
+import {
+  checkSession,
+  exchangePkceCode,
+  fetchAuthConfig,
+  startGoogleLogin
+} from '../web/portal/portal.js';
 
 const ownerId = '10000000-0000-0000-0000-000000000001';
 const siteAId = '20000000-0000-0000-0000-000000000001';
@@ -395,5 +401,285 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
       })
     );
     assert.equal(refusedConfig, null);
+  });
+
+  await t.test('POST /api/auth/session e callback PKCE (?code=...) em portal.js - troca código por token, valida ES256/JWKS, grava cookie __Host-vitrine_session, limpa verifier/URL e abre dashboard', async () => {
+    clearJwksCache();
+    const b64url = (input) =>
+      Buffer.from(input)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+
+    const { publicKey, privateKey } = await crypto.subtle.generateKey(
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign', 'verify']
+    );
+    const publicJwk = await crypto.subtle.exportKey('jwk', publicKey);
+    const kid = 'pkce-es256-key-1';
+    const jwks = {
+      keys: [
+        {
+          kty: 'EC',
+          crv: 'P-256',
+          alg: 'ES256',
+          use: 'sig',
+          kid,
+          x: publicJwk.x,
+          y: publicJwk.y
+        }
+      ]
+    };
+
+    async function signEs256(payload, signingKey = privateKey, headerKid = kid) {
+      const headerPart = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid: headerKid }));
+      const payloadPart = b64url(JSON.stringify(payload));
+      const signingInput = new TextEncoder().encode(`${headerPart}.${payloadPart}`);
+      const sigBuffer = await crypto.subtle.sign(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        signingKey,
+        signingInput
+      );
+      return `${headerPart}.${payloadPart}.${b64url(new Uint8Array(sigBuffer))}`;
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const validAccessToken = await signEs256({
+      sub: ownerId,
+      iss: `${SUPABASE_PUBLIC_PROJECT_URL}/auth/v1`,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 1800
+    });
+    const expiredAccessToken = await signEs256({
+      sub: ownerId,
+      iss: `${SUPABASE_PUBLIC_PROJECT_URL}/auth/v1`,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec - 60
+    });
+
+    const envWithJwks = {
+      SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+      SUPABASE_ANON_KEY: 'sb_publishable_portal_pkce_key',
+      SUPABASE_JWKS: jwks
+    };
+
+    // 1. POST /api/auth/session rejeita tokens inválidos/expirados sem definir Set-Cookie
+    for (const badBody of [{}, { accessToken: '' }, { accessToken: 'invalid.jwt.token' }, { accessToken: expiredAccessToken }]) {
+      const badRes = await api.fetch(
+        new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(badBody)
+        }),
+        envWithJwks
+      );
+      assert.equal(badRes.status, 401);
+      assert.equal(badRes.headers.get('set-cookie'), null, 'Jamais deve definir cookie para token inválido');
+    }
+
+    // 2. POST /api/auth/session aceita ES256 válido e define __Host-vitrine_session HttpOnly; Secure; SameSite=Lax; Path=/
+    const establishRes = await api.fetch(
+      new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: validAccessToken })
+      }),
+      envWithJwks
+    );
+    assert.equal(establishRes.status, 200);
+    const establishBody = await establishRes.json();
+    assert.deepEqual(establishBody, {
+      authenticated: true,
+      user: { id: ownerId }
+    });
+    const setCookieHeader = establishRes.headers.get('set-cookie') || '';
+    assert.match(setCookieHeader, /^__Host-vitrine_session=[^;]+;/);
+    assert.match(setCookieHeader, /Path=\//);
+    assert.match(setCookieHeader, /HttpOnly/);
+    assert.match(setCookieHeader, /Secure/);
+    assert.match(setCookieHeader, /SameSite=Lax/);
+    assert.doesNotMatch(setCookieHeader, /Domain=/i);
+
+    // 3. Fluxo completo no portal.js: startGoogleLogin -> redirect ?code=... -> checkSession troca código, envia ao Worker, limpa verifier e URL, e carrega o dashboard
+    const storageMap = new Map();
+    const mockSessionStorage = {
+      getItem: (k) => storageMap.get(k) ?? null,
+      setItem: (k, v) => storageMap.set(k, String(v)),
+      removeItem: (k) => storageMap.delete(k)
+    };
+
+    await startGoogleLogin({
+      origin: 'https://vitrine-inspira.vitrineinspira.workers.dev',
+      sessionStorage: mockSessionStorage,
+      navigate: () => {},
+      showFeedback: () => {},
+      fetch: (input, init) =>
+        api.fetch(new Request(new URL(input, 'https://vitrine-inspira.vitrineinspira.workers.dev'), init), envWithJwks)
+    });
+    const savedVerifier = storageMap.get('pkce_verifier');
+    assert.ok(savedVerifier && savedVerifier.length >= 40);
+
+    const tokenExchangeRequests = [];
+    const replaceStateCalls = [];
+    const sectionChanges = [];
+    const feedbackMessages = [];
+    let activeCookie = '';
+    let sitesLoadedCount = 0;
+
+    const pkceFetch = async (input, init = {}) => {
+      const reqUrl = new URL(
+        input instanceof Request ? input.url : String(input),
+        'https://vitrine-inspira.vitrineinspira.workers.dev'
+      );
+      if (reqUrl.origin === SUPABASE_PUBLIC_PROJECT_URL && reqUrl.pathname === '/auth/v1/token') {
+        const headers = new Headers(init.headers || {});
+        const body = JSON.parse(String(init.body || '{}'));
+        tokenExchangeRequests.push({
+          url: reqUrl.toString(),
+          method: init.method || 'GET',
+          apikey: headers.get('apikey'),
+          body
+        });
+        return new Response(
+          JSON.stringify({
+            access_token: validAccessToken,
+            refresh_token: 'ephemeral-refresh-token-never-persist',
+            token_type: 'bearer',
+            expires_in: 1800
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+
+      const headers = new Headers(init.headers || {});
+      if (activeCookie && !headers.has('cookie')) {
+        headers.set('cookie', activeCookie);
+      }
+      const workerReq = new Request(reqUrl.toString(), {
+        method: init.method || 'GET',
+        headers,
+        body: init.body
+      });
+      const workerRes = await api.fetch(workerReq, envWithJwks);
+      const sc = workerRes.headers.get('set-cookie');
+      if (sc) {
+        activeCookie = sc.split(';')[0];
+      }
+      return workerRes;
+    };
+
+    const callbackResult = await checkSession({
+      locationHref: 'https://vitrine-inspira.vitrineinspira.workers.dev/portal/?code=9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+      sessionStorage: mockSessionStorage,
+      history: {
+        replaceState: (state, title, url) => replaceStateCalls.push({ state, title, url })
+      },
+      showSection: (sec) => sectionChanges.push(sec),
+      showFeedback: (msg, type) => feedbackMessages.push({ msg, type }),
+      loadSites: async () => {
+        sitesLoadedCount += 1;
+      },
+      fetch: pkceFetch
+    });
+
+    assert.equal(callbackResult.ok, true);
+    assert.equal(callbackResult.user.id, ownerId);
+    assert.equal(tokenExchangeRequests.length, 1);
+    assert.equal(
+      tokenExchangeRequests[0].url,
+      `${SUPABASE_PUBLIC_PROJECT_URL}/auth/v1/token?grant_type=pkce`
+    );
+    assert.equal(tokenExchangeRequests[0].method, 'POST');
+    assert.equal(tokenExchangeRequests[0].apikey, 'sb_publishable_portal_pkce_key');
+    assert.deepEqual(tokenExchangeRequests[0].body, {
+      auth_code: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+      code_verifier: savedVerifier
+    });
+    assert.equal(activeCookie, `__Host-vitrine_session=${validAccessToken}`);
+    assert.equal(storageMap.has('pkce_verifier'), false, 'pkce_verifier deve ser removido após a troca');
+    for (const [k, v] of storageMap.entries()) {
+      assert.doesNotMatch(k, /refresh/i);
+      assert.doesNotMatch(String(v), /ephemeral-refresh-token-never-persist/);
+    }
+    assert.equal(replaceStateCalls.length, 1);
+    assert.equal(replaceStateCalls[0].url, '/portal/');
+    assert.deepEqual(sectionChanges, ['dashboard']);
+    assert.equal(sitesLoadedCount, 1);
+    assert.equal(feedbackMessages.length, 0);
+
+    // 4. Falha quando pkce_verifier está ausente/expirado: limpa URL, exibe erro claro e NÃO entra em modo demo
+    storageMap.clear();
+    replaceStateCalls.length = 0;
+    sectionChanges.length = 0;
+    feedbackMessages.length = 0;
+    let tokenEndpointCalledOnMissingVerifier = false;
+
+    const missingVerifierResult = await checkSession({
+      locationHref: 'https://vitrine-inspira.vitrineinspira.workers.dev/portal/?code=code-sem-verifier',
+      sessionStorage: mockSessionStorage,
+      history: {
+        replaceState: (state, title, url) => replaceStateCalls.push({ state, title, url })
+      },
+      showSection: (sec) => sectionChanges.push(sec),
+      showFeedback: (msg, type) => feedbackMessages.push({ msg, type }),
+      fetch: async () => {
+        tokenEndpointCalledOnMissingVerifier = true;
+        return new Response('Should not be called', { status: 500 });
+      }
+    });
+
+    assert.equal(missingVerifierResult.ok, false);
+    assert.equal(tokenEndpointCalledOnMissingVerifier, false);
+    assert.equal(replaceStateCalls.length, 1);
+    assert.equal(replaceStateCalls[0].url, '/portal/');
+    assert.deepEqual(sectionChanges, ['auth']);
+    assert.equal(feedbackMessages.length, 1);
+    assert.equal(feedbackMessages[0].type, 'error');
+    assert.match(feedbackMessages[0].msg, /verificador PKCE ausente|expirada/i);
+    assert.equal(storageMap.has('portal_local_authenticated'), false);
+
+    // 5. Falha quando a troca de token no Supabase falha (400 invalid_grant): limpa verifier e URL, exibe erro e NÃO entra em modo demo
+    storageMap.clear();
+    storageMap.set('pkce_verifier', 'verifier-para-codigo-expirado');
+    replaceStateCalls.length = 0;
+    sectionChanges.length = 0;
+    feedbackMessages.length = 0;
+
+    const failedExchangeResult = await exchangePkceCode('codigo-expirado-400', {
+      locationHref: 'https://vitrine-inspira.vitrineinspira.workers.dev/portal/?code=codigo-expirado-400',
+      sessionStorage: mockSessionStorage,
+      history: {
+        replaceState: (state, title, url) => replaceStateCalls.push({ state, title, url })
+      },
+      showSection: (sec) => sectionChanges.push(sec),
+      showFeedback: (msg, type) => feedbackMessages.push({ msg, type }),
+      fetch: async (input, init = {}) => {
+        const reqUrl = new URL(
+          input instanceof Request ? input.url : String(input),
+          'https://vitrine-inspira.vitrineinspira.workers.dev'
+        );
+        if (reqUrl.pathname === '/auth/v1/token') {
+          return new Response(JSON.stringify({ error: 'invalid_grant' }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return api.fetch(new Request(reqUrl.toString(), init), envWithJwks);
+      }
+    });
+
+    assert.equal(failedExchangeResult.ok, false);
+    assert.equal(storageMap.has('pkce_verifier'), false);
+    assert.equal(replaceStateCalls.length, 1);
+    assert.equal(replaceStateCalls[0].url, '/portal/');
+    assert.deepEqual(sectionChanges, ['auth']);
+    assert.equal(feedbackMessages.length, 1);
+    assert.equal(feedbackMessages[0].type, 'error');
+    assert.match(feedbackMessages[0].msg, /Não foi possível trocar o código de autorização PKCE/i);
+    assert.equal(storageMap.has('portal_local_authenticated'), false);
   });
 });
