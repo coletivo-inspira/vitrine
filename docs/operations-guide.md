@@ -189,14 +189,16 @@ node scripts/validate-pilot-pack.mjs
 
 1. **Variável pública versionada em `wrangler.jsonc`**:
    - `vars.SUPABASE_URL = "https://qawlpsrfewosxsfgmmpm.supabase.co"` (contém exclusivamente a URL pública do projeto, sem segredos).
-2. **Segredos exclusivos de servidor lidos por `workers/api.mjs`**:
-   Quando o proprietário da conta Cloudflare autenticar sua sessão (`npx wrangler login`), registre os segredos lidos por `workers/api.mjs` exclusivamente via `npx wrangler secret put`:
+2. **Verificação de JWT por JWKS (`ES256`) e Segredos de Servidor lidos por `workers/api.mjs`**:
+   - O projeto `qawlpsrfewosxsfgmmpm` emite JWTs assinados com **ECDSA P-256 (`alg: ES256`)** e `kid` publicado em `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`. `workers/api.mjs` (`verifyJwtEs256`) valida a assinatura via WebCrypto com cache da JWKS em memória do isolate (TTL de 10 min e refetch único em `kid` desconhecido), exigindo `exp` válido, `iss === "${SUPABASE_URL}/auth/v1"`, `aud` contendo `authenticated` e `role === 'authenticated'`.
+   - Quando o proprietário da conta Cloudflare autenticar sua sessão (`npx wrangler login`), registre os segredos lidos por `workers/api.mjs` exclusivamente via `npx wrangler secret put`:
    ```bash
    npx wrangler secret put SUPABASE_ANON_KEY
+   # Opcional (apenas fallback legado HS256):
    npx wrangler secret put SUPABASE_JWT_SECRET
    ```
-   - `SUPABASE_ANON_KEY`: lida por `workers/api.mjs` (`createSupabaseRestStore` e `resolveSessionUser`) para autenticar chamadas REST ao Supabase sob o token JWT do usuário (aplicando integralmente as políticas RLS).
-   - `SUPABASE_JWT_SECRET`: lida por `workers/api.mjs` (`verifyJwtHs256`) para validar a assinatura HS256 e a expiração dos tokens JWT de sessão no servidor.
+   - `SUPABASE_ANON_KEY` (**obrigatória**): aceita a nova **publishable key (`sb_publishable_...`)** ou a chave `anon` legada; é lida por `workers/api.mjs` (`createSupabaseRestStore`) para autenticar chamadas REST ao Supabase sob o token JWT do usuário (aplicando integralmente as políticas RLS).
+   - `SUPABASE_JWT_SECRET` (**opcional — legado**): lida por `workers/api.mjs` (`verifyJwtHs256`) apenas se configurada, como fallback para projetos ou tokens legados `HS256`. Para o projeto `qawlpsrfewosxsfgmmpm` (`ES256` via JWKS), sua configuração é opcional.
    - **Importante (Princípios I e III)**: `SUPABASE_SERVICE_ROLE_KEY` **não** é lida por `workers/api.mjs` e **jamais** deve ser injetada no Worker público.
 
 ### 5.4 Portões Obrigatórios de Pré-Lançamento (Dry-Run)

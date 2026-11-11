@@ -6,7 +6,12 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { createApiHandler, verifyJwtHs256 } from '../workers/api.mjs';
+import {
+  clearJwksCache,
+  createApiHandler,
+  verifyJwtEs256,
+  verifyJwtHs256
+} from '../workers/api.mjs';
 import { publishedPortfolio, quoteContactLink } from '../src/portfolio.mjs';
 import { publicMenu } from '../src/public-menu.mjs';
 import { compilePublicStorefront } from '../src/publication-engine.mjs';
@@ -49,6 +54,44 @@ async function createSignedJwt(payload, secret = AUDIT_JWT_SECRET) {
     ['sign']
   );
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(input));
+  return `${input}.${toBase64Url(new Uint8Array(sig))}`;
+}
+
+async function createEs256KeyPair(kid = 'audit-es256-kid-1') {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+  return {
+    kid,
+    privateKey: keyPair.privateKey,
+    publicKey: keyPair.publicKey,
+    jwk: {
+      kty: publicJwk.kty,
+      crv: publicJwk.crv,
+      x: publicJwk.x,
+      y: publicJwk.y,
+      kid,
+      use: 'sig',
+      alg: 'ES256'
+    }
+  };
+}
+
+async function createSignedEs256Jwt(payload, privateKey, kid = 'audit-es256-kid-1', extraHeader = {}) {
+  const encoder = new TextEncoder();
+  const headerB64 = toBase64Url(
+    encoder.encode(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid, ...extraHeader }))
+  );
+  const payloadB64 = toBase64Url(encoder.encode(JSON.stringify(payload)));
+  const input = `${headerB64}.${payloadB64}`;
+  const sig = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    privateKey,
+    encoder.encode(input)
+  );
   return `${input}.${toBase64Url(new Uint8Array(sig))}`;
 }
 
@@ -146,6 +189,9 @@ async function setupAuditDatabase() {
     ]
   );
 
+  let activeJwks = { keys: [] };
+  let jwksFetchCount = 0;
+
   async function asRole(role, userId, fn) {
     await db.exec('begin');
     try {
@@ -168,6 +214,13 @@ async function setupAuditDatabase() {
     const role = sub ? 'authenticated' : 'anon';
 
     try {
+      if (url.pathname === '/auth/v1/.well-known/jwks.json' && method === 'GET') {
+        jwksFetchCount += 1;
+        return new Response(JSON.stringify(activeJwks), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.pathname === '/rest/v1/sites') {
         if (method === 'GET') {
           const idFilter = url.searchParams.get('id');
@@ -272,14 +325,35 @@ async function setupAuditDatabase() {
     }
   }
 
-  return { db, asRole, postgrestFetch };
+  return {
+    db,
+    asRole,
+    postgrestFetch,
+    setJwks(nextJwks) {
+      activeJwks = nextJwks;
+    },
+    getJwksFetchCount() {
+      return jwksFetchCount;
+    },
+    resetJwksFetchCount() {
+      jwksFetchCount = 0;
+    }
+  };
 }
 
 test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML/Bundle', async (t) => {
-  const { db, asRole, postgrestFetch } = await setupAuditDatabase();
+  clearJwksCache();
+  const { db, asRole, postgrestFetch, setJwks, getJwksFetchCount, resetJwksFetchCount } =
+    await setupAuditDatabase();
   t.after(async () => {
+    clearJwksCache();
     await db.close();
   });
+
+  const es256Primary = await createEs256KeyPair('supabase-es256-kid-primary');
+  const es256Rotated = await createEs256KeyPair('supabase-es256-kid-rotated');
+  const es256Attacker = await createEs256KeyPair('supabase-es256-kid-primary');
+  setJwks({ keys: [es256Primary.jwk] });
 
   const api = createApiHandler({ fetch: postgrestFetch });
   const env = {
@@ -287,8 +361,13 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
     SUPABASE_ANON_KEY: AUDIT_SUPABASE_ANON_KEY,
     SUPABASE_JWT_SECRET: AUDIT_JWT_SECRET
   };
+  const envEs256Only = {
+    SUPABASE_URL: AUDIT_SUPABASE_URL,
+    SUPABASE_ANON_KEY: AUDIT_SUPABASE_ANON_KEY
+  };
 
   const nowSec = Math.floor(Date.now() / 1000);
+  const expectedIssuer = `${AUDIT_SUPABASE_URL}/auth/v1`;
   const jwtTenantA = await createSignedJwt({ sub: TENANT_A_ID, exp: nowSec + 3600 });
   const jwtTenantB = await createSignedJwt({ sub: TENANT_B_ID, exp: nowSec + 3600 });
   const jwtCollaborator = await createSignedJwt({ sub: COLLABORATOR_ID, exp: nowSec + 3600 });
@@ -296,15 +375,213 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
   const jwtExpired = await createSignedJwt({ sub: TENANT_A_ID, exp: nowSec - 60 });
   const jwtWrongSecret = await createSignedJwt({ sub: TENANT_A_ID, exp: nowSec + 3600 }, 'wrong-secret');
 
-  await t.test('1. Ataques de Autenticação: JWT expirado, assinatura adulterada, alg:none e anônimo são bloqueados (401)', async () => {
+  const es256ValidTenantA = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    es256Primary.privateKey,
+    es256Primary.kid
+  );
+  const es256UnknownKid = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    es256Primary.privateKey,
+    'unknown-kid-999'
+  );
+  const es256TamperedSig = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    es256Attacker.privateKey,
+    es256Primary.kid
+  );
+  const es256Expired = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec - 60
+    },
+    es256Primary.privateKey,
+    es256Primary.kid
+  );
+  const es256WrongIss = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: 'https://evil-issuer.supabase.co/auth/v1',
+      aud: 'authenticated',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    es256Primary.privateKey,
+    es256Primary.kid
+  );
+  const es256WrongAud = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'anon',
+      role: 'authenticated',
+      exp: nowSec + 3600
+    },
+    es256Primary.privateKey,
+    es256Primary.kid
+  );
+  const es256WrongRole = await createSignedEs256Jwt(
+    {
+      sub: TENANT_A_ID,
+      iss: expectedIssuer,
+      aud: 'authenticated',
+      role: 'anon',
+      exp: nowSec + 3600
+    },
+    es256Primary.privateKey,
+    es256Primary.kid
+  );
+
+  await t.test('1. Ataques de Autenticação (ES256/JWKS e HS256 legado): válido, kid desconhecido, assinatura adulterada, expirado, iss/aud/role errados e alg:none (401)', async () => {
     const algNoneToken = `${toBase64Url(Buffer.from('{"alg":"none","typ":"JWT"}'))}.${toBase64Url(
-      Buffer.from(JSON.stringify({ sub: TENANT_A_ID }))
+      Buffer.from(
+        JSON.stringify({
+          sub: TENANT_A_ID,
+          iss: expectedIssuer,
+          aud: 'authenticated',
+          role: 'authenticated',
+          exp: nowSec + 3600
+        })
+      )
     )}.`;
+
+    // Verificação direta unitária de verifyJwtEs256 e verifyJwtHs256
+    const simulatedJwks = { keys: [es256Primary.jwk] };
+    const verifiedEs256 = await verifyJwtEs256(es256ValidTenantA, simulatedJwks, nowSec, {
+      supabaseUrl: AUDIT_SUPABASE_URL
+    });
+    assert.equal(verifiedEs256?.id, TENANT_A_ID);
+    assert.equal(
+      await verifyJwtEs256(es256UnknownKid, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(es256TamperedSig, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(es256Expired, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(es256WrongIss, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(es256WrongAud, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(es256WrongRole, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+    assert.equal(
+      await verifyJwtEs256(algNoneToken, simulatedJwks, nowSec, { supabaseUrl: AUDIT_SUPABASE_URL }),
+      null
+    );
+
     assert.equal(await verifyJwtHs256(algNoneToken, AUDIT_JWT_SECRET), null);
     assert.equal(await verifyJwtHs256(jwtExpired, AUDIT_JWT_SECRET), null);
     assert.equal(await verifyJwtHs256(jwtWrongSecret, AUDIT_JWT_SECRET), null);
+    assert.equal((await verifyJwtHs256(jwtTenantA, AUDIT_JWT_SECRET, nowSec))?.id, TENANT_A_ID);
 
-    for (const badToken of [algNoneToken, jwtExpired, jwtWrongSecret, 'malformed.token']) {
+    // ES256 via JWKS sem SUPABASE_JWT_SECRET (com cache no isolate e refetch único em rotação de kid)
+    clearJwksCache();
+    resetJwksFetchCount();
+
+    const validEs256Res1 = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${es256ValidTenantA}` }
+      }),
+      envEs256Only
+    );
+    assert.equal(validEs256Res1.status, 200);
+    assert.equal((await validEs256Res1.json()).user.id, TENANT_A_ID);
+    assert.equal(getJwksFetchCount(), 1, 'Primeira chamada deve buscar a JWKS remota');
+
+    const validEs256Res2 = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${es256ValidTenantA}` }
+      }),
+      envEs256Only
+    );
+    assert.equal(validEs256Res2.status, 200);
+    assert.equal(getJwksFetchCount(), 1, 'Segunda chamada deve reutilizar a JWKS em cache no isolate');
+
+    // Rotação de chave: novo kid dispara 1 refetch da JWKS e autentica se a nova chave existir
+    setJwks({ keys: [es256Primary.jwk, es256Rotated.jwk] });
+    const es256RotatedToken = await createSignedEs256Jwt(
+      {
+        sub: TENANT_A_ID,
+        iss: expectedIssuer,
+        aud: ['authenticated'],
+        role: 'authenticated',
+        exp: nowSec + 3600
+      },
+      es256Rotated.privateKey,
+      es256Rotated.kid
+    );
+    const rotatedRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${es256RotatedToken}` }
+      }),
+      envEs256Only
+    );
+    assert.equal(rotatedRes.status, 200);
+    assert.equal((await rotatedRes.json()).user.id, TENANT_A_ID);
+    assert.equal(getJwksFetchCount(), 2, 'Chave rotacionada deve disparar exatamente 1 refetch da JWKS');
+
+    // Caminho HS256 legado: rejeitado quando SUPABASE_JWT_SECRET não existe, aceito quando existe
+    const hs256WithoutSecretRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${jwtTenantA}` }
+      }),
+      envEs256Only
+    );
+    assert.equal(hs256WithoutSecretRes.status, 401);
+
+    const hs256WithSecretRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: `Bearer ${jwtTenantA}` }
+      }),
+      env
+    );
+    assert.equal(hs256WithSecretRes.status, 200);
+    assert.equal((await hs256WithSecretRes.json()).user.id, TENANT_A_ID);
+
+    for (const badToken of [
+      algNoneToken,
+      jwtExpired,
+      jwtWrongSecret,
+      es256UnknownKid,
+      es256TamperedSig,
+      es256Expired,
+      es256WrongIss,
+      es256WrongAud,
+      es256WrongRole,
+      'malformed.token'
+    ]) {
       const res = await api.fetch(
         new Request(`https://painel.inspira.dev.br/api/sites/${SITE_A1_ID}/draft`, {
           headers: { Authorization: `Bearer ${badToken}` }

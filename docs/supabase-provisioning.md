@@ -132,11 +132,15 @@ node scripts/verify-supabase-rls.mjs
 
 - **Variável pública versionada (`wrangler.jsonc`)**:
   - `vars.SUPABASE_URL = "https://qawlpsrfewosxsfgmmpm.supabase.co"`
+- **Verificação de JWT no servidor (`ES256` via JWKS por padrão)**:
+  - O projeto `qawlpsrfewosxsfgmmpm` assina tokens JWT de sessão com chaves assimétricas **EC P-256 (`alg: ES256`)** identificadas por `kid`, expostas publicamente em `https://qawlpsrfewosxsfgmmpm.supabase.co/auth/v1/.well-known/jwks.json`.
+  - `workers/api.mjs` (`verifyJwtEs256` e `resolveJwtSession`) busca e mantém a JWKS em cache na memória do isolate (TTL de 10 minutos, com refetch único caso receba um `kid` recém-rotacionado) e valida criptograficamente a assinatura ECDSA P-256 SHA-256, além das claims `exp`, `iss` (`${SUPABASE_URL}/auth/v1`), `aud` contendo `authenticated` e `role === 'authenticated'`.
 - **Segredos exclusivos de servidor lidos por `workers/api.mjs`** (registrados via `npx wrangler secret put`, nunca em arquivos versionados):
   ```bash
   npx wrangler secret put SUPABASE_ANON_KEY
+  # Opcional (apenas fallback legado HS256):
   npx wrangler secret put SUPABASE_JWT_SECRET
   ```
-  - `SUPABASE_ANON_KEY`: utilizada por `workers/api.mjs` (`createSupabaseRestStore` e `resolveSessionUser`) como cabeçalho `apikey` nas chamadas autenticadas ao PostgREST/GoTrue sob o JWT do usuário.
-  - `SUPABASE_JWT_SECRET`: utilizada por `workers/api.mjs` (`verifyJwtHs256`) para verificar criptograficamente a assinatura HMAC-SHA256 e a expiração (`exp`) do JWT no servidor.
+  - `SUPABASE_ANON_KEY` (**obrigatória**): aceita tanto a nova **publishable key (`sb_publishable_...`)** quanto a chave `anon` legada. É utilizada por `workers/api.mjs` (`createSupabaseRestStore`) como cabeçalho `apikey` nas chamadas autenticadas ao PostgREST sob o JWT do usuário.
+  - `SUPABASE_JWT_SECRET` (**opcional — legado**): necessária apenas como fallback de compatibilidade para tokens legados `HS256` (`verifyJwtHs256`). Em projetos com chaves de assinatura assimétricas `ES256` via JWKS (`qawlpsrfewosxsfgmmpm`), não é necessário configurá-la.
   - **Importante**: `SUPABASE_SERVICE_ROLE_KEY` **não** é lida por `workers/api.mjs` e **jamais** deve ser configurada no Worker público.
