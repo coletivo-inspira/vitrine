@@ -2,6 +2,9 @@
   "name": "vitrine-inspira",
   "main": "workers/api.mjs",
   "compatibility_date": "2026-11-07",
+  "vars": {
+    "SUPABASE_URL": "https://qawlpsrfewosxsfgmmpm.supabase.co"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

@@ -1,0 +1,539 @@
+{
+  "schemaVersion": 1,
+  "pilotCohortId": "vitrine-inspira-pilot-v1",
+  "pilotLimit": 10,
+  "generatedAt": "2026-11-11T00:00:00.000Z",
+  "vitrines": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "ownerUserId": "90000000-0000-4000-8000-000000000001",
+      "slug": "loja1",
+      "name": "Forno & Praça Pizzaria Artesanal",
+      "template": "pizzeria-v1",
+      "revision": 3,
+      "publishedAt": "2026-11-11T12:00:00.000Z",
+      "subscription": {
+        "planTier": "free_basic",
+        "customHostname": null,
+        "paidUntil": null,
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "loja1",
+        "businessName": "Forno & Praça Pizzaria Artesanal",
+        "whatsapp": "5511999999999",
+        "website": "https://vitrine.inspira.dev.br/loja1",
+        "categories": [
+          {
+            "id": "pizzas-classicas",
+            "name": "Pizzas Clássicas de Fermentação Natural",
+            "items": [
+              {
+                "id": "margherita-verace",
+                "name": "Margherita Verace",
+                "description": "Molho de tomate San Marzano, muçarela fresca, folhas de manjericão e azeite extravirgem.",
+                "priceCents": 4800,
+                "active": true
+              },
+              {
+                "id": "calabresa-artesanal",
+                "name": "Calabresa Curada & Cebola Roxa",
+                "description": "Muçarela, calabresa artesanal fatiada fina, cebola roxa marinada e orégano fresco.",
+                "priceCents": 5200,
+                "active": true
+              },
+              {
+                "id": "quatro-queijos",
+                "name": "Quatro Queijos da Serra",
+                "description": "Muçarela, parmesão maturado, gorgonzola suave e catupiry artesanal na lenha.",
+                "priceCents": 5600,
+                "active": true
+              }
+            ]
+          },
+          {
+            "id": "pizzas-autorais",
+            "name": "Especiais da Casa",
+            "items": [
+              {
+                "id": "cogumelos-trufados",
+                "name": "Bosque de Cogumelos",
+                "description": "Mix de paris e shimeji salteados no alho, muçarela flor de leite e toque de salsa.",
+                "priceCents": 6200,
+                "active": true
+              },
+              {
+                "id": "rascunho-inverno-oculto",
+                "name": "Pizza Sazonal de Inverno (Oculta)",
+                "description": "Item em elaboração que jamais deve aparecer no cardápio público.",
+                "priceCents": 6900,
+                "active": false
+              }
+            ]
+          },
+          {
+            "id": "bebidas",
+            "name": "Bebidas & Sodas Artesanais",
+            "items": [
+              {
+                "id": "soda-limao-siciliano",
+                "name": "Soda Italiana de Limão Siciliano 350ml",
+                "description": "Xarope artesanal de limão siciliano fresco com água com gás gelada.",
+                "priceCents": 1400,
+                "active": true
+              },
+              {
+                "id": "agua-mineral",
+                "name": "Água Mineral sem Gás 500ml",
+                "description": "Garrafa 500ml refrigerada.",
+                "priceCents": 600,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "ownerUserId": "90000000-0000-4000-8000-000000000002",
+      "slug": "forno-da-vila",
+      "name": "Forno da Vila Pizzaria",
+      "template": "pizzeria-v1",
+      "revision": 2,
+      "publishedAt": "2026-11-11T12:05:00.000Z",
+      "subscription": {
+        "planTier": "inspira_subdomain",
+        "customHostname": "forno-da-vila.inspira.dev.br",
+        "paidUntil": "2026-12-01T23:59:59.000Z",
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "forno-da-vila",
+        "businessName": "Forno da Vila Pizzaria",
+        "whatsapp": "5511988881002",
+        "website": "https://forno-da-vila.inspira.dev.br",
+        "categories": [
+          {
+            "id": "tradicionais",
+            "name": "Pizzas Tradicionais",
+            "items": [
+              {
+                "id": "vila-margherita",
+                "name": "Margherita da Vila",
+                "description": "Molho pelati, muçarela, parmesão e manjericão colhido no dia.",
+                "priceCents": 4600,
+                "active": true
+              },
+              {
+                "id": "vila-portuguesa",
+                "name": "Portuguesa Clássica",
+                "description": "Presunto magro, ovos cozidos, cebola, ervilha fresca, muçarela e azeitonas pretas.",
+                "priceCents": 5100,
+                "active": true
+              },
+              {
+                "id": "vila-teste-oculto",
+                "name": "Receita Experimental de Alcachofra",
+                "description": "Em teste pela equipe da cozinha.",
+                "priceCents": 6400,
+                "active": false
+              }
+            ]
+          },
+          {
+            "id": "bebidas",
+            "name": "Bebidas",
+            "items": [
+              {
+                "id": "vila-suco-uva",
+                "name": "Suco Integral de Uva Tinta 300ml",
+                "description": "Sem adição de açúcares.",
+                "priceCents": 1200,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "ownerUserId": "90000000-0000-4000-8000-000000000003",
+      "slug": "napoli-express",
+      "name": "Napoli Express Pizza em Fatia",
+      "template": "pizzeria-v1",
+      "revision": 1,
+      "publishedAt": "2026-11-11T12:10:00.000Z",
+      "subscription": {
+        "planTier": "custom_domain",
+        "customHostname": "cardapio.napoliexpress.com.br",
+        "paidUntil": "2026-12-10T23:59:59.000Z",
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "napoli-express",
+        "businessName": "Napoli Express Pizza em Fatia",
+        "whatsapp": "5521977771003",
+        "website": "https://cardapio.napoliexpress.com.br",
+        "categories": [
+          {
+            "id": "individuais",
+            "name": "Pizzas Individuais Napolitanas",
+            "items": [
+              {
+                "id": "napoli-marinara",
+                "name": "Marinara Napolitana",
+                "description": "Molho de tomate italiano, alho laminado, orégano selvagem e azeite.",
+                "priceCents": 3400,
+                "active": true
+              },
+              {
+                "id": "napoli-diavola",
+                "name": "Diavola Picante",
+                "description": "Molho de tomate, muçarela de búfala e salame condimentado.",
+                "priceCents": 4200,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000004",
+      "ownerUserId": "90000000-0000-4000-8000-000000000004",
+      "slug": "bella-massa",
+      "name": "Bella Massa Forneria",
+      "template": "pizzeria-v1",
+      "revision": 4,
+      "publishedAt": "2026-11-11T12:15:00.000Z",
+      "subscription": {
+        "planTier": "free_basic",
+        "customHostname": null,
+        "paidUntil": null,
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "bella-massa",
+        "businessName": "Bella Massa Forneria",
+        "whatsapp": "5531966661004",
+        "categories": [
+          {
+            "id": "forneria",
+            "name": "Saídas do Forno a Lenha",
+            "items": [
+              {
+                "id": "bella-caprese",
+                "name": "Caprese ao Pesto",
+                "description": "Muçarela, tomate cereja assado, muçarela de búfala e pesto de manjericão.",
+                "priceCents": 5400,
+                "active": true
+              },
+              {
+                "id": "bella-frango-catupiry",
+                "name": "Frango Caipira com Catupiry",
+                "description": "Peito de frango desfiado temperado com ervas, milho doce e catupiry.",
+                "priceCents": 4900,
+                "active": true
+              },
+              {
+                "id": "bella-doce-leite",
+                "name": "Brotinho Doce de Leite com Flor de Sal",
+                "description": "Doce de leite mineiro cremoso finalizado com flor de sal.",
+                "priceCents": 3200,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "ownerUserId": "90000000-0000-4000-8000-000000000005",
+      "slug": "pizza-do-bairro",
+      "name": "Pizza do Bairro Delivery",
+      "template": "pizzeria-v1",
+      "revision": 2,
+      "publishedAt": "2026-11-11T12:20:00.000Z",
+      "subscription": {
+        "planTier": "inspira_subdomain",
+        "customHostname": "pizza-do-bairro.inspira.dev.br",
+        "paidUntil": "2026-11-25T23:59:59.000Z",
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "pizza-do-bairro",
+        "businessName": "Pizza do Bairro Delivery",
+        "whatsapp": "5541955551005",
+        "categories": [
+          {
+            "id": "favoritas",
+            "name": "As Mais Pedidas do Bairro",
+            "items": [
+              {
+                "id": "bairro-meia-calabresa-mucarela",
+                "name": "Meio a Meio Calabresa & Muçarela",
+                "description": "A combinação clássica para toda a família.",
+                "priceCents": 4500,
+                "active": true
+              },
+              {
+                "id": "bairro-milho-bacon",
+                "name": "Milho Cremoso & Bacon Crocante",
+                "description": "Muçarela, milho verde selecionado e cubos de bacon tostado.",
+                "priceCents": 4700,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000006",
+      "ownerUserId": "90000000-0000-4000-8000-000000000006",
+      "slug": "cantina-verace",
+      "name": "Cantina Verace Pizzas & Calzones",
+      "template": "pizzeria-v1",
+      "revision": 1,
+      "publishedAt": "2026-11-11T12:25:00.000Z",
+      "subscription": {
+        "planTier": "free_basic",
+        "customHostname": null,
+        "paidUntil": null,
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "cantina-verace",
+        "businessName": "Cantina Verace Pizzas & Calzones",
+        "whatsapp": "5551944441006",
+        "categories": [
+          {
+            "id": "calzones",
+            "name": "Calzones Assados na Pedra",
+            "items": [
+              {
+                "id": "verace-calzone-ricota",
+                "name": "Calzone de Ricota Fresca & Espinafre",
+                "description": "Massa fechada recheada com ricota temperada, espinafre e noz-moscada.",
+                "priceCents": 5300,
+                "active": true
+              },
+              {
+                "id": "verace-pizza-parma",
+                "name": "Pizza Rúcula & Tomate Seco",
+                "description": "Muçarela, rúcula fresca hidroponia e tomate seco artesanal.",
+                "priceCents": 5500,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000007",
+      "ownerUserId": "90000000-0000-4000-8000-000000000007",
+      "slug": "forneria-central",
+      "name": "Forneria Central",
+      "template": "pizzeria-v1",
+      "revision": 5,
+      "publishedAt": "2026-11-11T12:30:00.000Z",
+      "subscription": {
+        "planTier": "custom_domain",
+        "customHostname": "pedir.forneriacentral.com.br",
+        "paidUntil": "2026-12-15T23:59:59.000Z",
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "forneria-central",
+        "businessName": "Forneria Central",
+        "whatsapp": "5561933331007",
+        "categories": [
+          {
+            "id": "vegetarianas",
+            "name": "Pizzas Vegetarianas",
+            "items": [
+              {
+                "id": "central-abobrinha",
+                "name": "Abobrinha Grelhada & Queijo Cabra",
+                "description": "Lâminas de abobrinha no azeite de ervas com queijo cremoso e hortelã.",
+                "priceCents": 5800,
+                "active": true
+              },
+              {
+                "id": "central-berinjela",
+                "name": "Caponata de Berinjela",
+                "description": "Berinjela assada com pimentões doces, passas brancas e castanhas.",
+                "priceCents": 5400,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000008",
+      "ownerUserId": "90000000-0000-4000-8000-000000000008",
+      "slug": "brasa-e-manjericao",
+      "name": "Brasa & Manjericão Pizzaria",
+      "template": "pizzeria-v1",
+      "revision": 1,
+      "publishedAt": "2026-11-11T12:35:00.000Z",
+      "subscription": {
+        "planTier": "free_basic",
+        "customHostname": null,
+        "paidUntil": null,
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "brasa-e-manjericao",
+        "businessName": "Brasa & Manjericão Pizzaria",
+        "whatsapp": "5571922221008",
+        "categories": [
+          {
+            "id": "classicas-brasa",
+            "name": "Assadas na Brasa",
+            "items": [
+              {
+                "id": "brasa-napolitana",
+                "name": "Napolitana com Alho Tostado",
+                "description": "Muçarela, rodelas de tomate maduro, parmesão e alho dourado no azeite.",
+                "priceCents": 4700,
+                "active": true
+              },
+              {
+                "id": "brasa-lombinho",
+                "name": "Lombinho Canadense & Abacaxi Grelhado",
+                "description": "Lombo defumado, muçarela e toque agridoce de abacaxi na brasa.",
+                "priceCents": 5200,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000009",
+      "ownerUserId": "90000000-0000-4000-8000-000000000009",
+      "slug": "don-luigi-pizzas",
+      "name": "Don Luigi Pizzas Artesanais",
+      "template": "pizzeria-v1",
+      "revision": 2,
+      "publishedAt": "2026-11-11T12:40:00.000Z",
+      "subscription": {
+        "planTier": "free_basic",
+        "customHostname": null,
+        "paidUntil": null,
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "don-luigi-pizzas",
+        "businessName": "Don Luigi Pizzas Artesanais",
+        "whatsapp": "5581911111009",
+        "categories": [
+          {
+            "id": "don-luigi-especiais",
+            "name": "Receitas Don Luigi",
+            "items": [
+              {
+                "id": "luigi-pepperoni",
+                "name": "Pepperoni Americano",
+                "description": "Dupla camada de muçarela e pepperoni levemente picante.",
+                "priceCents": 5300,
+                "active": true
+              },
+              {
+                "id": "luigi-palmito",
+                "name": "Palmito Pupunha & Requeijão",
+                "description": "Corações de palmito pupunha macios com cobertura cremosa.",
+                "priceCents": 5000,
+                "active": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000010",
+      "ownerUserId": "90000000-0000-4000-8000-000000000010",
+      "slug": "estacao-da-pizza",
+      "name": "Estação da Pizza — Teto de 20 Itens Ativos",
+      "template": "pizzeria-v1",
+      "revision": 6,
+      "publishedAt": "2026-11-11T12:45:00.000Z",
+      "subscription": {
+        "planTier": "inspira_subdomain",
+        "customHostname": "estacao-da-pizza.inspira.dev.br",
+        "paidUntil": "2026-11-30T23:59:59.000Z",
+        "graceDays": 7
+      },
+      "draft": {
+        "schemaVersion": 1,
+        "template": "pizzeria-v1",
+        "slug": "estacao-da-pizza",
+        "businessName": "Estação da Pizza — Teto de 20 Itens Ativos",
+        "whatsapp": "5585999991010",
+        "categories": [
+          {
+            "id": "salgadas",
+            "name": "Pizzas Salgadas (15 Ativas + 2 Ocultas)",
+            "items": [
+              { "id": "est-01", "name": "01. Muçarela Tradicional", "priceCents": 4000, "active": true },
+              { "id": "est-02", "name": "02. Calabresa Acebolada", "priceCents": 4200, "active": true },
+              { "id": "est-03", "name": "03. Margherita Clássica", "priceCents": 4400, "active": true },
+              { "id": "est-04", "name": "04. Portuguesa Completa", "priceCents": 4600, "active": true },
+              { "id": "est-05", "name": "05. Frango com Catupiry", "priceCents": 4600, "active": true },
+              { "id": "est-06", "name": "06. Quatro Queijos", "priceCents": 4900, "active": true },
+              { "id": "est-07", "name": "07. Napolitana ao Alho", "priceCents": 4300, "active": true },
+              { "id": "est-08", "name": "08. Toscana Artesanal", "priceCents": 4800, "active": true },
+              { "id": "est-09", "name": "09. Bacon com Milho", "priceCents": 4700, "active": true },
+              { "id": "est-10", "name": "10. Lombo ao Creme", "priceCents": 4900, "active": true },
+              { "id": "est-11", "name": "11. Palmito Pupunha", "priceCents": 5000, "active": true },
+              { "id": "est-12", "name": "12. Rúcula com Tomate Seco", "priceCents": 5100, "active": true },
+              { "id": "est-13", "name": "13. Brócolis com Alho Poró", "priceCents": 5000, "active": true },
+              { "id": "est-14", "name": "14. Pepperoni Especial", "priceCents": 5400, "active": true },
+              { "id": "est-15", "name": "15. Cogumelos da Serra", "priceCents": 5800, "active": true },
+              { "id": "est-oculto-1", "name": "Oculta 1 — Pizza de Natal", "priceCents": 6500, "active": false },
+              { "id": "est-oculto-2", "name": "Oculta 2 — Pizza de Ano Novo", "priceCents": 6800, "active": false }
+            ]
+          },
+          {
+            "id": "doces-e-bebidas",
+            "name": "Pizzas Doces & Bebidas (5 Ativas)",
+            "items": [
+              { "id": "est-16", "name": "16. Brotinho Brigadeiro Belga", "priceCents": 3200, "active": true },
+              { "id": "est-17", "name": "17. Brotinho Banana com Canela", "priceCents": 2900, "active": true },
+              { "id": "est-18", "name": "18. Refrigerante Guaraná 2L", "priceCents": 1400, "active": true },
+              { "id": "est-19", "name": "19. Suco Natural de Laranja 500ml", "priceCents": 1200, "active": true },
+              { "id": "est-20", "name": "20. Água com Gás 500ml", "priceCents": 600, "active": true }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

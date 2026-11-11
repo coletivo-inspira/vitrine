@@ -25,6 +25,7 @@ const backToDashboardButton = document.getElementById('back-to-dashboard');
 
 // Reserved slugs to block on the client side
 const RESERVED_SLUGS = ['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout'];
+export const DEFAULT_SUPABASE_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', async () => {
@@ -145,7 +146,7 @@ function base64urlencode(a) {
 }
 
 async function startGoogleLogin() {
-  const supabaseUrl = window.SUPABASE_URL;
+  const supabaseUrl = String(window.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/+$/, '');
   const supabaseAnonKey = window.SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
