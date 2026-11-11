@@ -20,7 +20,15 @@ createServer(async (req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
     const pathname = decodeURIComponent(url.pathname);
     if (pathname.includes('\\') || pathname.includes('\0')) throw new Error('Invalid path');
-    const target = resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
+    let resolvedPath = pathname;
+    if (resolvedPath === '/') {
+      resolvedPath = '/index.html';
+    } else if (resolvedPath === '/portal') {
+      resolvedPath = '/portal/index.html';
+    } else if (resolvedPath === '/portal/') {
+      resolvedPath = '/portal/index.html';
+    }
+    const target = resolve(root, `.${resolvedPath}`);
     if (!target.startsWith(root.endsWith(sep) ? root : root + sep)) throw new Error('Invalid path');
     if (!(await stat(target)).isFile()) throw new Error('Missing file');
     const content = await readFile(target);
