@@ -34,4 +34,5 @@ test('marketing package excludes private sources and resolves its local assets',
   assert.match(notFound, /href="\/vitrine\/"/);
   const app = await readFile(resolve(output, 'app.js'), 'utf8');
   assert.match(app, /new URL\('\.\/data\/contact\.json', import\.meta\.url\)/);
+  await promisify(execFile)(process.execPath, ['scripts/build.mjs'], { cwd: root });
 });

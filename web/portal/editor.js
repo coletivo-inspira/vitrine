@@ -110,6 +110,12 @@ function setupEditorEvents() {
     });
   }
 
+  if (editorSettingsForm) {
+    editorSettingsForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+    });
+  }
+
   addCategoryButton.addEventListener('click', () => {
     addCategory();
   });
@@ -223,7 +229,7 @@ function renderCategories() {
     const moveUpBtn = document.createElement('button');
     moveUpBtn.type = 'button';
     moveUpBtn.className = 'button button-small button-secondary';
-    moveUpBtn.innerHTML = '▲';
+    moveUpBtn.textContent = '▲';
     moveUpBtn.disabled = catIndex === 0;
     moveUpBtn.setAttribute('aria-label', 'Mover Categoria para Cima');
     moveUpBtn.addEventListener('click', () => {
@@ -234,7 +240,7 @@ function renderCategories() {
     const moveDownBtn = document.createElement('button');
     moveDownBtn.type = 'button';
     moveDownBtn.className = 'button button-small button-secondary';
-    moveDownBtn.innerHTML = '▼';
+    moveDownBtn.textContent = '▼';
     moveDownBtn.disabled = catIndex === categories.length - 1;
     moveDownBtn.setAttribute('aria-label', 'Mover Categoria para Baixo');
     moveDownBtn.addEventListener('click', () => {
@@ -495,8 +501,7 @@ function renderLivePreview() {
   // Categories & Items
   if (!categories || categories.length === 0) {
     const emptyMsg = document.createElement('p');
-    emptyMsg.className = 'empty-msg';
-    emptyMsg.style.paddingBlock = '24px';
+    emptyMsg.className = 'empty-msg pizza-empty-msg';
     emptyMsg.textContent = 'Adicione categorias e produtos para ver a prévia ao vivo do seu cardápio de delivery.';
     liveStorefrontPreview.appendChild(emptyMsg);
     return;
@@ -519,10 +524,7 @@ function renderLivePreview() {
       cat.items.forEach(item => {
         // In the live preview, we display all items, but highlight/indicate if they are inactive or draft
         const itemRow = document.createElement('div');
-        itemRow.className = 'pizza-item-row';
-        if (item.active === false) {
-          itemRow.style.opacity = '0.5';
-        }
+        itemRow.className = item.active === false ? 'pizza-item-row is-inactive' : 'pizza-item-row';
 
         const infoCol = document.createElement('div');
         infoCol.className = 'pizza-item-info';
@@ -569,9 +571,7 @@ function renderLivePreview() {
 
     if (!hasVisibleItems) {
       const noItems = document.createElement('p');
-      noItems.style.fontSize = '12px';
-      noItems.style.color = '#7a5d4d';
-      noItems.style.fontStyle = 'italic';
+      noItems.className = 'pizza-no-items';
       noItems.textContent = 'Nenhum item nesta categoria.';
       catSection.appendChild(noItems);
     }
