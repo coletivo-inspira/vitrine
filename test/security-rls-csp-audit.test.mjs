@@ -7,8 +7,13 @@ import { extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import {
+  PORTAL_CSP_HEADER,
+  STRICT_CSP_HEADER,
   clearJwksCache,
   createApiHandler,
+  evaluateHeadersForPath,
+  isPublishableAnonKey,
+  parseHeadersRules,
   verifyJwtEs256,
   verifyJwtHs256
 } from '../workers/api.mjs';
@@ -1097,9 +1102,80 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
     );
     assert.match(
       distHeadersText,
-      /\/portal\*\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;|\/portal\/?\*\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/,
-      'Regra /portal/* em dist/_headers deve liberar connect-src para https://qawlpsrfewosxsfgmmpm.supabase.co'
+      /\/portal\s+!\s*Content-Security-Policy\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/,
+      'Regra /portal em dist/_headers deve remover a CSP global (! Content-Security-Policy) e liberar connect-src para https://qawlpsrfewosxsfgmmpm.supabase.co'
     );
+    assert.match(
+      distHeadersText,
+      /\/portal\/\*\s+!\s*Content-Security-Policy\s+Content-Security-Policy:[^\n]*connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/,
+      'Regra /portal/* em dist/_headers deve remover a CSP global (! Content-Security-Policy) e liberar connect-src para https://qawlpsrfewosxsfgmmpm.supabase.co'
+    );
+
+    // Regressão contra duplicidade de cabeçalhos Content-Security-Policy ao avaliar dist/_headers
+    const parsedDistRules = parseHeadersRules(distHeadersText);
+    const routesToVerify = new Set([
+      '/',
+      '/index.html',
+      '/404.html',
+      '/portal',
+      '/portal/',
+      '/portal/index.html',
+      '/portal/portal.js',
+      '/portal/editor.js',
+      '/portal/portal.css',
+      '/loja1',
+      '/loja1/',
+      '/loja1/index.html',
+      '/vitrine',
+      '/vitrine/',
+      '/vitrine/index.html',
+      '/vitrine/vitrine.js',
+      '/vitrine/vitrine.css',
+      '/assets/portfolio.mjs',
+      '/assets/public-menu.mjs',
+      '/data/portfolio.json',
+      '/data/contact.json',
+      '/data/vitrines/loja1/menu.json'
+    ]);
+    for (const { rel } of distFiles) {
+      if (rel !== '_headers') {
+        routesToVerify.add(`/${rel}`);
+      }
+    }
+
+    for (const routePath of routesToVerify) {
+      const evaluated = evaluateHeadersForPath(parsedDistRules, routePath);
+      assert.equal(
+        evaluated.cspValues.length,
+        1,
+        `Rota ${routePath} deve receber exatamente 1 cabeçalho Content-Security-Policy, mas recebeu ${evaluated.cspValues.length}`
+      );
+      const isPortalRoute = routePath === '/portal' || routePath.startsWith('/portal/');
+      assert.equal(
+        evaluated.cspValues[0],
+        isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER,
+        `CSP incorreta na rota ${routePath}`
+      );
+      assert.equal(
+        evaluated.headers.get('content-security-policy'),
+        isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER,
+        `Headers.get('content-security-policy') na rota ${routePath} não deve concatenar políticas duplicadas`
+      );
+      assert.deepEqual(evaluated.multiHeaders['x-content-type-options'], ['nosniff']);
+      assert.deepEqual(evaluated.multiHeaders['referrer-policy'], ['strict-origin-when-cross-origin']);
+      assert.deepEqual(evaluated.multiHeaders['permissions-policy'], ['camera=(), microphone=(), geolocation=()']);
+      assert.deepEqual(evaluated.multiHeaders['x-frame-options'], ['DENY']);
+    }
+
+    // Garante que o avaliador falha caso o operador "! Content-Security-Policy" seja omitido
+    const brokenHeadersWithoutUnset = distHeadersText.replace(/^\s*!\s*Content-Security-Policy\s*$/gm, '');
+    const brokenPortalEval = evaluateHeadersForPath(brokenHeadersWithoutUnset, '/portal/');
+    assert.equal(
+      brokenPortalEval.cspValues.length,
+      2,
+      'Sem "! Content-Security-Policy", /portal/ acumularia 2 cabeçalhos Content-Security-Policy'
+    );
+
     assert.match(
       jsContentsByPath.get('portal/portal.js') || '',
       /https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co/,

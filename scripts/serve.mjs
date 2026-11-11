@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../dist/', import.meta.url));
 const port = Number(process.env.PORT || 4173);
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8' };
+const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+const PORTAL_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' https://qawlpsrfewosxsfgmmpm.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
 const security = {
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  'Content-Security-Policy': PUBLIC_CSP,
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
@@ -15,6 +17,14 @@ const security = {
   'Cache-Control': 'no-store',
 };
 const RESERVED_PATHS = new Set(['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout', 'vitrine']);
+
+function securityHeadersForPath(pathname) {
+  const isPortal = pathname === '/portal' || pathname.startsWith('/portal/');
+  return {
+    ...security,
+    'Content-Security-Policy': isPortal ? PORTAL_CSP : PUBLIC_CSP,
+  };
+}
 
 async function isFile(filePath) {
   try {
@@ -64,13 +74,17 @@ createServer(async (req, res) => {
     if (!(await isFile(target))) throw new Error('Missing file');
     const content = await readFile(target);
     res.writeHead(200, {
-      ...security,
+      ...securityHeadersForPath(pathname),
       'Cache-Control': cacheControl,
       'Content-Type': mime[extname(target)] || 'application/octet-stream'
     });
     res.end(req.method === 'HEAD' ? undefined : content);
   } catch {
-    res.writeHead(404, { ...security, 'Content-Type': 'text/plain; charset=utf-8' });
+    let fallbackPath = '/';
+    try {
+      fallbackPath = decodeURIComponent(new URL(req.url, `http://127.0.0.1:${port}`).pathname);
+    } catch {}
+    res.writeHead(404, { ...securityHeadersForPath(fallbackPath), 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Página não encontrada.');
   }
 }).listen(port, '127.0.0.1', () => console.log(`Marketing preview: http://127.0.0.1:${port}`));

@@ -34,9 +34,106 @@ const PUBLIC_SECURITY_HEADERS = Object.freeze({
 });
 
 const JSON_HEADERS = Object.freeze({
+  ...PUBLIC_SECURITY_HEADERS,
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store'
 });
+
+const ESCAPE_RULE_REGEX_CHARS = /[-/\\^$*+?.()|[\]{}]/g;
+
+function compileHeaderRuleRegex(rulePath) {
+  const escaped = rulePath
+    .split('*')
+    .map((segment) => segment.replace(ESCAPE_RULE_REGEX_CHARS, '\\$&'))
+    .join('.*');
+  return new RegExp(`^${escaped}$`);
+}
+
+export function parseHeadersRules(headersText) {
+  if (typeof headersText !== 'string') {
+    return [];
+  }
+  const rules = [];
+  let currentRule = null;
+
+  for (const rawLine of headersText.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+    if (line.startsWith('/')) {
+      if (currentRule && (currentRule.set.length > 0 || currentRule.unset.length > 0)) {
+        rules.push(currentRule);
+      }
+      currentRule = {
+        path: line,
+        regex: compileHeaderRuleRegex(line),
+        unset: [],
+        set: []
+      };
+      continue;
+    }
+    if (!currentRule) {
+      continue;
+    }
+    if (line.startsWith('!')) {
+      const unsetName = line.slice(1).trim();
+      if (unsetName) {
+        currentRule.unset.push(unsetName);
+      }
+      continue;
+    }
+    const sepIdx = line.indexOf(':');
+    if (sepIdx > 0) {
+      const name = line.slice(0, sepIdx).trim();
+      const value = line.slice(sepIdx + 1).trim();
+      if (name && value) {
+        currentRule.set.push({ name, value });
+      }
+    }
+  }
+
+  if (currentRule && (currentRule.set.length > 0 || currentRule.unset.length > 0)) {
+    rules.push(currentRule);
+  }
+  return rules;
+}
+
+export function evaluateHeadersForPath(rulesOrText, pathname) {
+  const rules = Array.isArray(rulesOrText) ? rulesOrText : parseHeadersRules(rulesOrText);
+  const valuesByHeader = new Map();
+
+  for (const rule of rules) {
+    if (!rule.regex.test(pathname)) {
+      continue;
+    }
+    for (const unsetName of rule.unset) {
+      valuesByHeader.delete(unsetName.toLowerCase());
+    }
+    for (const { name, value } of rule.set) {
+      const lower = name.toLowerCase();
+      if (!valuesByHeader.has(lower)) {
+        valuesByHeader.set(lower, [value]);
+      } else {
+        valuesByHeader.get(lower).push(value);
+      }
+    }
+  }
+
+  const multiHeaders = Object.fromEntries(valuesByHeader.entries());
+  const headers = new Headers();
+  for (const [lower, values] of valuesByHeader.entries()) {
+    for (const val of values) {
+      headers.append(lower, val);
+    }
+  }
+
+  return {
+    headers,
+    multiHeaders,
+    cspValues: valuesByHeader.get('content-security-policy') ?? []
+  };
+}
 
 const PILOT_LOJA1_DRAFT = Object.freeze({
   schemaVersion: 1,
@@ -525,6 +622,46 @@ export async function resolveJwtSession(token, env = {}, deps = {}) {
   }
 
   return null;
+}
+
+export function isPublishableAnonKey(rawKey, env = {}) {
+  if (typeof rawKey !== 'string') {
+    return false;
+  }
+  const key = rawKey.trim();
+  if (!key || /\s/.test(key)) {
+    return false;
+  }
+  if (/^(?:sb_secret_|sbp_)/i.test(key) || /sb_secret_|service_role/i.test(key)) {
+    return false;
+  }
+  if (
+    (typeof env?.SUPABASE_SERVICE_ROLE_KEY === 'string' &&
+      env.SUPABASE_SERVICE_ROLE_KEY.trim() &&
+      key === env.SUPABASE_SERVICE_ROLE_KEY.trim()) ||
+    (typeof env?.SUPABASE_JWT_SECRET === 'string' &&
+      env.SUPABASE_JWT_SECRET.trim() &&
+      key === env.SUPABASE_JWT_SECRET.trim())
+  ) {
+    return false;
+  }
+  const parts = key.split('.');
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(utf8Decoder.decode(base64UrlToUint8Array(parts[1])));
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return false;
+      }
+      if (payload.role !== 'anon') {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  } else if (parts.length !== 1) {
+    return false;
+  }
+  return true;
 }
 
 export function extractSessionToken(request) {
@@ -1360,15 +1497,17 @@ export function createApiHandler(deps = {}) {
         const assetRes = await assetsFetcher.fetch(request);
         const headers = new Headers(assetRes.headers);
         const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
+        if (!headers.has('content-security-policy')) {
+          headers.set(
+            'content-security-policy',
+            isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER
+          );
+        }
         for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) {
           if (!headers.has(k)) {
             headers.set(k, v);
           }
         }
-        headers.set(
-          'content-security-policy',
-          isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER
-        );
         return new Response(method === 'HEAD' ? null : assetRes.body, {
           status: assetRes.status,
           statusText: assetRes.statusText,
@@ -1379,6 +1518,29 @@ export function createApiHandler(deps = {}) {
     }
 
     try {
+      if (pathname === '/api/auth/config') {
+        if (method !== 'GET') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/config.');
+        }
+        const rawUrl = String(
+          env?.SUPABASE_URL ?? deps?.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL
+        )
+          .trim()
+          .replace(/\/+$/, '');
+        const rawKey = env?.SUPABASE_ANON_KEY ?? deps?.supabaseAnonKey ?? '';
+        if (!rawUrl || !isPublishableAnonKey(rawKey, env)) {
+          return errorResponse(
+            503,
+            'AUTH_CONFIG_UNAVAILABLE',
+            'Configuração pública de autenticação do Supabase indisponível.'
+          );
+        }
+        return jsonResponse(200, {
+          supabaseUrl: rawUrl,
+          publishableKey: String(rawKey).trim()
+        });
+      }
+
       if (pathname === '/api/auth/logout') {
         if (method !== 'POST') {
           return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/logout.');

@@ -11,7 +11,9 @@ import worker, {
   PORTAL_CSP_HEADER,
   STOREFRONT_CACHE_CONTROL,
   STRICT_CSP_HEADER,
-  clearJwksCache
+  clearJwksCache,
+  evaluateHeadersForPath,
+  parseHeadersRules
 } from '../workers/api.mjs';
 import { publicMenu, whatsappLink } from '../src/public-menu.mjs';
 import { computeSha256Hex, FORBIDDEN_PUBLIC_KEYS } from '../src/publication-engine.mjs';
@@ -285,11 +287,21 @@ async function createPgliteSupabaseHarness() {
 }
 
 function createDistAssetsBinding() {
+  let cachedRules = null;
+  async function getRules() {
+    if (!cachedRules) {
+      const raw = await readFile(resolve(distDir, '_headers'), 'utf8');
+      cachedRules = parseHeadersRules(raw);
+    }
+    return cachedRules;
+  }
+
   return {
     async fetch(input) {
       const req = input instanceof Request ? input : new Request(input);
       const url = new URL(req.url, 'http://localhost');
-      let pathname = decodeURIComponent(url.pathname);
+      const requestPathname = decodeURIComponent(url.pathname);
+      let pathname = requestPathname;
       if (pathname === '/') pathname = '/index.html';
       else if (pathname === '/portal' || pathname === '/portal/') pathname = '/portal/index.html';
       else if (pathname === '/vitrine' || pathname === '/vitrine/') pathname = '/vitrine/index.html';
@@ -304,27 +316,16 @@ function createDistAssetsBinding() {
         if (!info.isFile()) return new Response('Not Found', { status: 404 });
         const body = await readFile(target);
         const ext = extname(target);
-        let cacheControl = 'public, max-age=0, must-revalidate';
-        if (pathname.startsWith('/data/vitrines/') && pathname.includes('/releases/')) {
-          cacheControl = IMMUTABLE_CACHE_CONTROL;
-        } else if (pathname.startsWith('/data/vitrines/') && pathname.endsWith('/menu.json')) {
-          cacheControl = STOREFRONT_CACHE_CONTROL;
-        } else if (pathname.startsWith('/data/')) {
-          cacheControl = 'no-cache';
-        } else if (pathname.startsWith('/assets/')) {
-          cacheControl = 'public, max-age=86400';
+        const rules = await getRules();
+        const evaluated = evaluateHeadersForPath(rules, requestPathname);
+        const headers = new Headers(evaluated.headers);
+        headers.set('content-type', MIME_TYPES[ext] || 'application/octet-stream');
+        if (!headers.has('cache-control')) {
+          headers.set('cache-control', 'public, max-age=0, must-revalidate');
         }
         return new Response(body, {
           status: 200,
-          headers: {
-            'content-type': MIME_TYPES[ext] || 'application/octet-stream',
-            'cache-control': cacheControl,
-            'content-security-policy': STRICT_CSP_HEADER,
-            'x-content-type-options': 'nosniff',
-            'referrer-policy': 'strict-origin-when-cross-origin',
-            'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-            'x-frame-options': 'DENY'
-          }
+          headers
         });
       } catch {
         return new Response('Not Found', { status: 404 });

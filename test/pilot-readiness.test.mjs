@@ -356,6 +356,8 @@ test('Fase 6 - Pacote do Piloto de 10 Vitrines, Ciclo Comercial 002-US4 e Guia O
     }
 
     // Verifica wrangler.jsonc e constantes de CSP no Worker
+    assert.equal(wranglerConfig.workers_dev, true);
+    assert.equal(wranglerConfig.preview_urls, false);
     assert.equal(wranglerConfig.vars.SUPABASE_URL, SUPABASE_PUBLIC_PROJECT_URL);
     assert.equal(SUPABASE_PUBLIC_PROJECT_URL, 'https://qawlpsrfewosxsfgmmpm.supabase.co');
     assert.match(STRICT_CSP_HEADER, /connect-src 'self';/);
