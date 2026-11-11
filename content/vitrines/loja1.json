@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "template": "pizzeria-v1",
+  "slug": "loja1",
+  "businessName": "Forno & Praça Pizzaria Artesanal",
+  "whatsapp": "5511999999999",
+  "categories": [
+    {
+      "id": "pizzas-classicas",
+      "name": "Pizzas Clássicas de Fermentação Natural",
+      "items": [
+        {
+          "id": "margherita-verace",
+          "name": "Margherita Verace",
+          "description": "Molho de tomate San Marzano, muçarela fresca, folhas de manjericão e azeite extravirgem.",
+          "priceCents": 4800,
+          "active": true
+        },
+        {
+          "id": "calabresa-artesanal",
+          "name": "Calabresa Curada & Cebola Roxa",
+          "description": "Muçarela, calabresa artesanal fatiada fina, cebola roxa marinada e orégano fresco.",
+          "priceCents": 5200,
+          "active": true
+        },
+        {
+          "id": "quatro-queijos",
+          "name": "Quatro Queijos da Serra",
+          "description": "Muçarela, parmesão maturado, gorgonzola suave e catupiry artesanal na lenha.",
+          "priceCents": 5600,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "pizzas-autorais",
+      "name": "Especiais da Casa",
+      "items": [
+        {
+          "id": "cogumelos-trufados",
+          "name": "Bosque de Cogumelos",
+          "description": "Mix de paris e shimeji salteados no alho, muçarela flor de leite e toque de salsa.",
+          "priceCents": 6200,
+          "active": true
+        },
+        {
+          "id": "rascunho-inverno-oculto",
+          "name": "Pizza Sazonal de Inverno (Oculta)",
+          "description": "Item em elaboração que jamais deve aparecer no cardápio público.",
+          "priceCents": 6900,
+          "active": false
+        }
+      ]
+    },
+    {
+      "id": "bebidas",
+      "name": "Bebidas & Sodas Artesanais",
+      "items": [
+        {
+          "id": "soda-limao-siciliano",
+          "name": "Soda Italiana de Limão Siciliano 350ml",
+          "description": "Xarope artesanal de limão siciliano fresco com água com gás gelada.",
+          "priceCents": 1400,
+          "active": true
+        },
+        {
+          "id": "agua-mineral",
+          "name": "Água Mineral sem Gás 500ml",
+          "description": "Garrafa 500ml refrigerada.",
+          "priceCents": 600,
+          "active": true
+        }
+      ]
+    }
+  ]
+}

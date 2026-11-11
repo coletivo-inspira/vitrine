@@ -11,8 +11,18 @@ const security = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'X-Frame-Options': 'DENY',
   'Cache-Control': 'no-store',
 };
+const RESERVED_PATHS = new Set(['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout', 'vitrine']);
+
+async function isFile(filePath) {
+  try {
+    return (await stat(filePath)).isFile();
+  } catch {
+    return false;
+  }
+}
 
 createServer(async (req, res) => {
   if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { ...security, Allow: 'GET, HEAD' }); res.end(); return; }
@@ -21,18 +31,43 @@ createServer(async (req, res) => {
     const pathname = decodeURIComponent(url.pathname);
     if (pathname.includes('\\') || pathname.includes('\0')) throw new Error('Invalid path');
     let resolvedPath = pathname;
+    let cacheControl = security['Cache-Control'];
+
     if (resolvedPath === '/') {
       resolvedPath = '/index.html';
-    } else if (resolvedPath === '/portal') {
+    } else if (resolvedPath === '/portal' || resolvedPath === '/portal/') {
       resolvedPath = '/portal/index.html';
-    } else if (resolvedPath === '/portal/') {
-      resolvedPath = '/portal/index.html';
+    } else if (resolvedPath === '/vitrine' || resolvedPath === '/vitrine/') {
+      resolvedPath = '/vitrine/index.html';
+    } else if (/^\/data\/vitrines\/[a-z0-9-]+\/releases\/[a-f0-9]{64}\.json$/.test(resolvedPath)) {
+      cacheControl = 'public, max-age=31536000, immutable';
+    } else if (/^\/data\/vitrines\/[a-z0-9-]+\/menu\.json$/.test(resolvedPath)) {
+      cacheControl = 'public, max-age=300, stale-while-revalidate=86400';
+    } else {
+      const slugMatch = resolvedPath.match(/^\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/);
+      if (slugMatch && !RESERVED_PATHS.has(slugMatch[1])) {
+        const slug = slugMatch[1];
+        const staticStorefrontIndex = resolve(root, `./${slug}/index.html`);
+        const staticStorefrontMenu = resolve(root, `./data/vitrines/${slug}/menu.json`);
+        if (await isFile(staticStorefrontIndex)) {
+          resolvedPath = `/${slug}/index.html`;
+          cacheControl = 'public, max-age=300, stale-while-revalidate=86400';
+        } else if (await isFile(staticStorefrontMenu)) {
+          resolvedPath = '/vitrine/index.html';
+          cacheControl = 'public, max-age=300, stale-while-revalidate=86400';
+        }
+      }
     }
+
     const target = resolve(root, `.${resolvedPath}`);
     if (!target.startsWith(root.endsWith(sep) ? root : root + sep)) throw new Error('Invalid path');
-    if (!(await stat(target)).isFile()) throw new Error('Missing file');
+    if (!(await isFile(target))) throw new Error('Missing file');
     const content = await readFile(target);
-    res.writeHead(200, { ...security, 'Content-Type': mime[extname(target)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      ...security,
+      'Cache-Control': cacheControl,
+      'Content-Type': mime[extname(target)] || 'application/octet-stream'
+    });
     res.end(req.method === 'HEAD' ? undefined : content);
   } catch {
     res.writeHead(404, { ...security, 'Content-Type': 'text/plain; charset=utf-8' });

@@ -109,8 +109,18 @@
         </div>
         <div class="editor-save-container">
           <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
-          <button id="save-draft-button" class="button" type="button">Salvar Rascunho</button>
+          <button id="save-draft-button" class="button button-secondary" type="button">Salvar Rascunho</button>
+          <button id="publish-site-button" class="button" type="button">Publicar Vitrine</button>
         </div>
+      </div>
+
+      <!-- Publication Status Banner -->
+      <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
+        <div class="publication-status-info">
+          <span class="publication-badge">Publicada</span>
+          <span id="publication-status-text">Vitrine publicada com sucesso.</span>
+        </div>
+        <a id="publication-view-link" class="button button-small button-secondary" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine Pública</a>
       </div>
 
       <!-- Optimistic Concurrency Alert Banner -->

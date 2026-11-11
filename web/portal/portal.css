@@ -509,6 +509,39 @@ svg {
   color: var(--ink-soft);
 }
 
+.publication-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--apricot);
+}
+
+.publication-status-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.publication-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--orange);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* Conflict Banner */
 .conflict-banner {
   background: #fff3cd;

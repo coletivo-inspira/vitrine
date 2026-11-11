@@ -1,0 +1,499 @@
+import { publicMenu, whatsappLink } from './public-menu.mjs';
+import {
+  DEFAULT_TEMPLATE,
+  PortalValidationError,
+  isItemActive,
+  toPublicMenuDraft,
+  validateDraftContent
+} from './portal-validation.mjs';
+
+const utf8Encoder = new TextEncoder();
+
+export const FORBIDDEN_PUBLIC_KEYS = Object.freeze([
+  'owner_user_id',
+  'ownerUserId',
+  'ownerEmail',
+  'email',
+  'userId',
+  'user_id',
+  'siteId',
+  'site_id',
+  'session',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'service_role',
+  'serviceRoleKey',
+  'internalCost',
+  'internalNotes',
+  'active',
+  'available',
+  'password',
+  'secret'
+]);
+
+const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
+  'schemaVersion',
+  'template',
+  'slug',
+  'name',
+  'whatsapp',
+  'currency',
+  'items',
+  'categories'
+]);
+
+const ALLOWED_ITEM_KEYS = new Set(['id', 'name', 'priceCents', 'description']);
+const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
+
+function slugifyCategoryId(value, index) {
+  if (typeof value === 'string' && value.trim()) {
+    const cleaned = value
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64);
+    if (cleaned) return cleaned;
+  }
+  return `categoria-${index + 1}`;
+}
+
+function sanitizeOptionalDescription(raw) {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > 280) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ITEM_DESCRIPTION',
+      'A descrição de cada item deve ter no máximo 280 caracteres.'
+    );
+  }
+  return trimmed;
+}
+
+function deepFreeze(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  Object.freeze(obj);
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+      deepFreeze(value);
+    }
+  }
+  return obj;
+}
+
+export function assertNoPrivateLeakage(menuArtifact) {
+  if (!menuArtifact || typeof menuArtifact !== 'object' || Array.isArray(menuArtifact)) {
+    throw new PortalValidationError(422, 'INVALID_PUBLIC_MENU', 'Artefato público inválido.');
+  }
+
+  for (const key of Object.keys(menuArtifact)) {
+    if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_TOP_LEVEL_MENU_KEYS.has(key)) {
+      throw new PortalValidationError(
+        422,
+        'PRIVATE_FIELD_LEAKAGE',
+        `Campo não permitido no artefato público: ${key}`
+      );
+    }
+  }
+
+  for (const item of menuArtifact.items ?? []) {
+    for (const key of Object.keys(item)) {
+      if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_ITEM_KEYS.has(key)) {
+        throw new PortalValidationError(
+          422,
+          'PRIVATE_FIELD_LEAKAGE',
+          `Campo não permitido em item público: ${key}`
+        );
+      }
+    }
+  }
+
+  for (const category of menuArtifact.categories ?? []) {
+    for (const key of Object.keys(category)) {
+      if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_CATEGORY_KEYS.has(key)) {
+        throw new PortalValidationError(
+          422,
+          'PRIVATE_FIELD_LEAKAGE',
+          `Campo não permitido em categoria pública: ${key}`
+        );
+      }
+    }
+    for (const item of category.items ?? []) {
+      for (const key of Object.keys(item)) {
+        if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_ITEM_KEYS.has(key)) {
+          throw new PortalValidationError(
+            422,
+            'PRIVATE_FIELD_LEAKAGE',
+            `Campo não permitido em item de categoria pública: ${key}`
+          );
+        }
+      }
+    }
+  }
+}
+
+export async function computeSha256Hex(input) {
+  const bytes = typeof input === 'string' ? utf8Encoder.encode(input) : input;
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const view = new Uint8Array(digest);
+  let hex = '';
+  for (let i = 0; i < view.length; i += 1) {
+    hex += view[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+export function projectPublicStorefrontMenu(draftContent, site = {}) {
+  if (!draftContent || typeof draftContent !== 'object' || Array.isArray(draftContent)) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_DRAFT',
+      'O conteúdo do rascunho para publicação deve ser um objeto JSON válido.'
+    );
+  }
+
+  const normalizedContent = {
+    ...draftContent,
+    slug: draftContent.slug ?? site.slug,
+    businessName: draftContent.businessName ?? draftContent.name ?? site.name,
+    template: draftContent.template ?? site.template ?? DEFAULT_TEMPLATE
+  };
+
+  validateDraftContent(normalizedContent);
+
+  let baseMenu;
+  try {
+    const publicMenuDraft = toPublicMenuDraft(normalizedContent, site);
+    baseMenu = publicMenu(publicMenuDraft);
+  } catch (err) {
+    if (err instanceof PortalValidationError) {
+      throw err;
+    }
+    throw new PortalValidationError(
+      422,
+      'INVALID_PUBLIC_MENU',
+      err?.message || 'Falha ao projetar os dados públicos do cardápio.'
+    );
+  }
+
+  if (!Array.isArray(baseMenu.items) || baseMenu.items.length === 0) {
+    throw new PortalValidationError(
+      422,
+      'EMPTY_PUBLIC_MENU',
+      'O rascunho precisa ter ao menos 1 item ativo para ser publicado.'
+    );
+  }
+
+  // Build map of validated active items by id, enriched only with sanitized optional description
+  const rawDescriptionsById = new Map();
+  let flatCounter = 0;
+
+  const collectSourceDescriptions = (itemsList) => {
+    if (!Array.isArray(itemsList)) return;
+    for (const rawItem of itemsList) {
+      if (!rawItem || typeof rawItem !== 'object') continue;
+      flatCounter += 1;
+      const itemId =
+        typeof rawItem.id === 'string' && rawItem.id.trim()
+          ? rawItem.id.trim()
+          : `item-${flatCounter}`;
+      if (isItemActive(rawItem)) {
+        const desc = sanitizeOptionalDescription(rawItem.description);
+        if (desc !== undefined) {
+          rawDescriptionsById.set(itemId, desc);
+        }
+      }
+    }
+  };
+
+  if (Array.isArray(normalizedContent.items)) {
+    collectSourceDescriptions(normalizedContent.items);
+  }
+  if (Array.isArray(normalizedContent.categories)) {
+    for (const cat of normalizedContent.categories) {
+      if (cat && typeof cat === 'object') {
+        collectSourceDescriptions(cat.items);
+      }
+    }
+  }
+
+  const validatedItemsById = new Map();
+  const projectedItems = baseMenu.items.map((item) => {
+    const description = rawDescriptionsById.get(item.id);
+    const projectedItem =
+      description !== undefined
+        ? { id: item.id, name: item.name, description, priceCents: item.priceCents }
+        : { id: item.id, name: item.name, priceCents: item.priceCents };
+    validatedItemsById.set(item.id, projectedItem);
+    return projectedItem;
+  });
+
+  const assignedItemIds = new Set();
+  const projectedCategories = [];
+  const seenCategoryIds = new Set();
+
+  if (Array.isArray(normalizedContent.categories)) {
+    let itemIndexCursor = Array.isArray(normalizedContent.items)
+      ? normalizedContent.items.length
+      : 0;
+
+    for (let catIdx = 0; catIdx < normalizedContent.categories.length; catIdx += 1) {
+      const rawCat = normalizedContent.categories[catIdx];
+      if (!rawCat || typeof rawCat !== 'object') continue;
+
+      const catName =
+        typeof rawCat.name === 'string' && rawCat.name.trim()
+          ? rawCat.name.trim()
+          : `Categoria ${catIdx + 1}`;
+      let catId = slugifyCategoryId(rawCat.id ?? catName, catIdx);
+      if (seenCategoryIds.has(catId)) {
+        catId = `${catId}-${catIdx + 1}`;
+      }
+
+      const catItems = [];
+      if (Array.isArray(rawCat.items)) {
+        for (const rawItem of rawCat.items) {
+          itemIndexCursor += 1;
+          if (!isItemActive(rawItem)) continue;
+          const resolvedId =
+            typeof rawItem.id === 'string' && rawItem.id.trim()
+              ? rawItem.id.trim()
+              : `item-${itemIndexCursor}`;
+          const validatedItem = validatedItemsById.get(resolvedId);
+          if (validatedItem && !assignedItemIds.has(resolvedId)) {
+            assignedItemIds.add(resolvedId);
+            catItems.push({ ...validatedItem });
+          }
+        }
+      }
+
+      if (catItems.length > 0) {
+        seenCategoryIds.add(catId);
+        projectedCategories.push({
+          id: catId,
+          name: catName,
+          items: catItems
+        });
+      }
+    }
+  }
+
+  const unassignedItems = projectedItems
+    .filter((item) => !assignedItemIds.has(item.id))
+    .map((item) => ({ ...item }));
+
+  if (unassignedItems.length > 0) {
+    projectedCategories.push({
+      id: projectedCategories.length === 0 ? 'cardapio' : 'outros-itens',
+      name: projectedCategories.length === 0 ? 'Cardápio' : 'Outros Itens',
+      items: unassignedItems
+    });
+  }
+
+  const menu = {
+    schemaVersion: baseMenu.schemaVersion,
+    template: baseMenu.template,
+    slug: baseMenu.slug,
+    name: baseMenu.name,
+    whatsapp: baseMenu.whatsapp,
+    currency: baseMenu.currency,
+    items: projectedItems,
+    categories: projectedCategories
+  };
+
+  // Validate that every public item produces a deterministic whatsappLink
+  for (const item of menu.items) {
+    whatsappLink(menu, item.id);
+  }
+
+  assertNoPrivateLeakage(menu);
+  return deepFreeze(menu);
+}
+
+export async function compilePublicStorefront(draftContent, site = {}, options = {}) {
+  const menu = projectPublicStorefrontMenu(draftContent, site);
+  const canonicalJson = JSON.stringify(menu);
+  const hash = await computeSha256Hex(canonicalJson);
+  const publishedAt = options.publishedAt ?? new Date().toISOString();
+  const revision = Number.isSafeInteger(options.revision) && options.revision >= 1 ? options.revision : 1;
+  const siteId = options.siteId ?? site.id ?? null;
+
+  const publication = deepFreeze({
+    ...(siteId ? { siteId } : {}),
+    slug: menu.slug,
+    revision,
+    hash,
+    publishedAt,
+    url: `/${menu.slug}`,
+    menuUrl: `/data/vitrines/${menu.slug}/menu.json`,
+    immutableMenuUrl: `/data/vitrines/${menu.slug}/releases/${hash}.json`,
+    menu
+  });
+
+  return {
+    hash,
+    json: canonicalJson,
+    menu,
+    publication
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function formatPublicPriceBRL(priceCents) {
+  const reais = Math.floor(priceCents / 100);
+  const centavos = String(priceCents % 100).padStart(2, '0');
+  return `R$ ${reais.toLocaleString('pt-BR')},${centavos}`;
+}
+
+export function renderStorefrontCatalogMarkup(menu) {
+  const categories =
+    Array.isArray(menu?.categories) && menu.categories.length > 0
+      ? menu.categories
+      : [{ id: 'cardapio', name: 'Cardápio', items: menu?.items ?? [] }];
+
+  const chipsHtml = categories
+    .map(
+      (cat) =>
+        `<a class="category-chip" href="#cat-${escapeHtml(cat.id)}">${escapeHtml(cat.name)}</a>`
+    )
+    .join('');
+
+  const sectionsHtml = categories
+    .map((cat) => {
+      const countLabel = cat.items.length === 1 ? '1 opção' : `${cat.items.length} opções`;
+      const itemsHtml = cat.items
+        .map((item) => {
+          const waHref = whatsappLink(menu, item.id);
+          const descHtml = item.description
+            ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>`
+            : '';
+          return [
+            `<article class="menu-item-card" data-item-id="${escapeHtml(item.id)}">`,
+            `  <div class="menu-item-body">`,
+            `    <h3 class="menu-item-title">${escapeHtml(item.name)}</h3>`,
+            descHtml ? `    ${descHtml}` : '',
+            `  </div>`,
+            `  <div class="menu-item-footer">`,
+            `    <span class="menu-item-price">${escapeHtml(formatPublicPriceBRL(item.priceCents))}</span>`,
+            `    <a class="whatsapp-order-button" href="${escapeHtml(waHref)}" target="_blank" rel="noopener noreferrer">Pedir no WhatsApp</a>`,
+            `  </div>`,
+            `</article>`
+          ]
+            .filter(Boolean)
+            .join('\n');
+        })
+        .join('\n');
+
+      return [
+        `<section class="menu-category" id="cat-${escapeHtml(cat.id)}">`,
+        `  <div class="menu-category-header">`,
+        `    <h2 class="menu-category-title">${escapeHtml(cat.name)}</h2>`,
+        `    <span class="menu-category-count">${escapeHtml(countLabel)}</span>`,
+        `  </div>`,
+        `  <div class="menu-items-grid">`,
+        itemsHtml,
+        `  </div>`,
+        `</section>`
+      ].join('\n');
+    })
+    .join('\n');
+
+  return { chipsHtml, sectionsHtml };
+}
+
+export function renderStorefrontHtml(menu, baseTemplateHtml) {
+  const { chipsHtml, sectionsHtml } = renderStorefrontCatalogMarkup(menu);
+  if (typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
+    return baseTemplateHtml
+      .replace(
+        '<title id="storefront-page-title">Cardápio Digital — Vitrine Inspira</title>',
+        `<title id="storefront-page-title">${escapeHtml(menu.name)} — Cardápio Digital</title>`
+      )
+      .replace(
+        '<span id="storefront-slug-pill" class="storefront-slug-pill">/loja1</span>',
+        `<span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>`
+      )
+      .replace(
+        '<h1 id="storefront-name">Carregando cardápio...</h1>',
+        `<h1 id="storefront-name">${escapeHtml(menu.name)}</h1>`
+      )
+      .replace(
+        '<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio"></nav>',
+        `<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>`
+      )
+      .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
+  }
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F7F7F4">
+  <meta name="description" content="Cardápio digital oficial — faça seu pedido direto no WhatsApp.">
+  <title id="storefront-page-title">${escapeHtml(menu.name)} — Cardápio Digital</title>
+  <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/vitrine/vitrine.css">
+</head>
+<body>
+  <a class="skip-link" href="#cardapio-principal">Pular para o cardápio</a>
+  <header class="storefront-topbar wrap">
+    <div class="storefront-brand-meta">
+      <span class="storefront-template-tag">Cardápio Digital</span>
+      <span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>
+    </div>
+    <div class="storefront-header-actions">
+      <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+        <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+        <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+      </button>
+    </div>
+  </header>
+  <main id="cardapio-principal" class="wrap storefront-main">
+    <section class="storefront-hero" aria-labelledby="storefront-name">
+      <div class="storefront-hero-copy">
+        <p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>
+        <h1 id="storefront-name">${escapeHtml(menu.name)}</h1>
+        <p id="storefront-subtitle" class="storefront-subtitle">
+          Escolha seus itens abaixo e toque em <strong>Pedir no WhatsApp</strong> para enviar seu pedido com mensagem preenchida.
+        </p>
+      </div>
+      <nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>
+    </section>
+    <div id="storefront-status" class="storefront-status" role="status" aria-live="polite" hidden></div>
+    <div id="storefront-catalog" class="storefront-catalog">
+${sectionsHtml}
+    </div>
+  </main>
+  <footer class="storefront-footer">
+    <div class="wrap storefront-footer-inner">
+      <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
+        <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+        <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+      </a>
+      <p class="storefront-footer-note">
+        Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
+      </p>
+    </div>
+  </footer>
+  <script type="module" src="/vitrine/vitrine.js"></script>
+</body>
+</html>`;
+}

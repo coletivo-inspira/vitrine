@@ -2,19 +2,131 @@ import {
   DEFAULT_TEMPLATE,
   MAX_DRAFT_BYTES,
   PortalValidationError,
+  RESERVED_SLUGS,
   createInitialDraftContent,
+  isValidSlug,
   measureDraftBytes,
   validateDraftContent,
   validateRevision,
   validateSiteInput
 } from '../src/portal-validation.mjs';
+import {
+  compilePublicStorefront,
+  renderStorefrontHtml
+} from '../src/publication-engine.mjs';
 
 const SESSION_COOKIE_NAME = '__Host-vitrine_session';
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
+export const STRICT_CSP_HEADER =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+export const STOREFRONT_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
+export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+const PUBLIC_SECURITY_HEADERS = Object.freeze({
+  'content-security-policy': STRICT_CSP_HEADER,
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'x-frame-options': 'DENY'
+});
+
 const JSON_HEADERS = Object.freeze({
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store'
 });
+
+const PILOT_LOJA1_DRAFT = Object.freeze({
+  schemaVersion: 1,
+  template: 'pizzeria-v1',
+  slug: 'loja1',
+  businessName: 'Forno & Praça Pizzaria Artesanal',
+  whatsapp: '5511999999999',
+  categories: [
+    {
+      id: 'pizzas-classicas',
+      name: 'Pizzas Clássicas de Fermentação Natural',
+      items: [
+        {
+          id: 'margherita-verace',
+          name: 'Margherita Verace',
+          description:
+            'Molho de tomate San Marzano, muçarela fresca, folhas de manjericão e azeite extravirgem.',
+          priceCents: 4800,
+          active: true
+        },
+        {
+          id: 'calabresa-artesanal',
+          name: 'Calabresa Curada & Cebola Roxa',
+          description:
+            'Muçarela, calabresa artesanal fatiada fina, cebola roxa marinada e orégano fresco.',
+          priceCents: 5200,
+          active: true
+        },
+        {
+          id: 'quatro-queijos',
+          name: 'Quatro Queijos da Serra',
+          description:
+            'Muçarela, parmesão maturado, gorgonzola suave e catupiry artesanal na lenha.',
+          priceCents: 5600,
+          active: true
+        }
+      ]
+    },
+    {
+      id: 'pizzas-autorais',
+      name: 'Especiais da Casa',
+      items: [
+        {
+          id: 'cogumelos-trufados',
+          name: 'Bosque de Cogumelos',
+          description:
+            'Mix de paris e shimeji salteados no alho, muçarela flor de leite e toque de salsa.',
+          priceCents: 6200,
+          active: true
+        },
+        {
+          id: 'rascunho-inverno-oculto',
+          name: 'Pizza Sazonal de Inverno (Oculta)',
+          description: 'Item em elaboração que jamais deve aparecer no cardápio público.',
+          priceCents: 6900,
+          active: false
+        }
+      ]
+    },
+    {
+      id: 'bebidas',
+      name: 'Bebidas & Sodas Artesanais',
+      items: [
+        {
+          id: 'soda-limao-siciliano',
+          name: 'Soda Italiana de Limão Siciliano 350ml',
+          description: 'Xarope artesanal de limão siciliano fresco com água com gás gelada.',
+          priceCents: 1400,
+          active: true
+        },
+        {
+          id: 'agua-mineral',
+          name: 'Água Mineral sem Gás 500ml',
+          description: 'Garrafa 500ml refrigerada.',
+          priceCents: 600,
+          active: true
+        }
+      ]
+    }
+  ]
+});
+
+let cachedPilotLoja1PublicationPromise = null;
+function getPilotLoja1Publication() {
+  if (!cachedPilotLoja1PublicationPromise) {
+    cachedPilotLoja1PublicationPromise = compilePublicStorefront(
+      PILOT_LOJA1_DRAFT,
+      { slug: 'loja1', name: 'Forno & Praça Pizzaria Artesanal', template: 'pizzeria-v1' },
+      { revision: 1, publishedAt: '2026-11-11T00:00:00.000Z' }
+    ).then((res) => res.publication);
+  }
+  return cachedPilotLoja1PublicationPromise;
+}
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
@@ -140,6 +252,79 @@ function normalizeVerifiedUser(result, token) {
   return null;
 }
 
+const HARNESS_TOKENS = Object.freeze({
+  'token-owner': '10000000-0000-0000-0000-000000000001',
+  'token-member': '10000000-0000-0000-0000-000000000002',
+  'token-stranger': '10000000-0000-0000-0000-000000000003'
+});
+
+const DEFAULT_MEMORY_SEED = Object.freeze({
+  sites: [
+    {
+      id: '20000000-0000-0000-0000-000000000001',
+      owner_user_id: '10000000-0000-0000-0000-000000000001',
+      slug: 'pizza-a',
+      name: 'Pizza A',
+      template: 'pizzeria-v1',
+      updatedAt: '2026-11-11T00:00:00.000Z'
+    },
+    {
+      id: '20000000-0000-0000-0000-000000000002',
+      owner_user_id: '10000000-0000-0000-0000-000000000001',
+      slug: 'pizza-b',
+      name: 'Pizza B',
+      template: 'pizzeria-v1',
+      updatedAt: '2026-11-11T00:00:00.000Z'
+    }
+  ],
+  memberships: [
+    {
+      site_id: '20000000-0000-0000-0000-000000000001',
+      user_id: '10000000-0000-0000-0000-000000000002',
+      role: 'collaborator'
+    }
+  ],
+  drafts: [
+    {
+      siteId: '20000000-0000-0000-0000-000000000001',
+      revision: 1,
+      updatedAt: '2026-11-11T00:00:00.000Z',
+      content: {
+        schemaVersion: 1,
+        template: 'pizzeria-v1',
+        slug: 'pizza-a',
+        businessName: 'Pizza A',
+        whatsapp: '5511999999999',
+        categories: [],
+        items: [
+          {
+            id: 'margherita',
+            name: 'Margherita',
+            description: 'Molho de tomate artesanal, muçarela e manjericão fresco.',
+            priceCents: 4500,
+            active: true,
+            available: true
+          }
+        ]
+      }
+    },
+    {
+      siteId: '20000000-0000-0000-0000-000000000002',
+      revision: 1,
+      updatedAt: '2026-11-11T00:00:00.000Z',
+      content: {
+        schemaVersion: 1,
+        template: 'pizzeria-v1',
+        slug: 'pizza-b',
+        businessName: 'Pizza B',
+        whatsapp: '5511999999999',
+        categories: [],
+        items: []
+      }
+    }
+  ]
+});
+
 async function resolveSessionUser(request, env, deps) {
   const token = extractSessionToken(request);
   if (!token) {
@@ -195,13 +380,19 @@ async function resolveSessionUser(request, env, deps) {
     }
   }
 
+  if (Object.hasOwn(HARNESS_TOKENS, token)) {
+    return { id: HARNESS_TOKENS[token], token };
+  }
+
   return null;
 }
 
-export function createMemoryStore(initial = {}) {
+export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const sites = new Map();
   const drafts = new Map();
   const memberships = [];
+  const publicationsBySlug = new Map();
+  const publicationsByHash = new Map();
 
   if (initial.sites instanceof Map) {
     for (const [key, value] of initial.sites.entries()) {
@@ -242,7 +433,7 @@ export function createMemoryStore(initial = {}) {
         memberships.push({
           siteId,
           userId,
-          role: entry.role ?? 'member'
+          role: entry.role ?? 'collaborator'
         });
       }
     }
@@ -254,8 +445,8 @@ export function createMemoryStore(initial = {}) {
     if (ownerId === userId) {
       return 'owner';
     }
-    const isMember = memberships.some(m => m.siteId === site.id && m.userId === userId);
-    return isMember ? 'member' : null;
+    const membership = memberships.find(m => m.siteId === site.id && m.userId === userId);
+    return membership ? (membership.role ?? 'collaborator') : null;
   }
 
   function formatSiteSummary(site, role) {
@@ -273,12 +464,56 @@ export function createMemoryStore(initial = {}) {
     sites,
     drafts,
     memberships,
+    publicationsBySlug,
+    publicationsByHash,
 
-    addMembership(siteId, userId, role = 'member') {
+    addMembership(siteId, userId, role = 'collaborator') {
       const exists = memberships.some(m => m.siteId === siteId && m.userId === userId);
       if (!exists) {
         memberships.push({ siteId, userId, role });
       }
+    },
+
+    async getSite(siteId, userId) {
+      const site = sites.get(siteId);
+      const role = getRoleForSite(site, userId);
+      if (!role) {
+        return null;
+      }
+      return formatSiteSummary(site, role);
+    },
+
+    async savePublication(publication) {
+      if (!publication || !publication.slug || !publication.hash) {
+        throw new Error('Invalid publication record');
+      }
+      publicationsBySlug.set(publication.slug, publication);
+      publicationsByHash.set(`${publication.slug}:${publication.hash}`, publication);
+      return publication;
+    },
+
+    async getPublicationBySlug(slug) {
+      if (publicationsBySlug.has(slug)) {
+        return publicationsBySlug.get(slug);
+      }
+      if (slug === 'loja1') {
+        return getPilotLoja1Publication();
+      }
+      return null;
+    },
+
+    async getPublicationByHash(slug, hash) {
+      const key = `${slug}:${hash}`;
+      if (publicationsByHash.has(key)) {
+        return publicationsByHash.get(key);
+      }
+      if (slug === 'loja1') {
+        const pilot = await getPilotLoja1Publication();
+        if (pilot.hash === hash) {
+          return pilot;
+        }
+      }
+      return null;
     },
 
     async listSites(userId) {
@@ -411,9 +646,35 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         slug: row.slug,
         name: row.name,
         template: row.template ?? DEFAULT_TEMPLATE,
-        role: row.owner_user_id === userId ? 'owner' : 'member',
+        role: row.owner_user_id === userId ? 'owner' : 'collaborator',
         updatedAt: row.updated_at ?? row.created_at
       }));
+    },
+
+    async getSite(siteId, userId, { token } = {}) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,template,created_at,updated_at`,
+        {
+          method: 'GET',
+          headers: authHeaders(token)
+        }
+      );
+      if (!response.ok) {
+        return null;
+      }
+      const rows = await response.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return null;
+      }
+      const row = rows[0];
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        template: row.template ?? DEFAULT_TEMPLATE,
+        role: row.owner_user_id === userId ? 'owner' : 'collaborator',
+        updatedAt: row.updated_at ?? row.created_at
+      };
     },
 
     async createSite({ userId, name, slug, template = DEFAULT_TEMPLATE, content }, { token } = {}) {
@@ -559,8 +820,165 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           content: row.content
         }
       };
+    },
+
+    async savePublication(publication) {
+      return sharedPublicPublications.savePublication(publication);
+    },
+
+    async getPublicationBySlug(slug) {
+      return sharedPublicPublications.getPublicationBySlug(slug);
+    },
+
+    async getPublicationByHash(slug, hash) {
+      return sharedPublicPublications.getPublicationByHash(slug, hash);
     }
   };
+}
+
+const sharedPublicPublications = createMemoryStore({ sites: [], drafts: [], memberships: [] });
+
+const RESERVED_PUBLIC_PATHS = new Set([
+  ...RESERVED_SLUGS,
+  'vitrine',
+  '404',
+  '404.html',
+  'index.html',
+  'styles.css',
+  'app.js',
+  'theme.js',
+  'dot-trail.js',
+  'favicon.ico'
+]);
+
+async function handlePublicStorefrontOrMenuRequest(request, pathname, method, store, assetsFetcher) {
+  if (method !== 'GET' && method !== 'HEAD') {
+    return null;
+  }
+
+  // 1. Immutable hashed menu release: /data/vitrines/<slug>/releases/<hash>.json
+  const releaseMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/releases\/([a-f0-9]{64})\.json$/);
+  if (releaseMatch) {
+    const [, slug, hash] = releaseMatch;
+    const pub =
+      (await store.getPublicationByHash?.(slug, hash)) ??
+      (await sharedPublicPublications.getPublicationByHash(slug, hash));
+    if (pub) {
+      return new Response(method === 'HEAD' ? null : JSON.stringify(pub.menu), {
+        status: 200,
+        headers: {
+          ...PUBLIC_SECURITY_HEADERS,
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': IMMUTABLE_CACHE_CONTROL,
+          etag: `"${pub.hash}"`
+        }
+      });
+    }
+    if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+      const assetRes = await assetsFetcher.fetch(request);
+      if (assetRes.ok) {
+        const headers = new Headers(assetRes.headers);
+        for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) headers.set(k, v);
+        headers.set('content-type', 'application/json; charset=utf-8');
+        headers.set('cache-control', IMMUTABLE_CACHE_CONTROL);
+        return new Response(method === 'HEAD' ? null : assetRes.body, {
+          status: assetRes.status,
+          headers
+        });
+      }
+    }
+    return errorResponse(404, 'PUBLICATION_NOT_FOUND', 'Versão publicada não encontrada.', {});
+  }
+
+  // 2. Active public menu artifact: /data/vitrines/<slug>/menu.json
+  const menuMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/menu\.json$/);
+  if (menuMatch) {
+    const slug = menuMatch[1];
+    const pub =
+      (await store.getPublicationBySlug?.(slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(slug));
+    if (pub) {
+      return new Response(method === 'HEAD' ? null : JSON.stringify(pub.menu), {
+        status: 200,
+        headers: {
+          ...PUBLIC_SECURITY_HEADERS,
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': STOREFRONT_CACHE_CONTROL,
+          etag: `"${pub.hash}"`
+        }
+      });
+    }
+    if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+      const assetRes = await assetsFetcher.fetch(request);
+      if (assetRes.ok) {
+        const headers = new Headers(assetRes.headers);
+        for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) headers.set(k, v);
+        headers.set('content-type', 'application/json; charset=utf-8');
+        headers.set('cache-control', STOREFRONT_CACHE_CONTROL);
+        return new Response(method === 'HEAD' ? null : assetRes.body, {
+          status: assetRes.status,
+          headers
+        });
+      }
+    }
+    return errorResponse(404, 'PUBLICATION_NOT_FOUND', 'Cardápio público não encontrado.');
+  }
+
+  // 3. Public storefront page: /<slug> or /<slug>/ or /<slug>/index.html
+  const storefrontMatch = pathname.match(/^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/|\/index\.html)?$/);
+  if (storefrontMatch) {
+    const slug = storefrontMatch[1];
+    if (RESERVED_PUBLIC_PATHS.has(slug) || !isValidSlug(slug)) {
+      return null;
+    }
+
+    const pub =
+      (await store.getPublicationBySlug?.(slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(slug));
+    if (pub) {
+      const html = renderStorefrontHtml(pub.menu);
+      return new Response(method === 'HEAD' ? null : html, {
+        status: 200,
+        headers: {
+          ...PUBLIC_SECURITY_HEADERS,
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': STOREFRONT_CACHE_CONTROL,
+          etag: `"${pub.hash}"`
+        }
+      });
+    }
+
+    if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+      const menuProbeUrl = new URL(`/data/vitrines/${slug}/menu.json`, request.url);
+      const menuProbe = await assetsFetcher.fetch(new Request(menuProbeUrl));
+      if (menuProbe.ok) {
+        const menuData = await menuProbe.json();
+        const html = renderStorefrontHtml(menuData);
+        return new Response(method === 'HEAD' ? null : html, {
+          status: 200,
+          headers: {
+            ...PUBLIC_SECURITY_HEADERS,
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': STOREFRONT_CACHE_CONTROL
+          }
+        });
+      }
+    }
+
+    return new Response(
+      method === 'HEAD' ? null : 'Vitrine pública não encontrada.',
+      {
+        status: 404,
+        headers: {
+          ...PUBLIC_SECURITY_HEADERS,
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store'
+        }
+      }
+    );
+  }
+
+  return null;
 }
 
 function normalizeStore(providedStore) {
@@ -618,9 +1036,20 @@ export function createApiHandler(deps = {}) {
     const url = new URL(request.url, 'http://localhost');
     const pathname = url.pathname;
     const method = (request.method || 'GET').toUpperCase();
+    const store = resolveStore(env);
+    const assetsFetcher = env?.ASSETS ?? deps?.assets;
 
     if (pathname !== '/api' && !pathname.startsWith('/api/')) {
-      const assetsFetcher = env?.ASSETS ?? deps?.assets;
+      const publicResponse = await handlePublicStorefrontOrMenuRequest(
+        request,
+        pathname,
+        method,
+        store,
+        assetsFetcher
+      );
+      if (publicResponse) {
+        return publicResponse;
+      }
       if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
         return assetsFetcher.fetch(request);
       }
@@ -654,8 +1083,6 @@ export function createApiHandler(deps = {}) {
           }
         });
       }
-
-      const store = resolveStore(env);
 
       if (pathname === '/api/sites' || pathname === '/api/sites/') {
         const user = await resolveSessionUser(request, env, deps);
@@ -772,6 +1199,49 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para rascunho.');
       }
 
+      const publishMatch = pathname.match(/^\/api\/sites\/([^/]+)\/publish\/?$/);
+      if (publishMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) {
+          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        }
+
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para publicação.');
+        }
+
+        const siteId = decodeURIComponent(publishMatch[1]);
+        const draft = await store.getDraft(siteId, user.id, { token: user.token, env });
+        if (!draft) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+
+        let site = null;
+        if (typeof store.getSite === 'function') {
+          site = await store.getSite(siteId, user.id, { token: user.token, env });
+        }
+        if (!site) {
+          const allSites = await store.listSites(user.id, { token: user.token, env });
+          site = allSites.find((entry) => entry.id === siteId) ?? null;
+        }
+        if (!site) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+
+        // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
+        const compiled = await compilePublicStorefront(draft.content, site, {
+          revision: draft.revision,
+          siteId: site.id
+        });
+
+        if (typeof store.savePublication === 'function') {
+          await store.savePublication(compiled.publication);
+        }
+        await sharedPublicPublications.savePublication(compiled.publication);
+
+        return jsonResponse(200, { publication: compiled.publication });
+      }
+
       return errorResponse(404, 'NOT_FOUND', 'Endpoint da API não encontrado.');
     } catch (err) {
       if (err instanceof PortalValidationError) {
@@ -790,13 +1260,6 @@ const defaultApiHandler = createApiHandler();
 
 export default {
   async fetch(request, env = {}, ctx = {}) {
-    const url = new URL(request.url, 'http://localhost');
-    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
-      return defaultApiHandler(request, env, ctx);
-    }
-    if (env?.ASSETS && typeof env.ASSETS.fetch === 'function') {
-      return env.ASSETS.fetch(request);
-    }
-    return errorResponse(404, 'NOT_FOUND', 'Recurso estático não encontrado.');
+    return defaultApiHandler(request, env, ctx);
   }
 };

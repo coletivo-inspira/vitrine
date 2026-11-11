@@ -6,5 +6,15 @@
   X-Frame-Options: DENY
 /data/*
   Cache-Control: no-cache
+/data/vitrines/*/menu.json
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
+/data/vitrines/*/releases/*
+  Cache-Control: public, max-age=31536000, immutable
+/loja1
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
+/loja1/*
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
+/vitrine/*
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
 /assets/*
   Cache-Control: public, max-age=86400

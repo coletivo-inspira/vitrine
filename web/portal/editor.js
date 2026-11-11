@@ -10,6 +10,10 @@ const editorSiteTitle = document.getElementById('editor-site-title');
 const editorSiteSlug = document.getElementById('editor-site-slug');
 const editorRevisionIndicator = document.getElementById('editor-revision-indicator');
 const saveDraftButton = document.getElementById('save-draft-button');
+const publishSiteButton = document.getElementById('publish-site-button');
+const publicationStatusBar = document.getElementById('publication-status-bar');
+const publicationStatusText = document.getElementById('publication-status-text');
+const publicationViewLink = document.getElementById('publication-view-link');
 const conflictBanner = document.getElementById('conflict-banner');
 const reloadConflictButton = document.getElementById('reload-conflict-button');
 const copyConflictButton = document.getElementById('copy-conflict-button');
@@ -41,6 +45,9 @@ export async function loadEditor(site, isOnline) {
   currentIsOnline = isOnline;
   currentDraft = null;
   conflictBanner.hidden = true;
+  if (publicationStatusBar) {
+    publicationStatusBar.hidden = true;
+  }
 
   editorSiteTitle.textContent = site.name;
   editorSiteSlug.textContent = `vitrine.inspira.dev.br/${site.slug}`;
@@ -96,6 +103,12 @@ function setupEditorEvents() {
   saveDraftButton.addEventListener('click', async () => {
     await handleSaveDraft();
   });
+
+  if (publishSiteButton) {
+    publishSiteButton.addEventListener('click', async () => {
+      await handlePublishSite();
+    });
+  }
 
   addCategoryButton.addEventListener('click', () => {
     addCategory();
@@ -672,4 +685,79 @@ async function handleSaveDraft() {
     conflictBanner.hidden = true;
   }
   updateDraftAndPreview();
+}
+
+// Handle publish storefront
+async function handlePublishSite() {
+  if (!validateCatalogLocal()) return;
+
+  if (currentIsOnline) {
+    try {
+      const saveRes = await fetch(`/api/sites/${currentSite.id}/draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          revision: currentDraft.revision,
+          content: currentDraft.content
+        })
+      });
+
+      if (saveRes.ok) {
+        const savedData = await saveRes.json();
+        currentDraft = savedData.draft;
+        editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+      } else if (saveRes.status === 409) {
+        conflictBanner.hidden = false;
+        showFeedback('Conflito de revisão detectado antes de publicar. Recarregue o rascunho.', 'error');
+        return;
+      } else {
+        const errData = await saveRes.json().catch(() => ({}));
+        showFeedback(errData.error?.message || 'Erro ao salvar rascunho antes de publicar.', 'error');
+        return;
+      }
+
+      const pubRes = await fetch(`/api/sites/${currentSite.id}/publish`, {
+        method: 'POST'
+      });
+
+      if (pubRes.ok) {
+        const pubData = await pubRes.json();
+        const pub = pubData.publication;
+        if (publicationStatusBar && publicationStatusText && publicationViewLink) {
+          const shortHash = String(pub.hash || '').slice(0, 12);
+          publicationStatusText.textContent = `Revisão ${pub.revision} publicada em ${pub.url} (SHA-256: ${shortHash}…)`;
+          publicationViewLink.href = pub.url;
+          publicationStatusBar.hidden = false;
+        }
+        showFeedback(`Vitrine publicada com sucesso em ${pub.url}!`, 'success');
+      } else {
+        const errData = await pubRes.json().catch(() => ({}));
+        showFeedback(
+          errData.error?.message || 'Falha ao publicar vitrine. A publicação anterior foi preservada.',
+          'error'
+        );
+      }
+    } catch {
+      showFeedback('Erro de rede ao publicar vitrine.', 'error');
+    }
+  } else {
+    let activeCount = 0;
+    (currentDraft.content.categories || []).forEach((cat) => {
+      (cat.items || []).forEach((item) => {
+        if (item.active !== false) activeCount += 1;
+      });
+    });
+
+    if (activeCount === 0) {
+      showFeedback('O rascunho precisa ter ao menos 1 item ativo para ser publicado.', 'error');
+      return;
+    }
+
+    if (publicationStatusBar && publicationStatusText && publicationViewLink) {
+      publicationStatusText.textContent = `Prévia publicada no modo local (revisão ${currentDraft.revision}). Exemplo estático disponível em /loja1.`;
+      publicationViewLink.href = '/loja1';
+      publicationStatusBar.hidden = false;
+    }
+    showFeedback('Publicação validada com sucesso no modo local!', 'success');
+  }
 }
