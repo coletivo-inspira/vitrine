@@ -1125,3 +1125,7 @@ body[data-button-style="rounded"] .category-chip {
   color: var(--ink-soft);
 }
 
+.sf-stage-card > .sf-quota-legal {
+  margin-bottom: 16px;
+}
+
