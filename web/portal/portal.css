@@ -1815,15 +1815,14 @@ svg {
 
 /* Fixed/Sticky Liquid Glass Editor Action Bar, Tabs, CSV & Shared Storefront Preview */
 .editor-action-bar {
-  position: sticky;
-  top: 12px;
+  position: relative;
   z-index: 40;
   border-radius: var(--radius-panel);
-  padding: 16px 22px;
-  margin-bottom: 20px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .editor-action-main {
@@ -1873,8 +1872,8 @@ svg {
 .editor-compact-meters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  padding-top: 10px;
+  gap: 12px;
+  padding-top: 6px;
   border-top: 1px solid var(--line);
 }
 
@@ -3312,29 +3311,44 @@ svg {
   opacity: 1;
 }
 
-/* On mobile, toolbar floats at the bottom */
+/* On mobile, toolbar sits cleanly below the item column with bottom clearance */
 @media (max-width: 1100px) {
   .editor-items-workspace {
     flex-direction: column;
+    gap: 16px;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .editor-items-workspace .categories-list-builder {
+    width: 100%;
+    padding-bottom: 8px;
   }
   
   .forms-floating-toolbar {
     flex-direction: row;
-    position: sticky;
+    position: relative;
     top: auto;
-    bottom: 84px;
+    bottom: auto;
     align-self: center;
     height: auto;
     width: auto;
-    padding: 6px 14px;
-    z-index: 150;
+    margin-top: 8px;
+    padding: 6px 16px;
+    z-index: 80;
     background: var(--white);
     border: 1px solid var(--orange);
-    box-shadow: 0 8px 28px rgb(0 0 0 / .24);
+    box-shadow: 0 8px 28px rgb(0 0 0 / .18);
   }
 }
 
 /* Google Forms Header & Item Cards */
+.editor-items-header-row,
+.editor-items-toolbar,
+.google-forms-header-card,
+.item-block.google-forms-card {
+  scroll-margin-top: 180px;
+}
+
 .google-forms-header-card {
   background: var(--white);
   border: 1px solid var(--line);
