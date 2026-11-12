@@ -1,0 +1,97 @@
+[
+  {
+    "nome": "antes de rolar, as demonstrações mostram o PNG",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "demonstrações visíveis viram SVG inline com controle",
+    "ok": true,
+    "detalhe": "[\"cardapio\",\"lanches\",\"servicos\",\"portfolio\"]"
+  },
+  {
+    "nome": "animação avança enquanto visível",
+    "ok": true,
+    "detalhe": "833 → 1450 ms"
+  },
+  {
+    "nome": "Pausar congela o quadro e atualiza o rótulo",
+    "ok": true,
+    "detalhe": "1467 → 1467 ms"
+  },
+  {
+    "nome": "fora da tela, todas ficam suspensas",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "de volta à tela, a escolha de pausa é preservada e as outras retomam",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "aba oculta suspende todas",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "Retomar volta a reproduzir",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "as quatro demonstrações carregam ao entrar na tela",
+    "ok": true,
+    "detalhe": "[[\"cardapio\",true],[\"lanches\",true],[\"servicos\",true],[\"portfolio\",true]]"
+  },
+  {
+    "nome": "IDs únicos com os quatro SVGs inline",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "texto do SVG usa as fontes do site sem contorno herdado",
+    "ok": true,
+    "detalhe": "Syne, \"DM Sans\", sans-serif / stroke none | \"DM Sans\", sans-serif / stroke none | \"DM Sans\", sans-serif / stroke none"
+  },
+  {
+    "nome": "filtros de área continuam funcionando",
+    "ok": true,
+    "detalhe": "area-food:false,area-art:false,area-photo:false,area-health:true,area-tech:false"
+  },
+  {
+    "nome": "sem erros de script ou CSP",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "movimento reduzido mostra PNG e esconde o controle",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "sem JavaScript, PNG e controle oculto",
+    "ok": true,
+    "detalhe": ""
+  },
+  {
+    "nome": "desktop-1280 light: sem rolagem horizontal",
+    "ok": true,
+    "detalhe": "1280px"
+  },
+  {
+    "nome": "desktop-1280 dark: sem rolagem horizontal",
+    "ok": true,
+    "detalhe": "1280px"
+  },
+  {
+    "nome": "celular-375 light: sem rolagem horizontal",
+    "ok": true,
+    "detalhe": "375px"
+  },
+  {
+    "nome": "celular-375 dark: sem rolagem horizontal",
+    "ok": true,
+    "detalhe": "375px"
+  }
+]
