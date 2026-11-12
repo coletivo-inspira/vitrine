@@ -950,8 +950,26 @@
                   </div>
                 </div>
 
-                <div id="items-container" class="categories-list-builder">
-                  <!-- Items rendered dynamically via JS -->
+                <div class="editor-items-workspace">
+                  <div id="items-container" class="categories-list-builder">
+                    <!-- Items rendered dynamically via JS -->
+                  </div>
+
+                  <!-- Floating Side/Bottom Toolbar (Google Forms style) -->
+                  <div class="forms-floating-toolbar" role="toolbar" aria-label="Ações do formulário">
+                    <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item">
+                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-plus"/></svg>
+                      <span class="tooltip">Adicionar item</span>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar seção" aria-label="Adicionar seção">
+                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-edit"/></svg>
+                      <span class="tooltip">Adicionar seção</span>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="toolbar-add-image" title="Adicionar imagem" aria-label="Adicionar imagem">
+                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-image"/></svg>
+                      <span class="tooltip">Adicionar imagem</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

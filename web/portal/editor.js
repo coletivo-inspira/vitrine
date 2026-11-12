@@ -458,6 +458,35 @@ function setupEditorEvents() {
     });
   });
 
+  // Floating Side/Bottom Toolbar Event Listeners
+  const toolbarAddItem = document.getElementById('toolbar-add-item');
+  const toolbarAddSection = document.getElementById('toolbar-add-section');
+  const toolbarAddImage = document.getElementById('toolbar-add-image');
+
+  toolbarAddItem?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!currentDraft) return;
+    if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
+      addCategory('Geral');
+    }
+    const expanded = addItemBtn?.getAttribute('aria-expanded') === 'true';
+    addItemBtn?.setAttribute('aria-expanded', !expanded);
+    if (addItemMenu) addItemMenu.hidden = expanded;
+  });
+
+  toolbarAddSection?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    addCategory();
+  });
+
+  toolbarAddImage?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
+      addCategory('Geral');
+    }
+    addItem('photo');
+  });
+
   const csvBtn = document.getElementById('csv-menu-btn');
   const csvMenu = document.getElementById('csv-dropdown-menu');
 
