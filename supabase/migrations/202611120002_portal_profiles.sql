@@ -779,13 +779,7 @@ begin
         allowed_mime_types = excluded.allowed_mime_types,
         updated_at = now();
 
-  -- Only the owner of storage.objects (or a role with ownership membership) can create/drop policies on it.
-  if pg_has_role(current_user, (
-    select c.relowner
-    from pg_class c
-    join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'storage' and c.relname = 'objects'
-  ), 'USAGE') then
+  begin
     execute 'drop policy if exists catalog_images_public_select on storage.objects';
     execute $pol$
       create policy catalog_images_public_select
@@ -836,7 +830,10 @@ begin
           and private.can_access_catalog_image_object(name)
         )
     $pol$;
-  end if;
+  exception
+    when insufficient_privilege then
+      raise warning 'catalog-images storage policies NOT created: % (SQLSTATE %)', sqlerrm, sqlstate;
+  end;
 end
 $$;
 

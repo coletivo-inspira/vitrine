@@ -396,9 +396,10 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
     );
 
     // Simula Supabase hospedado onde schema storage pertence a supabase_storage_admin (sem CREATE em storage)
-    const hostedDb = new PGlite();
-    t.after(() => hostedDb.close());
-    await hostedDb.exec(`
+    // 3.a Quando o papel de migração tem permissão para criar policies em storage.objects -> policies são criadas
+    const hostedDbAllowed = new PGlite();
+    t.after(() => hostedDbAllowed.close());
+    await hostedDbAllowed.exec(`
       create role anon nologin;
       create role authenticated nologin;
       create role supabase_storage_admin nologin;
@@ -466,16 +467,23 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       set role postgres_migration_runner;
     `);
 
+    const allowedNotices = [];
     for (const file of (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort()) {
-      await hostedDb.exec(await readFile(resolve(migrationsDir, file), 'utf8'));
+      await hostedDbAllowed.exec(await readFile(resolve(migrationsDir, file), 'utf8'), {
+        onNotice: (n) => allowedNotices.push(n)
+      });
     }
+    assert.equal(
+      allowedNotices.some((n) => String(n.message || '').includes('catalog-images storage policies NOT created')),
+      false
+    );
 
-    const hostedBucket = await hostedDb.query(
+    const hostedBucket = await hostedDbAllowed.query(
       "select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'catalog-images'"
     );
     assert.equal(hostedBucket.rows.length, 1);
     assert.equal(hostedBucket.rows[0].public, true);
-    const hostedPolicies = await hostedDb.query(
+    const hostedPolicies = await hostedDbAllowed.query(
       "select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'catalog_images_%' order by policyname"
     );
     assert.deepEqual(
@@ -487,6 +495,102 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
         'catalog_images_public_select'
       ]
     );
+
+    // 3.b Quando o papel de migração NÃO tem privilégio para criar policies em storage.objects -> emite WARNING alto e claro e a migração conclui de forma atômica
+    const hostedDbDenied = new PGlite();
+    t.after(() => hostedDbDenied.close());
+    await hostedDbDenied.exec(`
+      create role anon nologin;
+      create role authenticated nologin;
+      create role supabase_storage_admin nologin;
+      create role postgres_migration_runner login;
+      grant anon, authenticated to postgres_migration_runner;
+
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema auth to authenticated, anon, postgres_migration_runner;
+      grant execute on function auth.uid() to authenticated, anon, postgres_migration_runner;
+      grant references on auth.users to postgres_migration_runner;
+
+      create schema storage authorization supabase_storage_admin;
+      grant usage on schema storage to anon, authenticated, postgres_migration_runner;
+      revoke create on schema storage from public, postgres_migration_runner, supabase_storage_admin;
+
+      create table storage.buckets (
+        id text primary key,
+        name text not null,
+        owner uuid null,
+        public boolean not null default false,
+        file_size_limit bigint null,
+        allowed_mime_types text[] null,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+      alter table storage.buckets owner to supabase_storage_admin;
+
+      create table storage.objects (
+        id uuid primary key default gen_random_uuid(),
+        bucket_id text null references storage.buckets(id),
+        name text null,
+        owner uuid null default auth.uid(),
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        last_accessed_at timestamptz not null default now(),
+        metadata jsonb null,
+        unique (bucket_id, name)
+      );
+      alter table storage.objects owner to supabase_storage_admin;
+      alter table storage.objects enable row level security;
+
+      create function storage.foldername(name text)
+      returns text[]
+      language sql
+      immutable
+      set search_path = ''
+      as $$
+        select string_to_array(coalesce(name, ''), '/');
+      $$;
+      alter function storage.foldername(text) owner to supabase_storage_admin;
+      grant execute on function storage.foldername(text) to anon, authenticated, postgres_migration_runner;
+
+      grant all on storage.buckets, storage.objects to postgres_migration_runner;
+      grant select on storage.buckets, storage.objects to anon, authenticated;
+      grant insert, update, delete on storage.objects to authenticated;
+
+      insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+      values ('catalog-images', 'catalog-images', true, 262144, array['image/webp']);
+
+      grant create, usage on schema public to postgres_migration_runner;
+      grant create on database postgres to postgres_migration_runner;
+      set role postgres_migration_runner;
+    `);
+
+    const deniedNotices = [];
+    for (const file of (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort()) {
+      await hostedDbDenied.exec(await readFile(resolve(migrationsDir, file), 'utf8'), {
+        onNotice: (n) => deniedNotices.push(n)
+      });
+    }
+
+    const policyWarning = deniedNotices.find(
+      (n) =>
+        n.severity === 'WARNING' &&
+        String(n.message || '').includes('catalog-images storage policies NOT created:')
+    );
+    assert.ok(policyWarning, 'Deve emitir WARNING explícito quando insufficient_privilege impedir criação das policies');
+    assert.match(policyWarning.message, /42501/);
+
+    const deniedBucket = await hostedDbDenied.query(
+      "select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'catalog-images'"
+    );
+    assert.equal(deniedBucket.rows.length, 1);
+    assert.equal(deniedBucket.rows[0].public, true);
+    const profilesExists = await hostedDbDenied.query(
+      "select to_regclass('public.profiles') as reg"
+    );
+    assert.equal(profilesExists.rows[0].reg, 'profiles');
   });
 
   await t.test('4. Rotas HTTP no Worker: GET/PUT /api/profile, GET/POST /api/customization-requests e POST /api/sites estendido (Sessão, Origin, JSON e Isolamento)', async () => {
