@@ -172,3 +172,27 @@ test('Operador cria variante e a troca de modelo conserva personalizações e ca
   assert.equal(reset.status, 200);
   assert.equal((await reset.json()).resolved.pages[0].sections[0].id, 'hero-original');
 });
+
+test('Vitrine renderiza catálogo e destaque na ordem configurada e respeita módulos ocultos', async () => {
+  const store = createMemoryStore();
+  const [site] = [...store.sites.values()];
+  const draft = await store.getDraft(site.id, site.owner_user_id);
+  const compile = async catalogActive => (await compilePublicStorefront({
+    ...draft.content,
+    structure: { pages: [{ slug: 'home', title: 'Início', sections: [
+      { id: 'sobre', moduleCode: 'about_story', config: { bio: 'Nossa história' } },
+      { id: 'pedidos', moduleCode: 'catalog_grid', active: catalogActive, config: { columns: 3 } },
+      { id: 'abertura', moduleCode: 'hero', config: { headline: 'Boas-vindas' } }
+    ] }, { slug: 'contato', title: 'Contato', sections: [
+      { id: 'horarios', moduleCode: 'hours_location', config: { scheduleText: 'Segunda a sábado' } }
+    ] }] }
+  }, site)).menu;
+  const html = renderStorefrontHtml(await compile(true));
+  assert.ok(html.indexOf('id="sobre"') < html.indexOf('id="pedidos"'));
+  assert.ok(html.indexOf('id="pedidos"') < html.indexOf('id="abertura"'));
+  assert.match(html, /id="storefront-catalog"[^>]*data-columns="3"/);
+  assert.match(html, /id="pagina-contato"[^>]*><h2>Contato<\/h2>/);
+  const hidden = renderStorefrontHtml(await compile(false));
+  assert.doesNotMatch(hidden, /id="storefront-catalog"|id="pedidos"/);
+  assert.match(hidden, /Boas-vindas/);
+});

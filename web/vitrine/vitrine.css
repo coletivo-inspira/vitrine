@@ -906,3 +906,22 @@ body[data-button-style="rounded"] .category-chip {
   min-height: 120px;
   border: 0;
 }
+
+@media (min-width: 700px) {
+  .storefront-catalog[data-columns="1"] .menu-items-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .storefront-catalog[data-columns="3"] .menu-items-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.storefront-accessible-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -241,7 +241,7 @@ export async function bootStorefront(deps = {}) {
       statusBanner.hidden = true;
     }
 
-    const categories = normalizeStorefrontCategories(menu);
+    const categories = catalogContainer ? normalizeStorefrontCategories(menu) : [];
     const validItemIds = [];
     for (const cat of categories) {
       for (const item of cat.items ?? []) {
@@ -297,6 +297,8 @@ export async function bootStorefront(deps = {}) {
         categoryNav.appendChild(chip);
       });
     }
+
+    if (!catalogContainer) return null;
 
     const renderer = new StorefrontRenderer(catalogContainer, menu, {
       isPublicPage: true,

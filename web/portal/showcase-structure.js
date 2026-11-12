@@ -49,6 +49,17 @@ function checkbox(parent, text, checked) {
   return element;
 }
 
+function reorder(row, list, label) {
+  return [
+    action(`Subir ${label}`, () => {
+      if (row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+    }),
+    action(`Descer ${label}`, () => {
+      if (row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+    })
+  ];
+}
+
 export function renderStructureFields(root, structure, onSave, widgets = [], templateName = null, choices = null) {
   const form = document.createElement('form');
   const editingTemplate = templateName !== null;
@@ -87,7 +98,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
       href.required = true;
       href.placeholder = '#sec-sobre';
       row.read = () => ({ label: label.value, href: href.value });
-      row.append(action('Remover link', () => row.remove()));
+      row.append(...reorder(row, list, 'link'), action('Remover link', () => row.remove()));
       list.append(row);
     }
     (structure.navigation[key] ?? []).forEach(append);
@@ -137,12 +148,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
           : { ...section.config, ...Object.fromEntries(getters.map(([key, value]) => [key, value.value])) }
       });
       row.append(
-        action('Mover para cima', () => {
-          if (row.previousElementSibling) sections.insertBefore(row, row.previousElementSibling);
-        }),
-        action('Mover para baixo', () => {
-          if (row.nextElementSibling) sections.insertBefore(row.nextElementSibling, row);
-        }),
+        ...reorder(row, sections, 'seção'),
         action('Remover seção', () => row.remove())
       );
       sections.append(row);
@@ -161,7 +167,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
       }),
       sections
     );
-    if (!editingTemplate) card.append(action('Remover página', () => card.remove()));
+    if (!editingTemplate) card.append(...reorder(card, pageList, 'página'), action('Remover página', () => card.remove()));
     card.read = () => ({
       title: title.value, slug: slug.value, active: visible.checked,
       sections: [...sections.children].map(row => row.read())
