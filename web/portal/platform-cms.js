@@ -259,6 +259,7 @@ const templatePanel = globalThis.document?.getElementById('platform-templates');
 const templateStatus = globalThis.document?.getElementById('platform-templates-status');
 const templateSelect = globalThis.document?.getElementById('platform-template-select');
 const templateFields = globalThis.document?.getElementById('platform-template-fields');
+const templateCopy = globalThis.document?.getElementById('platform-template-copy');
 let availableTemplates = [];
 
 async function templateRequest(payload) {
@@ -270,13 +271,28 @@ async function templateRequest(payload) {
   return data;
 }
 
-function showSelectedTemplate() {
+function showSelectedTemplate(creating = false) {
   const template = availableTemplates.find(entry => entry.code === templateSelect.value);
+  templateCopy.hidden = !template || !['pizzeria-v1', 'products-v1', 'booking-v1', 'quote-v1'].includes(template.code);
   if (!template) {
     templateFields.replaceChildren();
     return;
   }
-  renderStructureFields(templateFields, {
+  const editor = document.createElement('div');
+  templateFields.replaceChildren(editor);
+  let code;
+  if (creating) {
+    const label = document.createElement('label');
+    label.textContent = 'Identificador do novo modelo ';
+    code = document.createElement('input');
+    code.pattern = '[a-z0-9][a-z0-9_\\-]{1,63}';
+    code.maxLength = 64;
+    code.placeholder = 'cardapio-bistro';
+    label.append(code);
+    templateFields.prepend(label);
+    code.focus();
+  }
+  renderStructureFields(editor, {
     theme: template.default_tokens,
     navigation: {},
     pages: [{ slug: 'home', title: 'Início', active: true, sections: template.default_sections }]
@@ -284,10 +300,16 @@ function showSelectedTemplate() {
     const currentGeneration = generation;
     try {
       const { template: saved } = await templateRequest({
-        code: template.code, name, defaultTokens: themeOverrides, defaultSections: pages[0].sections
+        code: creating ? code.value.trim() : template.code, name,
+        ...(creating ? { baseCode: template.code } : {}),
+        defaultTokens: themeOverrides, defaultSections: pages[0].sections
       });
       if (currentGeneration !== generation) return;
-      availableTemplates = availableTemplates.map(entry => entry.code === saved.code ? saved : entry);
+      if (creating) {
+        availableTemplates.push(saved);
+        templateSelect.add(new Option(saved.name, saved.code, false, true));
+        showSelectedTemplate();
+      } else availableTemplates = availableTemplates.map(entry => entry.code === saved.code ? saved : entry);
       templateSelect.querySelectorAll('option').forEach(option => {
         if (option.value === saved.code) option.textContent = saved.name;
       });
@@ -295,10 +317,11 @@ function showSelectedTemplate() {
     } catch (error) {
       if (currentGeneration === generation) templateStatus.textContent = error.message;
     }
-  }, [], template.name);
+  }, [], creating ? '' : template.name);
 }
 
-templateSelect?.addEventListener('change', showSelectedTemplate);
+templateSelect?.addEventListener('change', () => showSelectedTemplate());
+templateCopy?.addEventListener('click', () => showSelectedTemplate(true));
 templatePanel?.addEventListener('toggle', async () => {
   if (!templatePanel.open || section.hidden) return;
   const currentGeneration = generation;

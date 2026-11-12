@@ -113,3 +113,62 @@ test('Operador atualiza modelo suportado e o Worker recusa estrutura insegura', 
   assert.equal(saved.name, template.name);
   assert.equal(saved.default_sections[0].config.bio, 'Bem-vindo');
 });
+
+test('Operador cria variante e a troca de modelo conserva personalizações e catálogo', async () => {
+  const { createApiHandler } = await import('../workers/api.mjs');
+  const store = createMemoryStore();
+  const [site] = [...store.sites.values()];
+  const models = new Map([[site.template, {
+    catalogType: 'products', template: {
+      defaultTokens: { accentColor: '#1E3A8A', fontPair: 'editorial-syne' },
+      defaultSections: [{ id: 'hero-original', moduleCode: 'hero', config: { headline: 'Original' } }]
+    }
+  }]]);
+  store.isPlatformAdmin = userId => userId === site.owner_user_id;
+  store.createPlatformTemplate = async (code, baseCode, patch) => {
+    assert.equal(baseCode, site.template);
+    models.set(code, { catalogType: 'products', template: {
+      defaultTokens: patch.default_tokens, defaultSections: patch.default_sections
+    } });
+    return { code, ...patch };
+  };
+  store.getStructureDefaults = async code => models.get(code);
+  store.listStructureTemplates = async () => [{ code: 'cardapio-bistro', name: 'Bistrô' }];
+  const api = createApiHandler({ store });
+  const origin = 'https://vitrine.inspira.dev.br';
+  const path = `/api/sites/${site.id}`;
+  const send = (endpoint, method, body) => api(new Request(origin + endpoint, {
+    method, headers: { origin, authorization: 'Bearer token-owner', 'content-type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  }));
+  const create = await send('/api/admin/templates', 'POST', {
+    code: 'cardapio-bistro', baseCode: site.template, name: 'Bistrô',
+    defaultTokens: { fontPair: 'classic-garamond' },
+    defaultSections: [{ id: 'hero-bistro', moduleCode: 'hero', config: { headline: 'Bistrô' } }]
+  });
+  assert.equal(create.status, 200);
+  const { revision, resolved, templates } = await (await send(path + '/structure', 'GET')).json();
+  assert.equal(templates[0].code, 'cardapio-bistro');
+  const change = await send(path + '/structure', 'PUT', {
+    expectedRevision: revision, templateCode: 'cardapio-bistro', pages: resolved.pages,
+    themeOverrides: { ...resolved.theme, accentColor: '#272A38' },
+    navigationMenus: { header: [{ label: 'Cardápio', href: '#catalogo' }] }
+  });
+  assert.equal(change.status, 200);
+  const { draft, resolved: next } = await change.json();
+  assert.equal(draft.content.structure.templateCode, 'cardapio-bistro');
+  assert.equal(next.pages[0].sections[0].id, 'hero-bistro');
+  assert.deepEqual(next.theme, { accentColor: '#272A38', fontPair: 'classic-garamond' });
+  const invalid = await send(path + '/structure', 'PUT', {
+    expectedRevision: draft.revision, templateCode: 'nao-existe'
+  });
+  assert.equal(invalid.status, 422);
+  const { publication } = await (await send(path + '/publish', 'POST')).json();
+  assert.equal(publication.menu.structure.pages[0].sections[0].config.headline, 'Bistrô');
+  assert.ok(publication.menu.items.length > 0);
+  const reset = await send(path + '/structure', 'PUT', {
+    expectedRevision: draft.revision, templateCode: null
+  });
+  assert.equal(reset.status, 200);
+  assert.equal((await reset.json()).resolved.pages[0].sections[0].id, 'hero-original');
+});

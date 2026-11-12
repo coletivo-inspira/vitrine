@@ -48,7 +48,7 @@ returns trigger language plpgsql security definer set search_path = ''
 as $$
 begin
   if auth.uid() is not null then
-    perform private.record_audit_log(null, 'template_updated', 'template', new.code, '{}'::jsonb);
+    perform private.record_audit_log(null, case when tg_op = 'INSERT' then 'template_created' else 'template_updated' end, 'template', new.code, '{}'::jsonb);
   end if;
   return new;
 end;
@@ -58,5 +58,8 @@ create trigger audit_template_change
 after update on public.templates
 for each row when (old is distinct from new)
 execute function private.audit_template_change();
+create trigger audit_template_creation
+after insert on public.templates
+for each row execute function private.audit_template_change();
 
 commit;

@@ -98,7 +98,7 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 ### Tests for User Story 4
 
-- [ ] T019 [P] [US4] Criar a suíte `test/template-inheritance-modules.test.mjs` validando herança em cascata de tokens/seções, troca de modelo sem perda de itens, validação de páginas/menus e retrocompatibilidade com `pizzeria-v1`
+- [X] T019 [P] [US4] Criar a suíte `test/template-inheritance-modules.test.mjs` validando herança em cascata de tokens/seções, troca de modelo sem perda de itens, validação de páginas/menus e retrocompatibilidade com `pizzeria-v1`
 
 ### Implementation for User Story 4
 

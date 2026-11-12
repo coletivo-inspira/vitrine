@@ -1806,11 +1806,11 @@ structurePanel?.addEventListener('toggle', async () => {
   try {
     const response = await fetch(endpoint);
     if (!response.ok) throw new Error('Não foi possível consultar a estrutura.');
-    const { resolved, revision, widgets } = await response.json();
+    const { resolved, revision, widgets, templates, structure: savedStructure } = await response.json();
     if (site !== currentSite || !structurePanel.open) return;
     structureStatus.textContent = '';
     let expectedRevision = revision;
-    renderStructureFields(structureFields, resolved, async structure => {
+    const render = (layout, selected) => renderStructureFields(structureFields, layout, async structure => {
       try {
         if (currentDraft?.revision !== expectedRevision) {
           throw new Error('A revisão mudou. Feche e abra o editor de estrutura para recarregar.');
@@ -1825,12 +1825,19 @@ structurePanel?.addEventListener('toggle', async () => {
         expectedRevision = data.draft.revision;
         currentDraft.revision = expectedRevision;
         currentDraft.content.structure = data.draft.content.structure;
+        if (savedDraftContent) {
+          const previous = JSON.parse(savedDraftContent);
+          previous.structure = data.draft.content.structure;
+          savedDraftContent = JSON.stringify(previous);
+        }
+        if (Object.hasOwn(structure, 'templateCode')) render(data.resolved, data.draft.content.structure.templateCode);
         if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${expectedRevision}`;
         structureStatus.textContent = 'Estrutura salva. Abra a prévia para conferir.';
       } catch (error) {
         if (site === currentSite) structureStatus.textContent = error.message;
       }
-    }, widgets);
+    }, widgets, null, { templates, selected });
+    render(resolved, savedStructure?.templateCode);
   } catch (error) {
     if (site === currentSite) structureStatus.textContent = error.message;
   }

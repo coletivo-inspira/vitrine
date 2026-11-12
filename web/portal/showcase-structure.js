@@ -49,7 +49,7 @@ function checkbox(parent, text, checked) {
   return element;
 }
 
-export function renderStructureFields(root, structure, onSave, widgets = [], templateName = null) {
+export function renderStructureFields(root, structure, onSave, widgets = [], templateName = null, choices = null) {
   const form = document.createElement('form');
   const editingTemplate = templateName !== null;
   const name = editingTemplate ? input(form, 'Nome do modelo', templateName) : null;
@@ -57,6 +57,11 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
     name.required = true;
     name.maxLength = 120;
   }
+  const model = choices?.templates?.length
+    ? input(form, 'Modelo visual', choices.selected ?? '', {
+      '': 'Modelo original', ...Object.fromEntries(choices.templates.map(entry => [entry.code, entry.name]))
+    })
+    : null;
   const theme = document.createElement('fieldset');
   theme.append(control('legend', 'Identidade visual'));
   const accent = input(theme, 'Cor de destaque em hexadecimal', structure.theme.accentColor);
@@ -183,7 +188,8 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
         }).filter(([, value]) => value)),
         navigationMenus: Object.fromEntries(Object.entries(navReaders).map(([key, read]) => [key, read()])),
         pages: [...pageList.children].map(row => row.read()),
-        ...(name ? { name: name.value } : {})
+        ...(name ? { name: name.value } : {}),
+        ...(model && model.value !== (choices.selected ?? '') ? { templateCode: model.value || null } : {})
       });
     } finally {
       save.disabled = false;

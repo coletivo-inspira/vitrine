@@ -124,3 +124,10 @@
   - Atualizar o `status` de pedidos de customização (`novo` $\rightarrow$ `em_analise` $\rightarrow$ `respondido` $\rightarrow$ `encerrado`).
   - Cadastrar/atualizar modelos (`public.templates`) e aprovar componentes personalizados em sandbox (`public.custom_components` com `bundle_hash_sha256` e origem `sandbox.inspira.dev.br`).
   - Consultar a trilha de auditoria (`GET /api/admin/audit-logs`).
+
+
+### Modelos visuais
+
+`GET /api/admin/templates` lista os modelos para operadores. `POST /api/admin/templates` recebe `code`, `name`, `defaultTokens` e `defaultSections`. Para cadastrar uma variante, envie também `baseCode` com o código de um modelo-base suportado. A variante recebe o tipo de catálogo do modelo-base.
+
+`GET /api/sites/:siteId/structure` inclui os modelos ativos compatíveis com o catálogo. Envie `templateCode` no `PUT` para trocar o modelo visual ou `null` para voltar ao modelo original. A operação usa `expectedRevision` e preserva o conteúdo do catálogo.

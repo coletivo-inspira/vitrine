@@ -36,6 +36,7 @@ import {
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 
+const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
 const TEAM_ROLES = ['owner', 'admin'];
 const DRAFT_EDITOR_ROLES = ['owner', 'admin', 'editor'];
@@ -1949,10 +1950,37 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
     async listPlatformTemplates({ token }) {
       const fields = 'code,name,storefront_type,catalog_type,default_tokens,default_sections';
       const query = new URLSearchParams({
-        select: fields, code: `in.(${ALLOWED_TEMPLATES.join(',')})`, order: 'name.asc'
+        select: fields, order: 'name.asc', limit: '100'
       });
       const response = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
       if (!response.ok) throw new Error('Falha ao consultar os modelos.');
+      return response.json();
+    },
+
+    async createPlatformTemplate(code, baseCode, template, { token }) {
+      const query = new URLSearchParams({
+        code: 'eq.' + baseCode, select: 'storefront_type,catalog_type,schema_version'
+      });
+      const baseResponse = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!baseResponse.ok) throw new Error('Falha ao consultar o modelo-base.');
+      const [base] = await baseResponse.json();
+      if (!base) return null;
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates`, {
+        method: 'POST', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify({ ...base, ...template, code })
+      });
+      if (response.status === 409) throw new PortalValidationError(409, 'TEMPLATE_EXISTS', 'Já existe um modelo com esse identificador.');
+      if (!response.ok) throw new Error('Falha ao cadastrar o modelo.');
+      return (await response.json())[0] ?? null;
+    },
+
+    async listStructureTemplates(catalogType, { token }) {
+      const query = new URLSearchParams({
+        catalog_type: 'eq.' + catalogType, active: 'eq.true', is_custom_only: 'eq.false',
+        select: 'code,name', order: 'name.asc', limit: '100'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar modelos compatíveis.');
       return response.json();
     },
 
@@ -1967,7 +1995,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async getStructureDefaults(template, { token }) {
       const [templateResult, moduleResult] = await Promise.all([
-        fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&select=default_tokens,default_sections`,
+        fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&is_custom_only=eq.false&select=default_tokens,default_sections,catalog_type`,
           { headers: authHeaders(token) }),
         fetchImpl(`${baseUrl}/rest/v1/modules?active=eq.true&select=code,default_config`,
           { headers: authHeaders(token) })
@@ -1975,6 +2003,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       if (!templateResult.ok || !moduleResult.ok) throw new Error('Falha ao consultar os modelos da vitrine.');
       const [row] = await templateResult.json();
       return {
+        catalogType: row?.catalog_type,
         template: { defaultTokens: row?.default_tokens, defaultSections: row?.default_sections },
         modules: Object.fromEntries((await moduleResult.json()).map(entry => [entry.code, entry.default_config]))
       };
@@ -2775,9 +2804,20 @@ function validateMutationOriginAndJson(
   return null;
 }
 
+async function loadStructureDefaults(store, site, draft, options, code = draft.content.structure?.templateCode) {
+  if (code != null && (typeof code !== 'string' || !TEMPLATE_CODE_PATTERN.test(code))) {
+    throw new PortalValidationError(422, 'INVALID_TEMPLATE', 'Identificador de modelo inválido.');
+  }
+  const defaults = await store.getStructureDefaults?.(code ?? site.template, options);
+  if (code != null && (!defaults?.catalogType || defaults.catalogType !== draft.content.catalogType)) {
+    throw new PortalValidationError(422, 'INCOMPATIBLE_TEMPLATE', 'Escolha um modelo ativo compatível com este catálogo.');
+  }
+  return defaults;
+}
+
 async function resolveDraftForPublication(store, site, draft, options) {
   if (!draft.content.structure) return draft.content;
-  const defaults = await store.getStructureDefaults?.(site.template, options);
+  const defaults = await loadStructureDefaults(store, site, draft, options);
   const resolved = resolveShowcaseManifest(draft.content.structure, defaults?.template, {}, defaults?.modules);
   await assertApprovedWidgets(store, site.id, resolved.pages, options);
   return {
@@ -3051,19 +3091,23 @@ export function createApiHandler(deps = {}) {
         const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
         if (guardError) return guardError;
         const { parsed } = await parseJsonRequest(request);
-        const { code, name, defaultTokens, defaultSections } = parsed ?? {};
-        if (!ALLOWED_TEMPLATES.includes(code) || typeof name !== 'string' || !name.trim() || name.trim().length > 120 ||
+        const { code, name, defaultTokens, defaultSections, baseCode } = parsed ?? {};
+        if (typeof code !== 'string' || !TEMPLATE_CODE_PATTERN.test(code) ||
+            (baseCode !== undefined && !ALLOWED_TEMPLATES.includes(baseCode)) || typeof name !== 'string' || !name.trim() || name.trim().length > 120 ||
             !defaultTokens || !Array.isArray(defaultSections) ||
             defaultSections.some(entry => entry?.moduleCode === 'custom_sandbox')) {
           return errorResponse(422, 'INVALID_TEMPLATE', 'Informe um modelo suportado, nome e estrutura válidos.');
         }
         assertNoDangerousTextPayload(name);
         const validated = resolveShowcaseManifest({ themeOverrides: defaultTokens }, { defaultSections });
-        const template = await store.updatePlatformTemplate(code, {
+        const patch = {
           name: name.trim(),
           default_tokens: validated.theme,
           default_sections: validated.pages[0].sections
-        }, options);
+        };
+        const template = baseCode === undefined
+          ? await store.updatePlatformTemplate(code, patch, options)
+          : await store.createPlatformTemplate(code, baseCode, patch, options);
         if (!template) return errorResponse(404, 'TEMPLATE_NOT_FOUND', 'Modelo não encontrado.');
         return jsonResponse(200, { template });
       }
@@ -3638,10 +3682,11 @@ export function createApiHandler(deps = {}) {
         const draft = site && await store.getDraft(siteId, user.id, options);
         if (!draft) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         if (method === 'GET') {
-          const defaults = await store.getStructureDefaults?.(site.template, options);
+          const defaults = await loadStructureDefaults(store, site, draft, options);
           const structure = draft.content.structure ?? {};
           return jsonResponse(200, {
             revision: draft.revision, structure,
+            templates: await store.listStructureTemplates?.(draft.content.catalogType, options) ?? [],
             widgets: await store.listWidgets?.(siteId, options) ?? [],
             resolved: resolveShowcaseManifest(structure, defaults?.template, {}, defaults?.modules)
           });
@@ -3656,10 +3701,19 @@ export function createApiHandler(deps = {}) {
         }
         const { parsed } = await parseJsonRequest(request);
         const revision = validateRevision(parsed?.expectedRevision);
-        const defaults = await store.getStructureDefaults?.(site.template, options);
-        const resolved = resolveShowcaseManifest(parsed, defaults?.template, {}, defaults?.modules);
+        const selecting = Object.hasOwn(parsed, 'templateCode');
+        const code = selecting ? parsed.templateCode ?? undefined : draft.content.structure?.templateCode;
+        const defaults = await loadStructureDefaults(store, site, draft, options, code ?? null);
+        let edits = selecting ? draft.content.structure ?? {} : parsed;
+        if (selecting && Object.hasOwn(parsed, 'pages')) {
+          const previous = await loadStructureDefaults(store, site, draft, options);
+          const beforeSwitch = resolveShowcaseManifest(parsed, previous?.template, {}, previous?.modules);
+          edits = extractShowcaseOverrides(beforeSwitch, previous?.template, {}, previous?.modules);
+        }
+        const resolved = resolveShowcaseManifest(edits, defaults?.template, {}, defaults?.modules);
         await assertApprovedWidgets(store, siteId, resolved.pages, options);
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
+        if (code !== undefined) structure.templateCode = code;
         const content = { ...draft.content, structure };
         validateDraftContent(content);
         const updated = await store.updateDraft({ siteId, userId: user.id, revision, content }, options);
@@ -3667,7 +3721,7 @@ export function createApiHandler(deps = {}) {
           return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
         }
         if (updated.status !== 'ok') return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
-        return jsonResponse(200, { draft: updated.draft });
+        return jsonResponse(200, { draft: updated.draft, resolved });
       }
 
       const toggleMatch = pathname.match(/^\/api\/sites\/([^/]+)\/quick-toggle\/?$/);
@@ -3695,7 +3749,7 @@ export function createApiHandler(deps = {}) {
           return errorResponse(422, 'INVALID_TOGGLE', 'Informe o tipo, identificador e estado desejado.');
         }
         const content = structuredClone(draft.content);
-        const defaults = targetType === 'section' ? await store.getStructureDefaults?.(site.template, options) : undefined;
+        const defaults = targetType === 'section' ? await loadStructureDefaults(store, site, draft, options) : undefined;
         const resolved = targetType === 'section'
           ? resolveShowcaseManifest(content.structure ?? {}, defaults?.template, {}, defaults?.modules)
           : null;
@@ -3708,7 +3762,11 @@ export function createApiHandler(deps = {}) {
         const [target] = matching;
         target.active = active;
         if (targetType === 'item' && Object.hasOwn(target, 'available')) target.available = active;
-        if (resolved) content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
+        if (resolved) {
+          const code = content.structure?.templateCode;
+          content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
+          if (code !== undefined) content.structure.templateCode = code;
+        }
         validateDraftContent(content);
         const updated = await store.updateDraft({ siteId, userId: user.id, revision: draft.revision, content }, options);
         if (updated.status === 'conflict') {
@@ -3897,6 +3955,14 @@ export function createApiHandler(deps = {}) {
               'INVALID_SLUG',
               'O identificador (slug) do rascunho não pode divergir do slug da vitrine.'
             );
+          }
+
+          if (parsed.content.structure && Object.hasOwn(parsed.content.structure, 'templateCode')) {
+            if (parsed.content.catalogType !== existingDraft.content.catalogType) {
+              delete parsed.content.structure.templateCode;
+            } else if (parsed.content.structure.templateCode !== existingDraft.content.structure?.templateCode) {
+              return errorResponse(422, 'INVALID_TEMPLATE_CHANGE', 'Troque o modelo na edição de estrutura.');
+            }
           }
 
           const updateResult = await store.updateDraft(
