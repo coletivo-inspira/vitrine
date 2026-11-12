@@ -24,7 +24,7 @@ import { resolve } from 'node:path';
     await page.waitForTimeout(1000); // Wait for transition
 
     // Screenshot in light mode
-    const lightPath = resolve('/cursor/stores/self/media/portal-shell', `portal-shell-${vp.name}-light.png`);
+    const lightPath = resolve('/cursor/stores/bc-eda3ac10-4053-4841-9e17-ee3927f2a123/media/portal-shell', `portal-shell-${vp.name}-light.png`);
     await page.screenshot({ path: lightPath });
     console.log(`Saved Light Theme: ${lightPath}`);
 
@@ -33,7 +33,7 @@ import { resolve } from 'node:path';
     await page.waitForTimeout(1000); // Wait for transition
 
     // Screenshot in dark mode
-    const darkPath = resolve('/cursor/stores/self/media/portal-shell', `portal-shell-${vp.name}-dark.png`);
+    const darkPath = resolve('/cursor/stores/bc-eda3ac10-4053-4841-9e17-ee3927f2a123/media/portal-shell', `portal-shell-${vp.name}-dark.png`);
     await page.screenshot({ path: darkPath });
     console.log(`Saved Dark Theme: ${darkPath}`);
 

@@ -282,6 +282,9 @@ svg {
   border-radius: 4px;
   margin-left: auto;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  word-spacing: 3px;
+  white-space: nowrap;
 }
 
 /* Main Area Layout */
