@@ -74,7 +74,7 @@ create table if not exists public.custom_domains (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references public.sites(id) on delete cascade,
   hostname text not null unique check (
-    length(hostname) between 3 and 253
+    length(hostname) between 3 and 237
     and hostname ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
     and hostname !~ '(^|\.)inspira\.dev\.br$'
   ),
@@ -95,37 +95,49 @@ create table if not exists public.custom_domains (
 create index if not exists custom_domains_site_idx on public.custom_domains(site_id);
 create index if not exists custom_domains_hostname_idx on public.custom_domains(hostname);
 
-create or replace function private.enforce_free_custom_domain_quota()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_count integer;
-begin
-  if new.status in ('verifying', 'active') and (
-    tg_op = 'INSERT' or old.status not in ('verifying', 'active')
-  ) then
-    perform pg_advisory_xact_lock(509, 95);
-    select count(*) into v_count
-    from public.custom_domains
-    where status in ('verifying', 'active')
-      and id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid);
+create table private.custom_domain_quota (
+  singleton boolean primary key default true check (singleton),
+  reserved integer not null default 0 check (reserved between 0 and 95)
+);
+insert into private.custom_domain_quota default values;
+revoke all on private.custom_domain_quota from public, anon, authenticated;
 
-    if v_count >= 95 then
-      raise exception 'DOMAIN_QUOTA_REACHED: O limite gratuito de 95 domínios ativos foi atingido.';
-    end if;
-  end if;
+create function private.issue_custom_domain_challenge()
+returns trigger language plpgsql set search_path = ''
+as $$
+begin
+  new.verification_txt_name := '_vitrine-verify.' || new.hostname;
+  new.verification_txt_value := 'vitrine=' || gen_random_uuid();
   return new;
 end;
 $$;
+revoke all on function private.issue_custom_domain_challenge() from public, anon, authenticated;
+create trigger custom_domains_issue_challenge
+before insert on public.custom_domains
+for each row execute function private.issue_custom_domain_challenge();
 
+create function private.enforce_free_custom_domain_quota()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare
+  was_reserved boolean := tg_op <> 'INSERT' and old.status in ('verifying', 'active');
+  is_reserved boolean := tg_op <> 'DELETE' and new.status in ('verifying', 'active');
+begin
+  if is_reserved and not was_reserved then
+    update private.custom_domain_quota set reserved = reserved + 1
+      where singleton and reserved < 95;
+    if not found then
+      raise exception 'DOMAIN_QUOTA_REACHED: O limite gratuito de 95 domínios ativos foi atingido.';
+    end if;
+  elsif was_reserved and not is_reserved then
+    update private.custom_domain_quota set reserved = reserved - 1 where singleton;
+  end if;
+  return null;
+end;
+$$;
 revoke all on function private.enforce_free_custom_domain_quota() from public, anon, authenticated;
-
-drop trigger if exists custom_domains_quota on public.custom_domains;
 create trigger custom_domains_quota
-before insert or update on public.custom_domains
+after insert or update or delete on public.custom_domains
 for each row execute function private.enforce_free_custom_domain_quota();
 
 -- 4. RLS e Privilégios
@@ -140,7 +152,7 @@ grant update (upload_state) on public.assets to authenticated;
 grant select on public.custom_components to authenticated;
 grant insert, update, delete on public.custom_components to authenticated;
 grant select on public.custom_domains to authenticated;
-grant insert (site_id, hostname, is_apex, verification_txt_name, verification_txt_value, cname_target)
+grant insert (site_id, hostname, is_apex, cname_target)
   on public.custom_domains to authenticated;
 
 drop policy if exists assets_select on public.assets;

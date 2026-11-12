@@ -1816,7 +1816,10 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
     async addDomain(siteId, challenge, { token }) {
       const response = await fetchImpl(`${baseUrl}/rest/v1/custom_domains`, {
         method: 'POST', headers: authHeaders(token, { prefer: 'return=representation' }),
-        body: JSON.stringify({ site_id: siteId, ...challenge })
+        body: JSON.stringify({
+          site_id: siteId, hostname: challenge.hostname,
+          is_apex: challenge.is_apex, cname_target: challenge.cname_target
+        })
       });
       if (response.status === 409) {
         throw new PortalValidationError(409, 'HOSTNAME_TAKEN', 'Este endereço já está vinculado.');
@@ -3453,7 +3456,7 @@ export function createApiHandler(deps = {}) {
         const provider = new CloudflareHostnames(env.CF_SAAS_ZONE_ID, env.CF_SAAS_API_TOKEN, deps.fetch);
         const claimed = await store.changeDomain(domain, {
           lease_until: new Date(Date.now() + 45_000).toISOString(),
-          ...(isVerify && domain.status === 'pending_dns' ? { status: 'verifying' } : {})
+          ...(isVerify && !['active', 'verifying'].includes(domain.status) ? { status: 'verifying' } : {})
         }, { env, claim: true });
         if (!claimed) return errorResponse(409, 'DOMAIN_BUSY', 'Este domínio está sendo processado.');
         try {
@@ -3475,6 +3478,11 @@ export function createApiHandler(deps = {}) {
             verified_at: active ? new Date().toISOString() : null
           }, { env });
           return jsonResponse(200, { domain: domainPresentation(updated) });
+        } catch (error) {
+          if (error?.code === 'DOMAIN_QUOTA_REACHED' && !claimed.cf_hostname_id) {
+            await store.changeDomain(claimed, { status: 'pending_dns' }, { env });
+          }
+          throw error;
         } finally {
           await store.changeDomain(claimed, { lease_until: '-infinity' }, { env }).catch(() => {});
         }

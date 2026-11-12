@@ -5,7 +5,7 @@ const blockedSuffixes = ['inspira.dev.br', 'workers.dev', 'pages.dev', 'localhos
 
 export function validateCustomHostname(value) {
   const hostname = typeof value === 'string' ? value.trim().toLowerCase().replace(/\.$/, '') : '';
-  if (hostname.length > 253 || !hostnamePattern.test(hostname) ||
+  if (hostname.length > 237 || !hostnamePattern.test(hostname) ||
       !/[a-z]/.test(hostname.split('.').at(-1)) ||
       blockedSuffixes.some(suffix => hostname === suffix || hostname.endsWith('.' + suffix))) {
     throw new PortalValidationError(422, 'INVALID_HOSTNAME', 'Informe um domínio público ou subdomínio válido.');
@@ -19,8 +19,6 @@ export function createDomainChallenge(hostname, cnameTarget) {
   return {
     hostname,
     is_apex: parts.length === suffixLength + 1,
-    verification_txt_name: '_vitrine-verify.' + hostname,
-    verification_txt_value: 'vitrine=' + crypto.randomUUID(),
     cname_target: cnameTarget
   };
 }

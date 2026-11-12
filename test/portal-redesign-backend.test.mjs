@@ -1568,3 +1568,29 @@ test('Banco preserva as cinco versões recentes e restaura somente versões da p
   const audit = await db.query("select action, actor_user_id from public.audit_logs where entity_type = 'publication'");
   assert.deepEqual(audit.rows, [{ action: 'rollback', actor_user_id: USER_A }]);
 });
+
+test('Banco emite o desafio DNS e reserva até 95 domínios entre ativos e em verificação', async (t) => {
+  const db = await setupPgliteWithMigrations();
+  t.after(() => db.close());
+  await db.query("insert into public.sites (id, owner_user_id, slug, name) values ($1, $2, 'dominios-a', 'Domínios')", [
+    SITE_A, USER_A
+  ]);
+  const { rows: [pending] } = await asRole(db, USER_A, () => db.query(
+    "insert into public.custom_domains (site_id, hostname) values ($1, 'menu.example.com') returning *",
+    [SITE_A]
+  ), 'authenticated', true);
+  assert.equal(pending.verification_txt_name, '_vitrine-verify.menu.example.com');
+  assert.match(pending.verification_txt_value, /^vitrine=[a-f0-9-]{36}$/);
+  await assert.rejects(() => asRole(db, USER_A, () => db.query(
+    "insert into public.custom_domains (site_id, hostname, verification_txt_value) values ($1, 'unsafe.example.com', 'chosen')",
+    [SITE_A]
+  )), { code: '42501' });
+  await db.query(
+    "insert into public.custom_domains (site_id, hostname, status) select $1, 'menu-' || n || '.example.com', 'verifying' from generate_series(1,95) n",
+    [SITE_A]
+  );
+  const reserve = () => db.query("update public.custom_domains set status = 'verifying' where id = $1", [pending.id]);
+  await assert.rejects(reserve, /DOMAIN_QUOTA_REACHED/);
+  await db.query("delete from public.custom_domains where hostname = 'menu-95.example.com'");
+  assert.equal((await reserve()).affectedRows, 1);
+});
