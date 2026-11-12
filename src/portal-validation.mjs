@@ -1,5 +1,11 @@
 import { publicMenu } from './public-menu.mjs';
 import { ORDER_RELAY_MODES } from '../web/assets/mila-relay.mjs';
+import {
+  QUOTA_MAX_TOTAL,
+  QUOTA_MIN_TOTAL,
+  QUOTA_TEXT_MAX_LENGTH,
+  findProhibitedQuotaTerm
+} from '../web/assets/quota-rules.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -47,7 +53,8 @@ export const ALLOWED_ITEM_PRICE_MODES = Object.freeze([
   'fixed',
   'offer',
   'donation',
-  'trade'
+  'trade',
+  'quota'
 ]);
 
 export const ALLOWED_PROFILE_INTERESTS = Object.freeze([
@@ -709,6 +716,43 @@ export function validateWhatsapp(whatsapp) {
 
 export function isValidPriceCents(priceCents) {
   return Number.isSafeInteger(priceCents) && priceCents > 0;
+}
+
+export function validateQuotaFields(item) {
+  if (
+    !Number.isSafeInteger(item?.quotaTotal) ||
+    item.quotaTotal < QUOTA_MIN_TOTAL ||
+    item.quotaTotal > QUOTA_MAX_TOTAL
+  ) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_QUOTA_TOTAL',
+      `O total de cotas deve ser um número inteiro entre ${QUOTA_MIN_TOTAL} e ${QUOTA_MAX_TOTAL}.`
+    );
+  }
+  if (item.quotaFilled !== undefined && item.quotaFilled !== null) {
+    if (
+      !Number.isSafeInteger(item.quotaFilled) ||
+      item.quotaFilled < 0 ||
+      item.quotaFilled > item.quotaTotal
+    ) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_QUOTA_FILLED',
+        'As cotas confirmadas devem ser um número inteiro entre 0 e o total de cotas.'
+      );
+    }
+  }
+  if (item.quotaReward !== undefined && item.quotaReward !== null) {
+    if (typeof item.quotaReward !== 'string' || item.quotaReward.trim().length > QUOTA_TEXT_MAX_LENGTH) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_QUOTA_REWARD',
+        `O campo "O que cada cota garante" deve ter no máximo ${QUOTA_TEXT_MAX_LENGTH} caracteres.`
+      );
+    }
+    assertNoDangerousTextPayload(item.quotaReward, 422, 'INVALID_ITEM');
+  }
 }
 
 export function validatePriceCents(priceCents, { allowZero = false } = {}) {
@@ -1384,9 +1428,35 @@ export function validateDraftContent(content, options = {}) {
     }
 
     validateOptionalUrlFields(item, 422);
-    validatePriceCents(item.priceCents, {
-      allowZero: allowZeroPrice || itemPriceMode !== 'fixed'
-    });
+    if (itemPriceMode === 'quota') {
+      if (!isValidPriceCents(item.priceCents)) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_QUOTA_PRICE',
+          'Informe o valor de cada cota (maior que R$ 0,00).'
+        );
+      }
+    } else {
+      validatePriceCents(item.priceCents, {
+        allowZero: allowZeroPrice || itemPriceMode !== 'fixed'
+      });
+    }
+
+    if (itemPriceMode === 'quota') {
+      validateQuotaFields(item);
+    }
+
+    const prohibitedTerm = findProhibitedQuotaTerm(
+      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+      { quota: itemPriceMode === 'quota' }
+    );
+    if (prohibitedTerm) {
+      throw new PortalValidationError(
+        422,
+        itemPriceMode === 'quota' ? 'QUOTA_PROHIBITED_TERMS' : 'RAFFLE_NOT_ALLOWED',
+        `O termo "${prohibitedTerm}" não é permitido: a vitrine não oferece rifa, sorteio, prêmio ou retorno financeiro, que dependem de autorização federal.`
+      );
+    }
 
     if (item.conditions !== undefined && item.conditions !== null) {
       if (typeof item.conditions !== 'string' || item.conditions.trim().length > 240) {
