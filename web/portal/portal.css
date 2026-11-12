@@ -1026,6 +1026,9 @@ svg {
   color: #155724;
   border-radius: 999px;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+  word-spacing: 3px;
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .badge-status-available {
@@ -1042,6 +1045,9 @@ svg {
   color: var(--orange);
   border-radius: 999px;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+  word-spacing: 3px;
+  white-space: nowrap;
 }
 
 /* Editor Header */

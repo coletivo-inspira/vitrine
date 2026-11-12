@@ -1,3 +1,4 @@
+// Run via: npx --yes playwright-chromium@1.49.0 scripts/capture-portal-screenshots.js
 import { chromium } from 'playwright-chromium';
 import { resolve } from 'node:path';
 
