@@ -213,3 +213,108 @@ npm run build
 npm test
 npx --yes wrangler@4.158.0 deploy --dry-run
 ```
+
+---
+
+## 6. Automação no GitHub Actions (Deploy Cloudflare e Migrações Supabase — Guia Windows em pt-BR)
+
+Este guia passo a passo foi pensado para quem utiliza **Windows** (pelo navegador Google Chrome, Microsoft Edge ou Firefox) e precisa configurar os **4 segredos** no GitHub para habilitar o deploy automático no Cloudflare Workers Free (`.github/workflows/deploy.yml`) e a aplicação manual assistida de migrações SQL no Supabase Free (`.github/workflows/db-migrate.yml`), mantendo **custo zero** (ADR 0005) e **permissões mínimas** (Princípio III da Constituição).
+
+> **Regra de Segurança (Princípio III)**: Nenhum dos 4 valores abaixo deve ser salvo em arquivos do projeto no computador, colado em conversas públicas ou passado na linha de comando. Cole-os diretamente nos campos protegidos do GitHub.
+
+### 6.1 Resumo dos 4 Segredos do GitHub Actions
+
+| Nome Exato do Segredo no GitHub | Workflow que utiliza | Finalidade e Permissão Mínima |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | `deploy.yml` | Token de API da Cloudflare restrito ao template **Edit Cloudflare Workers** (apenas permissão `Account > Workers Scripts > Edit` na conta). |
+| `CLOUDFLARE_ACCOUNT_ID` | `deploy.yml` | Identificador hexadecimal de 32 caracteres da conta Cloudflare onde o Worker `vitrine-inspira` roda no plano gratuito. |
+| `SUPABASE_ACCESS_TOKEN` | `db-migrate.yml` | Personal Access Token (`sbp_...`) da conta Supabase usado pela CLI para vincular o projeto `qawlpsrfewosxsfgmmpm`. |
+| `SUPABASE_DB_PASSWORD` | `db-migrate.yml` | Senha do banco PostgreSQL do projeto `qawlpsrfewosxsfgmmpm`, lida pela Supabase CLI exclusivamente via variável de ambiente (nunca via `--db-url` ou `argv`). |
+
+### 6.2 Como criar o Token de API da Cloudflare (`CLOUDFLARE_API_TOKEN`) com Permissão Mínima
+
+1. No seu navegador no Windows, acesse [https://dash.cloudflare.com](https://dash.cloudflare.com) e faça login na conta Cloudflare do Coletivo Inspira.
+2. No canto superior direito da tela, clique no ícone do seu **Perfil (bonequinho)** e selecione **My Profile** (ou **Meu perfil**).
+3. No menu lateral esquerdo, clique em **API Tokens** (ou acesse diretamente [https://dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)).
+4. Clique no botão azul **Create Token** (Criar token).
+5. Na lista de modelos (*API token templates*), localize a linha **Edit Cloudflare Workers** e clique em **Use template** (Usar modelo) ao lado dela.
+6. Ajuste o formulário para manter **apenas** a permissão estritamente necessária na conta (Princípio III):
+   - Em **Token name** (Nome do token), digite algo identificável, como `vitrine-github-actions-workers`.
+   - Em **Permissions** (Permissões), mantenha **apenas** a linha:
+     - `Account` — `Workers Scripts` — `Edit`
+   - Caso o modelo traga linhas adicionais de zona/rotas ou outras permissões que você não vá usar pelo Actions, remova-as clicando no botão **×** ao lado de cada linha extra para que reste somente `Account | Workers Scripts | Edit`.
+   - Em **Account Resources** (Recursos da conta), selecione `Include` → **sua conta específica** (ex.: a conta do Coletivo Inspira).
+   - Em **Zone Resources** (se exibido), caso não seja obrigatório, remova ou mantenha restrito apenas à zona necessária; o deploy do Worker (`workers_dev: true`) exige apenas o escopo da conta.
+7. Clique em **Continue to summary** (Continuar para o resumo) e depois em **Create Token** (Criar token).
+8. A Cloudflare exibirá o token uma única vez. Clique no botão **Copy** (Copiar) — ou selecione e pressione `Ctrl + C` no teclado do Windows — e mantenha essa aba aberta para colar o valor no segredo `CLOUDFLARE_API_TOKEN` do GitHub (Seção 6.5).
+
+### 6.3 Onde encontrar o Account ID da Cloudflare (`CLOUDFLARE_ACCOUNT_ID`)
+
+Você pode copiar o **Account ID** (32 caracteres alfanuméricos) em qualquer um destes dois caminhos no painel da Cloudflare:
+
+- **Caminho A (Direto em Workers & Pages)**:
+  1. No menu lateral esquerdo do painel da Cloudflare ([https://dash.cloudflare.com](https://dash.cloudflare.com)), clique em **Workers & Pages** (ou **Compute (Workers)** → **Workers & Pages**).
+  2. No painel lateral direito da página **Overview**, localize o bloco **Account Details** (Detalhes da conta).
+  3. Abaixo de **Account ID**, clique em **Click to copy** (Clicar para copiar).
+- **Caminho B (Pela URL do Navegador no Windows)**:
+  1. Ao fazer login em `https://dash.cloudflare.com`, observe a barra de endereços do navegador: o endereço terá o formato `https://dash.cloudflare.com/<32-caracteres-hexadecimais>/home`.
+  2. Esse código de 32 caracteres logo após `dash.cloudflare.com/` é exatamente o seu `CLOUDFLARE_ACCOUNT_ID`.
+
+### 6.4 Como criar o Token de Acesso do Supabase (`SUPABASE_ACCESS_TOKEN`) e obter `SUPABASE_DB_PASSWORD`
+
+1. **Criar o `SUPABASE_ACCESS_TOKEN`**:
+   - No navegador no Windows, acesse [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) (ou, dentro do painel do Supabase, clique no seu avatar no canto superior direito → **Account Preferences** → menu lateral **Access Tokens**).
+   - Clique no botão **Generate new token** (Gerar novo token).
+   - Em **Token name**, digite `vitrine-github-actions-db-migrate`.
+   - Clique em **Generate token**.
+   - Copie imediatamente o valor gerado (ele começa com `sbp_...`) clicando no botão de copiar (`Ctrl + C`), pois ele não será mostrado novamente.
+2. **Localizar ou redefinir a senha do banco (`SUPABASE_DB_PASSWORD`)**:
+   - Este segredo é a senha do banco PostgreSQL do projeto oficial `qawlpsrfewosxsfgmmpm` (guardada no cofre de senhas da equipe Inspira).
+   - Caso precise consultá-la ou redefini-la: abra o projeto em [https://supabase.com/dashboard/project/qawlpsrfewosxsfgmmpm/settings/database](https://supabase.com/dashboard/project/qawlpsrfewosxsfgmmpm/settings/database) (**Project Settings** → **Database**) e utilize a seção **Database password**.
+
+### 6.5 Como cadastrar os 4 Segredos no GitHub (`Settings > Secrets and variables > Actions`)
+
+1. No navegador no Windows, abra o repositório no GitHub: `https://github.com/coletivo-inspira/vitrine`.
+2. No menu horizontal do topo do repositório, clique na aba **Settings** (ícone de engrenagem).
+3. Na barra lateral esquerda, role até a seção **Security**, clique em **Secrets and variables** para expandir e depois clique em **Actions**.
+4. Na aba **Secrets**, dentro da seção **Repository secrets**, clique no botão verde **New repository secret** (Novo segredo do repositório).
+5. Repita o processo para cadastrar cada um dos **4 segredos** exatamente com os nomes em letras maiúsculas abaixo (sem espaços antes ou depois do nome):
+   - **1º segredo**:
+     - **Name**: `CLOUDFLARE_API_TOKEN`
+     - **Secret**: cole (`Ctrl + V`) o token criado na Seção 6.2 e clique em **Add secret**.
+   - **2º segredo**:
+     - **Name**: `CLOUDFLARE_ACCOUNT_ID`
+     - **Secret**: cole (`Ctrl + V`) o ID de 32 caracteres copiado na Seção 6.3 e clique em **Add secret**.
+   - **3º segredo**:
+     - **Name**: `SUPABASE_ACCESS_TOKEN`
+     - **Secret**: cole (`Ctrl + V`) o token `sbp_...` criado na Seção 6.4 e clique em **Add secret**.
+   - **4º segredo**:
+     - **Name**: `SUPABASE_DB_PASSWORD`
+     - **Secret**: cole (`Ctrl + V`) a senha do banco PostgreSQL do projeto `qawlpsrfewosxsfgmmpm` e clique em **Add secret**.
+
+### 6.6 Como executar o Workflow de Migração do Banco (`db-migrate.yml`) — Simulação (`dry_run`) Primeiro
+
+O workflow `.github/workflows/db-migrate.yml` **nunca roda sozinho em push** (`workflow_dispatch` apenas), garantindo que nenhuma alteração de schema ocorra sem revisão explícita do **Operador Inspira**.
+
+1. **Passo 1 — Executar primeiro em modo Simulação (`dry_run = true`)**:
+   - No repositório `https://github.com/coletivo-inspira/vitrine`, clique na aba **Actions** no topo da página.
+   - Na coluna lateral esquerda (abaixo de *All workflows*), clique em **Supabase Database Migrate**.
+   - À direita, na faixa azul clara (*This workflow has a workflow_dispatch event trigger*), clique no botão **Run workflow** ▼.
+   - Mantenha **Use workflow from**: `Branch: main`.
+   - Mantenha a caixa **Executar apenas em modo simulação (--dry-run), sem alterar o banco remoto** (`dry_run`) **marcada** (`true`, que já é o padrão).
+   - Clique no botão verde **Run workflow**.
+   - Aguarde alguns segundos, clique na execução que apareceu no topo da lista e abra o job **migrate** para conferir nos logs quais arquivos SQL em `supabase/migrations/*.sql` seriam aplicados no projeto `qawlpsrfewosxsfgmmpm`.
+2. **Passo 2 — Aplicar de fato as migrações no banco (`dry_run = false`)**:
+   - Somente após confirmar que o resultado da simulação (`dry_run`) no Passo 1 ficou verde e listou apenas as migrações esperadas, volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼.
+   - **Desmarque** a caixa `dry_run` (deixando-a desativada / `false`).
+   - Clique no botão verde **Run workflow** para executar `supabase db push` contra o projeto `qawlpsrfewosxsfgmmpm`.
+
+### 6.7 Como funciona o Deploy Automático no Cloudflare Workers (`deploy.yml`)
+
+- Depois que `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` estiverem cadastrados (Seção 6.5), todo merge/push na branch `main` (ou clique manual em **Actions** → **Deploy Cloudflare Worker** → **Run workflow**) executará automaticamente:
+  1. `npm ci`
+  2. `npm test`
+  3. `npm run build`
+  4. `npx --yes wrangler@4.158.0 deploy`
+  5. Verificação leve pós-deploy (*smoke check*) exclusivamente no endereço `*.workers.dev` na rota `/api/auth/config` (domínios personalizados não sofrem smoke automatizado por estarem protegidos por desafio anti-bot da Cloudflare).
+

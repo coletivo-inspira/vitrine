@@ -366,5 +366,53 @@ test('Fase 6 - Pacote do Piloto de 10 Vitrines, Ciclo Comercial 002-US4 e Guia O
       PORTAL_CSP_HEADER,
       /connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/
     );
+
+    // Verifica workflows de deploy Cloudflare e migração Supabase e seção Windows pt-BR no guia operacional
+    const deployWorkflow = await readFile(resolve(root, '.github/workflows/deploy.yml'), 'utf8');
+    const migrateWorkflow = await readFile(resolve(root, '.github/workflows/db-migrate.yml'), 'utf8');
+
+    assert.match(deployWorkflow, /permissions:\s*\n\s*contents:\s*read/);
+    assert.match(deployWorkflow, /concurrency:\s*\n\s*group:\s*\S+\s*\n\s*cancel-in-progress:\s*false/);
+    assert.match(deployWorkflow, /node-version-file:\s*['"]?\.node-version['"]?/);
+    assert.match(deployWorkflow, /npm ci/);
+    assert.match(deployWorkflow, /npm test/);
+    assert.match(deployWorkflow, /npm run build/);
+    assert.match(deployWorkflow, /npx --yes wrangler@4\.158\.0 deploy/);
+    assert.match(deployWorkflow, /CLOUDFLARE_API_TOKEN:\s*\$\{\{\s*secrets\.CLOUDFLARE_API_TOKEN\s*\}\}/);
+    assert.match(deployWorkflow, /CLOUDFLARE_ACCOUNT_ID:\s*\$\{\{\s*secrets\.CLOUDFLARE_ACCOUNT_ID\s*\}\}/);
+    assert.match(deployWorkflow, /\/api\/auth\/config/);
+
+    assert.match(migrateWorkflow, /on:\s*\n\s*workflow_dispatch:/);
+    assert.doesNotMatch(migrateWorkflow, /\bpush:\b|\bpull_request:\b/);
+    assert.match(migrateWorkflow, /dry_run:[\s\S]*?type:\s*boolean[\s\S]*?default:\s*true/);
+    assert.match(migrateWorkflow, /uses:\s*supabase\/setup-cli@[a-f0-9]{40}\s+#\s*v/);
+    assert.match(migrateWorkflow, /supabase link --project-ref qawlpsrfewosxsfgmmpm/);
+    assert.match(migrateWorkflow, /supabase db push --dry-run/);
+    assert.match(migrateWorkflow, /SUPABASE_ACCESS_TOKEN:\s*\$\{\{\s*secrets\.SUPABASE_ACCESS_TOKEN\s*\}\}/);
+    assert.match(migrateWorkflow, /SUPABASE_DB_PASSWORD:\s*\$\{\{\s*secrets\.SUPABASE_DB_PASSWORD\s*\}\}/);
+    assert.doesNotMatch(migrateWorkflow, /--db-url|--password|-p\s+\$/);
+
+    for (const wf of [deployWorkflow, migrateWorkflow]) {
+      const usesLines = [...wf.matchAll(/uses:\s*([^\s#]+)(.*)$/gm)];
+      assert.ok(usesLines.length > 0);
+      for (const [, actionRef, trailingComment] of usesLines) {
+        assert.match(actionRef, /^[^@]+@[a-f0-9]{40}$/, `Action deve estar fixada por SHA completo: ${actionRef}`);
+        assert.match(trailingComment, /#\s*v\d+/, `Action deve ter comentário de versão: ${actionRef}${trailingComment}`);
+      }
+    }
+
+    for (const secretName of [
+      'CLOUDFLARE_API_TOKEN',
+      'CLOUDFLARE_ACCOUNT_ID',
+      'SUPABASE_ACCESS_TOKEN',
+      'SUPABASE_DB_PASSWORD',
+      'Edit Cloudflare Workers',
+      'Settings > Secrets and variables > Actions'
+    ]) {
+      assert.ok(
+        opsGuide.includes(secretName),
+        `docs/operations-guide.md deve documentar "${secretName}"`
+      );
+    }
   });
 });
