@@ -1,5 +1,9 @@
 /* Portal Administrative Design System - Laranja Pontual & Liquid Glass */
 
+.sprite-hidden {
+  display: none !important;
+}
+
 @font-face {
   font-family: Syne;
   src: url('../assets/fonts/syne.ttf') format('truetype');

@@ -206,8 +206,8 @@ export class StorefrontRenderer {
         : this.menu.items.filter((item) => item && item.active !== false);
       if (visibleFlat.length > 0) {
         normalized.push({
-          id: 'catalogo',
-          name: 'Catálogo',
+          id: 'vitrine',
+          name: 'Vitrine',
           items: visibleFlat
         });
       }
@@ -350,7 +350,7 @@ export class StorefrontRenderer {
         ? '1. Serviços'
         : catalogType === 'quote'
           ? '1. Itens'
-          : '1. Cardápio';
+          : '1. Vitrine';
     const steps = this.hasAnyOrderFields()
       ? [
           { num: 1, label: step1Label },
@@ -499,156 +499,47 @@ export class StorefrontRenderer {
       catHeader.appendChild(countSpan);
       catSec.appendChild(catHeader);
 
-      const grid = document.createElement('div');
-      grid.className = 'menu-items-grid';
+      const hasSections = cat.items.some(item => item && typeof item.section === 'string' && item.section.trim());
 
-      for (const item of cat.items) {
-        if (!item) continue;
-        const isInactive = item.active === false;
-        if (isInactive && !this.options.isPreview) continue;
-
-        const qty = this.cart.get(item.id) || 0;
-        const card = document.createElement('article');
-        card.className = isInactive
-          ? 'menu-item-card is-inactive'
-          : qty > 0
-            ? 'menu-item-card is-selected'
-            : 'menu-item-card';
-        if (item.id) {
-          card.setAttribute('data-item-id', String(item.id));
-        }
-
-        const body = document.createElement('div');
-        body.className = 'menu-item-body';
-
-        if (resolvedComponents.photo && typeof item.imageUrl === 'string' && item.imageUrl.trim()) {
-          const img = document.createElement('img');
-          img.src = item.imageUrl.trim();
-          img.alt = item.name || 'Foto do item';
-          img.loading = 'lazy';
-          img.className = 'menu-item-photo';
-          body.appendChild(img);
-        }
-
-        if (resolvedComponents.name !== false) {
-          const titleRow = document.createElement('div');
-          titleRow.className = 'sf-item-title-row';
-
-          const title = document.createElement('h3');
-          title.className = 'menu-item-title';
-          title.textContent = item.name || 'Item sem nome';
-          titleRow.appendChild(title);
-
-          if (isInactive) {
-            const hiddenBadge = document.createElement('span');
-            hiddenBadge.className = 'sf-hidden-badge';
-            hiddenBadge.textContent = 'Oculto';
-            titleRow.appendChild(hiddenBadge);
+      if (hasSections) {
+        const sectionsMap = new Map();
+        const defaultSectionKey = '';
+        
+        for (const item of cat.items) {
+          if (!item) continue;
+          const secName = (typeof item.section === 'string' && item.section.trim()) || defaultSectionKey;
+          if (!sectionsMap.has(secName)) {
+            sectionsMap.set(secName, []);
           }
-
-          body.appendChild(titleRow);
+          sectionsMap.get(secName).push(item);
         }
-
-        if (resolvedComponents.description && typeof item.description === 'string' && item.description.trim()) {
-          const desc = document.createElement('p');
-          desc.className = 'menu-item-description';
-          desc.textContent = item.description.trim();
-          body.appendChild(desc);
-        }
-
-        const showDuration = Boolean(resolvedComponents.durationMinutes && item.durationMinutes > 0);
-        const showMinQty = Boolean(resolvedComponents.minQuantity && item.minQuantity > 1);
-        if (showDuration || showMinQty) {
-          const metaRow = document.createElement('div');
-          metaRow.className = 'sf-item-meta-row';
-          if (showDuration) {
-            const durPill = document.createElement('span');
-            durPill.className = 'sf-meta-pill';
-            durPill.textContent = `Duração: ${item.durationMinutes} min`;
-            metaRow.appendChild(durPill);
+        
+        for (const [secName, secItems] of sectionsMap.entries()) {
+          if (secName) {
+            const secHeader = document.createElement('h3');
+            secHeader.className = 'menu-section-title';
+            secHeader.textContent = secName;
+            catSec.appendChild(secHeader);
           }
-          if (showMinQty) {
-            const minPill = document.createElement('span');
-            minPill.className = 'sf-meta-pill';
-            minPill.textContent = `Pedido mínimo: ${item.minQuantity} un.`;
-            metaRow.appendChild(minPill);
+          
+          const secGrid = document.createElement('div');
+          secGrid.className = 'menu-items-grid';
+          
+          for (const item of secItems) {
+            this.renderItemCard(item, secGrid, resolvedComponents, catalogType);
           }
-          body.appendChild(metaRow);
+          
+          catSec.appendChild(secGrid);
         }
-
-        const footer = document.createElement('div');
-        footer.className = 'menu-item-footer';
-
-        const hasPositivePrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
-        if (resolvedComponents.price && (catalogType !== 'quote' || hasPositivePrice)) {
-          const price = document.createElement('span');
-          price.className = 'menu-item-price';
-          price.textContent = this.formatPrice(item.priceCents || 0);
-          footer.appendChild(price);
-        } else if (catalogType === 'quote') {
-          const quoteLabel = document.createElement('span');
-          quoteLabel.className = 'sf-quote-tag';
-          quoteLabel.textContent = 'Sob consulta';
-          footer.appendChild(quoteLabel);
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'menu-items-grid';
+        for (const item of cat.items) {
+          this.renderItemCard(item, grid, resolvedComponents, catalogType);
         }
-
-        const useStepper = Boolean(
-          resolvedComponents.quantitySelector ||
-            (resolvedComponents.minQuantity && item.minQuantity > 1)
-        );
-
-        if (useStepper) {
-          const qtyDiv = document.createElement('div');
-          qtyDiv.className = 'qty-selector';
-          qtyDiv.setAttribute('role', 'group');
-          qtyDiv.setAttribute('aria-label', `Quantidade de ${item.name || 'item'}`);
-
-          const decBtn = document.createElement('button');
-          decBtn.type = 'button';
-          decBtn.className = 'btn-qty';
-          decBtn.textContent = '−';
-          decBtn.disabled = qty === 0 || isInactive;
-          decBtn.setAttribute('aria-label', `Diminuir quantidade de ${item.name || 'item'}`);
-          decBtn.addEventListener('click', () => this.setQuantity(item, -1));
-
-          const qtyVal = document.createElement('span');
-          qtyVal.className = 'qty-val';
-          qtyVal.textContent = String(qty);
-
-          const incBtn = document.createElement('button');
-          incBtn.type = 'button';
-          incBtn.className = 'btn-qty';
-          incBtn.textContent = '+';
-          incBtn.disabled = isInactive;
-          incBtn.setAttribute('aria-label', `Adicionar ${item.name || 'item'}`);
-          incBtn.addEventListener('click', () => this.setQuantity(item, 1));
-
-          qtyDiv.appendChild(decBtn);
-          qtyDiv.appendChild(qtyVal);
-          qtyDiv.appendChild(incBtn);
-          footer.appendChild(qtyDiv);
-        } else {
-          const selectBtn = document.createElement('button');
-          selectBtn.type = 'button';
-          selectBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
-          selectBtn.disabled = isInactive;
-          selectBtn.setAttribute('aria-pressed', qty > 0 ? 'true' : 'false');
-          selectBtn.textContent =
-            qty > 0
-              ? 'Selecionado'
-              : catalogType === 'booking'
-                ? 'Escolher serviço'
-                : 'Selecionar';
-          selectBtn.addEventListener('click', () => this.toggleSingleSelect(item));
-          footer.appendChild(selectBtn);
-        }
-
-        card.appendChild(body);
-        card.appendChild(footer);
-        grid.appendChild(card);
+        catSec.appendChild(grid);
       }
 
-      catSec.appendChild(grid);
       catalogContainer.appendChild(catSec);
     }
 
@@ -704,6 +595,152 @@ export class StorefrontRenderer {
       cartBar.appendChild(advBtn);
       parent.appendChild(cartBar);
     }
+  }
+
+  renderItemCard(item, grid, resolvedComponents, catalogType) {
+    if (!item) return;
+    const isInactive = item.active === false;
+    if (isInactive && !this.options.isPreview) return;
+
+    const qty = this.cart.get(item.id) || 0;
+    const card = document.createElement('article');
+    card.className = isInactive
+      ? 'menu-item-card is-inactive'
+      : qty > 0
+        ? 'menu-item-card is-selected'
+        : 'menu-item-card';
+    if (item.id) {
+      card.setAttribute('data-item-id', String(item.id));
+    }
+
+    const body = document.createElement('div');
+    body.className = 'menu-item-body';
+
+    if (resolvedComponents.photo && typeof item.imageUrl === 'string' && item.imageUrl.trim()) {
+      const img = document.createElement('img');
+      img.src = item.imageUrl.trim();
+      img.alt = item.name || 'Foto do item';
+      img.loading = 'lazy';
+      img.className = 'menu-item-photo';
+      body.appendChild(img);
+    }
+
+    if (resolvedComponents.name !== false) {
+      const titleRow = document.createElement('div');
+      titleRow.className = 'sf-item-title-row';
+
+      const title = document.createElement('h3');
+      title.className = 'menu-item-title';
+      title.textContent = item.name || 'Item sem nome';
+      titleRow.appendChild(title);
+
+      if (isInactive) {
+        const hiddenBadge = document.createElement('span');
+        hiddenBadge.className = 'sf-hidden-badge';
+        hiddenBadge.textContent = 'Oculto';
+        titleRow.appendChild(hiddenBadge);
+      }
+
+      body.appendChild(titleRow);
+    }
+
+    if (resolvedComponents.description && typeof item.description === 'string' && item.description.trim()) {
+      const desc = document.createElement('p');
+      desc.className = 'menu-item-description';
+      desc.textContent = item.description.trim();
+      body.appendChild(desc);
+    }
+
+    const showDuration = Boolean(resolvedComponents.durationMinutes && item.durationMinutes > 0);
+    const showMinQty = Boolean(resolvedComponents.minQuantity && item.minQuantity > 1);
+    if (showDuration || showMinQty) {
+      const metaRow = document.createElement('div');
+      metaRow.className = 'sf-item-meta-row';
+      if (showDuration) {
+        const durPill = document.createElement('span');
+        durPill.className = 'sf-meta-pill';
+        durPill.textContent = `Duração: ${item.durationMinutes} min`;
+        metaRow.appendChild(durPill);
+      }
+      if (showMinQty) {
+        const minPill = document.createElement('span');
+        minPill.className = 'sf-meta-pill';
+        minPill.textContent = `Pedido mínimo: ${item.minQuantity} un.`;
+        metaRow.appendChild(minPill);
+      }
+      body.appendChild(metaRow);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'menu-item-footer';
+
+    const hasPositivePrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
+    if (resolvedComponents.price && (catalogType !== 'quote' || hasPositivePrice)) {
+      const price = document.createElement('span');
+      price.className = 'menu-item-price';
+      price.textContent = this.formatPrice(item.priceCents || 0);
+      footer.appendChild(price);
+    } else if (catalogType === 'quote') {
+      const quoteLabel = document.createElement('span');
+      quoteLabel.className = 'sf-quote-tag';
+      quoteLabel.textContent = 'Sob consulta';
+      footer.appendChild(quoteLabel);
+    }
+
+    const useStepper = Boolean(
+      resolvedComponents.quantitySelector ||
+        (resolvedComponents.minQuantity && item.minQuantity > 1)
+    );
+
+    if (useStepper) {
+      const qtyDiv = document.createElement('div');
+      qtyDiv.className = 'qty-selector';
+      qtyDiv.setAttribute('role', 'group');
+      qtyDiv.setAttribute('aria-label', `Quantidade de ${item.name || 'item'}`);
+
+      const decBtn = document.createElement('button');
+      decBtn.type = 'button';
+      decBtn.className = 'btn-qty';
+      decBtn.textContent = '−';
+      decBtn.disabled = qty === 0 || isInactive;
+      decBtn.setAttribute('aria-label', `Diminuir quantidade de ${item.name || 'item'}`);
+      decBtn.addEventListener('click', () => this.setQuantity(item, -1));
+
+      const qtyVal = document.createElement('span');
+      qtyVal.className = 'qty-val';
+      qtyVal.textContent = String(qty);
+
+      const incBtn = document.createElement('button');
+      incBtn.type = 'button';
+      incBtn.className = 'btn-qty';
+      incBtn.textContent = '+';
+      incBtn.disabled = isInactive;
+      incBtn.setAttribute('aria-label', `Adicionar ${item.name || 'item'}`);
+      incBtn.addEventListener('click', () => this.setQuantity(item, 1));
+
+      qtyDiv.appendChild(decBtn);
+      qtyDiv.appendChild(qtyVal);
+      qtyDiv.appendChild(incBtn);
+      footer.appendChild(qtyDiv);
+    } else {
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
+      selectBtn.disabled = isInactive;
+      selectBtn.setAttribute('aria-pressed', qty > 0 ? 'true' : 'false');
+      selectBtn.textContent =
+        qty > 0
+          ? 'Selecionado'
+          : catalogType === 'booking'
+            ? 'Escolher serviço'
+            : 'Selecionar';
+      selectBtn.addEventListener('click', () => this.toggleSingleSelect(item));
+      footer.appendChild(selectBtn);
+    }
+
+    card.appendChild(body);
+    card.appendChild(footer);
+    grid.appendChild(card);
   }
 
   renderStage2(parent) {

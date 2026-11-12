@@ -26,6 +26,7 @@ export function hasUnsavedDraftChanges() {
 }
 let selectedCategoryForItems = null;
 let activePreviewRenderer = null;
+let activeEditingItemId = null;
 
 // DOM Elements
 const editorSiteTitle = globalThis.document?.getElementById('editor-site-title');
@@ -310,7 +311,7 @@ export async function loadEditor(site, isOnline) {
     categoriesContainer.replaceChildren();
     const loadingP = document.createElement('p');
     loadingP.className = 'loading-msg';
-    loadingP.textContent = 'Carregando catálogo...';
+    loadingP.textContent = 'Carregando vitrine...';
     categoriesContainer.appendChild(loadingP);
   }
 
@@ -433,12 +434,58 @@ function setupEditorEvents() {
     addCategory();
   });
 
-  addItemButton?.addEventListener('click', () => {
+  const addItemBtn = document.getElementById('add-item-button');
+  const addItemMenu = document.getElementById('add-item-menu');
+
+  addItemBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (!currentDraft) return;
     if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
       addCategory('Geral');
     }
-    addItem();
+    const expanded = addItemBtn.getAttribute('aria-expanded') === 'true';
+    addItemBtn.setAttribute('aria-expanded', !expanded);
+    addItemMenu.hidden = expanded;
+  });
+
+  // Handle clicking items in type menu
+  addItemMenu?.querySelectorAll('.dropdown-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const type = item.getAttribute('data-type');
+      addItem(type);
+      addItemBtn.setAttribute('aria-expanded', 'false');
+      addItemMenu.hidden = true;
+    });
+  });
+
+  const csvBtn = document.getElementById('csv-menu-btn');
+  const csvMenu = document.getElementById('csv-dropdown-menu');
+
+  csvBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const expanded = csvBtn.getAttribute('aria-expanded') === 'true';
+    csvBtn.setAttribute('aria-expanded', !expanded);
+    csvMenu.hidden = expanded;
+  });
+
+  // Wire up Planilha (CSV) dropdown items:
+  const csvUploadItem = document.getElementById('csv-upload-btn-item');
+  const csvExportItem = document.getElementById('csv-export-btn-item');
+  
+  csvUploadItem?.addEventListener('click', () => {
+    document.getElementById('csv-file-input')?.click();
+  });
+  
+  csvExportItem?.addEventListener('click', () => {
+    document.getElementById('csv-export-btn')?.click();
+  });
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', () => {
+    if (addItemBtn) addItemBtn.setAttribute('aria-expanded', 'false');
+    if (addItemMenu) addItemMenu.hidden = true;
+    if (csvBtn) csvBtn.setAttribute('aria-expanded', 'false');
+    if (csvMenu) csvMenu.hidden = true;
   });
 
   editorCategorySelect?.addEventListener('change', () => {
@@ -884,7 +931,7 @@ function renderItems() {
   if (!category.items || category.items.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-msg';
-    empty.textContent = 'Nenhum item nesta categoria. Clique em "+ Adicionar Item".';
+    empty.textContent = 'Nenhum item nesta categoria. Clique em "+ Adicionar Item" ou importe uma planilha.';
     itemsContainer.appendChild(empty);
     return;
   }
@@ -894,11 +941,150 @@ function renderItems() {
 
   category.items.forEach((item, itemIdx) => {
     const card = document.createElement('div');
-    card.className = 'item-block';
+    // Accent bar visual highlight like Google Forms
+    const isEditing = activeEditingItemId === item.id;
+    card.className = `item-block google-forms-card ${isEditing ? 'is-editing' : 'is-preview'}`;
+    card.id = `item-card-${item.id}`;
 
+    // Click to focus/edit card
+    card.addEventListener('click', (e) => {
+      if (activeEditingItemId !== item.id && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('textarea')) {
+        activeEditingItemId = item.id;
+        renderItems();
+      }
+    });
+
+    if (!isEditing) {
+      // COMPACT PREVIEW STATE (Google Forms Style)
+      const previewHeader = document.createElement('div');
+      previewHeader.className = 'item-preview-header';
+
+      // Thumbnail
+      const thumb = document.createElement('div');
+      thumb.className = 'item-preview-thumb';
+      if (comp.photo && item.imageUrl) {
+        const thumbImg = document.createElement('img');
+        thumbImg.src = item.imageUrl;
+        thumbImg.alt = item.name || 'Foto';
+        thumb.appendChild(thumbImg);
+      } else {
+        const thumbIcon = document.createElement('span');
+        thumbIcon.textContent = '📷';
+        thumb.appendChild(thumbIcon);
+      }
+      previewHeader.appendChild(thumb);
+
+      const previewInfo = document.createElement('div');
+      previewInfo.className = 'item-preview-info';
+
+      const previewTitle = document.createElement('h3');
+      previewTitle.className = 'item-preview-title';
+      previewTitle.textContent = item.name || 'Item sem nome';
+      previewInfo.appendChild(previewTitle);
+
+      const previewSub = document.createElement('p');
+      previewSub.className = 'item-preview-subtitle soft-text';
+      const priceText = item.priceCents ? formatCentsToReais(item.priceCents) : '';
+      const sectionText = item.section ? `Seção: ${item.section}` : '';
+      const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
+      previewSub.textContent = details.join(' · ');
+      previewInfo.appendChild(previewSub);
+
+      previewHeader.appendChild(previewInfo);
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'button button-small button-secondary button-pill';
+      editBtn.textContent = 'Editar';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeEditingItemId = item.id;
+        renderItems();
+      });
+      previewHeader.appendChild(editBtn);
+
+      card.appendChild(previewHeader);
+      itemsContainer.appendChild(card);
+      return;
+    }
+
+    // EXPANDED EDITING STATE (Google Forms Style)
+    const headerRow = document.createElement('div');
+    headerRow.className = 'item-header-row';
+
+    // Thumbnail / Placeholder
+    const thumb = document.createElement('div');
+    thumb.className = 'item-thumb-container';
+    if (comp.photo && item.imageUrl) {
+      const thumbImg = document.createElement('img');
+      thumbImg.src = item.imageUrl;
+      thumbImg.alt = item.name || 'Foto';
+      thumb.appendChild(thumbImg);
+    } else {
+      // Local symbol or inline SVG icon
+      thumb.innerHTML = `<svg width="24" height="24" class="svg-icon-gray"><use href="#icon-image"/></svg>`;
+    }
+    headerRow.appendChild(thumb);
+
+    // Title / bold name
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'item-title-group';
+    const boldName = document.createElement('h3');
+    boldName.className = 'item-bold-title';
+    boldName.textContent = item.name || 'Novo Item';
+    titleGroup.appendChild(boldName);
+    headerRow.appendChild(titleGroup);
+
+    // Header actions
+    const headerActions = document.createElement('div');
+    headerActions.className = 'item-header-actions';
+
+    // Move Up
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'icon-btn';
+    upBtn.setAttribute('aria-label', 'Subir item');
+    upBtn.disabled = itemIdx === 0;
+    upBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-up"/></svg>`;
+    upBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveItem(selectedCategoryForItems, itemIdx, -1);
+    });
+
+    // Move Down
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'icon-btn';
+    downBtn.setAttribute('aria-label', 'Descer item');
+    downBtn.disabled = itemIdx === category.items.length - 1;
+    downBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-down"/></svg>`;
+    downBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveItem(selectedCategoryForItems, itemIdx, 1);
+    });
+
+    // Duplicate
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.className = 'icon-btn';
+    dupBtn.setAttribute('aria-label', 'Duplicar item');
+    dupBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-copy"/></svg>`;
+    dupBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      duplicateItem(selectedCategoryForItems, itemIdx);
+    });
+
+    headerActions.appendChild(upBtn);
+    headerActions.appendChild(downBtn);
+    headerActions.appendChild(dupBtn);
+    headerRow.appendChild(headerActions);
+    card.appendChild(headerRow);
+
+    // FIELDS GRID
     const fields = document.createElement('div');
     fields.className = 'item-fields';
 
+    // Column 1: Nome do item
     const gName = document.createElement('div');
     gName.className = 'form-group';
     const lName = document.createElement('label');
@@ -912,13 +1098,16 @@ function renderItems() {
     nameInput.placeholder = 'Ex: Margherita Verace';
     nameInput.addEventListener('input', () => {
       item.name = nameInput.value;
+      boldName.textContent = nameInput.value || 'Novo Item';
       updateDraftAndPreview();
     });
     gName.appendChild(lName);
     gName.appendChild(nameInput);
     fields.appendChild(gName);
 
-    if (comp.price !== false) {
+    // Column 2: Preço (if visible)
+    const showPriceField = comp.price !== false && item._showPrice !== false;
+    if (showPriceField) {
       const gPrice = document.createElement('div');
       gPrice.className = 'form-group';
       const lPrice = document.createElement('label');
@@ -940,18 +1129,38 @@ function renderItems() {
       fields.appendChild(gPrice);
     }
 
+    // New Google Forms field: Section name (grupo de agrupamento opcional)
+    const gSec = document.createElement('div');
+    gSec.className = 'form-group';
+    const lSec = document.createElement('label');
+    lSec.setAttribute('for', `item-section-${item.id}`);
+    lSec.textContent = 'Seção / Agrupamento (opcional)';
+    const secInput = document.createElement('input');
+    secInput.type = 'text';
+    secInput.id = `item-section-${item.id}`;
+    secInput.className = 'item-input input-styled-height';
+    secInput.value = item.section || '';
+    secInput.placeholder = 'Ex: Pizzas, Pães, Doces, Bebidas';
+    secInput.addEventListener('input', () => {
+      item.section = secInput.value;
+      updateDraftAndPreview();
+    });
+    gSec.appendChild(lSec);
+    gSec.appendChild(secInput);
+    fields.appendChild(gSec);
+
+    // Full Width: Descrição (textarea style)
     if (comp.description !== false) {
       const gDesc = document.createElement('div');
       gDesc.className = 'form-group item-fields-full';
       const lDesc = document.createElement('label');
       lDesc.setAttribute('for', `item-desc-${item.id}`);
       lDesc.textContent = 'Descrição';
-      const descInput = document.createElement('input');
-      descInput.type = 'text';
+      const descInput = document.createElement('textarea');
       descInput.id = `item-desc-${item.id}`;
-      descInput.className = 'item-input input-styled-height';
+      descInput.className = 'item-input textarea-styled';
       descInput.value = item.description || '';
-      descInput.placeholder = 'Ex: Molho de tomate San Marzano, muçarela fresca e manjericão.';
+      descInput.placeholder = 'Ex: Molho de tomate San Marzano, muçarela fresca, folhas de manjericão e azeite extravirgem.';
       descInput.addEventListener('input', () => {
         item.description = descInput.value;
         updateDraftAndPreview();
@@ -961,6 +1170,7 @@ function renderItems() {
       fields.appendChild(gDesc);
     }
 
+    // Min Quantity (if enabled)
     if (comp.minQuantity) {
       const gMin = document.createElement('div');
       gMin.className = 'form-group';
@@ -983,6 +1193,7 @@ function renderItems() {
       fields.appendChild(gMin);
     }
 
+    // Duration Minutes (if enabled)
     if (comp.durationMinutes) {
       const gDur = document.createElement('div');
       gDur.className = 'form-group';
@@ -1005,14 +1216,16 @@ function renderItems() {
       fields.appendChild(gDur);
     }
 
-    if (comp.photo) {
+    // PHOTO UPLOAD AREA (if enabled)
+    const showPhotoField = comp.photo && item._showPhoto !== false;
+    if (showPhotoField) {
       const gPhoto = document.createElement('div');
       gPhoto.className = 'form-group item-fields-full';
 
       const fileInputId = `item-photo-file-${item.id}`;
       const lPhoto = document.createElement('label');
       lPhoto.setAttribute('for', fileInputId);
-      lPhoto.textContent = 'Foto do item (convertida no navegador para WebP até 200 KB)';
+      lPhoto.textContent = 'Foto do item';
       gPhoto.appendChild(lPhoto);
 
       const fileGroup = document.createElement('div');
@@ -1027,12 +1240,12 @@ function renderItems() {
       const uploadBtn = document.createElement('button');
       uploadBtn.type = 'button';
       uploadBtn.className = 'button button-small button-secondary button-pill';
-      uploadBtn.textContent = item.imageUrl ? 'Trocar foto' : 'Enviar foto';
+      uploadBtn.textContent = item.imageUrl ? 'Trocar' : 'Enviar foto';
       uploadBtn.addEventListener('click', () => fileInp.click());
 
       const statusSpan = document.createElement('span');
       statusSpan.className = 'upload-status-text';
-      statusSpan.textContent = item.imageUrl ? 'Foto vinculada ao item' : 'Sem foto';
+      statusSpan.textContent = item.imageUrl ? 'WebP até 200 KB, convertida automaticamente' : 'Sem foto';
 
       fileGroup.appendChild(fileInp);
       fileGroup.appendChild(uploadBtn);
@@ -1041,7 +1254,7 @@ function renderItems() {
         const clearPhotoBtn = document.createElement('button');
         clearPhotoBtn.type = 'button';
         clearPhotoBtn.className = 'button button-small button-secondary button-pill';
-        clearPhotoBtn.textContent = 'Remover foto';
+        clearPhotoBtn.textContent = 'Remover';
         clearPhotoBtn.addEventListener('click', () => {
           delete item.imageUrl;
           renderItems();
@@ -1083,11 +1296,63 @@ function renderItems() {
       fields.appendChild(gPhoto);
     }
 
-    const controls = document.createElement('div');
-    controls.className = 'item-controls';
+    card.appendChild(fields);
 
+    // CARD FOOTER (Google Forms style)
+    const footer = document.createElement('div');
+    footer.className = 'item-card-footer';
+
+    // Quick toggle switches or options
+    const quickAddLinks = document.createElement('div');
+    quickAddLinks.className = 'quick-add-links';
+    
+    if (item._showPrice === false) {
+      const addPriceLink = document.createElement('button');
+      addPriceLink.type = 'button';
+      addPriceLink.className = 'text-link-btn';
+      addPriceLink.textContent = '+ Adicionar Preço';
+      addPriceLink.addEventListener('click', () => {
+        item._showPrice = true;
+        renderItems();
+      });
+      quickAddLinks.appendChild(addPriceLink);
+    }
+    if (item._showPhoto === false && comp.photo) {
+      const addPhotoLink = document.createElement('button');
+      addPhotoLink.type = 'button';
+      addPhotoLink.className = 'text-link-btn';
+      addPhotoLink.textContent = '+ Adicionar Foto';
+      addPhotoLink.addEventListener('click', () => {
+        item._showPhoto = true;
+        renderItems();
+      });
+      quickAddLinks.appendChild(addPhotoLink);
+    }
+    footer.appendChild(quickAddLinks);
+
+    const footerRight = document.createElement('div');
+    footerRight.className = 'footer-right-actions';
+
+    // Delete Trash icon
+    const trashBtn = document.createElement('button');
+    trashBtn.type = 'button';
+    trashBtn.className = 'icon-btn trash-color-btn';
+    trashBtn.setAttribute('aria-label', 'Excluir item');
+    trashBtn.innerHTML = `<svg width="20" height="20"><use href="#icon-trash"/></svg>`;
+    trashBtn.addEventListener('click', () => {
+      if (item.name && !confirm(`Deseja excluir o item "${item.name}"?`)) {
+        return;
+      }
+      removeItem(selectedCategoryForItems, itemIdx);
+    });
+
+    // Separator line
+    const sep = document.createElement('div');
+    sep.className = 'footer-divider';
+
+    // Visible switch
     const activeLabel = document.createElement('label');
-    activeLabel.className = 'toggle-container';
+    activeLabel.className = 'toggle-container-forms';
 
     const activeCheckbox = document.createElement('input');
     activeCheckbox.type = 'checkbox';
@@ -1097,29 +1362,30 @@ function renderItems() {
       updateDraftAndPreview();
     });
 
-    activeLabel.appendChild(activeCheckbox);
-    activeLabel.appendChild(document.createTextNode('Visível na vitrine'));
+    const activeLabelText = document.createElement('span');
+    activeLabelText.textContent = 'Visível';
 
-    const removeItemBtn = document.createElement('button');
-    removeItemBtn.type = 'button';
-    removeItemBtn.className = 'button button-small button-secondary button-pill';
-    removeItemBtn.textContent = 'Excluir item';
-    removeItemBtn.setAttribute('aria-label', `Excluir item ${item.name || itemIdx + 1}`);
-    removeItemBtn.addEventListener('click', () => {
-      if (item.name && !confirm(`Deseja excluir o item "${item.name}"?`)) {
-        return;
-      }
-      removeItem(selectedCategoryForItems, itemIdx);
+    activeLabel.appendChild(activeCheckbox);
+    activeLabel.appendChild(activeLabelText);
+
+    // Save and collapse card button
+    const collapseBtn = document.createElement('button');
+    collapseBtn.type = 'button';
+    collapseBtn.className = 'button button-small button-pill';
+    collapseBtn.textContent = 'OK';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      activeEditingItemId = null;
+      renderItems();
     });
 
-    if (currentIsOnline && ['owner', 'admin', 'editor'].includes(currentSite.role)) {
-      controls.appendChild(quickToggleButton(item, 'item'));
-    }
-    controls.appendChild(activeLabel);
-    controls.appendChild(removeItemBtn);
+    footerRight.appendChild(trashBtn);
+    footerRight.appendChild(sep);
+    footerRight.appendChild(activeLabel);
+    footerRight.appendChild(collapseBtn);
+    footer.appendChild(footerRight);
 
-    card.appendChild(fields);
-    card.appendChild(controls);
+    card.appendChild(footer);
     itemsContainer.appendChild(card);
   });
 }
@@ -1287,7 +1553,7 @@ function moveCategory(catIndex, direction) {
   }
 }
 
-function addItem() {
+function addItem(type = 'price') {
   const category = (currentDraft.content.categories || []).find(
     (c) => c.id === selectedCategoryForItems
   );
@@ -1299,14 +1565,31 @@ function addItem() {
     id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: '',
     description: '',
-    priceCents: 0,
     active: true
   };
+
+  if (type === 'price' || type === 'photo') {
+    item.priceCents = 0;
+  }
+  if (type === 'photo') {
+    item._showPhoto = true;
+  }
+  if (type === 'text') {
+    item._showPrice = false;
+    item._showPhoto = false;
+  } else if (type === 'price') {
+    item._showPrice = true;
+    item._showPhoto = false;
+  } else if (type === 'photo') {
+    item._showPrice = true;
+    item._showPhoto = true;
+  }
 
   if (currentDraft.content.components?.minQuantity) item.minQuantity = 1;
   if (currentDraft.content.components?.durationMinutes) item.durationMinutes = 30;
 
   category.items.push(item);
+  activeEditingItemId = item.id; // Highlight new item in editing mode
   renderCategories();
   renderItems();
   updateDraftAndPreview();
@@ -1321,6 +1604,36 @@ function removeItem(catId, itemIdx) {
     updateDraftAndPreview();
   }
 }
+
+function moveItem(catId, itemIdx, direction) {
+  const category = (currentDraft.content.categories || []).find((c) => c.id === catId);
+  if (category && category.items) {
+    const targetIdx = itemIdx + direction;
+    if (targetIdx >= 0 && targetIdx < category.items.length) {
+      const temp = category.items[itemIdx];
+      category.items[itemIdx] = category.items[targetIdx];
+      category.items[targetIdx] = temp;
+      renderItems();
+      updateDraftAndPreview();
+    }
+  }
+}
+
+function duplicateItem(catId, itemIdx) {
+  const category = (currentDraft.content.categories || []).find((c) => c.id === catId);
+  if (category && category.items) {
+    const original = category.items[itemIdx];
+    const copy = structuredClone(original);
+    copy.id = `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    if (copy.name) copy.name = `${copy.name} (Cópia)`;
+    category.items.splice(itemIdx + 1, 0, copy);
+    activeEditingItemId = copy.id; // Highlight duplicated item
+    renderItems();
+    updateDraftAndPreview();
+  }
+}
+
+let autosaveTimeout = null;
 
 function updateDraftAndPreview() {
   if (!currentDraft) return;
@@ -1362,6 +1675,76 @@ function updateDraftAndPreview() {
   }
 
   renderLivePreview();
+
+  // AUTOSAVE DEBOUNCED TRIGGER
+  const indicator = globalThis.document?.getElementById('autosave-indicator');
+  if (indicator) {
+    indicator.textContent = 'Alterando...';
+    indicator.className = 'autosave-indicator saving';
+  }
+
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = setTimeout(async () => {
+    if (!currentDraft) return;
+    try {
+      if (currentIsOnline) {
+        const res = await fetch(`/api/sites/${currentSite.id}/draft`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            revision: currentDraft.revision,
+            content: currentDraft.content
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentDraft = data.draft;
+          currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
+          if (editorRevisionIndicator) {
+            editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+          }
+          savedDraftContent = JSON.stringify(currentDraft.content);
+          if (indicator) {
+            indicator.textContent = '✓ Todas as alterações foram salvas';
+            indicator.className = 'autosave-indicator saved';
+          }
+          if (conflictBanner) conflictBanner.hidden = true;
+        } else if (res.status === 409) {
+          const data = await res.json();
+          if (conflictBanner) conflictBanner.hidden = false;
+          if (indicator) {
+            indicator.textContent = '⚠️ Erro ao salvar (conflito)';
+            indicator.className = 'autosave-indicator error';
+          }
+          if (data.error?.currentRevision && editorRevisionIndicator) {
+            editorRevisionIndicator.textContent = `Revisão em conflito: ${currentDraft.revision} (servidor: ${data.error.currentRevision})`;
+          }
+        } else {
+          if (indicator) {
+            indicator.textContent = '⚠️ Erro ao salvar';
+            indicator.className = 'autosave-indicator error';
+          }
+        }
+      } else {
+        currentDraft.revision += 1;
+        currentDraft.updatedAt = new Date().toISOString();
+        localStorage.setItem(`vitrine_local_draft_${currentSite.id}`, JSON.stringify(currentDraft));
+        if (editorRevisionIndicator) {
+          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+        }
+        savedDraftContent = JSON.stringify(currentDraft.content);
+        if (indicator) {
+          indicator.textContent = '✓ Salvo localmente (offline)';
+          indicator.className = 'autosave-indicator saved';
+        }
+      }
+    } catch {
+      if (indicator) {
+        indicator.textContent = '⚠️ Erro de conexão';
+        indicator.className = 'autosave-indicator error';
+      }
+    }
+  }, 1200);
 }
 
 function renderLivePreview() {
@@ -1575,6 +1958,7 @@ async function handlePublishSite() {
         if (editorOpenPublicLink) {
           editorOpenPublicLink.href = pub.url;
         }
+        localStorage.setItem('vitrine_has_published', 'true');
         showFeedback(`Vitrine publicada com sucesso em ${pub.url}.`, 'success');
         void refreshPublicationHistory();
       } else {
@@ -1606,6 +1990,7 @@ async function handlePublishSite() {
       publicationViewLink.href = '/loja1';
       publicationStatusBar.hidden = false;
     }
+    localStorage.setItem('vitrine_has_published', 'true');
     showFeedback('Publicação validada com sucesso no modo local.', 'success');
   }
 }

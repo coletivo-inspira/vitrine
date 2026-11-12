@@ -1,6 +1,6 @@
 const modules = {
   hero: ['Cabeçalho', { headline: 'Título', subtitle: 'Subtítulo' }],
-  catalog_grid: ['Catálogo', {}],
+  catalog_grid: ['Vitrine', {}],
   service_booking: ['Agendamento', {}],
   quote_request: ['Orçamento', {}],
   about_story: ['Sobre', { bio: 'Apresentação' }],
