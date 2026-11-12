@@ -6,25 +6,30 @@
   "preview_urls": false,
   "triggers": { "crons": ["17 * * * *"] },
   "vars": {
-    "SUPABASE_URL": "https://qawlpsrfewosxsfgmmpm.supabase.co"
+    "SUPABASE_URL": "https://qawlpsrfewosxsfgmmpm.supabase.co",
+    "PUBLIC_SITE_ORIGIN": "https://vitrine.inspira.dev.br",
+    "PORTAL_ORIGIN": "https://painel.inspira.dev.br"
   },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
     "run_worker_first": [
-      "!/index.html",
-      "!/404",
-      "!/404.html",
       "!/styles.css",
       "!/app.js",
       "!/categories.js",
       "!/theme.js",
       "!/assets/*",
-      "!/portal",
-      "!/portal/*",
-      "!/vitrine",
-      "!/vitrine/*",
+      "!/vitrine/vitrine.css",
+      "!/vitrine/vitrine.js",
+      "!/como-funciona",
+      "!/como-funciona/*",
+      "!/possibilidades",
+      "!/possibilidades/*",
+      "!/planos",
+      "!/planos/*",
+      "!/orcamento",
+      "!/orcamento/*",
       "!/data/portfolio.json",
       "!/data/contact.json",
       "/*"

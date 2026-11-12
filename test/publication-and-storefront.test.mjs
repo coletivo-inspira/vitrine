@@ -431,6 +431,43 @@ test('Fase 4 - Motor de Publicação Imutável e Vitrine Pública Mobile-First',
     assert.equal(unknownRes.headers.get('x-frame-options'), 'DENY');
     assert.match(await unknownRes.text(), /Essa página<br>não está aqui\./);
 
+    // Antes de completar o perfil, tentar criar vitrine retorna 409 PROFILE_INCOMPLETE
+    const incompleteCreateRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/sites', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Pipira Pizzaria',
+          slug: 'pipira',
+          template: 'pizzeria-v1',
+          whatsapp: '5511988887777'
+        })
+      })
+    );
+    assert.equal(incompleteCreateRes.status, 409);
+    assert.equal((await incompleteCreateRes.json()).error.code, 'PROFILE_INCOMPLETE');
+
+    const saveOwnerProfileRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/profile', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: 'https://painel.inspira.dev.br',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: 'Chef Pipira',
+          businessName: 'Pipira Pizzaria',
+          city: 'Belo Horizonte, MG',
+          whatsapp: '5511988887777'
+        })
+      })
+    );
+    assert.equal(saveOwnerProfileRes.status, 200);
+
     // Cria vitrine pipira no portal
     const createRes = await api.fetch(
       new Request('https://painel.inspira.dev.br/api/sites', {
@@ -504,12 +541,10 @@ test('Fase 4 - Motor de Publicação Imutável e Vitrine Pública Mobile-First',
     assert.equal(publication.revision, 6);
     assert.equal(publication.url, '/pipira');
 
-    // Renderiza em vitrine.inspira.dev.br/pipira, painel.inspira.dev.br/pipira e workers.dev/pipira
+    // Renderiza em vitrine.inspira.dev.br/pipira e redireciona 301 de painel.inspira.dev.br/pipira e workers.dev/pipira
     for (const url of [
       'https://vitrine.inspira.dev.br/pipira',
-      'https://vitrine.inspira.dev.br/pipira/',
-      'https://painel.inspira.dev.br/pipira',
-      'https://vitrine-inspira.inspira.workers.dev/pipira'
+      'https://vitrine.inspira.dev.br/pipira/'
     ]) {
       const res = await api.fetch(new Request(url));
       assert.equal(res.status, 200, `Esperado 200 em ${url}`);
@@ -524,18 +559,43 @@ test('Fase 4 - Motor de Publicação Imutável e Vitrine Pública Mobile-First',
       assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i);
     }
 
-    // Verifica wrangler.jsonc: run_worker_first deve rotear /* para o Worker preservando regras !/ para assets estáticos
+    for (const redirectUrl of [
+      'https://painel.inspira.dev.br/pipira',
+      'https://vitrine-inspira.inspira.workers.dev/pipira'
+    ]) {
+      const res = await api.fetch(new Request(redirectUrl));
+      assert.equal(res.status, 301, `Esperado 301 em ${redirectUrl}`);
+      assert.equal(res.headers.get('location'), 'https://vitrine.inspira.dev.br/pipira');
+    }
+
+    // Verifica wrangler.jsonc: run_worker_first deve rotear /* para o Worker preservando regras !/ para assets estáticos e novas páginas de marketing
     const wranglerConfig = JSON.parse(await readFile(resolve(root, 'wrangler.jsonc'), 'utf8'));
     assert.ok(Array.isArray(wranglerConfig.assets.run_worker_first));
     assert.ok(
       wranglerConfig.assets.run_worker_first.includes('/*'),
-      'wrangler.jsonc run_worker_first deve incluir /* para que slugs dinâmicos (/pipira) invoquem o Worker'
+      'wrangler.jsonc run_worker_first deve incluir /* para que slugs dinâmicos (/pipira) e roteamento por host invoquem o Worker'
     );
     assert.ok(
-      wranglerConfig.assets.run_worker_first.includes('!/assets/*') &&
-        wranglerConfig.assets.run_worker_first.includes('!/portal/*') &&
-        wranglerConfig.assets.run_worker_first.includes('!/vitrine/*'),
-      'wrangler.jsonc run_worker_first deve manter exclusões !/ para assets estáticos'
+      !wranglerConfig.assets.run_worker_first.includes('!/') &&
+        !wranglerConfig.assets.run_worker_first.includes('!/portal') &&
+        !wranglerConfig.assets.run_worker_first.includes('!/portal/*'),
+      'wrangler.jsonc run_worker_first deve deixar / e /portal* passarem pelo Worker para roteamento por host'
     );
+    for (const rule of [
+      '!/assets/*',
+      '!/como-funciona',
+      '!/como-funciona/*',
+      '!/possibilidades',
+      '!/possibilidades/*',
+      '!/planos',
+      '!/planos/*',
+      '!/orcamento',
+      '!/orcamento/*'
+    ]) {
+      assert.ok(
+        wranglerConfig.assets.run_worker_first.includes(rule),
+        `wrangler.jsonc run_worker_first deve incluir ${rule}`
+      );
+    }
   });
 });

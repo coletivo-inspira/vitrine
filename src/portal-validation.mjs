@@ -10,7 +10,11 @@ export const RESERVED_SLUGS = Object.freeze([
   'assets',
   'data',
   'login',
-  'logout'
+  'logout',
+  'como-funciona',
+  'possibilidades',
+  'planos',
+  'orcamento'
 ]);
 
 export const DEFAULT_TEMPLATE = 'pizzeria-v1';
@@ -194,6 +198,9 @@ export class PortalValidationError extends Error {
     };
     if (typeof this.currentRevision === 'number') {
       error.currentRevision = this.currentRevision;
+    }
+    if (Array.isArray(this.missingFields)) {
+      error.missingFields = this.missingFields;
     }
     return { error };
   }
@@ -760,6 +767,57 @@ export function validateRevision(revision) {
   return revision;
 }
 
+export const REQUIRED_PROFILE_FIELDS = Object.freeze([
+  'displayName',
+  'businessName',
+  'city',
+  'whatsapp'
+]);
+
+export function getMissingRequiredProfileFields(profile = {}) {
+  if (!profile || typeof profile !== 'object') {
+    return [...REQUIRED_PROFILE_FIELDS];
+  }
+  const missing = [];
+  const displayName =
+    typeof profile.displayName === 'string'
+      ? profile.displayName.trim()
+      : typeof profile.display_name === 'string'
+        ? profile.display_name.trim()
+        : '';
+  const businessName =
+    typeof profile.businessName === 'string'
+      ? profile.businessName.trim()
+      : typeof profile.business_name === 'string'
+        ? profile.business_name.trim()
+        : '';
+  const city = typeof profile.city === 'string' ? profile.city.trim() : '';
+  const whatsapp = typeof profile.whatsapp === 'string' ? profile.whatsapp.trim() : '';
+
+  if (!displayName) missing.push('displayName');
+  if (!businessName) missing.push('businessName');
+  if (!city) missing.push('city');
+  if (!isValidWhatsapp(whatsapp)) missing.push('whatsapp');
+  return missing;
+}
+
+export function isProfileComplete(profile = {}) {
+  return getMissingRequiredProfileFields(profile).length === 0;
+}
+
+export function assertProfileComplete(profile = {}) {
+  const missingFields = getMissingRequiredProfileFields(profile);
+  if (missingFields.length > 0) {
+    throw new PortalValidationError(
+      409,
+      'PROFILE_INCOMPLETE',
+      'Complete seu perfil (nome, nome do negócio, cidade e WhatsApp) antes de criar uma vitrine.',
+      { missingFields }
+    );
+  }
+  return true;
+}
+
 export function computeProfileCompleteness(profile = {}) {
   const missingFields = [];
   if (typeof profile.displayName !== 'string' || !profile.displayName.trim()) {
@@ -1284,6 +1342,17 @@ export function validateDraftContent(content, options = {}) {
       assertNoDangerousTextPayload(item.description, 422, 'INVALID_ITEM');
     }
 
+    if (item.section !== undefined && item.section !== null) {
+      if (typeof item.section !== 'string' || item.section.trim().length > 160) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM',
+          'A seção do item (section) deve ter no máximo 160 caracteres.'
+        );
+      }
+      assertNoDangerousTextPayload(item.section, 422, 'INVALID_ITEM');
+    }
+
     if (item.minQuantity !== undefined && item.minQuantity !== null) {
       if (!Number.isSafeInteger(item.minQuantity) || item.minQuantity < 1 || item.minQuantity > 99) {
         throw new PortalValidationError(
@@ -1624,11 +1693,24 @@ function buildCatalogLookup(catalogSource = {}) {
       }
       const itemId = item.id.trim();
       if (!itemMetaById.has(itemId)) {
+        const secName =
+          typeof item.section === 'string' && item.section.trim()
+            ? item.section.trim()
+            : 'Cardápio';
+        const secId =
+          secName === 'Cardápio'
+            ? 'cardapio'
+            : secName
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '') || 'cardapio';
         itemMetaById.set(itemId, {
           itemId,
           name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : itemId,
-          categoryId: 'cardapio',
-          categoryName: 'Cardápio'
+          categoryId: secId,
+          categoryName: secName
         });
       }
     }

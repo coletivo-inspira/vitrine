@@ -84,7 +84,18 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
   });
 
   await t.test('POST /api/sites - rejeita slugs invalidos/reservados', async () => {
-    const invalidSlugs = ['ab', 'a'.repeat(45), 'admin', 'www', 'assets', 'pizza_grande'];
+    const invalidSlugs = [
+      'ab',
+      'a'.repeat(45),
+      'admin',
+      'www',
+      'assets',
+      'como-funciona',
+      'possibilidades',
+      'planos',
+      'orcamento',
+      'pizza_grande'
+    ];
     for (const slug of invalidSlugs) {
       const req = new Request('http://localhost/api/sites', {
         method: 'POST',
@@ -99,6 +110,45 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
       const body = await res.json();
       assert.equal(body.error.code, 'INVALID_SLUG');
     }
+  });
+
+  await t.test('POST /api/sites - rejeita criação com perfil incompleto (409 PROFILE_INCOMPLETE)', async () => {
+    const req = new Request('http://localhost/api/sites', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer token-owner',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name: 'Pizzaria Imperial', slug: 'pizza-imperial' })
+    });
+    const res = await api.fetch(req);
+    assert.equal(res.status, 409);
+    const body = await res.json();
+    assert.equal(body.error.code, 'PROFILE_INCOMPLETE');
+    assert.deepEqual(body.error.missingFields, [
+      'displayName',
+      'businessName',
+      'city',
+      'whatsapp'
+    ]);
+
+    const saveProfileRes = await api.fetch(
+      new Request('http://localhost/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer token-owner',
+          'Origin': 'http://localhost',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: 'Maria Silva',
+          businessName: 'Pizzaria Imperial',
+          city: 'Belo Horizonte, MG',
+          whatsapp: '5531999999999'
+        })
+      })
+    );
+    assert.equal(saveProfileRes.status, 200);
   });
 
   await t.test('POST /api/sites - rejeita slug já em uso', async () => {
@@ -298,7 +348,9 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
     const bodyPub = await resPub.json();
     assert.deepEqual(bodyPub, {
       supabaseUrl: SUPABASE_PUBLIC_PROJECT_URL,
-      publishableKey: 'sb_publishable_vitrine_public_123'
+      publishableKey: 'sb_publishable_vitrine_public_123',
+      PUBLIC_SITE_ORIGIN: 'https://vitrine.inspira.dev.br',
+      PORTAL_ORIGIN: 'https://painel.inspira.dev.br'
     });
 
     // 2. Sucesso com chave anon JWT legada (role=anon)

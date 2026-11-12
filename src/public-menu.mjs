@@ -13,10 +13,27 @@ const ALLOWED_PUBLIC_TEMPLATES = Object.freeze([
   'quote-v1'
 ]);
 
+const RESERVED_PUBLIC_SLUGS = Object.freeze([
+  'admin',
+  'api',
+  'www',
+  'app',
+  'auth',
+  'portal',
+  'assets',
+  'data',
+  'login',
+  'logout',
+  'como-funciona',
+  'possibilidades',
+  'planos',
+  'orcamento'
+]);
+
 export function publicMenu(draft) {
   if (!draft || !ALLOWED_PUBLIC_TEMPLATES.includes(draft.template)) throw new TypeError('Invalid template');
   const slug = text(draft.slug, 'slug', 63);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ['admin', 'api', 'www', 'app', 'auth'].includes(slug)) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || RESERVED_PUBLIC_SLUGS.includes(slug)) {
     throw new TypeError('Invalid slug');
   }
   const phone = text(draft.whatsapp, 'whatsapp', 15);
