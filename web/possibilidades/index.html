@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="../styles.css">
   <script type="module" src="../app.js"></script>
   <script src="../categories.js" defer></script>
+  <script src="../model-demos.js" defer></script>
   <script src="../assets/brand/dot-trail.js" defer></script>
   <script src="../assets/brand/inspira-orb.js" data-href="https://inspira.dev.br/" defer></script>
   <link rel="canonical" href="https://vitrine.inspira.dev.br/possibilidades/">
@@ -60,6 +61,51 @@
         <h2 id="possibilities-title">Uma base pronta.<br>Novas possibilidades.</h2>
         <p>Da primeira vitrine a uma ideia só sua. O modelo é um ponto de partida, não o limite do projeto.</p>
       </div>
+
+      <section class="model-demos" aria-labelledby="model-demos-title">
+        <div class="area-heading">
+          <h3 id="model-demos-title">Modelos em ação</h3>
+          <p>Escolher, montar o pedido, pedir orçamento ou apresentar o trabalho. Demonstrações ilustrativas com valores de exemplo.</p>
+        </div>
+        <div class="model-demos-grid">
+          <figure class="model-demo" data-demo="cardapio" data-svg="../assets/modelos/cardapio.svg">
+            <div class="model-demo-media">
+              <picture>
+                <source srcset="../assets/modelos/cardapio.webp" type="image/webp">
+                <img src="../assets/modelos/cardapio.png" width="1200" height="900" loading="lazy" decoding="async" alt="Demonstração ilustrativa de vitrine de restaurante: a pessoa toca em Moqueca de banana-da-terra, o total passa de R$ 0,00 para R$ 42,00 e a mensagem do pedido aparece pronta para continuar no WhatsApp.">
+              </picture>
+            </div>
+            <figcaption><span class="model-demo-name">Pratos</span><span class="model-demo-note">Escolha o prato e veja o total</span><button class="model-demo-toggle" type="button" aria-pressed="false" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span>Pausar</span></button></figcaption>
+          </figure>
+          <figure class="model-demo" data-demo="lanches" data-svg="../assets/modelos/lanches.svg">
+            <div class="model-demo-media">
+              <picture>
+                <source srcset="../assets/modelos/lanches.webp" type="image/webp">
+                <img src="../assets/modelos/lanches.png" width="1200" height="900" loading="lazy" decoding="async" alt="Demonstração ilustrativa de vitrine de lanchonete: a pessoa escolhe o Combo Clássico, aumenta a quantidade para 2, o total muda de R$ 32,00 para R$ 64,00 e o resumo do pedido fica em destaque com a opção de continuar no WhatsApp.">
+              </picture>
+            </div>
+            <figcaption><span class="model-demo-name">Lanches</span><span class="model-demo-note">Monte o pedido e continue no WhatsApp</span><button class="model-demo-toggle" type="button" aria-pressed="false" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span>Pausar</span></button></figcaption>
+          </figure>
+          <figure class="model-demo" data-demo="servicos" data-svg="../assets/modelos/servicos.svg">
+            <div class="model-demo-media">
+              <picture>
+                <source srcset="../assets/modelos/servicos.webp" type="image/webp">
+                <img src="../assets/modelos/servicos.png" width="1200" height="900" loading="lazy" decoding="async" alt="Demonstração ilustrativa de vitrine de serviços: a pessoa escolhe Pintura de cômodo e o pedido de orçamento se forma com o serviço, o que inclui e a estimativa a partir de R$ 380,00, pronto para enviar pelo WhatsApp.">
+              </picture>
+            </div>
+            <figcaption><span class="model-demo-name">Serviços</span><span class="model-demo-note">Apresente o serviço e facilite o orçamento</span><button class="model-demo-toggle" type="button" aria-pressed="false" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span>Pausar</span></button></figcaption>
+          </figure>
+          <figure class="model-demo" data-demo="portfolio" data-svg="../assets/modelos/portfolio.svg">
+            <div class="model-demo-media">
+              <picture>
+                <source srcset="../assets/modelos/portfolio.webp" type="image/webp">
+                <img src="../assets/modelos/portfolio.png" width="1200" height="900" loading="lazy" decoding="async" alt="Demonstração ilustrativa de portfólio de arquitetura: a apresentação alterna entre o projeto Apartamento Jardim, o currículo com três experiências e o diploma de Arquitetura e Urbanismo, aproximando cada conteúdo selecionado.">
+              </picture>
+            </div>
+            <figcaption><span class="model-demo-name">Portfólio</span><span class="model-demo-note">Projetos, currículo e conquistas juntos</span><button class="model-demo-toggle" type="button" aria-pressed="false" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span>Pausar</span></button></figcaption>
+          </figure>
+        </div>
+      </section>
       
       <div class="area-choices" role="group" aria-label="Explorar exemplos por área" hidden>
         <button class="area-choice area-food" type="button" data-area="food" aria-pressed="false" aria-controls="area-food">
