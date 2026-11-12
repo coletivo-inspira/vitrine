@@ -70,7 +70,7 @@ O visitante filtra a cidade por **Todos**, **Lance**, **Doação** ou **Troca** 
 
 - **FR-001**: A plataforma DEVE oferecer um índice público de cidades com itens listados, agrupado por UF, com contagem de itens por cidade.
 - **FR-002**: A plataforma DEVE oferecer uma página pública por cidade com os itens ativos de modo lance, doação e troca das vitrines publicadas que autorizaram a listagem naquela cidade.
-- **FR-003**: Itens de venda (`fixed`) e itens ocultos NÃO DEVEM aparecer.
+- **FR-003**: Itens de venda (`fixed`), itens de cota (`quota`, spec 014) e itens ocultos NÃO DEVEM aparecer.
 - **FR-004**: A cidade DEVE vir de um campo explícito por vitrine (cidade + UF), preenchido pelo proprietário no editor; a cidade do perfil pessoal NÃO DEVE ser usada automaticamente.
 - **FR-005**: A listagem DEVE ser opcional e desligada por padrão; só vale após publicação.
 - **FR-006**: A página DEVE exibir apenas: nome público da vitrine, endereço da vitrine, cidade/UF e os campos públicos do item (nome, descrição, foto, modo, valor mínimo de lance, condições de doação, "aceito em troca").

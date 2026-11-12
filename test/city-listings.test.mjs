@@ -112,6 +112,16 @@ test('Spec 012 — projeção pública da localidade', async (t) => {
     assert.doesNotMatch(renderStorefrontHtml(fixedOnly), /por-cidade/);
   });
 
+  await t.test('itens de cota (spec 014) não entram na página por cidade nem geram o link do rodapé', () => {
+    const quota = { id: 'cota', name: 'Cotas para a reforma', priceMode: 'quota', priceCents: 2000, quotaTotal: 50, quotaFilled: 5, quotaReward: 'Nome no mural' };
+    const mixed = projectPublicStorefrontMenu(draft({ items: [quota, { id: 'v', name: 'Violão', priceMode: 'trade', priceCents: 0 }] }), { slug: 'bazar-ana' });
+    assert.deepEqual(projectCityListings(mixed, '2026-11-12T10:00:00.000Z').map((row) => row.item_id), ['v']);
+    const quotaOnly = projectPublicStorefrontMenu(draft({ items: [quota] }), { slug: 'bazar-ana' });
+    assert.equal(quotaOnly.items[0].priceMode, 'quota');
+    assert.deepEqual(projectCityListings(quotaOnly, '2026-11-12T10:00:00.000Z'), []);
+    assert.doesNotMatch(renderStorefrontHtml(quotaOnly), /por-cidade/);
+  });
+
   await t.test('linhas derivadas ignoram venda e itens ocultos e preservam a ordem da vitrine', () => {
     const menu = projectPublicStorefrontMenu(draft(), { slug: 'bazar-ana' });
     const rows = projectCityListings(menu, '2026-11-12T10:00:00.000Z');

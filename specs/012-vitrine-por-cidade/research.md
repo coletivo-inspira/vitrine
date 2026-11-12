@@ -30,7 +30,7 @@ Perguntas em aberto foram decididas pelo agente, coerentes com a constituição 
 
 ## D5. Quais itens entram
 
-**Decisão**: itens ativos do manifesto com `priceMode` em `offer`, `donation`, `trade`. Venda fica de fora. O teto continua o da vitrine (20 ativos).
+**Decisão**: itens ativos do manifesto com `priceMode` em `offer`, `donation`, `trade`. Venda e cotas de apoio (`quota`, spec 014) ficam de fora: a cota é arrecadação da própria vitrine, não troca entre vizinhos, e a spec 014 não prevê exposição agregada. O teto continua o da vitrine (20 ativos).
 
 ## D6. Filtros
 

@@ -96,6 +96,19 @@ test('Spec 012 — city_listings derivada das publicações', async (t) => {
     assert.equal(rows[0].sort_key, buildListingSortKey('2026-11-12T10:00:00.000Z', 'bazar-ana', 1));
   });
 
+  await t.test('itens de cota (spec 014) ficam fora da listagem por cidade', async () => {
+    const db = await setupDb();
+    t.after(() => db.close());
+    await publish(db, siteA, 'bazar-ana', menuFor('bazar-ana', 'Bazar da Ana', {
+      items: [
+        { id: 'cota', name: 'Cotas para a reforma', priceMode: 'quota', priceCents: 2000, quotaTotal: 50, quotaFilled: 5 },
+        { id: 'violao', name: 'Violão', priceMode: 'trade', priceCents: 0 }
+      ]
+    }));
+    const { rows } = await db.query('select item_id from public.city_listings');
+    assert.deepEqual(rows.map((r) => r.item_id), ['violao']);
+  });
+
   await t.test('republicar sem cidade remove os itens; reverter com cidade traz de volta', async () => {
     const db = await setupDb();
     t.after(() => db.close());
