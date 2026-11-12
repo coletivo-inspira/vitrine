@@ -9,6 +9,7 @@ import { PGlite } from '@electric-sql/pglite';
 import {
   PORTAL_CSP_HEADER,
   STRICT_CSP_HEADER,
+  COMPLIANCE_CSP_HEADER,
   clearJwksCache,
   createApiHandler,
   evaluateHeadersForPath,
@@ -1239,6 +1240,10 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
       '/',
       '/index.html',
       '/404.html',
+      '/privacidade',
+      '/privacidade/',
+      '/termos',
+      '/termos/',
       '/portal',
       '/portal/',
       '/portal/index.html',
@@ -1273,14 +1278,16 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
         `Rota ${routePath} deve receber exatamente 1 cabeçalho Content-Security-Policy, mas recebeu ${evaluated.cspValues.length}`
       );
       const isPortalRoute = routePath === '/portal' || routePath.startsWith('/portal/');
+      const isComplianceRoute = /^\/(?:privacidade|termos)(?:\/index\.html|\/)?$/.test(routePath);
+      const expectedCsp = isComplianceRoute ? COMPLIANCE_CSP_HEADER : isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER;
       assert.equal(
         evaluated.cspValues[0],
-        isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER,
+        expectedCsp,
         `CSP incorreta na rota ${routePath}`
       );
       assert.equal(
         evaluated.headers.get('content-security-policy'),
-        isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER,
+        expectedCsp,
         `Headers.get('content-security-policy') na rota ${routePath} não deve concatenar políticas duplicadas`
       );
       assert.deepEqual(evaluated.multiHeaders['x-content-type-options'], ['nosniff']);

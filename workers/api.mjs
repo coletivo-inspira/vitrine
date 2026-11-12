@@ -53,6 +53,8 @@ export const PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
 export const PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
 export const STRICT_CSP_HEADER =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+export const COMPLIANCE_CSP_HEADER =
+  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 export const PORTAL_CSP_HEADER =
   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const PORTAL_STORAGE_CSP_HEADER =
@@ -2647,7 +2649,9 @@ const MARKETING_SUBPAGE_SLUGS = new Set([
   'como-funciona',
   'possibilidades',
   'planos',
-  'orcamento'
+  'orcamento',
+  'privacidade',
+  'termos'
 ]);
 
 const PORTAL_SHARED_ROOT_ASSETS = new Set([
@@ -3309,7 +3313,9 @@ export function createApiHandler(deps = {}) {
         }
         const headers = new Headers(assetRes.headers);
         const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
-        if (!headers.has('content-security-policy')) {
+        if (trimmedMarketingSlug === 'privacidade' || trimmedMarketingSlug === 'termos') {
+          headers.set('content-security-policy', COMPLIANCE_CSP_HEADER);
+        } else if (!headers.has('content-security-policy')) {
           headers.set(
             'content-security-policy',
             isPortalRoute ? PORTAL_CSP_HEADER : STRICT_CSP_HEADER

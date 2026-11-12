@@ -27,7 +27,9 @@ const RESERVED_PUBLIC_SLUGS = Object.freeze([
   'como-funciona',
   'possibilidades',
   'planos',
-  'orcamento'
+  'orcamento',
+  'privacidade',
+  'termos'
 ]);
 
 export function publicMenu(draft) {

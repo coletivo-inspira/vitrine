@@ -1,3 +1,4 @@
+import { COMPLIANCE_CSP_HEADER } from '../workers/api.mjs';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
@@ -19,6 +20,9 @@ const security = {
 const RESERVED_PATHS = new Set(['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout', 'vitrine']);
 
 function securityHeadersForPath(pathname) {
+  if (/^\/(?:privacidade|termos)(?:\/index\.html|\/)?$/.test(pathname)) {
+    return { ...security, 'Content-Security-Policy': COMPLIANCE_CSP_HEADER };
+  }
   const isPortal = pathname === '/portal' || pathname.startsWith('/portal/');
   return {
     ...security,

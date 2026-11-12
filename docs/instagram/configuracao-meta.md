@@ -67,6 +67,8 @@ Todas as URLs registradas no console Meta devem utilizar HTTPS estrito, apontand
 
 ## Bloqueios antes da liberação a clientes
 
+O pacote público inclui as páginas `/privacidade/` (com `#exclusao-dados`) e `/termos/`, conforme a [Spec 010](../../specs/010-ux-audit-meta-readiness/spec.md). Antes de publicar, confirme o texto institucional e o canal de privacidade, verifique se alguma vitrine publicada usa os endereços reservados e valide as URLs por HTTPS. Cadastre os callbacks no console somente depois de implementar e testar os endpoints correspondentes.
+
 1. **Bloqueios para o piloto fechado (Ganja)**:
    - Confirmação do tipo profissional da conta `@ganjastudio.br` (item 5).
    - Nomeação do responsável pelo app Meta (item 6), criação do app em *Development Mode* (item 8) e aceite do convite de *Instagram Tester* pela conta de teste e pela conta piloto (item 7).

@@ -277,4 +277,6 @@ async function loadPlatformCms() {
   }
 }
 
-void loadContent().catch(() => {}).then(loadPlatformCms);
+if (!document.body.hasAttribute('data-static-institutional-page')) {
+  void loadContent().catch(() => {}).then(loadPlatformCms);
+}

@@ -112,3 +112,18 @@
 @media(max-width:800px){
   .mila-cta-content{flex-direction:column;text-align:center;padding:32px 24px}
 }
+
+.institutional-copy {
+  max-inline-size: 70ch;
+  margin-inline: auto;
+}
+.institutional-copy h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1.1;
+}
+.institutional-copy section {
+  margin-block-start: 2rem;
+}
+.institutional-copy p {
+  margin-block-start: 0.75rem;
+}

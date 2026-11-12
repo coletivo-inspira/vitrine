@@ -14,7 +14,9 @@ export const RESERVED_SLUGS = Object.freeze([
   'como-funciona',
   'possibilidades',
   'planos',
-  'orcamento'
+  'orcamento',
+  'privacidade',
+  'termos'
 ]);
 
 export const DEFAULT_TEMPLATE = 'pizzeria-v1';
