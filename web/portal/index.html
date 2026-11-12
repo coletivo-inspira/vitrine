@@ -370,7 +370,7 @@
           <div class="section-header insights-header-flex">
             <div>
               <h1 class="display-title">Painel de Insights</h1>
-              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens e pedidos enviados ao WhatsApp, sem cookies nem coleta de dados pessoais.</p>
+              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens, curtidas e pedidos enviados ao WhatsApp, sem coleta de IP ou de dados pessoais.</p>
             </div>
             <div class="insights-toolbar" role="group" aria-label="Filtros de insights">
               <div class="form-group-inline">
@@ -479,6 +479,25 @@
               </p>
             </section>
           </div>
+
+          <section class="portal-card insights-ranking-card insights-likes-card" aria-labelledby="insights-likes-title">
+            <div class="insights-card-header">
+              <div>
+                <span class="card-eyebrow">Curtidas na Vitrine</span>
+                <h2 id="insights-likes-title">Itens mais curtidos</h2>
+              </div>
+              <div class="insights-likes-summary">
+                <span class="insights-metric-pill"><strong id="insights-likes-total">0</strong> no total</span>
+                <span class="insights-delta-pill"><strong id="insights-likes-period">0</strong> novas no período</span>
+              </div>
+            </div>
+            <div id="insights-likes-list" class="insights-ranking-list">
+              <!-- Populated via JS -->
+            </div>
+            <p class="insights-privacy-footnote">
+              Cada visitante curte um item uma única vez, lembrado por um cookie funcional e anônimo. Nenhum IP ou dado pessoal é armazenado.
+            </p>
+          </section>
         </section>
 
         <!-- Section 3: Perfil e Interesses -->

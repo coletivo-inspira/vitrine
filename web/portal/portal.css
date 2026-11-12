@@ -3455,6 +3455,33 @@ textarea {
   color: var(--orange);
 }
 
+.insights-likes-card {
+  margin-top: 24px;
+}
+
+.insights-likes-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.insights-likes-summary strong {
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .insights-likes-card .insights-rank-row {
+    flex-wrap: wrap;
+  }
+
+  .insights-likes-card .insights-rank-metrics {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 40px;
+  }
+}
+
 .insights-privacy-footnote {
   margin-top: auto;
   padding-top: 12px;

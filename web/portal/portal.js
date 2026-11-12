@@ -106,6 +106,9 @@ const insightsDayChartContainer = globalThis.document?.getElementById('insights-
 const insightsHourChartContainer = globalThis.document?.getElementById('insights-hour-chart-container');
 const insightsTopItemsList = globalThis.document?.getElementById('insights-top-items-list');
 const insightsTopCategoriesList = globalThis.document?.getElementById('insights-top-categories-list');
+const insightsLikesTotal = globalThis.document?.getElementById('insights-likes-total');
+const insightsLikesPeriod = globalThis.document?.getElementById('insights-likes-period');
+const insightsLikesList = globalThis.document?.getElementById('insights-likes-list');
 
 const googleLoginButton = globalThis.document?.getElementById('google-login-button');
 const localDemoButton = globalThis.document?.getElementById('local-demo-button');
@@ -1922,7 +1925,8 @@ export function getEmptyInsightsDataset() {
     byDay: [],
     byHour: [],
     topItems: [],
-    topCategories: []
+    topCategories: [],
+    likes: { total: 0, periodNew: 0, items: [] }
   };
 }
 
@@ -2394,6 +2398,79 @@ export function renderInsightsPanel(insights) {
       });
     }
   }
+
+  renderInsightsLikes(insights.likes);
+}
+
+function formatLikesCount(count) {
+  return count === 1 ? '1 curtida' : `${count} curtidas`;
+}
+
+function renderInsightsLikes(likes) {
+  const data = likes && typeof likes === 'object' ? likes : { total: 0, periodNew: 0, items: [] };
+  if (insightsLikesTotal) {
+    insightsLikesTotal.textContent = String(data.total ?? 0);
+  }
+  if (insightsLikesPeriod) {
+    insightsLikesPeriod.textContent = `+${data.periodNew ?? 0}`;
+  }
+  if (!insightsLikesList) return;
+
+  insightsLikesList.replaceChildren();
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent =
+      'Nenhuma curtida ainda. Quando visitantes tocarem no coração de um item da vitrine publicada, o ranking aparece aqui.';
+    insightsLikesList.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'insights-rank-row';
+
+    const main = document.createElement('div');
+    main.className = 'insights-rank-main';
+
+    const pos = document.createElement('span');
+    pos.className = 'insights-rank-pos';
+    pos.textContent = `${idx + 1}º`;
+
+    const info = document.createElement('div');
+    info.className = 'insights-rank-info';
+
+    const nameStrong = document.createElement('strong');
+    nameStrong.textContent = item.name || item.itemId;
+
+    const catSpan = document.createElement('span');
+    catSpan.textContent = item.categoryName || 'Vitrine';
+
+    info.appendChild(nameStrong);
+    info.appendChild(catSpan);
+    main.appendChild(pos);
+    main.appendChild(info);
+
+    const metrics = document.createElement('div');
+    metrics.className = 'insights-rank-metrics';
+
+    const likesPill = document.createElement('span');
+    likesPill.className = 'insights-metric-pill';
+    likesPill.textContent = formatLikesCount(item.likes ?? 0);
+    metrics.appendChild(likesPill);
+
+    if ((item.periodLikes ?? 0) > 0) {
+      const periodPill = document.createElement('span');
+      periodPill.className = 'insights-delta-pill';
+      periodPill.textContent = `+${item.periodLikes} no período`;
+      metrics.appendChild(periodPill);
+    }
+
+    row.appendChild(main);
+    row.appendChild(metrics);
+    insightsLikesList.appendChild(row);
+  });
 }
 
 

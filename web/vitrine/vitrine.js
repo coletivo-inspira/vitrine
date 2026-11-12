@@ -179,6 +179,120 @@ export function createStorefrontMetricsCollector({
   };
 }
 
+const LIKE_ERROR_MESSAGES = Object.freeze({
+  429: 'Muitas curtidas nesta vitrine agora. Tente de novo em alguns minutos.',
+  default: 'Não foi possível registrar sua curtida. Tente de novo.'
+});
+
+export function createStorefrontLikesClient({ slug, fetchImpl = globalThis.fetch } = {}) {
+  const counts = new Map();
+  const liked = new Set();
+  const pending = new Set();
+  const listeners = new Set();
+  let available = false;
+
+  function notify(itemId = null, message = '') {
+    for (const listener of listeners) {
+      try {
+        listener(itemId, message);
+      } catch {
+        // A failing listener must not block the others.
+      }
+    }
+  }
+
+  function apply(itemId, isLiked, count) {
+    if (isLiked) liked.add(itemId);
+    else liked.delete(itemId);
+    if (count > 0) counts.set(itemId, count);
+    else counts.delete(itemId);
+  }
+
+  async function load() {
+    if (!slug || typeof fetchImpl !== 'function') return false;
+    try {
+      const response = await fetchImpl(`/api/likes?slug=${encodeURIComponent(slug)}`, {
+        headers: { accept: 'application/json' },
+        credentials: 'same-origin'
+      });
+      if (!response || !response.ok) return false;
+      const body = await response.json();
+      counts.clear();
+      liked.clear();
+      const rawCounts = body?.counts && typeof body.counts === 'object' ? body.counts : {};
+      for (const [itemId, count] of Object.entries(rawCounts)) {
+        if (Number.isSafeInteger(count) && count > 0) counts.set(itemId, count);
+      }
+      for (const itemId of Array.isArray(body?.liked) ? body.liked : []) {
+        if (typeof itemId === 'string') liked.add(itemId);
+      }
+      available = true;
+      notify();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function getState(itemId) {
+    return {
+      available,
+      count: counts.get(itemId) ?? 0,
+      liked: liked.has(itemId),
+      pending: pending.has(itemId)
+    };
+  }
+
+  async function toggle(itemId) {
+    if (!available || typeof itemId !== 'string' || !itemId || pending.has(itemId)) {
+      return getState(itemId);
+    }
+    const wasLiked = liked.has(itemId);
+    const previousCount = counts.get(itemId) ?? 0;
+    const nextLiked = !wasLiked;
+    apply(itemId, nextLiked, Math.max(0, previousCount + (nextLiked ? 1 : -1)));
+    pending.add(itemId);
+    notify(itemId);
+
+    let message = '';
+    try {
+      const response = await fetchImpl('/api/likes', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ slug, itemId, liked: nextLiked })
+      });
+      if (response && response.ok) {
+        const body = await response.json();
+        const confirmedCount = Number.isSafeInteger(body?.count) ? body.count : counts.get(itemId) ?? 0;
+        apply(itemId, body?.liked === true, confirmedCount);
+      } else {
+        apply(itemId, wasLiked, previousCount);
+        message = LIKE_ERROR_MESSAGES[response?.status] ?? LIKE_ERROR_MESSAGES.default;
+      }
+    } catch {
+      apply(itemId, wasLiked, previousCount);
+      message = LIKE_ERROR_MESSAGES.default;
+    }
+    pending.delete(itemId);
+    notify(itemId, message);
+    return getState(itemId);
+  }
+
+  function subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
+
+  return {
+    load,
+    getState,
+    toggle,
+    subscribe,
+    isAvailable: () => available
+  };
+}
+
 export async function bootStorefront(deps = {}) {
   const doc = deps.document ?? globalThis.document;
   if (!doc) return null;
@@ -300,8 +414,10 @@ export async function bootStorefront(deps = {}) {
 
     if (!catalogContainer) return null;
 
+    const likesClient = createStorefrontLikesClient({ slug, fetchImpl });
     const renderer = new StorefrontRenderer(catalogContainer, menu, {
       isPublicPage: true,
+      likes: likesClient,
       targetWhatsapp: menu.whatsapp,
       onUpdate: (r) => {
         if (heroSec) {
@@ -311,6 +427,7 @@ export async function bootStorefront(deps = {}) {
     });
     renderer.metricsCollector = collector;
     renderer.render();
+    likesClient.load();
     return renderer;
   } catch {
     if (statusBanner) {

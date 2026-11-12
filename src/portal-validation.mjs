@@ -90,6 +90,9 @@ export const ALLOWED_INSIGHTS_PERIODS = Object.freeze(['7d', '30d', '90d']);
 export const MAX_EVENTS_BATCH_SIZE = 25;
 export const MAX_EVENTS_BATCH_BYTES = 16384;
 export const METRICS_RETENTION_MONTHS = 13;
+export const ITEM_LIKE_LIMITS = Object.freeze({ perItemPerHour: 30, perSitePerHour: 150 });
+export const MAX_LIKE_REQUEST_BYTES = 1024;
+export const MAX_RANKED_LIKED_ITEMS = 10;
 
 const BOT_USER_AGENT_PATTERN =
   /bot|crawler|spider|headless|slurp|facebookexternalhit|whatsapp|preview|curl|wget|python/i;
@@ -1745,6 +1748,40 @@ export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = n
   };
 }
 
+export function validateItemLikePayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'O corpo da curtida deve ser um objeto JSON válido.'
+    );
+  }
+  if (typeof payload.slug !== 'string') {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'Informe o identificador (slug) da vitrine publicada.'
+    );
+  }
+  const slug = validateSlug(payload.slug.trim().toLowerCase());
+
+  const itemId = typeof payload.itemId === 'string' ? payload.itemId.trim() : '';
+  if (!itemId || itemId.length > 64) {
+    throw new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Informe um item válido da vitrine.');
+  }
+  assertNoDangerousTextPayload(itemId, 422, 'INVALID_LIKE_ITEM');
+
+  if (typeof payload.liked !== 'boolean') {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'O campo liked deve ser verdadeiro (curtir) ou falso (remover curtida).'
+    );
+  }
+
+  return { slug, itemId, liked: payload.liked };
+}
+
 function addUtcDays(isoDateStr, deltaDays) {
   const [y, m, d] = isoDateStr.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
@@ -1818,10 +1855,72 @@ function buildCatalogLookup(catalogSource = {}) {
   return { itemMetaById, categoryNameById };
 }
 
+function insightsPeriodDays(validPeriod) {
+  return validPeriod === '90d' ? 90 : validPeriod === '30d' ? 30 : 7;
+}
+
+function toIsoDateOnly(referenceDate) {
+  return typeof referenceDate === 'string' && ISO_DATE_ONLY_PATTERN.test(referenceDate)
+    ? referenceDate
+    : (referenceDate instanceof Date ? referenceDate : new Date(referenceDate))
+        .toISOString()
+        .slice(0, 10);
+}
+
+export function resolveInsightsPeriodStart(period = '7d', referenceDate = new Date()) {
+  const validPeriod = validateInsightsPeriod(period);
+  return addUtcDays(toIsoDateOnly(referenceDate), -(insightsPeriodDays(validPeriod) - 1));
+}
+
+function summarizeItemLikes(likeRows, itemMetaById) {
+  const restrictToCatalog = itemMetaById.size > 0;
+  const byItem = new Map();
+  for (const row of Array.isArray(likeRows) ? likeRows : []) {
+    if (!row || typeof row !== 'object') continue;
+    const itemKey = String(row.item_key ?? row.itemKey ?? '').trim();
+    if (!itemKey || (restrictToCatalog && !itemMetaById.has(itemKey))) continue;
+    const likesVal = Math.max(0, Number(row.total_likes ?? row.totalLikes ?? 0) || 0);
+    const periodVal = Math.min(
+      likesVal,
+      Math.max(0, Number(row.period_likes ?? row.periodLikes ?? 0) || 0)
+    );
+    const existing = byItem.get(itemKey) ?? { likes: 0, periodLikes: 0 };
+    existing.likes += likesVal;
+    existing.periodLikes += periodVal;
+    byItem.set(itemKey, existing);
+  }
+
+  let total = 0;
+  let periodNew = 0;
+  const items = [];
+  for (const [itemKey, stat] of byItem.entries()) {
+    if (stat.likes <= 0) continue;
+    total += stat.likes;
+    periodNew += stat.periodLikes;
+    const meta = itemMetaById.get(itemKey);
+    items.push({
+      itemId: itemKey,
+      name: meta?.name ?? itemKey,
+      categoryName: meta?.categoryName ?? '',
+      likes: stat.likes,
+      periodLikes: stat.periodLikes
+    });
+  }
+
+  items.sort((a, b) => {
+    if (b.likes !== a.likes) return b.likes - a.likes;
+    if (b.periodLikes !== a.periodLikes) return b.periodLikes - a.periodLikes;
+    return a.name.localeCompare(b.name, 'pt-BR');
+  });
+
+  return { total, periodNew, items: items.slice(0, MAX_RANKED_LIKED_ITEMS) };
+}
+
 export function computeStorefrontInsights({
   siteId,
   period = '7d',
   rows = [],
+  likeRows = [],
   catalogSource = {},
   referenceDate = new Date()
 } = {}) {
@@ -2074,6 +2173,14 @@ export function computeStorefrontInsights({
     }
   }
 
+  const likes = summarizeItemLikes(likeRows, itemMetaById);
+  if (likes.items.length > 0) {
+    const favorite = likes.items[0];
+    highlights.push(
+      `${favorite.name} é o item mais curtido da vitrine, com ${favorite.likes} ${favorite.likes === 1 ? 'curtida' : 'curtidas'}.`
+    );
+  }
+
   if (highlights.length === 0) {
     highlights.push(
       'Ainda não há eventos registrados neste período. Divulgue o link da sua vitrine para acompanhar visitas e pedidos aqui.'
@@ -2095,6 +2202,7 @@ export function computeStorefrontInsights({
     },
     topItems,
     topCategories,
+    likes,
     byDay,
     byHour,
     highlights

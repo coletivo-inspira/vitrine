@@ -8,8 +8,10 @@ import {
   CATALOG_IMAGES_BUCKET,
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
+  ITEM_LIKE_LIMITS,
   MAX_DRAFT_BYTES,
   MAX_EVENTS_BATCH_BYTES,
+  MAX_LIKE_REQUEST_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
   assertNoDangerousTextPayload,
@@ -26,8 +28,10 @@ import {
   validateCatalogImagePath,
   validateCustomizationRequestInput,
   validateDraftContent,
+  resolveInsightsPeriodStart,
   validateEventsBatchPayload,
   validateInsightsPeriod,
+  validateItemLikePayload,
   validateProfileInput,
   validateRevision,
   validateSiteInput
@@ -49,6 +53,10 @@ const SESSION_COOKIE_NAME = '__Host-vitrine_session';
 const DEFAULT_SESSION_MAX_AGE_SECONDS = 3600;
 const MAX_SESSION_MAX_AGE_SECONDS = 86400;
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
+export const LIKE_VISITOR_COOKIE_NAME = 'vitrine_curtidas';
+const LIKE_VISITOR_COOKIE_MAX_AGE_SECONDS = 31536000;
+const LIKE_VISITOR_TOKEN_PATTERN = /^[a-f0-9]{32}$/;
+const LIKE_VISITOR_HASH_PATTERN = /^[a-f0-9]{64}$/;
 export const SUPABASE_PUBLIC_PROJECT_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 export const PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
 export const PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
@@ -787,6 +795,33 @@ export function extractSessionToken(request) {
   return null;
 }
 
+export function extractLikeVisitorToken(request) {
+  const cookieHeader = request.headers.get('cookie');
+  if (typeof cookieHeader !== 'string' || !cookieHeader.trim()) return null;
+  for (const part of cookieHeader.split(';')) {
+    const eqIdx = part.indexOf('=');
+    if (eqIdx === -1) continue;
+    if (part.slice(0, eqIdx).trim() !== LIKE_VISITOR_COOKIE_NAME) continue;
+    const value = part.slice(eqIdx + 1).trim().toLowerCase();
+    return LIKE_VISITOR_TOKEN_PATTERN.test(value) ? value : null;
+  }
+  return null;
+}
+
+function createLikeVisitorToken() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function buildLikeVisitorCookieHeader(token) {
+  return `${LIKE_VISITOR_COOKIE_NAME}=${token}; Path=/api/likes; Max-Age=${LIKE_VISITOR_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export async function hashLikeVisitorToken(token) {
+  return computeSha256Hex(`vitrine-curtidas:v1:${token}`);
+}
+
 function sanitizeVerifiedUserMetadata(rawMeta) {
   if (!rawMeta || typeof rawMeta !== 'object' || Array.isArray(rawMeta)) {
     return undefined;
@@ -970,6 +1005,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const publicationsBySlug = new Map();
   const publicationsByHash = new Map();
   const metricsDaily = new Map();
+  const itemLikes = new Map();
 
   if (initial.sites instanceof Map) {
     for (const [key, value] of initial.sites.entries()) {
@@ -1059,6 +1095,46 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     }
   }
 
+  if (Array.isArray(initial.itemLikes)) {
+    for (const row of initial.itemLikes) {
+      const siteId = row?.siteId ?? row?.site_id;
+      const itemKey = String(row?.itemKey ?? row?.item_key ?? '');
+      const visitorHash = String(row?.visitorHash ?? row?.visitor_hash ?? '');
+      if (siteId && itemKey && LIKE_VISITOR_HASH_PATTERN.test(visitorHash)) {
+        itemLikes.set(`${siteId}:${itemKey}:${visitorHash}`, {
+          site_id: siteId,
+          item_key: itemKey,
+          visitor_hash: visitorHash,
+          created_at: row.createdAt ?? row.created_at ?? new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  async function resolveLikeTarget(storeApi, slug) {
+    const pub =
+      (await storeApi.getPublicationBySlug(slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(slug));
+    if (!pub || !pub.menu) {
+      throw new PortalValidationError(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+    }
+    let siteId = pub.siteId ?? null;
+    if (!siteId) {
+      for (const site of sites.values()) {
+        if (site.slug === slug) {
+          siteId = site.id;
+          break;
+        }
+      }
+    }
+    const itemIds = new Set(
+      Array.isArray(pub.menu.items)
+        ? pub.menu.items.map((item) => (typeof item?.id === 'string' ? item.id.trim() : '')).filter(Boolean)
+        : []
+    );
+    return { siteId: siteId ?? `pub-${slug}`, itemIds };
+  }
+
   function getRoleForSite(site, userId) {
     if (!site || !userId) return null;
     const ownerId = site.ownerUserId ?? site.owner_user_id;
@@ -1091,6 +1167,89 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     publicationsBySlug,
     publicationsByHash,
     metricsDaily,
+    itemLikes,
+
+    async getItemLikes(slug, visitorHash = null) {
+      const { siteId, itemIds } = await resolveLikeTarget(this, slug);
+      const counts = {};
+      const liked = [];
+      for (const row of itemLikes.values()) {
+        if (row.site_id !== siteId || !itemIds.has(row.item_key)) continue;
+        counts[row.item_key] = (counts[row.item_key] ?? 0) + 1;
+        if (visitorHash && row.visitor_hash === visitorHash) {
+          liked.push(row.item_key);
+        }
+      }
+      liked.sort();
+      return { counts, liked };
+    },
+
+    async setItemLike(slug, itemId, visitorHash, liked, { now = new Date() } = {}) {
+      if (!LIKE_VISITOR_HASH_PATTERN.test(String(visitorHash ?? '')) || typeof liked !== 'boolean') {
+        throw new PortalValidationError(400, 'INVALID_LIKE_REQUEST', 'Curtida inválida.');
+      }
+      const { siteId, itemIds } = await resolveLikeTarget(this, slug);
+      if (!itemIds.has(itemId)) {
+        throw new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Item inexistente na vitrine publicada.');
+      }
+
+      const nowMs = (now instanceof Date ? now : new Date(now)).getTime();
+      const key = `${siteId}:${itemId}:${visitorHash}`;
+      if (liked && !itemLikes.has(key)) {
+        const windowStartMs = nowMs - 3600 * 1000;
+        let siteRecent = 0;
+        let itemRecent = 0;
+        for (const row of itemLikes.values()) {
+          if (row.site_id !== siteId || Date.parse(row.created_at) <= windowStartMs) continue;
+          siteRecent += 1;
+          if (row.item_key === itemId) itemRecent += 1;
+        }
+        if (
+          itemRecent >= ITEM_LIKE_LIMITS.perItemPerHour ||
+          siteRecent >= ITEM_LIKE_LIMITS.perSitePerHour
+        ) {
+          throw new PortalValidationError(
+            429,
+            'LIKE_RATE_LIMITED',
+            'Muitas curtidas nesta vitrine agora. Tente novamente em alguns minutos.'
+          );
+        }
+        itemLikes.set(key, {
+          site_id: siteId,
+          item_key: itemId,
+          visitor_hash: visitorHash,
+          created_at: new Date(nowMs).toISOString()
+        });
+      } else if (!liked) {
+        itemLikes.delete(key);
+      }
+
+      let count = 0;
+      for (const row of itemLikes.values()) {
+        if (row.site_id === siteId && row.item_key === itemId) count += 1;
+      }
+      return { itemId, liked, count };
+    },
+
+    async getSiteItemLikeStats(siteId, userId, sinceIso) {
+      if (!getRoleForSite(sites.get(siteId), userId)) {
+        return [];
+      }
+      const sinceMs = Date.parse(sinceIso);
+      const byItem = new Map();
+      for (const row of itemLikes.values()) {
+        if (row.site_id !== siteId) continue;
+        const stat = byItem.get(row.item_key) ?? {
+          item_key: row.item_key,
+          total_likes: 0,
+          period_likes: 0
+        };
+        stat.total_likes += 1;
+        if (Date.parse(row.created_at) >= sinceMs) stat.period_likes += 1;
+        byItem.set(row.item_key, stat);
+      }
+      return [...byItem.values()];
+    },
 
     addMembership(siteId, userId, role = 'collaborator') {
       const exists = memberships.some(m => m.siteId === siteId && m.userId === userId);
@@ -1471,11 +1630,17 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         (await sharedPublicPublications.getPublicationBySlug(site.slug));
       const draft = drafts.get(siteId);
       const catalogSource = pub?.menu ?? draft?.content ?? {};
+      const likeRows = await this.getSiteItemLikeStats(
+        siteId,
+        userId,
+        `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`
+      );
 
       return computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
+        likeRows,
         catalogSource,
         referenceDate
       });
@@ -1587,6 +1752,38 @@ function createUpstreamStoreError(operation, errInfo) {
   const err = new Error(`Supabase ${operation} error: ${errInfo.status}`);
   err.upstream = errInfo;
   return err;
+}
+
+function likesUnavailableError() {
+  return new PortalValidationError(
+    503,
+    'LIKES_UNAVAILABLE',
+    'As curtidas estão indisponíveis no momento.'
+  );
+}
+
+async function mapItemLikeRpcError(operation, response) {
+  const errInfo = await readUpstreamErrorDetails(response);
+  const code = errInfo.code ?? '';
+  const message = errInfo.message ?? '';
+  if (code === 'P0002' || message.includes('PUBLICATION_NOT_FOUND')) {
+    return new PortalValidationError(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+  }
+  if (code === '23514' || message.includes('INVALID_LIKE_ITEM')) {
+    return new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Item inexistente na vitrine publicada.');
+  }
+  if (code === '22023' || message.includes('INVALID_LIKE_REQUEST')) {
+    return new PortalValidationError(400, 'INVALID_LIKE_REQUEST', 'Curtida inválida.');
+  }
+  if (errInfo.status === 429 || code === 'PT429' || message.includes('LIKE_RATE_LIMITED')) {
+    return new PortalValidationError(
+      429,
+      'LIKE_RATE_LIMITED',
+      'Muitas curtidas nesta vitrine agora. Tente novamente em alguns minutos.'
+    );
+  }
+  logUpstreamError(operation, errInfo);
+  return likesUnavailableError();
 }
 
 export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: customFetch } = {}) {
@@ -2601,6 +2798,82 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return sharedPublicPublications.recordSiteMetricBatch(slug, events, { now });
     },
 
+    async getItemLikes(slug, visitorHash = null) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.getItemLikes(slug, visitorHash);
+      }
+      let res;
+      try {
+        res = await fetchImpl(`${baseUrl}/rest/v1/rpc/get_item_likes`, {
+          method: 'POST',
+          headers: anonHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({ target_slug: slug, visitor_key: visitorHash })
+        });
+      } catch {
+        throw likesUnavailableError();
+      }
+      if (!res || !res.ok) {
+        throw await mapItemLikeRpcError('get_item_likes', res);
+      }
+      const body = await res.json().catch(() => null);
+      return {
+        counts: body?.counts && typeof body.counts === 'object' && !Array.isArray(body.counts) ? body.counts : {},
+        liked: Array.isArray(body?.liked) ? body.liked.filter((id) => typeof id === 'string') : []
+      };
+    },
+
+    async setItemLike(slug, itemId, visitorHash, liked, { now = new Date() } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.setItemLike(slug, itemId, visitorHash, liked, { now });
+      }
+      let res;
+      try {
+        res = await fetchImpl(`${baseUrl}/rest/v1/rpc/set_item_like`, {
+          method: 'POST',
+          headers: anonHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({
+            target_slug: slug,
+            target_item: itemId,
+            visitor_key: visitorHash,
+            liked
+          })
+        });
+      } catch {
+        throw likesUnavailableError();
+      }
+      if (!res || !res.ok) {
+        throw await mapItemLikeRpcError('set_item_like', res);
+      }
+      const body = await res.json().catch(() => null);
+      const count = Number(body?.count);
+      return {
+        itemId,
+        liked: typeof body?.liked === 'boolean' ? body.liked : liked,
+        count: Number.isSafeInteger(count) && count >= 0 ? count : 0
+      };
+    },
+
+    async getSiteItemLikeStats(siteId, _userId, sinceIso, { token } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return [];
+      }
+      try {
+        const res = await fetchImpl(`${baseUrl}/rest/v1/rpc/site_item_like_stats`, {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ target_site_id: siteId, since: sinceIso })
+        });
+        if (res && res.ok) {
+          const rows = await res.json();
+          return Array.isArray(rows) ? rows : [];
+        }
+        logUpstreamError('site_item_like_stats', await readUpstreamErrorDetails(res));
+      } catch {
+        // Insights continue without likes when the stats RPC is unavailable.
+      }
+      return [];
+    },
+
     async getSiteInsights(
       siteId,
       userId,
@@ -2644,11 +2917,18 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       const pub = await this.getPublicationBySlug(site.slug);
       const draft = !pub ? await this.getDraft(siteId, userId, { token }) : null;
       const catalogSource = pub?.menu ?? draft?.content ?? {};
+      const likeRows = await this.getSiteItemLikeStats(
+        siteId,
+        userId,
+        `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`,
+        { token }
+      );
 
       return computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
+        likeRows,
         catalogSource,
         referenceDate
       });
@@ -3155,7 +3435,8 @@ export function createApiHandler(deps = {}) {
 
     if (url.hostname === SANDBOX_HOST) return handleSandboxPage(request, url, store);
 
-    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname)) {
+    const isItemLikesRoute = pathname === '/api/likes' || pathname === '/api/likes/';
+    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname) && !isItemLikesRoute) {
       try {
         return await handleCustomHostname(request, url, store, assetsFetcher, _ctx);
       } catch {
@@ -3763,6 +4044,74 @@ export function createApiHandler(deps = {}) {
           405,
           'METHOD_NOT_ALLOWED',
           'Método não permitido para /api/customization-requests.'
+        );
+      }
+
+      if (pathname === '/api/likes' || pathname === '/api/likes/') {
+        if (method === 'GET') {
+          const slug = (url.searchParams.get('slug') ?? '').trim().toLowerCase();
+          if (!isValidSlug(slug)) {
+            return errorResponse(400, 'INVALID_SLUG', 'Identificador (slug) da vitrine inválido.');
+          }
+          const token = extractLikeVisitorToken(request);
+          const visitorHash = token ? await hashLikeVisitorToken(token) : null;
+          const { counts, liked } = await store.getItemLikes(slug, visitorHash);
+          return jsonResponse(200, { slug, counts, liked }, { 'cache-control': 'private, no-store' });
+        }
+
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/likes.');
+        }
+
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true,
+          requireJson: true
+        });
+        if (guardError) return guardError;
+
+        if (isBotUserAgent(request.headers.get('user-agent') || '')) {
+          return errorResponse(403, 'LIKE_NOT_ALLOWED', 'Curtidas automáticas não são aceitas.');
+        }
+
+        const declaredLength = Number(request.headers.get('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_LIKE_REQUEST_BYTES) {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'A curtida excede o limite de 1 KiB.');
+        }
+        let rawText = '';
+        try {
+          rawText = await request.text();
+        } catch {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'Não foi possível ler a curtida.');
+        }
+        if (!rawText.trim() || utf8Encoder.encode(rawText).byteLength > MAX_LIKE_REQUEST_BYTES) {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'Curtida vazia ou acima do limite de 1 KiB.');
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'O corpo da requisição não contém JSON válido.');
+        }
+        const { slug, itemId, liked } = validateItemLikePayload(parsed);
+
+        const nowSeconds =
+          typeof deps?.nowSeconds === 'function' ? deps.nowSeconds() : deps?.nowSeconds;
+        const effectiveNow =
+          typeof nowSeconds === 'number' && Number.isFinite(nowSeconds)
+            ? new Date(nowSeconds * 1000)
+            : new Date();
+
+        const existingToken = extractLikeVisitorToken(request);
+        const token = existingToken ?? createLikeVisitorToken();
+        const visitorHash = await hashLikeVisitorToken(token);
+        const result = await store.setItemLike(slug, itemId, visitorHash, liked, {
+          now: effectiveNow,
+          env
+        });
+        return jsonResponse(
+          200,
+          { itemId: result.itemId, liked: result.liked, count: result.count },
+          !existingToken && liked ? { 'set-cookie': buildLikeVisitorCookieHeader(token) } : {}
         );
       }
 

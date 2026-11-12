@@ -507,6 +507,83 @@ html[data-theme="dark"] .brand .brand-logo-dark {
   gap: 8px;
 }
 
+.sf-item-title-row .menu-item-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sf-like-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sf-like-button:hover {
+  border-color: var(--primary);
+  color: var(--ink);
+}
+
+.sf-like-button[aria-busy="true"] {
+  cursor: progress;
+}
+
+.sf-like-icon {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.sf-like-count:empty {
+  display: none;
+}
+
+.sf-like-button.is-liked {
+  border-color: var(--primary);
+  background: var(--apricot);
+  color: var(--ink);
+}
+
+.sf-like-button.is-liked .sf-like-icon {
+  fill: var(--primary);
+  stroke: var(--primary);
+}
+
+.sf-like-button.is-popping .sf-like-icon {
+  animation: sf-like-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sf-like-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-like-button,
+  .sf-like-button.is-popping .sf-like-icon {
+    transition: none;
+    animation: none;
+  }
+}
+
 .sf-hidden-badge,
 .sf-meta-pill,
 .sf-quote-tag {

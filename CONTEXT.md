@@ -57,4 +57,6 @@ _Evitar_: negócio para designar o modelo.
 
 **Sandbox de extensão**: Contêiner isolado em origem opaca (`<iframe sandbox="allow-scripts">` sem `allow-same-origin`) onde componentes personalizados em HTML/CSS/JS ou de repositórios externos executam sem acesso a cookies ou dados de outros clientes.
 
+**Curtida**: Marcação anônima de um visitante em um item da vitrine publicada, contada no servidor uma vez por visitante e item; o visitante é lembrado só por um cookie funcional, sem login, IP ou dados pessoais.
+
 **Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.
