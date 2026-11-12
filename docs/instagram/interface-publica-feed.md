@@ -92,7 +92,7 @@ A resposta JSON pública contém exclusivamente dados aprovados para exibição 
 
 - **Identidade pública do perfil (`profile`)**:
   - `username` (string obrigatória): identificador público da conta profissional no Instagram.
-  - `displayName` (string opcional): nome público de exibição do perfil, quando disponível na sincronização (**a confirmar** conforme campos retornados pela permissão `instagram_business_basic` em #48/#50).
+  - `displayName` (string opcional): nome público de exibição do perfil, quando disponível na sincronização (**a confirmar** conforme campos retornados pela permissão `instagram_basic`, decidida em #48, na sincronização de #50).
   - `profileUrl` (string HTTPS obrigatória): endereço canônico do perfil no Instagram.
   - `avatarUrl` (string HTTPS opcional): URL da foto de perfil, validada como HTTPS pública segura.
 - **Mídia (`items[]`)**:
@@ -284,7 +284,7 @@ Quando a especificação for implementada via Spec Kit, a suíte automatizada (`
 
 | Tema | Documento / Issue | Status |
 | --- | --- | --- |
-| Permissões exatas do app Meta (`instagram_business_basic`) e campos públicos do perfil disponíveis | `docs/instagram/configuracao-meta.md` ([vitrine #48](https://github.com/coletivo-inspira/vitrine/issues/48)) | A confirmar |
+| Permissões exatas do app Meta (`instagram_basic`, login unificado) e campos públicos do perfil disponíveis | [`configuracao-meta.md`](configuracao-meta.md) ([vitrine #48](https://github.com/coletivo-inspira/vitrine/issues/48)) | Permissão decidida; campos a confirmar no primeiro teste |
 | Fluxo de conexão OAuth por vitrine, revogação e limpeza dos dados na desconexão | `docs/instagram/conectar-por-vitrine.md` ([vitrine #49](https://github.com/coletivo-inspira/vitrine/issues/49)) | A confirmar |
 | Frequência do Cron Trigger no Workers Free, tabelas de persistência, renovação de URLs da Meta e política de retenção | `docs/instagram/sincronizacao.md` ([vitrine #50](https://github.com/coletivo-inspira/vitrine/issues/50)) | A confirmar |
 | Evolução futura para mensagens no Instagram (fora do escopo do feed) | `docs/instagram/mensagens-futuro.md` ([vitrine #52](https://github.com/coletivo-inspira/vitrine/issues/52)) | A confirmar |
