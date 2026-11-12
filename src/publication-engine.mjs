@@ -12,6 +12,8 @@ import {
   PortalValidationError,
   isItemActive,
   migrateLegacyDraftContent,
+  projectPublicLocality,
+  slugifyCity,
   toPublicMenuDraft,
   validateComponentsConfig,
   validateDraftContent,
@@ -60,8 +62,10 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'messages',
   'items',
   'categories',
-  'structure'
+  'structure',
+  'locality'
 ]);
+const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
 const ALLOWED_ITEM_KEYS = new Set([
   'id',
@@ -212,6 +216,19 @@ export function assertNoPrivateLeakage(menuArtifact) {
     const projected = projectShowcaseManifest({ themeOverrides: theme, navigationMenus: navigation, pages });
     if (JSON.stringify(projected) !== JSON.stringify(menuArtifact.structure)) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'A estrutura pública contém campos não permitidos.');
+    }
+  }
+
+  if (menuArtifact.locality !== undefined) {
+    const locality = menuArtifact.locality;
+    if (
+      !locality ||
+      typeof locality !== 'object' ||
+      Array.isArray(locality) ||
+      Object.keys(locality).some((key) => !ALLOWED_LOCALITY_KEYS.has(key)) ||
+      locality.citySlug !== slugifyCity(locality.city, locality.uf)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco locality inválido.');
     }
   }
 
@@ -607,6 +624,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     baseMenu.name,
     baseMenu.template
   );
+  const locality = projectPublicLocality(migrated.locality);
 
   const menu = {
     schemaVersion: baseMenu.schemaVersion,
@@ -623,7 +641,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     messages: sanitizedMessages,
     items: projectedItems,
     categories: projectedCategories,
-    ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {})
+    ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
+    ...(locality ? { locality } : {})
   };
 
   for (const item of menu.items) {
@@ -847,6 +866,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const hero = home?.sections.find(section => section.moduleCode === 'hero')?.config;
   const topNav = renderNavigation(structure?.navigation.header, 'Navegação da vitrine');
   const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
+  const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
+    ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
+    : '';
   const modularHtml = structure
     ? renderPublicSections(structure.pages, menu, catalog)
     : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) +
@@ -950,6 +972,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <footer class="storefront-footer">
     <div class="wrap storefront-footer-inner">
       ${footerNav}
+      ${cityLink}
       <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
         <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
         <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">

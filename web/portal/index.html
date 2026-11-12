@@ -1093,6 +1093,54 @@
                     </label>
                     <span id="editor-mila-relay-help" class="form-help" aria-live="polite">Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.</span>
                   </div>
+                  <fieldset class="form-group locality-fieldset" id="editor-locality-group">
+                    <legend class="locality-legend">Página por cidade</legend>
+                    <span class="form-help">Seus itens de lance, doação e troca podem aparecer na página pública da sua cidade, junto com outras vitrines. Lá aparecem só o nome da vitrine, a cidade e os dados públicos dos itens; nada de nome, telefone ou endereço.</span>
+                    <label class="checkbox-label-styled locality-optin">
+                      <input type="checkbox" id="editor-locality-listed"> Mostrar meus itens de lance, doação e troca na página da cidade
+                    </label>
+                    <div class="locality-fields-row">
+                      <div class="locality-field locality-field-city">
+                        <label for="editor-locality-city">Cidade</label>
+                        <input type="text" id="editor-locality-city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Porto Alegre" class="item-input input-styled-height">
+                      </div>
+                      <div class="locality-field locality-field-uf">
+                        <label for="editor-locality-uf">Estado</label>
+                        <select id="editor-locality-uf" class="select-styled input-styled-height">
+                          <option value="">UF</option>
+                          <option value="AC">AC</option>
+                          <option value="AL">AL</option>
+                          <option value="AP">AP</option>
+                          <option value="AM">AM</option>
+                          <option value="BA">BA</option>
+                          <option value="CE">CE</option>
+                          <option value="DF">DF</option>
+                          <option value="ES">ES</option>
+                          <option value="GO">GO</option>
+                          <option value="MA">MA</option>
+                          <option value="MT">MT</option>
+                          <option value="MS">MS</option>
+                          <option value="MG">MG</option>
+                          <option value="PA">PA</option>
+                          <option value="PB">PB</option>
+                          <option value="PR">PR</option>
+                          <option value="PE">PE</option>
+                          <option value="PI">PI</option>
+                          <option value="RJ">RJ</option>
+                          <option value="RN">RN</option>
+                          <option value="RS">RS</option>
+                          <option value="RO">RO</option>
+                          <option value="RR">RR</option>
+                          <option value="SC">SC</option>
+                          <option value="SP">SP</option>
+                          <option value="SE">SE</option>
+                          <option value="TO">TO</option>
+                        </select>
+                      </div>
+                    </div>
+                    <span id="editor-locality-error" class="form-error-msg" role="alert" hidden>Informe a cidade e o estado para aparecer na página da cidade.</span>
+                    <span class="form-help">Vale a partir da próxima publicação. <a id="editor-locality-link" class="text-link" href="/por-cidade" target="_blank" rel="noopener noreferrer">Ver página por cidade</a></span>
+                  </fieldset>
 
                   <div class="form-group">
                     <span class="label-spaced">Componentes Visíveis do Item</span>

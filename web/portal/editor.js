@@ -88,6 +88,12 @@ const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp
 const editorMilaRelay = globalThis.document?.getElementById('editor-mila-relay');
 const editorMilaRelayHelp = globalThis.document?.getElementById('editor-mila-relay-help');
 const editorCatalogType = globalThis.document?.getElementById('editor-catalog-type');
+const editorLocalityListed = globalThis.document?.getElementById('editor-locality-listed');
+const editorLocalityCity = globalThis.document?.getElementById('editor-locality-city');
+const editorLocalityUf = globalThis.document?.getElementById('editor-locality-uf');
+const editorLocalityError = globalThis.document?.getElementById('editor-locality-error');
+const editorLocalityLink = globalThis.document?.getElementById('editor-locality-link');
+const LOCALITY_CITY_PATTERN = /^[\p{L}][\p{L}\s.'’-]{0,58}[\p{L}.]$/u;
 const addCategoryButton = globalThis.document?.getElementById('add-category-button');
 const categoriesContainer = globalThis.document?.getElementById('categories-container');
 const liveStorefrontPreview = globalThis.document?.getElementById('live-storefront-preview');
@@ -674,6 +680,17 @@ function setupEditorEvents() {
     updateDraftAndPreview();
   });
 
+  [editorLocalityListed, editorLocalityUf].forEach((control) => {
+    control?.addEventListener('change', () => {
+      syncLocalityFromUI();
+      updateDraftAndPreview();
+    });
+  });
+  editorLocalityCity?.addEventListener('input', () => {
+    syncLocalityFromUI();
+    updateDraftAndPreview();
+  });
+
   attachWhatsappMask(editorWhatsapp, (rawPhone) => {
     if (!currentDraft) return;
     currentDraft.content.whatsapp = rawPhone;
@@ -1068,6 +1085,11 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (editorCatalogType) {
     editorCatalogType.value = currentDraft.content.catalogType || 'products';
   }
+  const locality = currentDraft.content.locality || {};
+  if (editorLocalityListed) editorLocalityListed.checked = locality.listed === true;
+  if (editorLocalityCity) editorLocalityCity.value = locality.city || '';
+  if (editorLocalityUf) editorLocalityUf.value = locality.uf || '';
+  renderLocalityState();
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;
@@ -1123,6 +1145,51 @@ function syncCatalogTypeDefaults() {
   if (!currentDraft) return;
   applyCatalogTypeSwitch(currentDraft.content, currentDraft.content.catalogType);
   initializeEditorWorkspace();
+}
+
+function slugifyLocality(city, uf) {
+  const base = city
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base && uf ? `${base}-${uf.toLowerCase()}` : '';
+}
+
+function readLocalityFromUI() {
+  const city = (editorLocalityCity?.value || '').trim().replace(/\s+/g, ' ');
+  const uf = editorLocalityUf?.value || '';
+  const cityValid = !city || LOCALITY_CITY_PATTERN.test(city);
+  const wantsListing = Boolean(editorLocalityListed?.checked);
+  return { city, uf, cityValid, wantsListing, complete: Boolean(city && uf && cityValid) };
+}
+
+function renderLocalityState() {
+  const state = readLocalityFromUI();
+  if (editorLocalityError) {
+    editorLocalityError.hidden = state.cityValid && (!state.wantsListing || state.complete);
+    editorLocalityError.textContent = state.cityValid
+      ? 'Informe a cidade e o estado para aparecer na página da cidade.'
+      : 'Use só letras no nome da cidade (2 a 60 caracteres).';
+  }
+  if (editorLocalityLink) {
+    const slug = state.complete ? slugifyLocality(state.city, state.uf) : '';
+    editorLocalityLink.href = slug ? `/por-cidade/${slug}` : '/por-cidade';
+    editorLocalityLink.textContent = slug ? `Ver página de ${state.city} – ${state.uf}` : 'Ver página por cidade';
+  }
+  return state;
+}
+
+// Incomplete or invalid input stays local (listed=false) so autosave never sends a draft the API rejects.
+function syncLocalityFromUI() {
+  if (!currentDraft) return;
+  const state = renderLocalityState();
+  currentDraft.content.locality = {
+    listed: state.wantsListing && state.complete,
+    city: state.cityValid ? state.city : '',
+    uf: state.uf
+  };
 }
 
 function syncComponentsFromUI() {
