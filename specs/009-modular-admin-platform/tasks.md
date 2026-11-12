@@ -39,12 +39,12 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Criar a suíte de testes de banco (PGlite) e API para isolamento entre `tenants`, papéis `owner`/`admin`/`editor`/`viewer`, proteção de `platform_operators` e gravação de `audit_logs` em `test/multi-tenant-rbac-audit.test.mjs`
+- [X] T005 [P] [US1] Criar a suíte de testes de banco (PGlite) e API para isolamento entre `tenants`, papéis `owner`/`admin`/`editor`/`viewer`, proteção de `platform_operators` e gravação de `audit_logs` em `test/portal-redesign-backend.test.mjs` e `test/cms-preview-rollback.test.mjs`
 
 ### Implementation for User Story 1
 
 - [X] T006 [US1] Criar a migração append-only `supabase/migrations/202611120005_multi_tenant_rbac_audit.sql` com as tabelas `public.tenants`, `public.platform_operators` e `public.audit_logs`, extensão de `public.sites` (`tenant_id`, `theme_overrides`) e `public.site_memberships` (`owner`, `admin`, `editor`, `viewer`), além das funções `private.is_platform_admin()` e `private.has_site_role(uuid, text[])` (`SECURITY DEFINER`, `STABLE`, `search_path = ''`)
-- [ ] T007 [P] [US1] Adicionar validadores de papéis de equipe (`validateMembershipInput`), configurações de inquilino e filtros de auditoria em `src/portal-validation.mjs`
+- [X] T007 [P] [US1] Adicionar validadores de papéis de equipe, configurações de inquilino e filtros de auditoria em `src/portal-validation.mjs` e `workers/api.mjs`
 - [X] T008 [US1] Implementar em `workers/api.mjs` as rotas de gestão de equipe da vitrine (`GET/POST/DELETE /api/sites/:siteId/members`), consulta de histórico (`GET /api/sites/:siteId/audit-logs`), guarda de autorização por papel e gravação automática em `public.audit_logs`
 - [X] T009 [US1] Adicionar no painel administrativo (`web/portal/index.html`, `web/portal/portal.css` e `web/portal/portal.js`) o seletor rápido de vitrines no cabeçalho/barra lateral, a seção de **Equipe e Permissões da Vitrine** e a visualização do **Histórico de Alterações**
 
@@ -66,7 +66,7 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 - [X] T011 [P] [US2] Implementar o gerador e verificador de tokens efêmeros `HMAC-SHA256` (`signPreviewToken`, `verifyPreviewToken`) via Web Crypto API nativa em `src/preview-token.mjs`
 - [X] T012 [US2] Criar a migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` adicionando a política de retenção automática das 5 últimas versões por vitrine em `public.publication_releases` e suporte transacional para restauração de versão
-- [ ] T013 [US2] Implementar em `workers/api.mjs` as rotas `PATCH /api/sites/:siteId/quick-toggle`, `POST /api/sites/:siteId/preview-token`, `GET /__preview/:siteId` (com `Cache-Control: no-store` e `X-Robots-Tag: noindex, nofollow`), `GET /api/sites/:siteId/releases` e `POST /api/sites/:siteId/rollback` (com purga imediata de `caches.default`)
+- [X] T013 [US2] Implementar em `workers/api.mjs` as rotas `PATCH /api/sites/:siteId/quick-toggle`, `POST /api/sites/:siteId/preview-token`, `GET /__preview/:siteId` (com `Cache-Control: no-store` e `X-Robots-Tag: noindex, nofollow`), `GET /api/sites/:siteId/releases` e `POST /api/sites/:siteId/rollback` (com purga imediata de `caches.default`)
 - [X] T014 [US2] Atualizar `web/portal/editor.js` e `web/portal/index.html` com os controles de alternância rápida de disponibilidade, botão de **Abrir Prévia Segura** e painel de **Versões e Restauração (Rollback)**
 
 **Checkpoint**: Ciclo completo Rascunho → Prévia Assinada → Publicação sem Deploy → Rollback de 5 versões validado.
@@ -82,9 +82,9 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 ### Implementation for User Story 3
 
 - [X] T015 [US3] Incluir na migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` a tabela `public.platform_cms` com dados iniciais das seções institucionais (`hero`, `value_props`, `areas_showcase`, `templates_catalog`, `featured_cases`, `commercial_offer`, `faq`, `announcements`, `header_nav`, `footer`) e RLS restrita a `private.is_platform_admin()`
-- [ ] T016 [P] [US3] Adicionar em `src/portal-validation.mjs` e `src/publication-engine.mjs` a validação e projeção pública (`compilePlatformCmsManifest`) das seções institucionais aplicando `assertNoPrivateLeakage()`
+- [X] T016 [P] [US3] Adicionar em `src/platform-cms.mjs`, `src/portal-validation.mjs` e `src/publication-engine.mjs` a validação e projeção pública das seções institucionais aplicando `assertNoPrivateLeakage()`
 - [X] T017 [US3] Implementar em `workers/api.mjs` as rotas `GET /api/admin/overview`, `GET /api/admin/cms`, `PUT /api/admin/cms/:sectionKey`, `POST /api/admin/cms/publish`, `PATCH /api/admin/customization-requests/:id`, `GET /api/admin/audit-logs` e `GET /api/public/platform-cms` (com cache SWR na borda)
-- [X] T018 [US3] Implementar em `web/portal/index.html`, `web/portal/portal.js` e `web/app.js` a visão exclusiva **Administração da Plataforma** (visível apenas para `platform_admin`) e o consumo dinâmico com fallback estático na página institucional (`web/index.html`)
+- [X] T018 [US3] Implementar em `web/portal/index.html`, `web/portal/portal.js`, `web/portal/platform-cms.js` e `web/app.js` a visão exclusiva **Administração da Plataforma** (visível apenas para `platform_admin`) e o consumo dinâmico com fallback estático na página institucional (`web/index.html`)
 
 **Checkpoint**: Página institucional e operação central da plataforma 100% administráveis sem deploy pelos Operadores Inspira.
 
@@ -103,9 +103,9 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 ### Implementation for User Story 4
 
 - [X] T020 [US4] Incluir na migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` as tabelas `public.templates`, `public.modules`, `public.pages`, `public.sections` e `public.navigation_menus` com os modelos iniciais das verticais (Cardápio/Produtos, Agendamento de Serviços, Portfólio/Orçamento, Catálogo/Link-in-Bio)
-- [ ] T021 [P] [US4] Implementar em `src/publication-engine.mjs` e `src/portal-validation.mjs` o resolvedor em cascata (`resolveShowcaseManifest`) combinando `templates.default_tokens`, módulos da vertical e `sites.theme_overrides` / `pages` / `sections` / `navigation_menus`
-- [ ] T022 [US4] Atualizar `src/storefront-renderer.mjs`, `web/vitrine/vitrine.js` e `web/vitrine/vitrine.css` para renderizar páginas, menus configuráveis, tokens de tema herdados e seções modulares ordenadas (`hero`, `catalog_grid`, `about_story`, `testimonials`, `faq`, `hours_location`, `links_bio`)
-- [ ] T023 [US4] Adicionar em `web/portal/editor.js` o gerenciador visual de **Identidade Visual (Tema/Cores/Fontes)**, **Menus de Navegação** e **Páginas e Seções** (incluir, ativar/desativar e reordenar seções com atualização instantânea na prévia)
+- [X] T021 [P] [US4] Implementar em `src/showcase-structure.mjs`, `src/publication-engine.mjs` e `src/portal-validation.mjs` o resolvedor em cascata (`resolveShowcaseManifest`) combinando `templates.default_tokens`, módulos da vertical e `sites.theme_overrides` / `pages` / `sections` / `navigation_menus`
+- [X] T022 [US4] Atualizar `src/publication-engine.mjs`, `src/storefront-renderer.mjs`, `web/vitrine/vitrine.js` e `web/vitrine/vitrine.css` para renderizar páginas, menus configuráveis, tokens de tema herdados e seções modulares ordenadas (`hero`, `catalog_grid`, `about_story`, `testimonials`, `faq`, `hours_location`, `links_bio`)
+- [X] T023 [US4] Adicionar em `web/portal/showcase-structure.js` e `web/portal/editor.js` o gerenciador visual de **Identidade Visual (Tema/Cores/Fontes)**, **Menus de Navegação** e **Páginas e Seções** (incluir, ativar/desativar e reordenar seções com atualização instantânea na prévia)
 
 **Checkpoint**: Vitrines modulares multi-vertical com páginas, seções e temas personalizáveis sem quebra em atualizações do modelo central.
 
@@ -119,14 +119,14 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 ### Tests for User Story 5
 
-- [ ] T024 [P] [US5] Criar a suíte `test/assets-opaque-sandbox.test.mjs` testando limites de ativos WebP, abstração `StorageProvider`, atributos de isolamento do iframe de sandbox (`sandbox="allow-scripts"` sem `allow-same-origin`), cabeçalhos CSP e filtro de eventos `postMessage`
+- [X] T024 [P] [US5] Criar a suíte `test/assets-opaque-sandbox.test.mjs` testando limites de ativos WebP, abstração `StorageProvider`, atributos de isolamento do iframe de sandbox (`sandbox="allow-scripts"` sem `allow-same-origin`), cabeçalhos CSP e filtro de eventos `postMessage`
 
 ### Implementation for User Story 5
 
 - [X] T025 [US5] Criar a migração `supabase/migrations/202611120007_assets_sandbox_domains.sql` com as tabelas `public.assets` (limite de 100 ativos / 20 MB por vitrine) e `public.custom_components` (registro e aprovação de widgets em sandbox por `platform_admin`)
 - [X] T026 [P] [US5] Criar `src/storage-adapter.mjs` implementando a interface `StorageProvider` com o provedor padrão sem cartão (`SupabaseStorageProvider` + cabeçalhos `Cache-Control: public, max-age=31536000, immutable`) e o adaptador plugável `R2StorageProvider` (`env.R2_BUCKET`)
-- [ ] T027 [US5] Implementar em `workers/api.mjs` e `src/storefront-renderer.mjs` as rotas de ativos (`GET/POST/DELETE /api/sites/:siteId/assets`), a rota isolada de entrega de sandbox (`/embed/:widgetId` / `sandbox.inspira.dev.br` com CSP `default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'`) e o listener seguro de `postMessage`
-- [ ] T028 [US5] Adicionar em `web/portal/editor.js` a **Biblioteca de Arquivos da Vitrine** (com compressor cliente `OffscreenCanvas` para WebP `<= 200 KB` e indicador de cota) e a seleção de **Componentes Personalizados** aprovados para a vitrine
+- [X] T027 [US5] Implementar em `workers/api.mjs`, `src/publication-engine.mjs` e `web/vitrine/vitrine.js` as rotas de ativos (`GET/POST/DELETE /api/sites/:siteId/assets`), a rota isolada de entrega de sandbox (`/embed/:widgetId` / `sandbox.inspira.dev.br` com CSP `default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'`) e o listener seguro de `postMessage`
+- [X] T028 [US5] Adicionar em `web/portal/editor.js` e `web/portal/showcase-structure.js` a **Biblioteca de Arquivos da Vitrine** (com compressor cliente `OffscreenCanvas` para WebP `<= 200 KB` e indicador de cota) e a seleção de **Componentes Personalizados** aprovados para a vitrine
 
 **Checkpoint**: Upload otimizado a custo zero e execução de componentes externos em sandbox de origem opaca (`null`) verificados.
 
@@ -145,8 +145,8 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 ### Implementation for User Story 6
 
 - [X] T030 [US6] Incluir na migração `supabase/migrations/202611120007_assets_sandbox_domains.sql` a tabela `public.custom_domains` e a função/trigger `private.enforce_free_custom_domain_quota()` que bloqueia mais de 95 domínios em status `'verifying'` ou `'active'`
-- [ ] T031 [US6] Implementar em `workers/api.mjs` as rotas `GET/POST/DELETE /api/sites/:siteId/domains` e `POST /api/sites/:siteId/domains/:domainId/verify`, a resolução pública de vitrines por cabeçalho `Host` via `caches.default` (`Cache-Control: public, max-age=300, stale-while-revalidate=86400`) e o handler `scheduled` (Cron diário) para verificação de domínios pendentes e prevenção de pausa por inatividade de 7 dias do Supabase Free
-- [X] T032 [US6] Implementar em `web/portal/portal.js` e `web/portal/index.html` a tela de **Domínios e Publicação** exibindo o endereço gratuito ativo, o formulário de vínculo de subdomínio/domínio próprio, as instruções de apontamento DNS (`CNAME` e `TXT`), orientações para domínio raiz e status de verificação e HTTPS/SSL
+- [X] T031 [US6] Implementar em `workers/api.mjs` e `src/custom-domains.mjs` as rotas `GET/POST/DELETE /api/sites/:siteId/domains` e `POST /api/sites/:siteId/domains/:domainId/verify`, a resolução pública de vitrines por cabeçalho `Host` via `caches.default` (`Cache-Control: public, max-age=300, stale-while-revalidate=86400`) e o handler `scheduled` (Cron diário) para verificação de domínios pendentes
+- [X] T032 [US6] Implementar em `web/portal/editor.js` e `web/portal/index.html` a tela de **Domínios e Publicação** exibindo o endereço gratuito ativo, o formulário de vínculo de subdomínio/domínio próprio, as instruções de apontamento DNS (`CNAME` e `TXT`), orientações para domínio raiz e status de verificação e HTTPS/SSL
 
 **Checkpoint**: Fluxo completo de domínios personalizados e cache de borda operando com custo zero garantido.
 
@@ -156,8 +156,8 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 **Purpose**: Validação integrada de acessibilidade WCAG AA/AAA, contenção visual do *Liquid Glass*, performance e empacotamento Cloudflare Worker.
 
-- [ ] T033 [P] Atualizar `supabase/README.md` e `docs/operations-guide.md` com o guia operacional das migrações `202611120004` a `202611120006`, governança da trava de 95 domínios e chaveamento opcional do adaptador Cloudflare R2
-- [ ] T034 Executar `npm test`, `npm run build` e `npx --yes wrangler@4.158.0 deploy --dry-run` validando 100% dos testes, integridade do pacote estático e orçamento do Worker (`< 100 KiB` comprimido)
+- [X] T033 [P] Atualizar `supabase/README.md` e `docs/operations-guide.md` com o guia operacional das migrações `202611120004` a `202611120009`, governança da trava de 95 domínios e chaveamento opcional do adaptador Cloudflare R2
+- [X] T034 Executar `npm test`, `npm run build` e `npx --yes wrangler@4.158.0 deploy --dry-run` validando 100% dos testes, integridade do pacote estático e orçamento do Worker (`< 100 KiB` comprimido)
 
 ---
 
