@@ -11,6 +11,19 @@ import {
 let currentSite = null;
 let currentIsOnline = false;
 let currentDraft = null;
+let savedDraftContent = '';
+let editorLoadGeneration = 0;
+
+export function clearEditor() {
+  editorLoadGeneration += 1;
+  currentDraft = null;
+  currentSite = null;
+  savedDraftContent = '';
+}
+
+export function hasUnsavedDraftChanges() {
+  return Boolean(currentDraft && JSON.stringify(currentDraft.content) !== savedDraftContent);
+}
 let selectedCategoryForItems = null;
 let activePreviewRenderer = null;
 
@@ -246,6 +259,7 @@ export function normalizeDraftForEditor(rawContent, site = {}) {
 }
 
 export async function loadEditor(site, isOnline) {
+  const generation = ++editorLoadGeneration;
   currentSite = site;
   currentIsOnline = isOnline;
   currentDraft = null;
@@ -305,17 +319,19 @@ export async function loadEditor(site, isOnline) {
       const res = await fetch(`/api/sites/${site.id}/draft`);
       if (res.ok) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = data.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, site);
         const initialTab =
           currentDraft.content.categories.length > 0 ? 'items' : 'settings';
         setActiveTab(initialTab);
         initializeEditorWorkspace();
+        savedDraftContent = JSON.stringify(currentDraft.content);
       } else {
-        showFeedback('Erro ao carregar o rascunho remoto.', 'error');
+        if (generation === editorLoadGeneration) showFeedback('Erro ao carregar o rascunho remoto.', 'error');
       }
     } catch {
-      showFeedback('Falha de rede ao buscar o rascunho.', 'error');
+      if (generation === editorLoadGeneration) showFeedback('Falha de rede ao buscar o rascunho.', 'error');
     }
   } else {
     const saved = localStorage.getItem(`vitrine_local_draft_${site.id}`);
@@ -335,6 +351,7 @@ export async function loadEditor(site, isOnline) {
       currentDraft.content.categories.length > 0 ? 'items' : 'settings';
     setActiveTab(initialTab);
     initializeEditorWorkspace();
+    savedDraftContent = JSON.stringify(currentDraft.content);
   }
 }
 
@@ -1441,7 +1458,8 @@ function validateCatalogLocal() {
 }
 
 async function handleSaveDraft() {
-  if (!validateCatalogLocal()) return;
+  if (!currentDraft || !validateCatalogLocal()) return;
+  const generation = editorLoadGeneration;
 
   if (currentIsOnline) {
     try {
@@ -1454,17 +1472,21 @@ async function handleSaveDraft() {
         })
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (res.ok) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = data.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
         if (editorRevisionIndicator) {
           editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
         }
+        savedDraftContent = JSON.stringify(currentDraft.content);
         showFeedback('Rascunho salvo com sucesso.', 'success');
         if (conflictBanner) conflictBanner.hidden = true;
       } else if (res.status === 409) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         if (conflictBanner) conflictBanner.hidden = false;
         showFeedback(
           'Conflito de revisão detectado. Salve suas alterações locais ou recarregue.',
@@ -1475,9 +1497,11 @@ async function handleSaveDraft() {
         }
       } else {
         const data = await res.json().catch(() => ({}));
+        if (generation !== editorLoadGeneration) return;
         showFeedback(data.error?.message || 'Erro ao salvar rascunho.', 'error');
       }
     } catch {
+      if (generation !== editorLoadGeneration) return;
       showFeedback('Erro de rede ao salvar rascunho.', 'error');
     }
   } else {
@@ -1487,6 +1511,7 @@ async function handleSaveDraft() {
     if (editorRevisionIndicator) {
       editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
     }
+    savedDraftContent = JSON.stringify(currentDraft.content);
     showFeedback('Rascunho local salvo com sucesso.', 'success');
     if (conflictBanner) conflictBanner.hidden = true;
   }
@@ -1494,7 +1519,8 @@ async function handleSaveDraft() {
 }
 
 async function handlePublishSite() {
-  if (!validateCatalogLocal()) return;
+  if (!currentDraft || !validateCatalogLocal()) return;
+  const generation = editorLoadGeneration;
 
   if (currentIsOnline) {
     try {
@@ -1507,13 +1533,16 @@ async function handlePublishSite() {
         })
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (saveRes.ok) {
         const savedData = await saveRes.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = savedData.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
         if (editorRevisionIndicator) {
           editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
         }
+        savedDraftContent = JSON.stringify(currentDraft.content);
       } else if (saveRes.status === 409) {
         if (conflictBanner) conflictBanner.hidden = false;
         showFeedback(
@@ -1523,6 +1552,7 @@ async function handlePublishSite() {
         return;
       } else {
         const errData = await saveRes.json().catch(() => ({}));
+        if (generation !== editorLoadGeneration) return;
         showFeedback(errData.error?.message || 'Erro ao salvar rascunho antes de publicar.', 'error');
         return;
       }
@@ -1531,8 +1561,10 @@ async function handlePublishSite() {
         method: 'POST'
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (pubRes.ok) {
         const pubData = await pubRes.json();
+        if (generation !== editorLoadGeneration) return;
         const pub = pubData.publication;
         if (publicationStatusBar && publicationStatusText && publicationViewLink) {
           const shortHash = String(pub.hash || '').slice(0, 12);

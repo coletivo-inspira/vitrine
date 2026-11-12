@@ -3074,3 +3074,39 @@ svg {
     padding: 20px;
   }
 }
+
+.showcase-switcher:not([hidden]) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.showcase-switcher .select-styled {
+  width: min(34vw, 280px);
+  min-height: 44px;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .app-top-bar {
+    flex-wrap: wrap;
+  }
+
+  .top-bar-middle:has(.showcase-switcher:not([hidden])) {
+    order: 1;
+    width: 100%;
+  }
+
+  .showcase-switcher .select-styled {
+    width: min(65vw, 280px);
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-save-container {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+}

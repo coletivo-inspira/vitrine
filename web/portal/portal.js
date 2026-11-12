@@ -1,5 +1,5 @@
 import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './platform-cms.js';
-import { loadEditor } from './editor.js';
+import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 
 // State variables
 let isOnline = false;
@@ -789,6 +789,8 @@ async function handleLogout() {
   void detectPlatformCms(false);
   sites = [];
   activeSite = null;
+  clearEditor();
+  syncShowcaseSwitcher();
   profile = {
     displayName: '',
     businessName: '',
@@ -1327,7 +1329,25 @@ function loadLocalSites() {
   renderSites();
 }
 
+const showcaseSwitcher = globalThis.document?.getElementById('showcase-switcher');
+const showcaseSelect = globalThis.document?.getElementById('showcase-switcher-select');
+
+function syncShowcaseSwitcher() {
+  if (!showcaseSelect) return;
+  showcaseSwitcher.hidden = sites.length < 2;
+  showcaseSelect.replaceChildren(new Option('Escolher vitrine', ''));
+  for (const site of sites) showcaseSelect.add(new Option(`${site.name} · /${site.slug}`, site.id));
+  showcaseSelect.value = sites.some(site => site.id === activeSite?.id) ? activeSite.id : '';
+}
+
+showcaseSelect?.addEventListener('change', () => {
+  const site = sites.find(entry => entry.id === showcaseSelect.value);
+  if (site) openEditor(site);
+  else syncShowcaseSwitcher();
+});
+
 function renderSites() {
+  syncShowcaseSwitcher();
   if (!sitesListContainer) return;
 
   if (sites.length === 0) {
@@ -1499,11 +1519,20 @@ async function handleCreateWizardSite() {
 
 // Open Catalog Editor screen
 function openEditor(site) {
+  if (activeSite?.id === site.id && !editorSection?.hidden) {
+    syncShowcaseSwitcher();
+    return;
+  }
+  if (hasUnsavedDraftChanges() && !globalThis.window.confirm('Trocar de vitrine e descartar as alterações ainda não salvas?')) {
+    syncShowcaseSwitcher();
+    return;
+  }
   activeSite = site;
+  syncShowcaseSwitcher();
   if (globalThis.window && globalThis.window.location.hash !== '#editor') {
     globalThis.window.location.hash = '#editor';
   }
-  loadEditor(site, isOnline);
+  void loadEditor(site, isOnline);
 }
 
 // ==========================================

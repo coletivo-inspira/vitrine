@@ -46,7 +46,7 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 - [X] T006 [US1] Criar a migração append-only `supabase/migrations/202611120005_multi_tenant_rbac_audit.sql` com as tabelas `public.tenants`, `public.platform_operators` e `public.audit_logs`, extensão de `public.sites` (`tenant_id`, `theme_overrides`) e `public.site_memberships` (`owner`, `admin`, `editor`, `viewer`), além das funções `private.is_platform_admin()` e `private.has_site_role(uuid, text[])` (`SECURITY DEFINER`, `STABLE`, `search_path = ''`)
 - [ ] T007 [P] [US1] Adicionar validadores de papéis de equipe (`validateMembershipInput`), configurações de inquilino e filtros de auditoria em `src/portal-validation.mjs`
 - [X] T008 [US1] Implementar em `workers/api.mjs` as rotas de gestão de equipe da vitrine (`GET/POST/DELETE /api/sites/:siteId/members`), consulta de histórico (`GET /api/sites/:siteId/audit-logs`), guarda de autorização por papel e gravação automática em `public.audit_logs`
-- [ ] T009 [US1] Adicionar no painel administrativo (`web/portal/index.html`, `web/portal/portal.css` e `web/portal/portal.js`) o seletor rápido de vitrines no cabeçalho/barra lateral, a seção de **Equipe e Permissões da Vitrine** e a visualização do **Histórico de Alterações**
+- [X] T009 [US1] Adicionar no painel administrativo (`web/portal/index.html`, `web/portal/portal.css` e `web/portal/portal.js`) o seletor rápido de vitrines no cabeçalho/barra lateral, a seção de **Equipe e Permissões da Vitrine** e a visualização do **Histórico de Alterações**
 
 **Checkpoint**: Isolamento multi-inquilino, equipes por vitrine e trilha de auditoria funcionando e testados independentemente.
 
