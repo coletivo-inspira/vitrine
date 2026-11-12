@@ -2113,7 +2113,8 @@ export function createApiHandler(deps = {}) {
             authenticated: true,
             user: {
               id: user.id
-            }
+            },
+            token: user.token
           });
         }
 

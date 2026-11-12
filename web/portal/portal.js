@@ -493,6 +493,9 @@ export async function exchangePkceCode(code, deps = {}) {
     if (typeof storage?.removeItem === 'function') {
       storage.removeItem('portal_local_authenticated');
     }
+    if (typeof storage?.setItem === 'function') {
+      storage.setItem('supabase_access_token', accessToken);
+    }
     if (demoModeBadge) demoModeBadge.hidden = true;
     if (logoutButton) logoutButton.hidden = false;
     
@@ -516,12 +519,16 @@ export async function checkSession(deps = {}) {
   const fetchImpl = deps.fetch ?? globalThis.fetch;
   const onSection = deps.showSection ?? showSection;
   const loadSitesFn = deps.loadSites ?? (() => loadSites(fetchImpl));
+  const storage = deps.sessionStorage ?? globalThis.sessionStorage;
   try {
     const res = await fetchImpl('/api/auth/session');
     if (res.ok) {
       const data = await res.json();
       isOnline = true;
       currentUser = data.user;
+      if (typeof storage?.setItem === 'function' && data.token) {
+        storage.setItem('supabase_access_token', data.token);
+      }
       if (demoModeBadge) demoModeBadge.hidden = true;
       if (logoutButton) logoutButton.hidden = false;
       
@@ -698,6 +705,7 @@ async function handleLogout() {
   globalThis.sessionStorage?.removeItem('portal_local_authenticated');
   globalThis.sessionStorage?.removeItem('pkce_verifier');
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
+  globalThis.sessionStorage?.removeItem('supabase_access_token');
   currentUser = null;
   sites = [];
   activeSite = null;

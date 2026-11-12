@@ -522,28 +522,201 @@
             </div>
           </div>
 
+          <!-- Editor Navigation Tabs (Fix AUD-005) -->
+          <div class="editor-tabs-selector">
+            <button type="button" class="tab-btn active" data-tab="settings">Configurações</button>
+            <button type="button" class="tab-btn" data-tab="categories">Categorias</button>
+            <button type="button" class="tab-btn" data-tab="items">Itens</button>
+            <button type="button" class="tab-btn" data-tab="order-msg">Pedido & Mensagem</button>
+            <button type="button" class="tab-btn mobile-only-tab" data-tab="preview">Prévia ao Vivo</button>
+          </div>
+
           <div class="editor-workspace">
             <!-- Editor Controls (Left Pane) -->
             <div class="editor-controls-pane portal-card portal-card-left">
-              <h2>Configurações do Cardápio</h2>
               
-              <form id="editor-settings-form" novalidate>
-                <div class="form-group">
-                  <label for="editor-whatsapp">WhatsApp para Pedidos (com código de país, ex: 5511999999999)</label>
-                  <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999">
-                  <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+              <!-- PANE 1: Settings -->
+              <div id="pane-settings" class="editor-tab-pane">
+                <h2>Configurações Gerais</h2>
+                <form id="editor-settings-form" novalidate class="form-flex-col">
+                  <div class="form-group">
+                    <label for="editor-whatsapp">WhatsApp para Pedidos (com código de país, ex: 5511999999999)</label>
+                    <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999" class="item-input input-styled-height">
+                    <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="editor-catalog-type">Tipo de Catálogo</label>
+                    <select id="editor-catalog-type" name="catalogType" class="select-styled">
+                      <option value="products">Cardápio / Produtos (com carrinho)</option>
+                      <option value="booking">Agendamento de Serviços (com horários)</option>
+                      <option value="quote">Lista de Interesse / Orçamento (sem preços obrigatórios)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="label-spaced">Componentes Visíveis por Item</label>
+                    <span class="form-help help-block-spaced">Ative ou desative elementos visuais dos cartões de itens:</span>
+                    <div class="checkbox-group-grid">
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-name" checked disabled> Nome do Produto/Serviço (Sempre ativo)
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-description"> Descrição detalhada
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-photo"> Foto do Item
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-price"> Preço
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-min-quantity"> Quantidade Mínima
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-quantity-selector"> Seletor de Quantidade
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="comp-duration"> Duração em Minutos (Serviços)
+                      </label>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- PANE 2: Categories -->
+              <div id="pane-categories" class="editor-tab-pane" hidden>
+                <div class="editor-categories-header">
+                  <h2>Categorias do Catálogo</h2>
+                  <button id="add-category-button" class="button button-small button-pill" type="button">+ Categoria</button>
                 </div>
-              </form>
-
-              <div class="editor-categories-header">
-                <h3>Categorias de Produtos</h3>
-                <button id="add-category-button" class="button button-small button-pill" type="button">+ Categoria</button>
+                <p class="form-help">Adicione, ordene, exclua ou renomeie as categorias do seu catálogo:</p>
+                <!-- Categories List Container -->
+                <div id="categories-container" class="categories-list-builder">
+                  <!-- Rendered via JS -->
+                </div>
               </div>
 
-              <!-- Categories List Container -->
-              <div id="categories-container" class="categories-list-builder">
-                <!-- Rendered via JS -->
+              <!-- PANE 3: Items -->
+              <div id="pane-items" class="editor-tab-pane" hidden>
+                <div class="editor-items-header-row">
+                  <h2>Itens do Catálogo</h2>
+                  <div class="form-group-inline">
+                    <label for="editor-category-select">Editar Itens da Categoria:</label>
+                    <select id="editor-category-select" class="select-styled compact-select">
+                      <!-- Populated via JS -->
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="editor-items-list-flex">
+                  <div class="editor-category-items-actions">
+                    <button id="add-item-button" class="button button-small button-pill" type="button">+ Adicionar Item</button>
+                  </div>
+                  <div id="items-container" class="categories-list-builder">
+                    <!-- Items rendered dynamically via JS based on selected category -->
+                  </div>
+                </div>
               </div>
+
+              <!-- PANE 4: Order & Message -->
+              <div id="pane-order-msg" class="editor-tab-pane" hidden>
+                <h2>Campos do Pedido e WhatsApp</h2>
+                <form id="editor-order-msg-form" novalidate class="form-flex-col">
+                  
+                  <div class="form-group">
+                    <label class="label-spaced">Campos Opcionais do Formulário de Pedido</label>
+                    <span class="form-help help-block-spaced">Escolha os dados que quem visita preenche no final (Etapa 2):</span>
+                    <div class="checkbox-group-grid">
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="field-cust-name" checked disabled> Nome do Cliente (Sempre obrigatório)
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="field-date"> Data de preferência
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="field-delivery-pickup"> Escolha de Entrega ou Retirada
+                      </label>
+                      <label class="checkbox-label-styled">
+                        <input type="checkbox" id="field-notes"> Observações adicionais
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="form-group" id="field-timeslots-config-group">
+                    <label for="editor-timeslots">Lista de Horários para Agendamento (um por linha, ex: 09:00)</label>
+                    <textarea id="editor-timeslots" class="textarea-goal" placeholder="Ex:&#10;09:00&#10;10:00&#10;11:00"></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="editor-hero-title">Título do Topo (Hero Title)</label>
+                    <input type="text" id="editor-hero-title" class="item-input input-styled-height" placeholder="Ex: Pastus Fogo & Parrilla" maxlength="120">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="editor-welcome-text">Texto de Boas-Vindas</label>
+                    <textarea id="editor-welcome-text" class="textarea-goal" placeholder="Ex: Escolha seus itens abaixo, preencha seus dados e confirme pelo WhatsApp." maxlength="500"></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="editor-cta-label">Rótulo do Botão Enviar (CTA Label)</label>
+                    <input type="text" id="editor-cta-label" class="item-input input-styled-height" placeholder="Ex: Enviar pedido no WhatsApp" maxlength="120">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="editor-whatsapp-template">Mensagem para Envio no WhatsApp (Template)</label>
+                    <textarea id="editor-whatsapp-template" class="textarea-goal" placeholder="Use {nome}, {itens}, {total}, {data}, {horario}, {endereco}" maxlength="1000"></textarea>
+                    <span class="form-help">Atalhos disponíveis: <code>{nome}</code>, <code>{itens}</code>, <code>{total}</code>, <code>{data}</code>, <code>{horario}</code>, <code>{endereco}</code>.</span>
+                  </div>
+                </form>
+
+                <!-- CSV IMPORT/EXPORT SECTION -->
+                <div class="csv-tools-divider">
+                  <h2>Importação / Exportação por Planilha</h2>
+                  <p class="form-help">Cadastre dezenas de itens em lote usando o Excel ou Google Planilhas.</p>
+                  
+                  <div class="csv-actions-row">
+                    <div class="dropdown-csv-model-wrapper">
+                      <button type="button" id="csv-download-models-btn" class="button button-small button-secondary button-pill">Baixar Modelo Planilha (CSV) ⬇</button>
+                      <div class="dropdown-csv-menu" id="csv-models-dropdown-menu" hidden>
+                        <a href="./modelo-produtos.csv" download="modelo-produtos.csv" class="dropdown-csv-item">Modelo para Produtos / Cardápios</a>
+                        <a href="./modelo-servicos.csv" download="modelo-servicos.csv" class="dropdown-csv-item">Modelo para Agendamento de Serviços</a>
+                      </div>
+                    </div>
+                    <button type="button" id="csv-export-btn" class="button button-small button-secondary button-pill">Exportar Cardápio Atual (CSV) ⬆</button>
+                  </div>
+
+                  <div id="csv-import-box" class="csv-import-box">
+                    <h3>Importar Cardápio (CSV)</h3>
+                    <p class="form-help">Selecione uma planilha CSV formatada para carregar seus itens em lote.</p>
+                    <div class="csv-file-row">
+                      <input type="file" id="csv-file-input" accept=".csv" class="file-input-hidden">
+                      <button type="button" id="csv-upload-btn" class="button button-small button-secondary button-pill">Escolher Arquivo CSV</button>
+                      <span id="csv-file-name" class="csv-file-name">Nenhum arquivo selecionado</span>
+                    </div>
+                    
+                    <div id="csv-preview-container" class="csv-preview-container" hidden>
+                      <div class="csv-summary-pill" id="csv-summary-text">0 linhas válidas encontradas.</div>
+                      <div id="csv-errors-list" class="csv-errors-list" hidden></div>
+                      
+                      <div class="form-group csv-radio-group">
+                        <label>Modo de Importação</label>
+                        <div class="radio-group-container">
+                          <label class="radio-label-styled">
+                            <input type="radio" name="csv-import-mode" value="merge" checked> Adicionar e atualizar sem duplicar (Upsert)
+                          </label>
+                          <label class="radio-label-styled">
+                            <input type="radio" name="csv-import-mode" value="replace"> Substituir cardápio atual completamente
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <button type="button" id="csv-apply-btn" class="button button-small button-pill">Confirmar e Aplicar Importação</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             <!-- Editor Live Preview (Right Pane) -->
@@ -552,8 +725,8 @@
                 <h2>Pré-visualização Instantânea</h2>
                 <span class="preview-badge">Ao Vivo</span>
               </div>
-              <div id="live-storefront-preview" class="pizza-demo live-preview-box">
-                <!-- Rendered dynamically matching pizzeria-v1 style -->
+              <div id="live-storefront-preview" class="live-preview-box">
+                <!-- Rendered dynamically via StorefrontRenderer -->
               </div>
             </div>
           </div>
