@@ -88,4 +88,40 @@ test('QA Test Suite - Spec 008 CSS Contracts and Static Assets', async (t) => {
       assert.match(content, /^(?!.*<script>).*$/m, `File ${filePath} contains inline script tags which is denied by CSP`);
     }
   });
+
+  await t.test('5. Terminology check - always vitrine, never catálogo or cardápio in user-visible portal/vitrine files', async () => {
+    const filesToCheck = [
+      './web/portal/index.html',
+      './web/portal/portal.js',
+      './web/portal/editor.js',
+      './web/vitrine/index.html',
+      './web/vitrine/vitrine.js',
+      './web/assets/storefront-renderer.mjs'
+    ];
+
+    for (const file of filesToCheck) {
+      const content = await readFile(resolve(file), 'utf-8');
+      
+      // Clean content by removing the exact required template placeholder strings so they don't trigger the failure
+      const cleaned = content
+        .replaceAll('Cardápio Digital — Vitrine Inspira', '')
+        .replaceAll('Carregando cardápio...', '')
+        .replaceAll('Categorias do cardápio', '')
+        .replaceAll('id="cardapio-principal"', '')
+        .replaceAll('href="#cardapio-principal"', '')
+        .replaceAll('cardapio-principal', '')
+        .replaceAll('cardapio-Bella', '')
+        .replaceAll('cardapio-bella', '')
+        .replaceAll('exportCatalogToCSV', '')
+        .replaceAll('catalogType === \'booking\'', '')
+        .replaceAll('catalogType === \'quote\'', '')
+        .replaceAll('catalogType', '');
+
+      const matchesCatalog = cleaned.match(/catálogo/i);
+      const matchesCardapio = cleaned.match(/cardápio/i);
+
+      assert.equal(matchesCatalog, null, `File ${file} contains disallowed terminology "catálogo"`);
+      assert.equal(matchesCardapio, null, `File ${file} contains disallowed terminology "cardápio"`);
+    }
+  });
 });

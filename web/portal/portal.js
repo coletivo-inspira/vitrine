@@ -7,6 +7,9 @@ let currentUser = null;
 let sites = [];
 let activeSite = null;
 
+export let PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
+export let PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
+
 // New Profile & Customization state
 let profile = {
   displayName: '',
@@ -32,6 +35,7 @@ const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
 const pedidosSection = globalThis.document?.getElementById('pedidos-section');
 const wizardSection = globalThis.document?.getElementById('wizard-section');
+const profileGateSection = globalThis.document?.getElementById('profile-gate-section');
 
 const demoModeBadge = globalThis.document?.getElementById('demo-mode-badge');
 const logoutButton = globalThis.document?.getElementById('logout-button');
@@ -46,6 +50,15 @@ const profileCityInput = globalThis.document?.getElementById('profile-city');
 const profileWhatsappInput = globalThis.document?.getElementById('profile-whatsapp');
 const profileWhatsappError = globalThis.document?.getElementById('profile-whatsapp-error');
 const interestsChipsContainer = globalThis.document?.getElementById('interests-chips-container');
+
+// Profile Gate DOM Elements
+const profileGateForm = globalThis.document?.getElementById('profile-gate-form');
+const gateDisplayNameInput = globalThis.document?.getElementById('gate-display-name');
+const gateBusinessNameInput = globalThis.document?.getElementById('gate-business-name');
+const gateCityInput = globalThis.document?.getElementById('gate-city');
+const gateWhatsappInput = globalThis.document?.getElementById('gate-whatsapp');
+const gateWhatsappError = globalThis.document?.getElementById('gate-whatsapp-error');
+const gateInterestsChipsContainer = globalThis.document?.getElementById('gate-interests-chips-container');
 
 // Customization DOM Elements
 const customizationForm = globalThis.document?.getElementById('customization-request-form');
@@ -199,18 +212,23 @@ function setupAppShellNavigation() {
 
 // Profile Chips setup
 function setupProfileChips() {
-  interestsChipsContainer?.querySelectorAll('.chip-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const interest = btn.getAttribute('data-interest');
-      if (selectedInterests.has(interest)) {
-        selectedInterests.delete(interest);
-        btn.classList.remove('active');
-      } else {
-        selectedInterests.add(interest);
-        btn.classList.add('active');
-      }
+  const wireChips = (container) => {
+    container?.querySelectorAll('.chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const interest = btn.getAttribute('data-interest');
+        if (selectedInterests.has(interest)) {
+          selectedInterests.delete(interest);
+          btn.classList.remove('active');
+        } else {
+          selectedInterests.add(interest);
+          btn.classList.add('active');
+        }
+      });
     });
-  });
+  };
+
+  wireChips(interestsChipsContainer);
+  wireChips(gateInterestsChipsContainer);
 }
 
 // Setup Events
@@ -218,15 +236,14 @@ function setupEventListeners() {
   // Google OAuth PKCE
   googleLoginButton?.addEventListener('click', async () => {
     try {
+      googleLoginButton.disabled = true;
+      googleLoginButton.textContent = 'Redirecionando...';
       await startGoogleLogin();
     } catch (err) {
-      showFeedback('Erro ao iniciar login com Google. Tente novamente ou utilize o Modo Local (Offline).', 'error');
+      googleLoginButton.disabled = false;
+      googleLoginButton.textContent = 'Entrar com Google';
+      showFeedback('Erro ao iniciar login com Google. Tente novamente.', 'error');
     }
-  });
-
-  // Local Demo Mode
-  localDemoButton?.addEventListener('click', () => {
-    enterLocalDemoMode();
   });
 
   // Logout
@@ -244,6 +261,14 @@ function setupEventListeners() {
     profileForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       await handleSaveProfile();
+    });
+  }
+
+  // Profile Gate Form Submit
+  if (profileGateForm) {
+    profileGateForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleSaveProfileGate();
     });
   }
 
@@ -493,9 +518,28 @@ export async function exchangePkceCode(code, deps = {}) {
 
   const trimmedCode = typeof code === 'string' ? code.trim() : '';
   if (!trimmedCode || !codeVerifier) {
-    return handlePkceFailure(
-      'Sessão de login expirada ou verificador PKCE ausente. Inicie o login com Google novamente.'
-    );
+    const retryCount = parseInt(storage?.getItem('pkce_retry_count') || '0', 10);
+    if (retryCount === 0 && typeof window !== 'undefined' && !deps.history) {
+      if (typeof storage?.setItem === 'function') {
+        storage.setItem('pkce_retry_count', '1');
+      }
+      onFeedback('Verificador PKCE ausente. Tentando reiniciar o login automaticamente...', 'info');
+      setTimeout(() => {
+        startGoogleLogin(deps);
+      }, 1500);
+      return { ok: false, error: 'missing_verifier_retrying' };
+    } else {
+      if (typeof storage?.removeItem === 'function') {
+        storage.removeItem('pkce_retry_count');
+      }
+      return handlePkceFailure(
+        'Sessão de login expirada ou verificador PKCE ausente. Inicie o login com Google novamente.'
+      );
+    }
+  } else {
+    if (typeof storage?.removeItem === 'function') {
+      storage.removeItem('pkce_retry_count');
+    }
   }
 
   const config = await fetchAuthConfig(fetchImpl);
@@ -620,32 +664,16 @@ export async function checkSession(deps = {}) {
       onSection('auth');
       return { ok: false, status: 401 };
     } else {
-      fallbackToLocalIfNoSession();
+      isOnline = false;
+      if (logoutButton) logoutButton.hidden = true;
+      onSection('auth');
       return { ok: false, status: res.status };
     }
   } catch (err) {
-    fallbackToLocalIfNoSession();
-    return { ok: false, error: 'network_error' };
-  }
-}
-
-function fallbackToLocalIfNoSession() {
-  isOnline = false;
-  const localAuth = globalThis.sessionStorage?.getItem('portal_local_authenticated') === 'true';
-  if (localAuth) {
-    currentUser = { id: 'local-demo-user' };
-    if (demoModeBadge) demoModeBadge.hidden = false;
-    if (logoutButton) logoutButton.hidden = false;
-    
-    loadLocalSites();
-    loadLocalProfile();
-    loadLocalCustomizationRequests();
-    loadInsightsForActiveSite();
-    updateHubSummary();
-    showSection('inicio');
-  } else {
+    isOnline = false;
     if (logoutButton) logoutButton.hidden = true;
-    showSection('auth');
+    onSection('auth');
+    return { ok: false, error: 'network_error' };
   }
 }
 
@@ -685,6 +713,12 @@ export async function fetchAuthConfig(fetchImpl = globalThis.fetch) {
       });
       if (res && res.ok) {
         const data = await res.json();
+        if (data?.PUBLIC_SITE_ORIGIN || data?.publicSiteOrigin) {
+          PUBLIC_SITE_ORIGIN = data.PUBLIC_SITE_ORIGIN || data.publicSiteOrigin;
+        }
+        if (data?.PORTAL_ORIGIN || data?.portalOrigin) {
+          PORTAL_ORIGIN = data.PORTAL_ORIGIN || data.portalOrigin;
+        }
         const supabaseUrl = String(
           data?.supabaseUrl || globalThis.window?.SUPABASE_URL || DEFAULT_SUPABASE_URL
         )
@@ -697,7 +731,7 @@ export async function fetchAuthConfig(fetchImpl = globalThis.fetch) {
             window.SUPABASE_URL = supabaseUrl;
             window.SUPABASE_ANON_KEY = publishableKey;
           }
-          return { supabaseUrl, publishableKey };
+          return { supabaseUrl, publishableKey, PUBLIC_SITE_ORIGIN, PORTAL_ORIGIN };
         }
       }
     } catch {
@@ -725,7 +759,7 @@ export async function startGoogleLogin(deps = {}) {
 
   if (!config || !config.supabaseUrl || !config.publishableKey) {
     onFeedback(
-      'Configuração de autenticação do Supabase ausente ou indisponível no servidor. Verifique SUPABASE_ANON_KEY ou utilize o Modo Local (Offline).',
+      'Configuração de autenticação do Supabase ausente ou indisponível no servidor. Verifique SUPABASE_ANON_KEY.',
       'error'
     );
     return null;
@@ -742,7 +776,7 @@ export async function startGoogleLogin(deps = {}) {
   const hashed = await sha256(verifier);
   const challenge = base64urlencode(hashed);
 
-  const origin = deps.origin ?? globalThis.window?.location?.origin ?? 'http://localhost';
+  const origin = deps.origin ?? globalThis.window?.location?.origin ?? PORTAL_ORIGIN;
   const redirectUrl = `${origin}/portal/`;
   const googleAuthUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&code_challenge=${challenge}&code_challenge_method=s256&redirect_to=${encodeURIComponent(redirectUrl)}`;
 
@@ -754,24 +788,7 @@ export async function startGoogleLogin(deps = {}) {
   return googleAuthUrl;
 }
 
-// Enter Local Demo Mode
-function enterLocalDemoMode() {
-  isOnline = false;
-  currentUser = { id: 'local-demo-user' };
-  sessionStorage.setItem('portal_local_authenticated', 'true');
-  demoModeBadge.hidden = false;
-  logoutButton.hidden = false;
-  showFeedback('Entrou no Modo Local de Demonstração (Offline)', 'success');
-  
-  loadLocalSites();
-  loadLocalProfile();
-  loadLocalCustomizationRequests();
-  loadInsightsForActiveSite();
-  updateHubSummary();
-  showSection('inicio');
-}
-
-// Handle Logout
+// Logout
 async function handleLogout() {
   if (isOnline) {
     try {
@@ -782,7 +799,6 @@ async function handleLogout() {
   }
 
   // Clear local state
-  globalThis.sessionStorage?.removeItem('portal_local_authenticated');
   globalThis.sessionStorage?.removeItem('pkce_verifier');
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
   currentUser = null;
@@ -823,6 +839,7 @@ export function showSection(section) {
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
     if (wizardSection) wizardSection.hidden = section !== 'wizard';
     if (editorSection) editorSection.hidden = section !== 'editor';
+    if (profileGateSection) profileGateSection.hidden = section !== 'profile-gate';
 
     // Update active nav styling
     globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
@@ -890,11 +907,61 @@ function loadLocalProfile() {
   }
 }
 
+function prefillProfileWithGoogleCredentials() {
+  if (!currentUser) return;
+  
+  const googleName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
+  const googleAvatar = currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || '';
+  const googleEmail = currentUser.email || '';
+
+  // Prefill ONLY empty fields!
+  if (!profile.displayName && googleName) {
+    profile.displayName = googleName;
+  }
+
+  // Update read-only account cards in UI
+  const updateAccountCard = (avatarImg, placeholderDiv, emailSpan) => {
+    if (emailSpan) emailSpan.textContent = `Conectado como ${googleEmail || '...'}`;
+    if (googleAvatar) {
+      if (avatarImg) {
+        avatarImg.src = googleAvatar;
+        avatarImg.hidden = false;
+      }
+      if (placeholderDiv) placeholderDiv.hidden = true;
+    } else {
+      if (avatarImg) avatarImg.hidden = true;
+      if (placeholderDiv) {
+        placeholderDiv.hidden = false;
+        placeholderDiv.textContent = (googleName || googleEmail || 'U')[0].toUpperCase();
+      }
+    }
+  };
+
+  updateAccountCard(
+    globalThis.document?.getElementById('gate-avatar'),
+    globalThis.document?.getElementById('gate-avatar-placeholder'),
+    globalThis.document?.getElementById('gate-email')
+  );
+
+  updateAccountCard(
+    globalThis.document?.getElementById('profile-avatar'),
+    globalThis.document?.getElementById('profile-avatar-placeholder'),
+    globalThis.document?.getElementById('profile-email')
+  );
+}
+
 function syncProfileToForm() {
+  prefillProfileWithGoogleCredentials();
+
   if (profileDisplayNameInput) profileDisplayNameInput.value = profile.displayName || '';
   if (profileBusinessNameInput) profileBusinessNameInput.value = profile.businessName || '';
   if (profileCityInput) profileCityInput.value = profile.city || '';
   if (profileWhatsappInput) profileWhatsappInput.value = profile.whatsapp || '';
+
+  if (gateDisplayNameInput) gateDisplayNameInput.value = profile.displayName || '';
+  if (gateBusinessNameInput) gateBusinessNameInput.value = profile.businessName || '';
+  if (gateCityInput) gateCityInput.value = profile.city || '';
+  if (gateWhatsappInput) gateWhatsappInput.value = profile.whatsapp || '';
 
   selectedInterests.clear();
   const interestsArray = profile.interests || [];
@@ -902,10 +969,66 @@ function syncProfileToForm() {
     selectedInterests.add(interest);
   });
 
-  interestsChipsContainer?.querySelectorAll('.chip-btn').forEach(btn => {
-    const interest = btn.getAttribute('data-interest');
-    btn.classList.toggle('active', selectedInterests.has(interest));
-  });
+  const updateChips = (container) => {
+    container?.querySelectorAll('.chip-btn').forEach(btn => {
+      const interest = btn.getAttribute('data-interest');
+      btn.classList.toggle('active', selectedInterests.has(interest));
+    });
+  };
+
+  updateChips(interestsChipsContainer);
+  updateChips(gateInterestsChipsContainer);
+}
+
+// Save Profile Gate
+async function handleSaveProfileGate() {
+  const displayName = gateDisplayNameInput.value.trim();
+  const businessName = gateBusinessNameInput.value.trim();
+  const city = gateCityInput.value.trim();
+  const whatsapp = gateWhatsappInput.value.trim();
+  const interests = Array.from(selectedInterests);
+
+  // Validations
+  if (!displayName || !businessName || !city || !whatsapp) {
+    showFeedback('Por favor, preencha todos os campos obrigatórios.', 'error');
+    return;
+  }
+
+  if (whatsapp && !/^[1-9]\d{7,14}$/.test(whatsapp)) {
+    gateWhatsappError.hidden = false;
+    showFeedback('Digite o número de WhatsApp no formato internacional de dígitos (ex: 5551999999999).', 'error');
+    return;
+  }
+  gateWhatsappError.hidden = true;
+
+  profile = { displayName, businessName, city, whatsapp, interests };
+  localStorage.setItem('vitrine_profile', JSON.stringify(profile));
+
+  let savedOnServer = false;
+  if (isOnline) {
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      if (res.ok) {
+        savedOnServer = true;
+      }
+    } catch (err) {
+      // Caught gracefully
+    }
+  }
+
+  updateHubSummary();
+  if (savedOnServer) {
+    showFeedback('Perfil criado com sucesso na nuvem!', 'success');
+    if (globalThis.window) {
+      globalThis.window.location.hash = '#inicio';
+    }
+  } else {
+    showFeedback('Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.', 'error');
+  }
 }
 
 // Save Profile
@@ -946,11 +1069,10 @@ async function handleSaveProfile() {
   updateHubSummary();
   if (savedOnServer) {
     showFeedback('Perfil e interesses salvos com sucesso na nuvem!', 'success');
+    showSection('inicio');
   } else {
-    showFeedback('Perfil e interesses salvos com sucesso no navegador (modo offline).', 'success');
+    showFeedback('Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.', 'error');
   }
-  
-  showSection('inicio');
 }
 
 // Load Customization Requests (Online/Offline)
@@ -1154,32 +1276,65 @@ async function handleCreateCustomizationRequest() {
   }
 }
 
+function updateOnboardingChecklist() {
+  const checklistCard = globalThis.document?.getElementById('onboarding-checklist-card');
+  if (!checklistCard) return;
+
+  const profileComplete = isProfileComplete();
+  const hasSite = sites.length > 0;
+  
+  // Check if published from localStorage
+  let isPublished = localStorage.getItem('vitrine_has_published') === 'true';
+
+  const itemProfile = globalThis.document?.getElementById('checklist-item-profile');
+  const itemCreate = globalThis.document?.getElementById('checklist-item-create');
+  const itemPublish = globalThis.document?.getElementById('checklist-item-publish');
+
+  const updateChecklistItem = (el, done) => {
+    if (!el) return;
+    el.classList.toggle('done', done);
+    const icon = el.querySelector('.checklist-status-icon');
+    if (icon) {
+      icon.textContent = done ? '✓' : '○';
+    }
+  };
+
+  updateChecklistItem(itemProfile, profileComplete);
+  updateChecklistItem(itemCreate, hasSite);
+  updateChecklistItem(itemPublish, isPublished);
+
+  checklistCard.hidden = false;
+}
+
 // Update Home Dashboard (Início) Summary Cards
 function updateHubSummary() {
-  // 1. Profile completeness
+  // 1. Profile completeness based only on optional fields (Áreas de interesse)
   let filledFields = 0;
   let missing = [];
-  if (profile.displayName) filledFields++; else missing.push('Seu Nome');
-  if (profile.businessName) filledFields++; else missing.push('Nome do Negócio');
-  if (profile.city) filledFields++; else missing.push('Cidade');
-  if (profile.whatsapp && /^[1-9]\d{7,14}$/.test(profile.whatsapp)) filledFields++; else missing.push('WhatsApp válido');
-  if (profile.interests && profile.interests.length > 0) filledFields++; else missing.push('Áreas de interesse');
+  if (profile.interests && profile.interests.length > 0) {
+    filledFields = 1;
+  } else {
+    missing.push('Áreas de interesse');
+  }
 
-  const completenessPercent = filledFields * 20;
+  const completenessPercent = filledFields * 100;
   if (profileProgressText) profileProgressText.textContent = `${completenessPercent}% completo`;
   if (profileCompletenessBar) profileCompletenessBar.value = completenessPercent;
 
   if (profileMissingFields) {
     if (completenessPercent === 100) {
-      profileMissingFields.textContent = 'Parabéns! Seu perfil está completo.';
+      profileMissingFields.textContent = 'Parabéns! Seu perfil de interesses está completo.';
       profileMissingFields.classList.add('success-text');
       profileMissingFields.classList.remove('soft-text');
     } else {
-      profileMissingFields.textContent = `Pendente: ${missing.join(', ')}`;
+      profileMissingFields.textContent = `Pendente opcional: ${missing.join(', ')}`;
       profileMissingFields.classList.add('soft-text');
       profileMissingFields.classList.remove('success-text');
     }
   }
+
+  // Update onboarding checklist
+  updateOnboardingChecklist();
 
   // 2. Vitrines list summary
   if (vitrinesSummaryText) {
@@ -1380,7 +1535,7 @@ function renderSites() {
     const actionBtn = document.createElement('button');
     actionBtn.className = 'button button-small button-secondary button-pill';
     actionBtn.type = 'button';
-    actionBtn.textContent = 'Gerenciar Cardápio';
+    actionBtn.textContent = 'Editar vitrine';
     actionBtn.addEventListener('click', () => {
       openEditor(site);
     });
@@ -1433,7 +1588,8 @@ async function handleCreateWizardSite() {
           slug,
           storefrontType: area,
           template,
-          catalogType
+          catalogType,
+          whatsapp: profile.whatsapp
         })
       });
 
@@ -1445,7 +1601,14 @@ async function handleCreateWizardSite() {
         updateHubSummary();
         if (globalThis.window) globalThis.window.location.hash = '#vitrines';
       } else if (res.status === 409) {
-        showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine.', 'error');
+        const errorData = await res.json().catch(() => null);
+        if (errorData?.error?.code === 'PROFILE_INCOMPLETE') {
+          showFeedback('Por favor, preencha todos os campos do seu perfil antes de criar sua vitrine.', 'error');
+          profile.displayName = ''; // force incomplete
+          handleRouting();
+        } else {
+          showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine.', 'error');
+        }
       } else {
         // Safe 404/501 retry fallback for backwards compatibility when route is not yet fully extended
         const errorData = await res.json().catch(() => null);
@@ -1454,7 +1617,7 @@ async function handleCreateWizardSite() {
           const retryRes = await fetch('/api/sites', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, slug, template: 'pizzeria-v1' })
+            body: JSON.stringify({ name, slug, template: 'pizzeria-v1', whatsapp: profile.whatsapp })
           });
           if (retryRes.status === 201) {
             showFeedback(`Vitrine "${name}" criada com sucesso (modelo padrão)!`, 'success');
@@ -1710,6 +1873,25 @@ function syncInsightsSiteSelector() {
   }
 }
 
+export function getEmptyInsightsDataset() {
+  return {
+    summary: {
+      visits: 0,
+      orders: 0,
+      conversionPercent: 0,
+      estimatedCents: 0,
+      visitsDelta: 0,
+      ordersDelta: 0,
+      estimatedDeltaCents: 0
+    },
+    highlights: ['Ainda sem visitas registradas'],
+    byDay: [],
+    byHour: [],
+    topItems: [],
+    topCategories: []
+  };
+}
+
 export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
   syncInsightsSiteSelector();
   const targetSiteId = insightsSelectedSiteId || sites[0]?.id || 'demo-site-pastus';
@@ -1732,11 +1914,11 @@ export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
         }
       }
     } catch {
-      // Fallback to demo dataset below
+      // Fallback to empty dataset
     }
   }
 
-  currentInsightsData = buildDemoInsightsDataset(targetSiteId, insightsPeriod);
+  currentInsightsData = getEmptyInsightsDataset();
   renderInsightsPanel(currentInsightsData);
   renderHubInsightsCard(currentInsightsData);
   return currentInsightsData;
@@ -1744,7 +1926,7 @@ export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
 
 function renderHubInsightsCard(insights) {
   if (!hubInsightsHighlightText || !hubInsightsStatsList || !globalThis.document) return;
-  const data = insights || buildDemoInsightsDataset(insightsSelectedSiteId || 'demo-site-pastus', '7d');
+  const data = insights || getEmptyInsightsDataset();
   const firstHighlight =
     Array.isArray(data.highlights) && data.highlights.length > 0
       ? data.highlights[0]
@@ -2104,7 +2286,7 @@ export function renderInsightsPanel(insights) {
         nameStrong.textContent = item.name || item.itemId;
 
         const catSpan = document.createElement('span');
-        catSpan.textContent = `${item.categoryName || 'Cardápio'} · ${item.views ?? 0} visualizações`;
+        catSpan.textContent = `${item.categoryName || 'Vitrine'} · ${item.views ?? 0} visualizações`;
 
         info.appendChild(nameStrong);
         info.appendChild(catSpan);

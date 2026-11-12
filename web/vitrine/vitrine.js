@@ -60,8 +60,8 @@ export function normalizeStorefrontCategories(menu) {
   if (Array.isArray(menu?.items) && menu.items.length > 0) {
     return [
       {
-        id: 'catalogo',
-        name: 'Catálogo',
+        id: 'vitrine',
+        name: 'Vitrine',
         items: menu.items
       }
     ];
@@ -72,7 +72,7 @@ export function normalizeStorefrontCategories(menu) {
 function resolveCatalogTagLabel(catalogType) {
   if (catalogType === 'booking') return 'Agendamento Online';
   if (catalogType === 'quote') return 'Solicitação de Orçamento';
-  return 'Cardápio Digital';
+  return 'Vitrine';
 }
 
 export function createStorefrontMetricsCollector({
@@ -314,7 +314,7 @@ export async function bootStorefront(deps = {}) {
     return renderer;
   } catch {
     if (statusBanner) {
-      statusBanner.textContent = 'Não foi possível carregar o cardápio neste momento.';
+      statusBanner.textContent = 'Não foi possível carregar a vitrine neste momento.';
       statusBanner.hidden = false;
     }
     return null;
