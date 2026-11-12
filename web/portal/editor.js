@@ -2,6 +2,7 @@ import { renderStructureFields } from './showcase-structure.js';
 import { showFeedback } from './portal.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
+import { MILA_WHATSAPP, ORDER_RELAY_MILA, buildPublicOrderRelay } from '../assets/mila-relay.mjs';
 import {
   addTimeSlot,
   buildHighlightedTemplateNodes,
@@ -78,6 +79,8 @@ const editorOrderMsgForm = globalThis.document?.getElementById('editor-order-msg
 const editorBusinessName = globalThis.document?.getElementById('editor-business-name');
 const editorWhatsapp = globalThis.document?.getElementById('editor-whatsapp');
 const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp-error');
+const editorMilaRelay = globalThis.document?.getElementById('editor-mila-relay');
+const editorMilaRelayHelp = globalThis.document?.getElementById('editor-mila-relay-help');
 const editorCatalogType = globalThis.document?.getElementById('editor-catalog-type');
 const addCategoryButton = globalThis.document?.getElementById('add-category-button');
 const categoriesContainer = globalThis.document?.getElementById('categories-container');
@@ -675,6 +678,17 @@ function setupEditorEvents() {
     updateDraftAndPreview();
   });
 
+  editorMilaRelay?.addEventListener('change', () => {
+    if (!currentDraft) return;
+    if (editorMilaRelay.checked) {
+      currentDraft.content.orderRelay = ORDER_RELAY_MILA;
+    } else {
+      delete currentDraft.content.orderRelay;
+    }
+    syncMilaRelayUI();
+    updateDraftAndPreview();
+  });
+
   [compDescription, compPhoto, compPrice, compMinQuantity, compQuantitySelector, compDuration].forEach(
     (checkbox) => {
       checkbox?.addEventListener('change', () => {
@@ -1044,6 +1058,7 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (editorWhatsappError) {
     editorWhatsappError.hidden = true;
   }
+  syncMilaRelayUI();
   if (editorCatalogType) {
     editorCatalogType.value = currentDraft.content.catalogType || 'products';
   }
@@ -2470,10 +2485,39 @@ function updateDraftAndPreview({ skipAutosave = false } = {}) {
   }, 1200);
 }
 
+function resolveDraftMilaRelay() {
+  if (currentDraft?.content?.orderRelay !== ORDER_RELAY_MILA) return null;
+  try {
+    return buildPublicOrderRelay(currentDraft.content.slug || currentSite?.slug || '');
+  } catch {
+    return null;
+  }
+}
+
+function syncMilaRelayUI() {
+  if (!editorMilaRelay || !currentDraft) return;
+  const relay = resolveDraftMilaRelay();
+  const enabled = currentDraft.content.orderRelay === ORDER_RELAY_MILA;
+  editorMilaRelay.checked = enabled;
+  editorMilaRelay.setAttribute('aria-checked', enabled ? 'true' : 'false');
+  if (editorMilaRelayHelp) {
+    editorMilaRelayHelp.textContent = enabled
+      ? `Ligado: o botão de pedido abre o WhatsApp da Mila, da equipe Vitrine Inspira, e a mensagem começa com o código #${relay?.code ?? 'da sua vitrine'}. A Mila repassa cada pedido para o WhatsApp acima. O repasse é feito por uma pessoa, então pode levar alguns minutos. Vale a partir da próxima publicação.`
+      : 'Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.';
+  }
+}
+
 function renderLivePreview() {
   if (!liveStorefrontPreview || !currentDraft) return;
 
   const menuConfig = structuredClone(currentDraft.content);
+  const milaRelay = resolveDraftMilaRelay();
+  if (milaRelay) {
+    menuConfig.whatsapp = MILA_WHATSAPP;
+    menuConfig.orderRelay = milaRelay;
+  } else {
+    delete menuConfig.orderRelay;
+  }
 
   if (!activePreviewRenderer || activePreviewRenderer.container !== liveStorefrontPreview) {
     activePreviewRenderer = new StorefrontRenderer(liveStorefrontPreview, menuConfig, {

@@ -1,6 +1,13 @@
 import { projectShowcaseManifest } from './showcase-structure.mjs';
 import { publicMenu, whatsappLink } from './public-menu.mjs';
 import {
+  MILA_WHATSAPP,
+  ORDER_RELAY_MILA,
+  buildMilaRelayCode,
+  buildPublicOrderRelay,
+  resolveOrderRelayMode
+} from '../web/assets/mila-relay.mjs';
+import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
@@ -46,6 +53,7 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'slug',
   'name',
   'whatsapp',
+  'orderRelay',
   'currency',
   'components',
   'orderFields',
@@ -172,6 +180,26 @@ export function assertNoPrivateLeakage(menuArtifact) {
         422,
         'PRIVATE_FIELD_LEAKAGE',
         `Campo não permitido no artefato público: ${key}`
+      );
+    }
+  }
+
+  if (menuArtifact.orderRelay !== undefined) {
+    const relay = menuArtifact.orderRelay;
+    const relayKeys = relay && typeof relay === 'object' && !Array.isArray(relay) ? Object.keys(relay) : null;
+    if (
+      !relayKeys ||
+      relayKeys.length !== 2 ||
+      relay.via !== ORDER_RELAY_MILA ||
+      relay.code !== buildMilaRelayCode(menuArtifact.slug)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco orderRelay inválido.');
+    }
+    if (menuArtifact.whatsapp !== MILA_WHATSAPP) {
+      throw new PortalValidationError(
+        422,
+        'PRIVATE_FIELD_LEAKAGE',
+        'Com pedidos pela Mila, o artefato público só pode conter o WhatsApp da Mila.'
       );
     }
   }
@@ -320,6 +348,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
   );
 
   validateDraftContent(migrated);
+  const relayViaMila = resolveOrderRelayMode(migrated) === ORDER_RELAY_MILA;
 
   let baseMenu;
   try {
@@ -327,6 +356,9 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       ? { ...migrated, categories: migrated.categories.filter(category => category?.active !== false) }
       : migrated;
     const publicMenuDraft = toPublicMenuDraft(visibleContent, site);
+    if (relayViaMila) {
+      publicMenuDraft.whatsapp = MILA_WHATSAPP;
+    }
     baseMenu = publicMenu(publicMenuDraft);
   } catch (err) {
     if (err instanceof PortalValidationError) {
@@ -566,6 +598,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     slug: baseMenu.slug,
     name: baseMenu.name,
     whatsapp: baseMenu.whatsapp,
+    ...(relayViaMila ? { orderRelay: buildPublicOrderRelay(baseMenu.slug) } : {}),
     currency: baseMenu.currency,
     components: sanitizedComponents,
     orderFields: sanitizedOrderFields,
@@ -610,6 +643,11 @@ export async function compilePublicStorefront(draftContent, site = {}, options =
     publication
   };
 }
+
+const DIRECT_ORDER_FOOTER_NOTE =
+  'Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.';
+const MILA_RELAY_FOOTER_NOTE =
+  'Preços em Reais (BRL). Os pedidos desta vitrine chegam à Mila, da equipe Vitrine Inspira, que repassa cada um ao negócio pelo WhatsApp.';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -799,6 +837,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
   const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
   const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
+  const orderNote = menu.orderRelay?.via === ORDER_RELAY_MILA
+    ? MILA_RELAY_FOOTER_NOTE
+    : DIRECT_ORDER_FOOTER_NOTE;
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
     const welcome = menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.';
     const ogImg = getOgImage(menu);
@@ -839,6 +880,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         '<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine"></nav>',
         `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`
       )
+      .replace(DIRECT_ORDER_FOOTER_NOTE, orderNote)
       .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
   }
 
@@ -895,7 +937,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
       </a>
       <p class="storefront-footer-note">
-        Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
+        ${orderNote}
       </p>
       <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">
         Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais.

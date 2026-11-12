@@ -1,4 +1,5 @@
 import { publicMenu } from './public-menu.mjs';
+import { ORDER_RELAY_MODES } from '../web/assets/mila-relay.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -1503,6 +1504,18 @@ export function validateDraftContent(content, options = {}) {
 
   const whatsappValue = content.whatsapp ?? options.defaultWhatsapp;
   validateWhatsapp(whatsappValue);
+
+  if (
+    content.orderRelay !== undefined &&
+    content.orderRelay !== null &&
+    !ORDER_RELAY_MODES.includes(content.orderRelay)
+  ) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ORDER_RELAY',
+      'Forma de receber pedidos inválida. Use "direct" (seu WhatsApp) ou "mila" (pela Mila).'
+    );
+  }
 
   return {
     content,

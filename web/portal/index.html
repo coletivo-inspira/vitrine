@@ -337,6 +337,23 @@
             <h2>Atividade recente</h2>
             <ul id="platform-audit"></ul>
           </details>
+          <details id="platform-mila" class="portal-card mila-console">
+            <summary>Pedidos pela Mila</summary>
+            <p class="form-help">Cole a mensagem que chegou no WhatsApp da Mila, ou só o código (#VI-XXXXXX-XXXX). O painel localiza a vitrine e monta o repasse para o dono. Nada do que você cola aqui é salvo.</p>
+            <form id="platform-mila-form" class="form-flex-col mila-console-form" novalidate>
+              <div class="form-group">
+                <label for="platform-mila-message">Mensagem do cliente</label>
+                <textarea id="platform-mila-message" class="textarea-goal" rows="6" maxlength="4000" placeholder="#VI-PIZZAR-7F3K · Pedido para Pizzaria do Zé&#10;&#10;Olá! Tenho interesse nestes itens..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="platform-mila-customer">WhatsApp do cliente (opcional)</label>
+                <input type="text" id="platform-mila-customer" inputmode="tel" autocomplete="off" maxlength="20" placeholder="+55 (31) 99999-9999" class="item-input input-styled-height">
+              </div>
+              <button type="submit" class="button button-pill mila-console-submit">Localizar vitrine</button>
+            </form>
+            <p id="platform-mila-status" class="form-help" role="status"></p>
+            <ul id="platform-mila-results" class="mila-console-results"></ul>
+          </details>
           <details id="platform-templates" class="portal-card">
             <summary>Modelos de vitrine</summary>
             <p id="platform-templates-status" role="status"></p>
@@ -1035,6 +1052,14 @@
                     <label for="editor-whatsapp">WhatsApp do Negócio</label>
                     <input type="text" id="editor-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="+55 (51) 99999-9999" class="item-input input-styled-height">
                     <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
+                  </div>
+
+                  <div class="form-group mila-relay-group">
+                    <label class="checkbox-label-styled mila-relay-toggle" for="editor-mila-relay">
+                      <input type="checkbox" id="editor-mila-relay" role="switch" aria-checked="false" aria-describedby="editor-mila-relay-help">
+                      <span>Receber pedidos pela Mila (meu número não aparece na vitrine)</span>
+                    </label>
+                    <span id="editor-mila-relay-help" class="form-help" aria-live="polite">Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.</span>
                   </div>
 
                   <div class="form-group">
