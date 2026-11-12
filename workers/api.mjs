@@ -1718,6 +1718,35 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       };
     },
 
+    async readPlatformOperations(resource, { token }) {
+      const queries = {
+        overview: 'rpc/read_platform_overview',
+        'audit-logs': 'audit_logs?select=id,action,entity_type,entity_id,created_at,summary&order=created_at.desc,id.desc&limit=50',
+        'customization-requests': 'customization_requests?select=id,status,goal,storefront_type,created_at&order=created_at.desc,id.desc&limit=50'
+      };
+      const response = await fetchImpl(`${baseUrl}/rest/v1/${queries[resource]}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar a administração da plataforma.');
+      return response.json();
+    },
+
+    async updateCustomizationStatus(id, status, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/customization_requests?id=eq.${encodeURIComponent(id)}&select=id,status`,
+        {
+          method: 'PATCH', headers: authHeaders(token, { prefer: 'return=representation' }),
+          body: JSON.stringify({ status })
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (error?.message === 'INVALID_CUSTOMIZATION_TRANSITION') {
+          throw new PortalValidationError(409, 'INVALID_CUSTOMIZATION_TRANSITION', 'A solicitação mudou. Confira a etapa atual.');
+        }
+        throw new Error('Falha ao atualizar a solicitação.');
+      }
+      return (await response.json())[0] ?? null;
+    },
+
     async isPlatformAdmin(userId, { token }) {
       const response = await fetchImpl(
         `${baseUrl}/rest/v1/platform_operators?user_id=eq.${encodeURIComponent(userId)}&role=eq.platform_admin&select=role`,
@@ -2929,8 +2958,53 @@ export function createApiHandler(deps = {}) {
 
     try {
       if (pathname === '/api/public/platform-cms' && method === 'GET') {
-        const sections = typeof store.readPublicCms === 'function' ? await store.readPublicCms() : [];
-        return jsonResponse(200, { sections }, { 'cache-control': 'public, max-age=60, stale-while-revalidate=300' });
+        const cache = globalThis.caches?.default;
+        const key = new Request(url.origin + pathname);
+        const refresh = async () => {
+          const sections = typeof store.readPublicCms === 'function' ? await store.readPublicCms() : [];
+          const response = jsonResponse(200, { sections }, {
+            'cache-control': 'public, max-age=60, stale-while-revalidate=300',
+            'x-vitrine-cached-at': String(Date.now())
+          });
+          if (cache) await cache.put(key, response.clone()).catch(() => {});
+          return response;
+        };
+        const cached = await cache?.match(key);
+        if (cached && Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) < 360_000) {
+          if (Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) >= 60_000 && _ctx.waitUntil) {
+            _ctx.waitUntil(refresh().catch(() => {}));
+          }
+          return cached;
+        }
+        return await refresh();
+      }
+
+      const operations = pathname.match(/^\/api\/admin\/(overview|audit-logs|customization-requests)(?:\/([^/]+))?\/?$/);
+      if (operations) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        const [, resource, id] = operations;
+        if (method === 'GET' && !id) {
+          const data = await store.readPlatformOperations(resource, options);
+          const key = { overview: 'overview', 'audit-logs': 'logs', 'customization-requests': 'requests' }[resource];
+          return jsonResponse(200, { [key]: data });
+        }
+        if (method === 'PATCH' && resource === 'customization-requests' && id) {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+          if (guardError) return guardError;
+          const { parsed } = await parseJsonRequest(request);
+          if (!UUID_PATTERN.test(id) || !['em_analise', 'respondido', 'encerrado'].includes(parsed?.status)) {
+            return errorResponse(422, 'INVALID_CUSTOMIZATION_STATUS', 'Informe uma solicitação e etapa válidas.');
+          }
+          const updated = await store.updateCustomizationStatus(id, parsed.status, options);
+          if (!updated) return errorResponse(404, 'CUSTOMIZATION_REQUEST_NOT_FOUND', 'Solicitação não encontrada.');
+          return jsonResponse(200, { request: updated });
+        }
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para administração.');
       }
 
       if (pathname === '/api/admin/custom-components') {
@@ -2998,6 +3072,11 @@ export function createApiHandler(deps = {}) {
           ]));
           if (!await store.publishCms(expected, options)) {
             return errorResponse(409, 'CMS_CHANGED', 'O rascunho mudou durante a publicação. Recarregue e tente novamente.');
+          }
+          const cache = globalThis.caches?.default;
+          if (cache) {
+            const origins = new Set([url.origin, 'https://vitrine.inspira.dev.br']);
+            await Promise.allSettled([...origins].map(origin => cache.delete(origin + '/api/public/platform-cms')));
           }
           return jsonResponse(200, { published: true });
         }

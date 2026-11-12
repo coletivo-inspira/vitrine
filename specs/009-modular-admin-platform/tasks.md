@@ -83,8 +83,8 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 - [X] T015 [US3] Incluir na migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` a tabela `public.platform_cms` com dados iniciais das seções institucionais (`hero`, `value_props`, `areas_showcase`, `templates_catalog`, `featured_cases`, `commercial_offer`, `faq`, `announcements`, `header_nav`, `footer`) e RLS restrita a `private.is_platform_admin()`
 - [ ] T016 [P] [US3] Adicionar em `src/portal-validation.mjs` e `src/publication-engine.mjs` a validação e projeção pública (`compilePlatformCmsManifest`) das seções institucionais aplicando `assertNoPrivateLeakage()`
-- [ ] T017 [US3] Implementar em `workers/api.mjs` as rotas `GET /api/admin/overview`, `GET /api/admin/cms`, `PUT /api/admin/cms/:sectionKey`, `POST /api/admin/cms/publish`, `PATCH /api/admin/customization-requests/:id`, `GET /api/admin/audit-logs` e `GET /api/public/platform-cms` (com cache SWR na borda)
-- [ ] T018 [US3] Implementar em `web/portal/index.html`, `web/portal/portal.js` e `web/app.js` a visão exclusiva **Administração da Plataforma** (visível apenas para `platform_admin`) e o consumo dinâmico com fallback estático na página institucional (`web/index.html`)
+- [X] T017 [US3] Implementar em `workers/api.mjs` as rotas `GET /api/admin/overview`, `GET /api/admin/cms`, `PUT /api/admin/cms/:sectionKey`, `POST /api/admin/cms/publish`, `PATCH /api/admin/customization-requests/:id`, `GET /api/admin/audit-logs` e `GET /api/public/platform-cms` (com cache SWR na borda)
+- [X] T018 [US3] Implementar em `web/portal/index.html`, `web/portal/portal.js` e `web/app.js` a visão exclusiva **Administração da Plataforma** (visível apenas para `platform_admin`) e o consumo dinâmico com fallback estático na página institucional (`web/index.html`)
 
 **Checkpoint**: Página institucional e operação central da plataforma 100% administráveis sem deploy pelos Operadores Inspira.
 

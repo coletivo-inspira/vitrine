@@ -78,3 +78,53 @@ test('Equipe, prévia privada e rollback pelo Worker', async () => {
   assert.equal(restored.status, 200);
   assert.equal((await restored.json()).publication.revision, 3);
 });
+
+test('Rotas globais bloqueiam contas comuns e exigem mesma origem nas transições', async () => {
+  const { createMemoryStore } = await import('../workers/api.mjs');
+  const store = createMemoryStore();
+  store.isPlatformAdmin = id => id === ownerId;
+  store.readPlatformOperations = async resource => resource === 'overview' ? { siteCount: 2 } : [];
+  store.updateCustomizationStatus = async (id, status) => ({ id, status });
+  const api = createApiHandler({ store });
+  const read = (resource, token) => api(new Request(origin + '/api/admin/' + resource, {
+    headers: { authorization: 'Bearer ' + token }
+  }));
+  assert.equal((await read('overview', 'token-member')).status, 403);
+  assert.deepEqual(await (await read('overview', 'token-owner')).json(), { overview: { siteCount: 2 } });
+  assert.deepEqual(await (await read('audit-logs', 'token-owner')).json(), { logs: [] });
+  const update = (requestOrigin, status) => api(new Request(origin + '/api/admin/customization-requests/' + siteId, {
+    method: 'PATCH',
+    headers: { origin: requestOrigin, authorization: 'Bearer token-owner', 'content-type': 'application/json' },
+    body: JSON.stringify({ status })
+  }));
+  assert.equal((await update('https://other.example', 'em_analise')).status, 403);
+  assert.equal((await update(origin, 'invalid')).status, 422);
+  assert.deepEqual(await (await update(origin, 'em_analise')).json(), { request: { id: siteId, status: 'em_analise' } });
+});
+
+test('CMS serve a versão pública do cache e atualiza conteúdo vencido em segundo plano', async () => {
+  const { createMemoryStore } = await import('../workers/api.mjs');
+  const store = createMemoryStore();
+  store.readPublicCms = async () => [{ sectionKey: 'hero', content: { headline: 'Nova versão' } }];
+  const api = createApiHandler({ store });
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+  let cached = Response.json({ sections: [] }, {
+    headers: { 'x-vitrine-cached-at': String(Date.now() - 70_000) }
+  });
+  const pending = [];
+  Object.defineProperty(globalThis, 'caches', { configurable: true, value: {
+    default: { match: async () => cached.clone(), put: async (_key, response) => { cached = response; } }
+  } });
+  try {
+    const request = () => api(new Request(origin + '/api/public/platform-cms'), {}, {
+      waitUntil: work => pending.push(work)
+    });
+    assert.deepEqual(await (await request()).json(), { sections: [] });
+    assert.equal(pending.length, 1);
+    await Promise.all(pending);
+    assert.equal((await (await request()).json()).sections[0].content.headline, 'Nova versão');
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'caches', original);
+    else delete globalThis.caches;
+  }
+});

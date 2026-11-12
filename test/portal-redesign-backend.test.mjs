@@ -1594,3 +1594,24 @@ test('Banco emite o desafio DNS e reserva até 95 domínios entre ativos e em ve
   await db.query("delete from public.custom_domains where hostname = 'menu-95.example.com'");
   assert.equal((await reserve()).affectedRows, 1);
 });
+
+test('Operações globais exigem operador e gravam a transição do pedido no banco', async (t) => {
+  const db = await setupPgliteWithMigrations();
+  t.after(() => db.close());
+  await db.query('insert into public.platform_operators (user_id) values ($1)', [USER_A]);
+  const overview = () => db.query('select public.read_platform_overview() as overview');
+  await assert.rejects(() => asRole(db, USER_B, overview), { code: '42501' });
+  const info = (await asRole(db, USER_A, overview)).rows[0].overview;
+  assert.equal(info.domainLimit, 95);
+  assert.ok(info.databaseBytes > 0);
+  const request = (await db.query(
+    "insert into public.customization_requests (user_id, storefront_type, template_interest, goal) values ($1, 'art', 'portfolio', 'Criar portfólio online') returning id",
+    [USER_B]
+  )).rows[0];
+  const move = status => db.query('update public.customization_requests set status = $1 where id = $2 returning status', [status, request.id]);
+  await assert.rejects(() => asRole(db, USER_A, () => move('respondido')), /INVALID_CUSTOMIZATION_TRANSITION/);
+  assert.equal((await asRole(db, USER_B, () => move('em_analise'))).rows.length, 0);
+  assert.equal((await asRole(db, USER_A, () => move('em_analise'), 'authenticated', true)).rows[0].status, 'em_analise');
+  const audit = await db.query("select action, summary from public.audit_logs where entity_id = $1", [request.id]);
+  assert.deepEqual(audit.rows, [{ action: 'status_changed', summary: { from: 'novo', to: 'em_analise' } }]);
+});

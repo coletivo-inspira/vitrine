@@ -330,7 +330,7 @@ O workflow `.github/workflows/db-migrate.yml` permanece disponível exclusivamen
 
 ## Painel modular (Spec 009)
 
-As migrações `202611120005`, `202611120006` e `202611120007` acrescentam papéis por vitrine, auditoria, CMS, versões, estrutura, ativos, componentes e domínios. Valide a cadeia em staging antes de liberar os recursos na conta de produção.
+As migrações `202611120005`, `202611120006`, `202611120007` e `202611120008` acrescentam papéis por vitrine, auditoria, CMS, versões, estrutura, ativos, componentes e domínios. Valide a cadeia em staging antes de liberar os recursos na conta de produção.
 
 - **Prévia**. Configure `PREVIEW_HMAC_SECRET` como segredo do Worker. O link expira em 30 minutos, exige a sessão que o emitiu e perde validade quando o rascunho muda.
 - **CMS**. Cadastre os operadores autorizados em `public.platform_operators` pelo ambiente administrativo do banco. O conteúdo estático continua visível até a primeira publicação do CMS.

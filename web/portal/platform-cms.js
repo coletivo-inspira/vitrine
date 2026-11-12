@@ -153,6 +153,7 @@ let generation = 0;
 
 export function showPlatformCms(active) {
   if (section) section.hidden = !active;
+  if (active) void loadOperations();
 }
 
 export async function detectPlatformCms(authenticated) {
@@ -161,6 +162,12 @@ export async function detectPlatformCms(authenticated) {
   open.hidden = true;
   fields.replaceChildren();
   status.textContent = '';
+  if (operations) {
+    operations.open = false;
+    overviewList.replaceChildren();
+    requestList.replaceChildren();
+    auditList.replaceChildren();
+  }
   if (!authenticated) return;
   try {
     const { sections } = await request();
@@ -171,3 +178,73 @@ export async function detectPlatformCms(authenticated) {
     // A administração só aparece após autorização positiva do servidor.
   }
 }
+
+const operations = globalThis.document?.getElementById('platform-operations');
+const operationStatus = globalThis.document?.getElementById('platform-operations-status');
+const overviewList = globalThis.document?.getElementById('platform-overview');
+const requestList = globalThis.document?.getElementById('platform-requests');
+const auditList = globalThis.document?.getElementById('platform-audit');
+const stages = { novo: 'Novo', em_analise: 'Em análise', respondido: 'Respondido', encerrado: 'Encerrado' };
+const nextStage = { novo: 'em_analise', em_analise: 'respondido', respondido: 'encerrado' };
+
+async function operation(path, payload) {
+  const response = await fetch('/api/admin/' + path, payload ? {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  } : {});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message ?? 'A operação não pôde ser concluída.');
+  return data;
+}
+
+function listItem(value) {
+  const entry = document.createElement('li');
+  entry.textContent = value;
+  return entry;
+}
+
+async function loadOperations() {
+  if (!operations?.open || section.hidden) return;
+  const currentGeneration = generation;
+  operationStatus.textContent = 'Carregando administração…';
+  try {
+    const [{ overview }, { requests }, { logs }] = await Promise.all([
+      operation('overview'), operation('customization-requests'), operation('audit-logs')
+    ]);
+    if (currentGeneration !== generation || !operations.open || section.hidden) return;
+    const mb = bytes => (bytes / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    overviewList.replaceChildren(...[
+      `Banco: ${mb(overview.databaseBytes)} de ${mb(overview.databaseLimitBytes)} MB`,
+      `Vitrines: ${overview.siteCount}`,
+      `Arquivos: ${overview.assetCount}`,
+      `Domínios ativos: ${overview.activeDomainCount} · vagas reservadas: ${overview.reservedDomainCount} de ${overview.domainLimit}`
+    ].map(listItem));
+    requestList.replaceChildren(...requests.map(entry => {
+      const item = listItem(`${stages[entry.status] ?? entry.status} · ${entry.goal}`);
+      const next = nextStage[entry.status];
+      if (!next) return item;
+      const advance = button(`Marcar como ${stages[next].toLowerCase()}`);
+      advance.addEventListener('click', async () => {
+        advance.disabled = true;
+        try {
+          await operation('customization-requests/' + encodeURIComponent(entry.id), { status: next });
+          await loadOperations();
+        } catch (error) {
+          operationStatus.textContent = error.message;
+        } finally {
+          advance.disabled = false;
+        }
+      });
+      item.append(' ', advance);
+      return item;
+    }));
+    if (!requests.length) requestList.append(listItem('Nenhum pedido registrado.'));
+    auditList.replaceChildren(...logs.map(entry => listItem(
+      `${new Date(entry.created_at).toLocaleString('pt-BR')} · ${entry.action} · ${entry.entity_type}`
+    )));
+    if (!logs.length) auditList.append(listItem('Nenhuma atividade registrada.'));
+    operationStatus.textContent = '';
+  } catch (error) {
+    if (currentGeneration === generation) operationStatus.textContent = error.message;
+  }
+}
+operations?.addEventListener('toggle', loadOperations);
