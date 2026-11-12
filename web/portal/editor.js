@@ -3,6 +3,17 @@ import { showFeedback } from './portal.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import {
+  addTimeSlot,
+  buildHighlightedTemplateNodes,
+  buildSimulatedWhatsappPreview,
+  generateTimeSlotInterval,
+  getAvailableTemplateVariables,
+  handleAtomicVariableKeydown,
+  normalizeTimeSlots,
+  removeTimeSlot,
+  toggleVariableInTemplate
+} from './order-message-tools.mjs';
+import {
   parseImportCatalogCSV,
   applyCSVToCatalog,
   exportCatalogToCSV,
@@ -97,6 +108,26 @@ const editorHeroTitle = globalThis.document?.getElementById('editor-hero-title')
 const editorWelcomeText = globalThis.document?.getElementById('editor-welcome-text');
 const editorCtaLabel = globalThis.document?.getElementById('editor-cta-label');
 const editorWhatsappTemplate = globalThis.document?.getElementById('editor-whatsapp-template');
+const editorWhatsappBackdrop = globalThis.document?.getElementById('editor-whatsapp-backdrop');
+const whatsappTemplateVars = globalThis.document?.getElementById('whatsapp-template-vars');
+const simulateWhatsappBtn = globalThis.document?.getElementById('simulate-whatsapp-btn');
+const whatsappSimulationPanel = globalThis.document?.getElementById('whatsapp-simulation-panel');
+const whatsappSimCloseBtn = globalThis.document?.getElementById('whatsapp-sim-close-btn');
+const whatsappSimWarning = globalThis.document?.getElementById('whatsapp-sim-warning');
+const whatsappSimBubbleText = globalThis.document?.getElementById('whatsapp-sim-bubble-text');
+const whatsappSimOpenLink = globalThis.document?.getElementById('whatsapp-sim-open-link');
+
+const timeslotPickerInput = globalThis.document?.getElementById('timeslot-picker-input');
+const timeslotAddBtn = globalThis.document?.getElementById('timeslot-add-btn');
+const timeslotGeneratorToggleBtn = globalThis.document?.getElementById('timeslot-generator-toggle-btn');
+const timeslotGeneratorPanel = globalThis.document?.getElementById('timeslot-generator-panel');
+const timeslotGenStart = globalThis.document?.getElementById('timeslot-gen-start');
+const timeslotGenEnd = globalThis.document?.getElementById('timeslot-gen-end');
+const timeslotGenStep = globalThis.document?.getElementById('timeslot-gen-step');
+const timeslotGenApplyBtn = globalThis.document?.getElementById('timeslot-gen-apply-btn');
+const timeslotClearAllBtn = globalThis.document?.getElementById('timeslot-clear-all-btn');
+const timeslotsChipsList = globalThis.document?.getElementById('timeslots-chips-list');
+const timeslotsStatusNote = globalThis.document?.getElementById('timeslots-status-note');
 
 // CSV Tool Elements
 const csvDownloadPrimaryLink = globalThis.document?.getElementById('csv-download-primary-link');
@@ -649,6 +680,7 @@ function setupEditorEvents() {
       checkbox?.addEventListener('change', () => {
         syncComponentsFromUI();
         renderItems();
+        renderTemplateVarsAndHighlight();
         updateDraftAndPreview();
       });
     }
@@ -657,6 +689,7 @@ function setupEditorEvents() {
   [fieldCustName, fieldDate, fieldDeliveryPickup, fieldNotes].forEach((checkbox) => {
     checkbox?.addEventListener('change', () => {
       syncOrderFieldsFromUI();
+      renderTemplateVarsAndHighlight();
       updateDraftAndPreview();
     });
   });
@@ -724,20 +757,163 @@ function setupEditorEvents() {
 
   editorTimeslots?.addEventListener('input', () => {
     if (!currentDraft) return;
-    const lines = editorTimeslots.value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => /^([01]\d|2[0-3]):[0-5]\d$/.test(line))
-      .slice(0, 24);
+    const lines = normalizeTimeSlots(editorTimeslots.value.split('\n'));
     currentDraft.content.orderFields.timeSlots = lines;
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+  });
+
+  timeslotAddBtn?.addEventListener('click', () => {
+    if (!currentDraft || !timeslotPickerInput) return;
+    const currentSlots = currentDraft.content.orderFields?.timeSlots || [];
+    const result = addTimeSlot(currentSlots, timeslotPickerInput.value);
+    if (!result.added) {
+      if (result.reason === 'limit') {
+        showFeedback('O limite máximo é de 24 horários disponíveis.', 'error');
+      } else if (result.reason === 'duplicate') {
+        showFeedback('Este horário já está na lista.', 'info');
+      } else {
+        showFeedback('Informe um horário válido no formato HH:MM.', 'error');
+      }
+      return;
+    }
+    currentDraft.content.orderFields.timeSlots = result.slots;
+    if (editorTimeslots) editorTimeslots.value = result.slots.join('\n');
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+  });
+
+  timeslotGeneratorToggleBtn?.addEventListener('click', () => {
+    if (!timeslotGeneratorPanel) return;
+    const nextOpen = timeslotGeneratorPanel.hidden;
+    timeslotGeneratorPanel.hidden = !nextOpen;
+    timeslotGeneratorToggleBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+  });
+
+  timeslotGenApplyBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    const startVal = timeslotGenStart?.value || '09:00';
+    const endVal = timeslotGenEnd?.value || '17:00';
+    const stepVal = Number(timeslotGenStep?.value || 60);
+    const result = generateTimeSlotInterval(startVal, endVal, stepVal, []);
+    if (result.error) {
+      showFeedback(result.error, 'error');
+      return;
+    }
+    currentDraft.content.orderFields.timeSlots = result.slots;
+    if (editorTimeslots) editorTimeslots.value = result.slots.join('\n');
+    if (timeslotGeneratorPanel) timeslotGeneratorPanel.hidden = true;
+    timeslotGeneratorToggleBtn?.setAttribute('aria-expanded', 'false');
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+    if (result.truncated) {
+      showFeedback('Horários gerados (limitados aos primeiros 24 horários).', 'info');
+    }
+  });
+
+  timeslotClearAllBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    currentDraft.content.orderFields.timeSlots = [];
+    if (editorTimeslots) editorTimeslots.value = '';
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
     updateDraftAndPreview();
   });
 
   [editorHeroTitle, editorWelcomeText, editorCtaLabel, editorWhatsappTemplate].forEach((input) => {
     input?.addEventListener('input', () => {
       syncMessagesFromUI();
+      if (input === editorWhatsappTemplate) {
+        renderTemplateVarsAndHighlight();
+      }
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
       updateDraftAndPreview();
     });
+  });
+
+  editorWhatsappTemplate?.addEventListener('scroll', () => {
+    if (editorWhatsappBackdrop && editorWhatsappTemplate) {
+      editorWhatsappBackdrop.scrollTop = editorWhatsappTemplate.scrollTop;
+      editorWhatsappBackdrop.scrollLeft = editorWhatsappTemplate.scrollLeft;
+    }
+  });
+
+  editorWhatsappTemplate?.addEventListener('keydown', (e) => {
+    if (!editorWhatsappTemplate) return;
+    const atomic = handleAtomicVariableKeydown(
+      editorWhatsappTemplate.value,
+      editorWhatsappTemplate.selectionStart ?? 0,
+      editorWhatsappTemplate.selectionEnd ?? 0,
+      e.key
+    );
+    if (atomic) {
+      e.preventDefault();
+      editorWhatsappTemplate.value = atomic.text;
+      try {
+        editorWhatsappTemplate.setSelectionRange(atomic.cursor, atomic.cursor);
+      } catch {
+        // Ignore on unsupported environments
+      }
+      syncMessagesFromUI();
+      renderTemplateVarsAndHighlight();
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
+      updateDraftAndPreview();
+    }
+  });
+
+  editorWhatsappTemplate?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  editorWhatsappTemplate?.addEventListener('drop', (e) => {
+    const token = e.dataTransfer?.getData('text/plain') || '';
+    if (!/^\{(itens|total|data|horario|endereco|nome)\}$/.test(token.trim())) {
+      return;
+    }
+    e.preventDefault();
+    const cleanToken = token.trim();
+    const pos =
+      typeof editorWhatsappTemplate.selectionStart === 'number'
+        ? editorWhatsappTemplate.selectionStart
+        : editorWhatsappTemplate.value.length;
+    const before = editorWhatsappTemplate.value.slice(0, pos);
+    const after = editorWhatsappTemplate.value.slice(pos);
+    editorWhatsappTemplate.value = `${before}${cleanToken}${after}`;
+    const nextPos = pos + cleanToken.length;
+    editorWhatsappTemplate.focus();
+    try {
+      editorWhatsappTemplate.setSelectionRange(nextPos, nextPos);
+    } catch {
+      // Ignore
+    }
+    syncMessagesFromUI();
+    renderTemplateVarsAndHighlight();
+    if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+      renderWhatsappSimulation();
+    }
+    updateDraftAndPreview();
+  });
+
+  simulateWhatsappBtn?.addEventListener('click', () => {
+    if (!whatsappSimulationPanel) return;
+    const nextOpen = whatsappSimulationPanel.hidden;
+    whatsappSimulationPanel.hidden = !nextOpen;
+    simulateWhatsappBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    if (nextOpen) {
+      renderWhatsappSimulation();
+    }
+  });
+
+  whatsappSimCloseBtn?.addEventListener('click', () => {
+    if (whatsappSimulationPanel) whatsappSimulationPanel.hidden = true;
+    simulateWhatsappBtn?.setAttribute('aria-expanded', 'false');
   });
 
   reloadConflictButton?.addEventListener('click', async () => {
@@ -884,10 +1060,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (fieldCustName) fieldCustName.checked = fields.customerName !== false;
   if (fieldDate) fieldDate.checked = Boolean(fields.date);
   if (fieldDeliveryPickup) fieldDeliveryPickup.checked = Boolean(fields.deliveryOrPickup);
-  if (fieldNotes) fieldNotes.checked = fields.notes !== false;
+  if (fieldNotes) fieldNotes.checked = Boolean(fields.notes !== false);
 
+  const normalizedSlots = normalizeTimeSlots(fields.timeSlots || []);
+  currentDraft.content.orderFields.timeSlots = normalizedSlots;
   if (editorTimeslots) {
-    editorTimeslots.value = (fields.timeSlots || []).join('\n');
+    editorTimeslots.value = normalizedSlots.join('\n');
   }
   if (timeslotsConfigGroup) {
     timeslotsConfigGroup.hidden = false;
@@ -905,6 +1083,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   }
   if (editorWhatsappTemplate) {
     editorWhatsappTemplate.value = msgs.whatsappTemplate || '';
+  }
+
+  renderTimeslotsUI();
+  renderTemplateVarsAndHighlight();
+  if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+    renderWhatsappSimulation();
   }
 
   updateCsvModelLink();
@@ -949,6 +1133,150 @@ function syncMessagesFromUI() {
     ctaLabel: editorCtaLabel?.value || '',
     whatsappTemplate: editorWhatsappTemplate?.value || ''
   };
+}
+
+function renderTimeslotsUI() {
+  if (!currentDraft) return;
+  const slots = normalizeTimeSlots(currentDraft.content.orderFields?.timeSlots || []);
+  currentDraft.content.orderFields.timeSlots = slots;
+
+  if (timeslotsStatusNote) {
+    timeslotsStatusNote.textContent = `${slots.length} / 24 horários`;
+  }
+  if (timeslotAddBtn) {
+    timeslotAddBtn.disabled = slots.length >= 24;
+  }
+  if (!timeslotsChipsList) return;
+
+  timeslotsChipsList.replaceChildren();
+  if (slots.length === 0) {
+    const emptySpan = document.createElement('span');
+    emptySpan.className = 'timeslots-empty-hint';
+    emptySpan.textContent = 'Lista vazia: não pedir horário ao visitante.';
+    timeslotsChipsList.appendChild(emptySpan);
+    return;
+  }
+
+  slots.forEach((slot) => {
+    const chip = document.createElement('span');
+    chip.className = 'timeslot-chip';
+    chip.setAttribute('role', 'listitem');
+    chip.setAttribute('data-slot', slot);
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = slot;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'timeslot-chip-remove';
+    removeBtn.setAttribute('aria-label', `Remover horário ${slot}`);
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      const next = removeTimeSlot(currentDraft.content.orderFields.timeSlots, slot);
+      currentDraft.content.orderFields.timeSlots = next;
+      if (editorTimeslots) editorTimeslots.value = next.join('\n');
+      renderTimeslotsUI();
+      renderTemplateVarsAndHighlight();
+      updateDraftAndPreview();
+    });
+
+    chip.appendChild(textSpan);
+    chip.appendChild(removeBtn);
+    timeslotsChipsList.appendChild(chip);
+  });
+}
+
+function renderTemplateVarsAndHighlight() {
+  if (!currentDraft) return;
+  const text = editorWhatsappTemplate?.value || '';
+
+  if (editorWhatsappBackdrop) {
+    const nodes = buildHighlightedTemplateNodes(document, text);
+    editorWhatsappBackdrop.replaceChildren(...nodes);
+  }
+
+  if (!whatsappTemplateVars) return;
+  whatsappTemplateVars.replaceChildren();
+
+  const available = getAvailableTemplateVariables(
+    currentDraft.content.catalogType,
+    currentDraft.content.orderFields,
+    currentDraft.content.components
+  );
+
+  available.forEach((varMeta) => {
+    const isUsed = text.includes(varMeta.token);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.draggable = true;
+    btn.className = `template-var-chip ${varMeta.colorClass} ${isUsed ? 'is-used' : ''}`.trim();
+    btn.setAttribute('data-var-token', varMeta.token);
+    btn.setAttribute('aria-pressed', isUsed ? 'true' : 'false');
+    btn.title = isUsed
+      ? `Remover ${varMeta.token} do modelo`
+      : `Inserir ${varMeta.token} no modelo`;
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'template-var-chip-label';
+    labelSpan.textContent = varMeta.label;
+
+    const codeSpan = document.createElement('code');
+    codeSpan.className = 'template-var-chip-code';
+    codeSpan.textContent = varMeta.token;
+
+    btn.appendChild(labelSpan);
+    btn.appendChild(codeSpan);
+
+    btn.addEventListener('dragstart', (e) => {
+      e.dataTransfer?.setData('text/plain', varMeta.token);
+    });
+
+    btn.addEventListener('click', () => {
+      if (!editorWhatsappTemplate) return;
+      const res = toggleVariableInTemplate(
+        editorWhatsappTemplate.value,
+        varMeta.token,
+        editorWhatsappTemplate.selectionStart,
+        editorWhatsappTemplate.selectionEnd
+      );
+      editorWhatsappTemplate.value = res.text;
+      editorWhatsappTemplate.focus();
+      try {
+        editorWhatsappTemplate.setSelectionRange(res.cursor, res.cursor);
+      } catch {
+        // Ignore
+      }
+      syncMessagesFromUI();
+      renderTemplateVarsAndHighlight();
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
+      updateDraftAndPreview();
+    });
+
+    whatsappTemplateVars.appendChild(btn);
+  });
+}
+
+function renderWhatsappSimulation() {
+  if (!currentDraft || !whatsappSimulationPanel) return;
+  const sim = buildSimulatedWhatsappPreview(currentDraft.content);
+  if (whatsappSimBubbleText) {
+    whatsappSimBubbleText.textContent = sim.message;
+  }
+  if (whatsappSimOpenLink) {
+    whatsappSimOpenLink.href = sim.waHref;
+  }
+  if (whatsappSimWarning) {
+    if (sim.unsupported.length > 0) {
+      const tokens = sim.unsupported.map((u) => u.token).join(', ');
+      whatsappSimWarning.textContent = `Atenção: seu modelo usa ${tokens}, que este tipo de vitrine ou configuração de campos não preenche.`;
+      whatsappSimWarning.hidden = false;
+    } else {
+      whatsappSimWarning.textContent = '';
+      whatsappSimWarning.hidden = true;
+    }
+  }
 }
 
 function populateCategorySelect() {

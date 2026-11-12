@@ -1153,8 +1153,41 @@
                   </div>
 
                   <div class="form-group" id="field-timeslots-config-group">
-                    <label for="editor-timeslots">Horários disponíveis para preferência (um por linha no formato HH:MM, deixe vazio para não pedir horário)</label>
-                    <textarea id="editor-timeslots" class="textarea-goal" placeholder="09:00&#10;10:00&#10;14:00&#10;15:00"></textarea>
+                    <div class="timeslots-header-row">
+                      <label for="timeslot-picker-input">Horários disponíveis para preferência</label>
+                      <span id="timeslots-status-note" class="timeslots-count-badge">0 / 24 horários</span>
+                    </div>
+                    <div class="timeslots-picker-controls">
+                      <input type="time" id="timeslot-picker-input" value="09:00" class="item-input input-styled-height timeslot-time-input" aria-label="Escolher horário">
+                      <button type="button" id="timeslot-add-btn" class="button button-small button-secondary button-pill">Adicionar horário</button>
+                      <button type="button" id="timeslot-generator-toggle-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Gerar horários</button>
+                    </div>
+                    <div id="timeslot-generator-panel" class="timeslot-generator-panel" hidden>
+                      <div class="timeslot-generator-grid">
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-start" class="structure-field-label">Das</label>
+                          <input type="time" id="timeslot-gen-start" value="09:00" class="item-input input-styled-height">
+                        </div>
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-end" class="structure-field-label">Às</label>
+                          <input type="time" id="timeslot-gen-end" value="17:00" class="item-input input-styled-height">
+                        </div>
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-step" class="structure-field-label">A cada</label>
+                          <select id="timeslot-gen-step" class="select-styled">
+                            <option value="30">30 minutos</option>
+                            <option value="60" selected>60 minutos</option>
+                            <option value="90">90 minutos</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="timeslot-generator-actions">
+                        <button type="button" id="timeslot-gen-apply-btn" class="button button-small button-pill">Preencher horários</button>
+                        <button type="button" id="timeslot-clear-all-btn" class="button button-small button-secondary button-pill">Limpar todos</button>
+                      </div>
+                    </div>
+                    <div id="timeslots-chips-list" class="timeslots-chips-list" role="list" aria-label="Horários cadastrados"></div>
+                    <textarea id="editor-timeslots" class="textarea-goal" hidden aria-hidden="true"></textarea>
                   </div>
 
                   <div class="form-group">
@@ -1173,9 +1206,34 @@
                   </div>
 
                   <div class="form-group">
-                    <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
-                    <textarea id="editor-whatsapp-template" class="textarea-goal" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
-                    <span class="form-help">Variáveis disponíveis: <code>{itens}</code>, <code>{total}</code>, <code>{data}</code>, <code>{horario}</code>, <code>{endereco}</code> e <code>{nome}</code>.</span>
+                    <div class="template-header-row">
+                      <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
+                      <button type="button" id="simulate-whatsapp-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Simular mensagem</button>
+                    </div>
+                    <div class="template-editor-wrap">
+                      <div id="editor-whatsapp-backdrop" class="template-editor-backdrop" aria-hidden="true"></div>
+                      <textarea id="editor-whatsapp-template" class="textarea-goal template-editor-textarea" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
+                    </div>
+                    <div class="template-vars-section">
+                      <span class="form-help">Variáveis disponíveis (clique para inserir ou remover, ou arraste para o texto):</span>
+                      <div id="whatsapp-template-vars" class="template-vars-bar" role="group" aria-label="Variáveis disponíveis"></div>
+                    </div>
+                    <div id="whatsapp-simulation-panel" class="whatsapp-simulation-panel" hidden>
+                      <div class="whatsapp-sim-header">
+                        <strong>Prévia da mensagem no WhatsApp</strong>
+                        <button type="button" id="whatsapp-sim-close-btn" class="button button-small button-secondary button-pill">Fechar</button>
+                      </div>
+                      <p id="whatsapp-sim-warning" class="whatsapp-sim-warning" role="alert" hidden></p>
+                      <div class="whatsapp-chat-stage">
+                        <div class="whatsapp-bubble">
+                          <pre id="whatsapp-sim-bubble-text" class="whatsapp-bubble-text"></pre>
+                          <span class="whatsapp-bubble-meta" aria-hidden="true">14:32 ✓✓</span>
+                        </div>
+                      </div>
+                      <div class="whatsapp-sim-actions">
+                        <a id="whatsapp-sim-open-link" class="button button-small button-pill" href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">Abrir no meu WhatsApp</a>
+                      </div>
+                    </div>
                   </div>
                 </form>
               </div>

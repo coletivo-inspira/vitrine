@@ -1856,26 +1856,32 @@ svg {
 
 .textarea-goal {
   min-height: 120px;
-  padding: 12px;
+  padding: 12px 14px;
   resize: vertical;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
+  line-height: 1.5;
 }
 
 .textarea-refs {
   min-height: 80px;
-  padding: 12px;
+  padding: 12px 14px;
   resize: vertical;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
+  line-height: 1.5;
+}
+
+textarea {
+  border-radius: 12px;
 }
 
 .wizard-card-styled {
@@ -4796,4 +4802,347 @@ svg {
     grid-template-columns: 1fr;
   }
 }
+
+/* Order & Message Pane: Timeslot Picker, Variable Chips & WhatsApp Simulation (Items 12, 13, 14) */
+.timeslots-header-row,
+.template-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeslots-count-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--apricot);
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeslots-picker-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeslot-time-input {
+  width: 130px;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeslot-generator-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timeslot-generator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.timeslot-generator-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeslots-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  align-items: center;
+}
+
+.timeslots-empty-hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.timeslot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--white);
+  border: 1px solid var(--orange);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeslot-chip-remove {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.timeslot-chip-remove:hover {
+  background: var(--orange);
+  color: #ffffff;
+}
+
+/* Highlighted WhatsApp Template Textarea & Variable Chips */
+.template-editor-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.template-editor-backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.template-editor-textarea {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: var(--ink);
+  caret-color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.template-var-highlight {
+  border-radius: 4px;
+  padding: 1px 0;
+  color: transparent;
+  font-weight: inherit;
+}
+
+.template-vars-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-vars-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-var-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), opacity 0.15s var(--ease);
+}
+
+.template-var-chip:hover {
+  transform: translateY(-1px);
+}
+
+.template-var-chip.is-used {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.template-var-chip-code {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* Distinct variable colors */
+.var-chip-itens,
+.template-var-highlight.var-chip-itens {
+  background: rgb(199 68 20 / 0.16);
+  border-color: #C74414;
+  color: #A9360E;
+}
+
+.var-chip-total,
+.template-var-highlight.var-chip-total {
+  background: rgb(19 56 36 / 0.16);
+  border-color: #1E6B45;
+  color: #133824;
+}
+
+.var-chip-data,
+.template-var-highlight.var-chip-data {
+  background: rgb(140 90 50 / 0.18);
+  border-color: #8C5A32;
+  color: #6B4223;
+}
+
+.var-chip-horario,
+.template-var-highlight.var-chip-horario {
+  background: rgb(35 104 122 / 0.16);
+  border-color: #23687A;
+  color: #194E5C;
+}
+
+.var-chip-endereco,
+.template-var-highlight.var-chip-endereco {
+  background: rgb(122 62 108 / 0.16);
+  border-color: #7A3E6C;
+  color: #5C2C51;
+}
+
+.var-chip-nome,
+.template-var-highlight.var-chip-nome {
+  background: rgb(58 90 140 / 0.16);
+  border-color: #3A5A8C;
+  color: #274066;
+}
+
+[data-theme="dark"] .var-chip-itens { color: #FFB18A; border-color: #FFB18A; background: rgb(255 177 138 / 0.22); }
+[data-theme="dark"] .var-chip-total { color: #A3E5C2; border-color: #A3E5C2; background: rgb(163 229 194 / 0.2); }
+[data-theme="dark"] .var-chip-data { color: #F5CBA7; border-color: #F5CBA7; background: rgb(245 203 167 / 0.2); }
+[data-theme="dark"] .var-chip-horario { color: #9AD7E8; border-color: #9AD7E8; background: rgb(154 215 232 / 0.2); }
+[data-theme="dark"] .var-chip-endereco { color: #E8B4DC; border-color: #E8B4DC; background: rgb(232 180 220 / 0.2); }
+[data-theme="dark"] .var-chip-nome { color: #B4CBF0; border-color: #B4CBF0; background: rgb(180 203 240 / 0.2); }
+
+.template-var-highlight.var-chip-itens,
+.template-var-highlight.var-chip-total,
+.template-var-highlight.var-chip-data,
+.template-var-highlight.var-chip-horario,
+.template-var-highlight.var-chip-endereco,
+.template-var-highlight.var-chip-nome {
+  color: transparent;
+}
+
+/* WhatsApp Message Simulation Panel */
+.whatsapp-simulation-panel {
+  margin-top: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.whatsapp-sim-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.whatsapp-sim-warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--apricot);
+  border: 1px solid var(--orange);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.whatsapp-chat-stage {
+  background: #ECE5DD;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+[data-theme="dark"] .whatsapp-chat-stage {
+  background: #121B17;
+}
+
+.whatsapp-bubble {
+  max-width: min(100%, 420px);
+  background: #DCF8C6;
+  color: #171E1A;
+  border-radius: 14px 14px 2px 14px;
+  padding: 12px 14px 8px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+[data-theme="dark"] .whatsapp-bubble {
+  background: #1F4D37;
+  color: #F7F7F4;
+}
+
+.whatsapp-bubble-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.whatsapp-bubble-meta {
+  align-self: flex-end;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.whatsapp-sim-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 
