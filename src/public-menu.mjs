@@ -6,8 +6,15 @@ function text(value, name, max = 160) {
   return value.trim();
 }
 
+const ALLOWED_PUBLIC_TEMPLATES = Object.freeze([
+  'pizzeria-v1',
+  'products-v1',
+  'booking-v1',
+  'quote-v1'
+]);
+
 export function publicMenu(draft) {
-  if (!draft || draft.template !== 'pizzeria-v1') throw new TypeError('Invalid template');
+  if (!draft || !ALLOWED_PUBLIC_TEMPLATES.includes(draft.template)) throw new TypeError('Invalid template');
   const slug = text(draft.slug, 'slug', 63);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ['admin', 'api', 'www', 'app', 'auth'].includes(slug)) {
     throw new TypeError('Invalid slug');
@@ -23,7 +30,7 @@ export function publicMenu(draft) {
     if (!Number.isSafeInteger(item.priceCents) || item.priceCents < 0) throw new TypeError('Invalid price');
     return { id, name: text(item.name, 'item name'), priceCents: item.priceCents };
   });
-  return { schemaVersion: 1, template: 'pizzeria-v1', slug,
+  return { schemaVersion: 1, template: draft.template, slug,
     name: text(draft.name, 'name'), whatsapp: phone, currency: 'BRL', items };
 }
 

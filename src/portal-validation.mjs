@@ -14,6 +14,59 @@ export const RESERVED_SLUGS = Object.freeze([
 ]);
 
 export const DEFAULT_TEMPLATE = 'pizzeria-v1';
+export const ALLOWED_TEMPLATES = Object.freeze([
+  'pizzeria-v1',
+  'products-v1',
+  'booking-v1',
+  'quote-v1'
+]);
+
+export const DEFAULT_STOREFRONT_TYPE = 'food';
+export const ALLOWED_STOREFRONT_TYPES = Object.freeze([
+  'food',
+  'art',
+  'photo',
+  'health',
+  'tech'
+]);
+
+export const DEFAULT_CATALOG_TYPE = 'products';
+export const ALLOWED_CATALOG_TYPES = Object.freeze([
+  'products',
+  'booking',
+  'quote'
+]);
+
+export const ALLOWED_PROFILE_INTERESTS = Object.freeze([
+  'cardapio-digital',
+  'agendamento',
+  'orcamento-whatsapp',
+  'dominio-proprio',
+  'identidade-visual',
+  'fotografia-conteudo',
+  'automacao-atendimento',
+  'design-sob-medida'
+]);
+
+export const ALLOWED_CUSTOMIZATION_STATUSES = Object.freeze([
+  'novo',
+  'em_analise',
+  'respondido',
+  'encerrado'
+]);
+
+export const ALLOWED_WHATSAPP_VARIABLES = Object.freeze([
+  '{itens}',
+  '{total}',
+  '{data}',
+  '{horario}',
+  '{endereco}',
+  '{nome}'
+]);
+
+export const CATALOG_IMAGES_BUCKET = 'catalog-images';
+export const MAX_CATALOG_IMAGE_BYTES = 262144;
+
 export const DEFAULT_WHATSAPP = '5511999999999';
 export const MAX_ACTIVE_ITEMS = 20;
 export const FREE_PLAN_ACTIVE_ITEMS_LIMIT = MAX_ACTIVE_ITEMS;
@@ -25,9 +78,35 @@ export const DRAFT_MAX_BYTES = MAX_DRAFT_BYTES;
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const WHATSAPP_PATTERN = /^[1-9]\d{7,14}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DANGEROUS_SCHEME_OR_TAG_PATTERN =
-  /\b(?:javascript|vbscript|data)\s*:|\bhttp:\/\/|\bhttps?:\/\/[^/\s:@]+:[^/\s@]*@|<\s*\/?\s*(?:script|iframe|object|embed|svg|img|style|link|meta)\b|\bon[a-z]+\s*=/i;
+  /\b(?:javascript|vbscript)\s*:|(?:^|[\s"'=(])data\s*:(?!\s+[\{\p{L}\p{N}])/iu;
+const DANGEROUS_TAG_OR_HANDLER_PATTERN =
+  /\bhttp:\/\/|\bhttps?:\/\/[^/\s:@]+:[^/\s@]*@|<\s*\/?\s*(?:script|iframe|object|embed|svg|img|style|link|meta)\b|\b(?:onabort|onafterprint|onanimationend|onanimationiteration|onanimationstart|onauxclick|onbeforeinput|onbeforeprint|onbeforeunload|onblur|oncancel|oncanplay|oncanplaythrough|onchange|onclick|onclose|oncontextmenu|oncopy|oncuechange|oncut|ondblclick|ondrag|ondragend|ondragenter|ondragleave|ondragover|ondragstart|ondrop|ondurationchange|onemptied|onended|onerror|onfocus|onfocusin|onfocusout|onformdata|onfullscreenchange|onfullscreenerror|ongotpointercapture|onhashchange|oninput|oninvalid|onkeydown|onkeypress|onkeyup|onlanguagechange|onload|onloadeddata|onloadedmetadata|onloadstart|onlostpointercapture|onmessage|onmessageerror|onmousedown|onmouseenter|onmouseleave|onmousemove|onmouseout|onmouseover|onmouseup|onoffline|ononline|onpagehide|onpageshow|onpaste|onpause|onplay|onplaying|onpointercancel|onpointerdown|onpointerenter|onpointerleave|onpointermove|onpointerout|onpointerover|onpointerrawupdate|onpointerup|onpopstate|onprogress|onratechange|onrejectionhandled|onreset|onresize|onscroll|onscrollend|onsecuritypolicyviolation|onseeked|onseeking|onselect|onselectionchange|onselectstart|onslotchange|onstalled|onstorage|onsubmit|onsuspend|ontimeupdate|ontoggle|ontouchcancel|ontouchend|ontouchmove|ontouchstart|ontransitioncancel|ontransitionend|ontransitionrun|ontransitionstart|onunhandledrejection|onunload|onvolumechange|onwaiting|onwheel)\s*=/i;
 const OPTIONAL_URL_FIELDS = Object.freeze(['url', 'imageUrl', 'logoUrl', 'website', 'href']);
+const ALLOWED_COMPONENT_KEYS = Object.freeze([
+  'name',
+  'description',
+  'photo',
+  'price',
+  'minQuantity',
+  'quantitySelector',
+  'durationMinutes'
+]);
+const ALLOWED_ORDER_FIELD_KEYS = Object.freeze([
+  'date',
+  'timeSlots',
+  'deliveryOrPickup',
+  'customerName',
+  'notes'
+]);
+const ALLOWED_MESSAGE_KEYS = Object.freeze([
+  'heroTitle',
+  'welcomeText',
+  'ctaLabel',
+  'whatsappTemplate'
+]);
+
 const utf8Encoder = new TextEncoder();
 
 export function validateSafePublicHttpsUrl(rawUrl, errorStatus = 422) {
@@ -59,7 +138,10 @@ export function validateSafePublicHttpsUrl(rawUrl, errorStatus = 422) {
 }
 
 export function assertNoDangerousTextPayload(value, errorStatus = 422, errorCode = 'INVALID_PAYLOAD') {
-  if (typeof value === 'string' && DANGEROUS_SCHEME_OR_TAG_PATTERN.test(value)) {
+  if (
+    typeof value === 'string' &&
+    (DANGEROUS_SCHEME_OR_TAG_PATTERN.test(value) || DANGEROUS_TAG_OR_HANDLER_PATTERN.test(value))
+  ) {
     throw new PortalValidationError(
       errorStatus,
       errorCode,
@@ -72,6 +154,9 @@ function validateOptionalUrlFields(target, errorStatus = 422) {
   if (!target || typeof target !== 'object') return;
   for (const field of OPTIONAL_URL_FIELDS) {
     if (target[field] !== undefined && target[field] !== null) {
+      if (field === 'imageUrl' && target[field] === '') {
+        continue;
+      }
       validateSafePublicHttpsUrl(target[field], errorStatus);
     }
   }
@@ -138,14 +223,431 @@ export function validateSiteName(name, errorStatus = 400) {
 
 export function validateTemplate(template = DEFAULT_TEMPLATE, errorStatus = 400) {
   const resolved = template === undefined ? DEFAULT_TEMPLATE : template;
-  if (resolved !== DEFAULT_TEMPLATE) {
+  if (typeof resolved !== 'string' || !ALLOWED_TEMPLATES.includes(resolved)) {
     throw new PortalValidationError(
       errorStatus,
       'INVALID_TEMPLATE',
-      'Modelo de vitrine inválido. Apenas pizzeria-v1 é suportado no MVP.'
+      `Modelo de vitrine inválido. Modelos suportados: ${ALLOWED_TEMPLATES.join(', ')}.`
     );
   }
   return resolved;
+}
+
+export function validateStorefrontType(storefrontType = DEFAULT_STOREFRONT_TYPE, errorStatus = 400) {
+  const resolved = storefrontType === undefined ? DEFAULT_STOREFRONT_TYPE : storefrontType;
+  if (typeof resolved !== 'string' || !ALLOWED_STOREFRONT_TYPES.includes(resolved)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_STOREFRONT_TYPE',
+      `Tipo de vitrine inválido. Áreas suportadas: ${ALLOWED_STOREFRONT_TYPES.join(', ')}.`
+    );
+  }
+  return resolved;
+}
+
+export function validateCatalogType(catalogType = DEFAULT_CATALOG_TYPE, errorStatus = 422) {
+  const resolved = catalogType === undefined ? DEFAULT_CATALOG_TYPE : catalogType;
+  if (typeof resolved !== 'string' || !ALLOWED_CATALOG_TYPES.includes(resolved)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_CATALOG_TYPE',
+      `Tipo de catálogo inválido. Tipos suportados: ${ALLOWED_CATALOG_TYPES.join(', ')}.`
+    );
+  }
+  return resolved;
+}
+
+export function resolveCatalogTypeForTemplate(template = DEFAULT_TEMPLATE, catalogType = undefined) {
+  if (catalogType !== undefined) {
+    return validateCatalogType(catalogType, 400);
+  }
+  if (template === 'booking-v1') return 'booking';
+  if (template === 'quote-v1') return 'quote';
+  return 'products';
+}
+
+export function resolveTemplateForCatalogType(catalogType, template = undefined) {
+  if (template !== undefined) {
+    return validateTemplate(template, 400);
+  }
+  if (catalogType === 'booking') return 'booking-v1';
+  if (catalogType === 'quote') return 'quote-v1';
+  if (catalogType === 'products') return 'products-v1';
+  return DEFAULT_TEMPLATE;
+}
+
+export function getDefaultComponents(catalogType = DEFAULT_CATALOG_TYPE, template = DEFAULT_TEMPLATE) {
+  const resolvedCatalog = ALLOWED_CATALOG_TYPES.includes(catalogType)
+    ? catalogType
+    : resolveCatalogTypeForTemplate(template);
+
+  if (resolvedCatalog === 'booking') {
+    return {
+      name: true,
+      description: true,
+      photo: true,
+      price: true,
+      minQuantity: false,
+      quantitySelector: false,
+      durationMinutes: true
+    };
+  }
+
+  if (resolvedCatalog === 'quote') {
+    return {
+      name: true,
+      description: true,
+      photo: true,
+      price: false,
+      minQuantity: false,
+      quantitySelector: true,
+      durationMinutes: false
+    };
+  }
+
+  return {
+    name: true,
+    description: true,
+    photo: template === 'pizzeria-v1' ? false : true,
+    price: true,
+    minQuantity: false,
+    quantitySelector: true,
+    durationMinutes: false
+  };
+}
+
+export function getDefaultOrderFields(catalogType = DEFAULT_CATALOG_TYPE) {
+  if (catalogType === 'booking') {
+    return {
+      date: true,
+      timeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
+      deliveryOrPickup: false,
+      customerName: true,
+      notes: true
+    };
+  }
+
+  if (catalogType === 'quote') {
+    return {
+      date: false,
+      timeSlots: [],
+      deliveryOrPickup: false,
+      customerName: true,
+      notes: true
+    };
+  }
+
+  return {
+    date: false,
+    timeSlots: [],
+    deliveryOrPickup: true,
+    customerName: true,
+    notes: true
+  };
+}
+
+export function getDefaultMessages(
+  catalogType = DEFAULT_CATALOG_TYPE,
+  businessName = 'Vitrine',
+  template = DEFAULT_TEMPLATE
+) {
+  const safeName = typeof businessName === 'string' && businessName.trim() ? businessName.trim() : 'Vitrine';
+
+  if (catalogType === 'booking') {
+    return {
+      heroTitle: safeName,
+      welcomeText:
+        'Escolha o serviço desejado, selecione a data e o horário de preferência e confirme pelo WhatsApp.',
+      ctaLabel: 'Confirmar agendamento no WhatsApp',
+      whatsappTemplate:
+        'Olá! Meu nome é {nome}. Gostaria de agendar:\n{itens}\nData: {data} às {horario}\nTotal estimado: {total}'
+    };
+  }
+
+  if (catalogType === 'quote') {
+    return {
+      heroTitle: safeName,
+      welcomeText:
+        'Selecione os itens de seu interesse e envie sua solicitação de orçamento pelo WhatsApp.',
+      ctaLabel: 'Solicitar orçamento no WhatsApp',
+      whatsappTemplate:
+        'Olá! Meu nome é {nome}. Tenho interesse em solicitar orçamento para:\n{itens}'
+    };
+  }
+
+  if (template === 'pizzeria-v1') {
+    return {
+      heroTitle: safeName,
+      welcomeText:
+        'Escolha seus itens abaixo, revise os dados do pedido e envie pelo WhatsApp.',
+      ctaLabel: 'Enviar pedido no WhatsApp',
+      whatsappTemplate:
+        'Olá! Tenho interesse nestes produtos:\n{itens}\nTotal estimado: {total}'
+    };
+  }
+
+  return {
+    heroTitle: safeName,
+    welcomeText:
+      'Escolha seus itens abaixo, revise os dados do pedido e envie pelo WhatsApp.',
+    ctaLabel: 'Enviar pedido no WhatsApp',
+    whatsappTemplate:
+      'Olá! Meu nome é {nome}. Gostaria de pedir:\n{itens}\nTotal: {total}\nEntrega/Retirada: {endereco}'
+  };
+}
+
+export function validateComponentsConfig(components, catalogType = DEFAULT_CATALOG_TYPE, template = DEFAULT_TEMPLATE) {
+  if (!components || typeof components !== 'object' || Array.isArray(components)) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_COMPONENTS',
+      'A configuração de componentes do item deve ser um objeto JSON válido.'
+    );
+  }
+  for (const key of Object.keys(components)) {
+    if (!ALLOWED_COMPONENT_KEYS.includes(key)) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_COMPONENTS',
+        `Componente de item desconhecido: ${key}.`
+      );
+    }
+    if (typeof components[key] !== 'boolean') {
+      throw new PortalValidationError(
+        422,
+        'INVALID_COMPONENTS',
+        `O componente ${key} deve ser booleano (true ou false).`
+      );
+    }
+  }
+  if (components.name === false) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_COMPONENTS',
+      'O componente name (nome do item) é obrigatório e não pode ser desativado.'
+    );
+  }
+  return {
+    ...getDefaultComponents(catalogType, template),
+    ...components
+  };
+}
+
+export function validateOrderFieldsConfig(orderFields, catalogType = DEFAULT_CATALOG_TYPE) {
+  if (!orderFields || typeof orderFields !== 'object' || Array.isArray(orderFields)) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ORDER_FIELDS',
+      'A configuração de campos do pedido deve ser um objeto JSON válido.'
+    );
+  }
+  for (const key of Object.keys(orderFields)) {
+    if (!ALLOWED_ORDER_FIELD_KEYS.includes(key)) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_ORDER_FIELDS',
+        `Campo de pedido desconhecido: ${key}.`
+      );
+    }
+    if (key === 'timeSlots') {
+      if (!Array.isArray(orderFields.timeSlots) || orderFields.timeSlots.length > 48) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ORDER_FIELDS',
+          'A lista de horários (timeSlots) deve ser um array com até 48 horários.'
+        );
+      }
+      for (const slot of orderFields.timeSlots) {
+        if (typeof slot !== 'string' || !slot.trim() || slot.trim().length > 40) {
+          throw new PortalValidationError(
+            422,
+            'INVALID_ORDER_FIELDS',
+            'Cada horário em timeSlots deve ter entre 1 e 40 caracteres.'
+          );
+        }
+        assertNoDangerousTextPayload(slot, 422, 'INVALID_ORDER_FIELDS');
+      }
+    } else if (typeof orderFields[key] !== 'boolean') {
+      throw new PortalValidationError(
+        422,
+        'INVALID_ORDER_FIELDS',
+        `O campo de pedido ${key} deve ser booleano (true ou false).`
+      );
+    }
+  }
+  const defaults = getDefaultOrderFields(catalogType);
+  return {
+    ...defaults,
+    ...orderFields,
+    timeSlots: Array.isArray(orderFields.timeSlots)
+      ? orderFields.timeSlots.map((s) => s.trim())
+      : defaults.timeSlots
+  };
+}
+
+export function validateMessagesConfig(
+  messages,
+  catalogType = DEFAULT_CATALOG_TYPE,
+  businessName = 'Vitrine',
+  template = DEFAULT_TEMPLATE
+) {
+  if (!messages || typeof messages !== 'object' || Array.isArray(messages)) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_MESSAGES',
+      'A configuração de textos e mensagens deve ser um objeto JSON válido.'
+    );
+  }
+  for (const key of Object.keys(messages)) {
+    if (!ALLOWED_MESSAGE_KEYS.includes(key)) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_MESSAGES',
+        `Campo de mensagem desconhecido: ${key}.`
+      );
+    }
+    const val = messages[key];
+    if (typeof val !== 'string') {
+      throw new PortalValidationError(
+        422,
+        'INVALID_MESSAGES',
+        `O campo ${key} deve ser um texto válido.`
+      );
+    }
+    assertNoDangerousTextPayload(val, 422, 'INVALID_MESSAGES');
+  }
+
+  if (messages.heroTitle !== undefined && messages.heroTitle.trim().length > 160) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_MESSAGES',
+      'O título (heroTitle) deve ter no máximo 160 caracteres.'
+    );
+  }
+  if (messages.welcomeText !== undefined && messages.welcomeText.trim().length > 500) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_MESSAGES',
+      'O texto de boas-vindas (welcomeText) deve ter no máximo 500 caracteres.'
+    );
+  }
+  if (messages.ctaLabel !== undefined && messages.ctaLabel.trim().length > 80) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_MESSAGES',
+      'O texto do botão (ctaLabel) deve ter no máximo 80 caracteres.'
+    );
+  }
+  if (messages.whatsappTemplate !== undefined) {
+    const tpl = messages.whatsappTemplate.trim();
+    if (!tpl || tpl.length > 1000) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_MESSAGES',
+        'O modelo de mensagem do WhatsApp (whatsappTemplate) deve ter entre 1 e 1000 caracteres.'
+      );
+    }
+    const placeholders = tpl.match(/\{[^{}]+\}/g) ?? [];
+    for (const token of placeholders) {
+      if (!ALLOWED_WHATSAPP_VARIABLES.includes(token)) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_MESSAGES',
+          `Variável não suportada na mensagem do WhatsApp: ${token}. Variáveis permitidas: ${ALLOWED_WHATSAPP_VARIABLES.join(', ')}.`
+        );
+      }
+    }
+  }
+
+  const defaults = getDefaultMessages(catalogType, businessName, template);
+  return {
+    heroTitle:
+      typeof messages.heroTitle === 'string' && messages.heroTitle.trim()
+        ? messages.heroTitle.trim()
+        : defaults.heroTitle,
+    welcomeText:
+      typeof messages.welcomeText === 'string' && messages.welcomeText.trim()
+        ? messages.welcomeText.trim()
+        : defaults.welcomeText,
+    ctaLabel:
+      typeof messages.ctaLabel === 'string' && messages.ctaLabel.trim()
+        ? messages.ctaLabel.trim()
+        : defaults.ctaLabel,
+    whatsappTemplate:
+      typeof messages.whatsappTemplate === 'string' && messages.whatsappTemplate.trim()
+        ? messages.whatsappTemplate.trim()
+        : defaults.whatsappTemplate
+  };
+}
+
+export function migrateLegacyDraftContent(content, site = {}) {
+  if (!content || typeof content !== 'object' || Array.isArray(content)) {
+    return content;
+  }
+
+  const cloned = structuredClone(content);
+  const resolvedTemplate =
+    typeof cloned.template === 'string' && ALLOWED_TEMPLATES.includes(cloned.template)
+      ? cloned.template
+      : typeof site?.template === 'string' && ALLOWED_TEMPLATES.includes(site.template)
+        ? site.template
+        : DEFAULT_TEMPLATE;
+
+  const rawStorefrontType =
+    cloned.storefrontType ?? site?.storefrontType ?? site?.storefront_type ?? DEFAULT_STOREFRONT_TYPE;
+  const resolvedStorefrontType = ALLOWED_STOREFRONT_TYPES.includes(rawStorefrontType)
+    ? rawStorefrontType
+    : DEFAULT_STOREFRONT_TYPE;
+
+  const rawCatalogType = cloned.catalogType;
+  const resolvedCatalogType = ALLOWED_CATALOG_TYPES.includes(rawCatalogType)
+    ? rawCatalogType
+    : resolveCatalogTypeForTemplate(resolvedTemplate);
+
+  const resolvedBusinessName =
+    (typeof cloned.businessName === 'string' && cloned.businessName.trim()) ||
+    (typeof cloned.name === 'string' && cloned.name.trim()) ||
+    (typeof site?.name === 'string' && site.name.trim()) ||
+    'Vitrine';
+
+  const defaultComponents = getDefaultComponents(resolvedCatalogType, resolvedTemplate);
+  const components =
+    cloned.components && typeof cloned.components === 'object' && !Array.isArray(cloned.components)
+      ? { ...defaultComponents, ...cloned.components }
+      : defaultComponents;
+
+  const defaultOrderFields = getDefaultOrderFields(resolvedCatalogType);
+  const orderFields =
+    cloned.orderFields && typeof cloned.orderFields === 'object' && !Array.isArray(cloned.orderFields)
+      ? {
+          ...defaultOrderFields,
+          ...cloned.orderFields,
+          timeSlots: Array.isArray(cloned.orderFields.timeSlots)
+            ? [...cloned.orderFields.timeSlots]
+            : defaultOrderFields.timeSlots
+        }
+      : defaultOrderFields;
+
+  const defaultMessages = getDefaultMessages(resolvedCatalogType, resolvedBusinessName, resolvedTemplate);
+  const messages =
+    cloned.messages && typeof cloned.messages === 'object' && !Array.isArray(cloned.messages)
+      ? { ...defaultMessages, ...cloned.messages }
+      : defaultMessages;
+
+  return {
+    schemaVersion: cloned.schemaVersion ?? 1,
+    ...cloned,
+    template: resolvedTemplate,
+    storefrontType: resolvedStorefrontType,
+    catalogType: resolvedCatalogType,
+    ...(cloned.slug ?? site?.slug ? { slug: cloned.slug ?? site.slug } : {}),
+    ...(cloned.businessName ?? cloned.name ?? site?.name
+      ? { businessName: resolvedBusinessName }
+      : {}),
+    components,
+    orderFields,
+    messages
+  };
 }
 
 export function isValidWhatsapp(whatsapp) {
@@ -175,7 +677,10 @@ export function isValidPriceCents(priceCents) {
   return Number.isSafeInteger(priceCents) && priceCents > 0;
 }
 
-export function validatePriceCents(priceCents) {
+export function validatePriceCents(priceCents, { allowZero = false } = {}) {
+  if (allowZero && (priceCents === 0 || priceCents === null || priceCents === undefined)) {
+    return 0;
+  }
   if (!isValidPriceCents(priceCents)) {
     throw new PortalValidationError(
       422,
@@ -240,6 +745,279 @@ export function validateRevision(revision) {
   return revision;
 }
 
+export function computeProfileCompleteness(profile = {}) {
+  const missingFields = [];
+  if (typeof profile.displayName !== 'string' || !profile.displayName.trim()) {
+    missingFields.push('displayName');
+  }
+  if (typeof profile.businessName !== 'string' || !profile.businessName.trim()) {
+    missingFields.push('businessName');
+  }
+  if (typeof profile.city !== 'string' || !profile.city.trim()) {
+    missingFields.push('city');
+  }
+  if (typeof profile.whatsapp !== 'string' || !profile.whatsapp.trim()) {
+    missingFields.push('whatsapp');
+  }
+  if (!Array.isArray(profile.interests) || profile.interests.length === 0) {
+    missingFields.push('interests');
+  }
+  const completedCount = 5 - missingFields.length;
+  return {
+    percent: Math.round((completedCount / 5) * 100),
+    missingFields
+  };
+}
+
+export function formatProfileRecord(userId, raw = {}, interests = []) {
+  const displayName = typeof raw.displayName === 'string'
+    ? raw.displayName.trim()
+    : typeof raw.display_name === 'string'
+      ? raw.display_name.trim()
+      : '';
+  const businessName = typeof raw.businessName === 'string'
+    ? raw.businessName.trim()
+    : typeof raw.business_name === 'string'
+      ? raw.business_name.trim()
+      : '';
+  const city = typeof raw.city === 'string' ? raw.city.trim() : '';
+  const whatsapp = typeof raw.whatsapp === 'string' ? raw.whatsapp.trim() : '';
+  const normalizedInterests = Array.isArray(interests)
+    ? [...new Set(interests.filter((item) => ALLOWED_PROFILE_INTERESTS.includes(item)))]
+    : [];
+  const updatedAt = raw.updatedAt ?? raw.updated_at ?? raw.createdAt ?? raw.created_at ?? null;
+
+  return {
+    userId,
+    displayName,
+    businessName,
+    city,
+    whatsapp,
+    interests: normalizedInterests,
+    completeness: computeProfileCompleteness({
+      displayName,
+      businessName,
+      city,
+      whatsapp,
+      interests: normalizedInterests
+    }),
+    updatedAt
+  };
+}
+
+export function validateProfileInput(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new PortalValidationError(400, 'INVALID_PAYLOAD', 'Dados de perfil inválidos.');
+  }
+
+  const validateTextField = (val, maxLen, fieldLabel) => {
+    if (val === undefined || val === null) return '';
+    if (typeof val !== 'string') {
+      throw new PortalValidationError(422, 'INVALID_PROFILE', `O campo ${fieldLabel} deve ser um texto válido.`);
+    }
+    const trimmed = val.trim();
+    if (trimmed.length > maxLen) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_PROFILE',
+        `O campo ${fieldLabel} deve ter no máximo ${maxLen} caracteres.`
+      );
+    }
+    assertNoDangerousTextPayload(trimmed, 422, 'INVALID_PROFILE');
+    return trimmed;
+  };
+
+  const displayName = validateTextField(payload.displayName, 120, 'nome de exibição');
+  const businessName = validateTextField(payload.businessName, 160, 'nome do negócio');
+  const city = validateTextField(payload.city, 120, 'cidade');
+
+  let whatsapp = '';
+  if (payload.whatsapp !== undefined && payload.whatsapp !== null) {
+    if (typeof payload.whatsapp !== 'string') {
+      throw new PortalValidationError(
+        422,
+        'INVALID_WHATSAPP',
+        'Informe um número de WhatsApp internacional válido contendo apenas dígitos.'
+      );
+    }
+    const trimmedWa = payload.whatsapp.trim();
+    if (trimmedWa !== '') {
+      whatsapp = validateWhatsapp(trimmedWa);
+    }
+  }
+
+  let interests = [];
+  if (payload.interests !== undefined && payload.interests !== null) {
+    if (!Array.isArray(payload.interests) || payload.interests.length > 8) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_INTERESTS',
+        'A lista de interesses deve conter até 8 opções válidas.'
+      );
+    }
+    const seen = new Set();
+    for (const entry of payload.interests) {
+      if (typeof entry !== 'string' || !ALLOWED_PROFILE_INTERESTS.includes(entry.trim())) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_INTERESTS',
+          `Interesse inválido: ${String(entry)}.`
+        );
+      }
+      seen.add(entry.trim());
+    }
+    interests = [...seen];
+  }
+
+  return {
+    displayName,
+    businessName,
+    city,
+    whatsapp,
+    interests
+  };
+}
+
+export function validateCustomizationRequestInput(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_PAYLOAD',
+      'Dados do pedido de customização inválidos.'
+    );
+  }
+
+  let siteId = null;
+  if (payload.siteId !== undefined && payload.siteId !== null && payload.siteId !== '') {
+    if (typeof payload.siteId !== 'string' || !UUID_PATTERN.test(payload.siteId.trim())) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_SITE_ID',
+        'O identificador da vitrine associada (siteId) deve ser um UUID válido.'
+      );
+    }
+    siteId = payload.siteId.trim();
+  }
+
+  const storefrontType = validateStorefrontType(payload.storefrontType ?? null, 422);
+
+  if (typeof payload.templateInterest !== 'string') {
+    throw new PortalValidationError(
+      422,
+      'INVALID_TEMPLATE_INTEREST',
+      'Informe o modelo de interesse (entre 1 e 120 caracteres).'
+    );
+  }
+  const templateInterest = payload.templateInterest.trim();
+  if (templateInterest.length < 1 || templateInterest.length > 120) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_TEMPLATE_INTEREST',
+      'O modelo de interesse deve ter entre 1 e 120 caracteres.'
+    );
+  }
+  assertNoDangerousTextPayload(templateInterest, 422, 'INVALID_TEMPLATE_INTEREST');
+
+  if (typeof payload.goal !== 'string') {
+    throw new PortalValidationError(
+      422,
+      'INVALID_GOAL',
+      'Descreva o objetivo da customização (entre 10 e 2000 caracteres).'
+    );
+  }
+  const goal = payload.goal.trim();
+  if (goal.length < 10 || goal.length > 2000) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_GOAL',
+      'O objetivo da customização deve ter entre 10 e 2000 caracteres.'
+    );
+  }
+  assertNoDangerousTextPayload(goal, 422, 'INVALID_GOAL');
+
+  const referenceUrls = [];
+  if (payload.referenceUrls !== undefined && payload.referenceUrls !== null) {
+    if (!Array.isArray(payload.referenceUrls) || payload.referenceUrls.length > 10) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_URL',
+        'Informe no máximo 10 links HTTPS públicos de referência.'
+      );
+    }
+    for (const rawUrl of payload.referenceUrls) {
+      referenceUrls.push(validateSafePublicHttpsUrl(rawUrl, 422));
+    }
+  }
+
+  let desiredDeadline = '';
+  if (payload.desiredDeadline !== undefined && payload.desiredDeadline !== null) {
+    if (typeof payload.desiredDeadline !== 'string' || payload.desiredDeadline.trim().length > 120) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_DEADLINE',
+        'O prazo desejado deve ter no máximo 120 caracteres.'
+      );
+    }
+    desiredDeadline = payload.desiredDeadline.trim();
+    assertNoDangerousTextPayload(desiredDeadline, 422, 'INVALID_DEADLINE');
+  }
+
+  return {
+    siteId,
+    storefrontType,
+    templateInterest,
+    goal,
+    referenceUrls,
+    desiredDeadline
+  };
+}
+
+export function buildCustomizationWhatsappUrl(requestRecord, teamWhatsapp = DEFAULT_WHATSAPP) {
+  const validPhone = validateWhatsapp(teamWhatsapp);
+  const lines = [
+    'Olá! Enviei um pedido de customização pelo Portal Vitrine Inspira:',
+    `Área: ${requestRecord.storefrontType}`,
+    `Modelo de interesse: ${requestRecord.templateInterest}`,
+    `Objetivo: ${requestRecord.goal}`
+  ];
+  if (requestRecord.desiredDeadline) {
+    lines.push(`Prazo desejado: ${requestRecord.desiredDeadline}`);
+  }
+  if (Array.isArray(requestRecord.referenceUrls) && requestRecord.referenceUrls.length > 0) {
+    lines.push(`Referências: ${requestRecord.referenceUrls.join(', ')}`);
+  }
+  return `https://wa.me/${validPhone}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+
+export function validateCatalogImagePath(objectPath, expectedSiteId = null) {
+  if (typeof objectPath !== 'string' || !objectPath.trim() || objectPath.includes('..')) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_IMAGE_PATH',
+      'Caminho de imagem inválido para o bucket catalog-images.'
+    );
+  }
+  const trimmed = objectPath.trim().replace(/^\/+/, '');
+  const match = trimmed.match(
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([a-z0-9][a-z0-9._-]*\.webp)$/i
+  );
+  if (!match) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_IMAGE_PATH',
+      'Use o formato <site_id>/<item_id>.webp em WebP.'
+    );
+  }
+  if (expectedSiteId && match[1].toLowerCase() !== String(expectedSiteId).toLowerCase()) {
+    throw new PortalValidationError(
+      403,
+      'FORBIDDEN_IMAGE_PATH',
+      'O caminho da imagem não pertence à vitrine selecionada.'
+    );
+  }
+  return trimmed;
+}
+
 export function validateSiteInput(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new PortalValidationError(400, 'INVALID_PAYLOAD', 'Dados de criação da vitrine inválidos.');
@@ -247,10 +1025,12 @@ export function validateSiteInput(payload) {
   validateOptionalUrlFields(payload, 400);
   const slug = validateSlug(payload.slug);
   const name = validateSiteName(payload.name, 400);
-  const template = validateTemplate(payload.template, 400);
+  const storefrontType = validateStorefrontType(payload.storefrontType, 400);
+  const template = resolveTemplateForCatalogType(payload.catalogType, payload.template);
+  const catalogType = resolveCatalogTypeForTemplate(template, payload.catalogType);
   const whatsapp =
     payload.whatsapp !== undefined ? validateWhatsapp(payload.whatsapp) : DEFAULT_WHATSAPP;
-  return { name, slug, template, whatsapp };
+  return { name, slug, storefrontType, template, catalogType, whatsapp };
 }
 
 export const validateCreateSitePayload = validateSiteInput;
@@ -260,19 +1040,28 @@ export function createInitialDraftContent({
   slug,
   name,
   businessName,
+  storefrontType = DEFAULT_STOREFRONT_TYPE,
   template = DEFAULT_TEMPLATE,
+  catalogType,
   whatsapp = DEFAULT_WHATSAPP
 }) {
   const validSlug = validateSlug(slug);
   const resolvedName = validateSiteName(businessName ?? name);
-  const validTemplate = validateTemplate(template, 400);
+  const validStorefrontType = validateStorefrontType(storefrontType, 400);
+  const validTemplate = resolveTemplateForCatalogType(catalogType, template);
+  const validCatalogType = resolveCatalogTypeForTemplate(validTemplate, catalogType);
   const validWhatsapp = validateWhatsapp(whatsapp);
   return {
     schemaVersion: 1,
     template: validTemplate,
+    storefrontType: validStorefrontType,
+    catalogType: validCatalogType,
     slug: validSlug,
     businessName: resolvedName,
     whatsapp: validWhatsapp,
+    components: getDefaultComponents(validCatalogType, validTemplate),
+    orderFields: getDefaultOrderFields(validCatalogType),
+    messages: getDefaultMessages(validCatalogType, resolvedName, validTemplate),
     categories: []
   };
 }
@@ -338,9 +1127,17 @@ export function validateDraftContent(content, options = {}) {
     );
   }
 
-  if (content.template !== undefined) {
-    validateTemplate(content.template, 422);
+  const effectiveTemplate =
+    content.template !== undefined ? validateTemplate(content.template, 422) : DEFAULT_TEMPLATE;
+
+  if (content.storefrontType !== undefined) {
+    validateStorefrontType(content.storefrontType, 422);
   }
+
+  const effectiveCatalogType =
+    content.catalogType !== undefined
+      ? validateCatalogType(content.catalogType, 422)
+      : resolveCatalogTypeForTemplate(effectiveTemplate);
 
   validateOptionalUrlFields(content, 422);
 
@@ -367,6 +1164,31 @@ export function validateDraftContent(content, options = {}) {
     }
     assertNoDangerousTextPayload(rawBusinessName, 422, 'INVALID_NAME');
   }
+
+  let validatedComponents = null;
+  if (content.components !== undefined) {
+    validatedComponents = validateComponentsConfig(
+      content.components,
+      effectiveCatalogType,
+      effectiveTemplate
+    );
+  }
+
+  if (content.orderFields !== undefined) {
+    validateOrderFieldsConfig(content.orderFields, effectiveCatalogType);
+  }
+
+  if (content.messages !== undefined) {
+    validateMessagesConfig(
+      content.messages,
+      effectiveCatalogType,
+      rawBusinessName ?? 'Vitrine',
+      effectiveTemplate
+    );
+  }
+
+  const allowZeroPrice =
+    effectiveCatalogType === 'quote' || validatedComponents?.price === false;
 
   const hasCategories = content.categories !== undefined;
   const hasItems = content.items !== undefined;
@@ -423,7 +1245,7 @@ export function validateDraftContent(content, options = {}) {
     }
 
     validateOptionalUrlFields(item, 422);
-    validatePriceCents(item.priceCents);
+    validatePriceCents(item.priceCents, { allowZero: allowZeroPrice });
 
     if (item.name !== undefined) {
       if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 160) {
@@ -445,6 +1267,30 @@ export function validateDraftContent(content, options = {}) {
         );
       }
       assertNoDangerousTextPayload(item.description, 422, 'INVALID_ITEM');
+    }
+
+    if (item.minQuantity !== undefined && item.minQuantity !== null) {
+      if (!Number.isSafeInteger(item.minQuantity) || item.minQuantity < 1 || item.minQuantity > 99) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM',
+          'A quantidade mínima (minQuantity) deve ser um número inteiro entre 1 e 99.'
+        );
+      }
+    }
+
+    if (item.durationMinutes !== undefined && item.durationMinutes !== null) {
+      if (
+        !Number.isSafeInteger(item.durationMinutes) ||
+        item.durationMinutes < 5 ||
+        item.durationMinutes > 480
+      ) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM',
+          'A duração em minutos (durationMinutes) deve ser um número inteiro entre 5 e 480.'
+        );
+      }
     }
 
     if (item.id !== undefined) {
@@ -536,7 +1382,7 @@ export function toPublicMenuDraft(content, site = {}) {
   const items = validated.items.map((item, idx) => ({
     id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : `item-${idx + 1}`,
     name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : `Item ${idx + 1}`,
-    priceCents: item.priceCents,
+    priceCents: Number.isSafeInteger(item.priceCents) && item.priceCents >= 0 ? item.priceCents : 0,
     active: isItemActive(item)
   }));
 

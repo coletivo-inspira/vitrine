@@ -3,8 +3,13 @@ import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
+  migrateLegacyDraftContent,
   toPublicMenuDraft,
-  validateDraftContent
+  validateComponentsConfig,
+  validateDraftContent,
+  validateMessagesConfig,
+  validateOrderFieldsConfig,
+  validateSafePublicHttpsUrl
 } from './portal-validation.mjs';
 
 const utf8Encoder = new TextEncoder();
@@ -35,16 +40,51 @@ export const FORBIDDEN_PUBLIC_KEYS = Object.freeze([
 const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'schemaVersion',
   'template',
+  'storefrontType',
+  'catalogType',
   'slug',
   'name',
   'whatsapp',
   'currency',
+  'components',
+  'orderFields',
+  'messages',
   'items',
   'categories'
 ]);
 
-const ALLOWED_ITEM_KEYS = new Set(['id', 'name', 'priceCents', 'description']);
+const ALLOWED_ITEM_KEYS = new Set([
+  'id',
+  'name',
+  'priceCents',
+  'description',
+  'imageUrl',
+  'minQuantity',
+  'durationMinutes'
+]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
+const ALLOWED_COMPONENT_KEYS = new Set([
+  'name',
+  'description',
+  'photo',
+  'price',
+  'minQuantity',
+  'quantitySelector',
+  'durationMinutes'
+]);
+const ALLOWED_ORDER_FIELD_KEYS = new Set([
+  'date',
+  'timeSlots',
+  'deliveryOrPickup',
+  'customerName',
+  'notes'
+]);
+const ALLOWED_MESSAGE_KEYS = new Set([
+  'heroTitle',
+  'welcomeText',
+  'ctaLabel',
+  'whatsappTemplate'
+]);
 
 function slugifyCategoryId(value, index) {
   if (typeof value === 'string' && value.trim()) {
@@ -99,6 +139,63 @@ export function assertNoPrivateLeakage(menuArtifact) {
         'PRIVATE_FIELD_LEAKAGE',
         `Campo não permitido no artefato público: ${key}`
       );
+    }
+  }
+
+  if (menuArtifact.components !== undefined) {
+    if (
+      !menuArtifact.components ||
+      typeof menuArtifact.components !== 'object' ||
+      Array.isArray(menuArtifact.components)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco components inválido.');
+    }
+    for (const key of Object.keys(menuArtifact.components)) {
+      if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_COMPONENT_KEYS.has(key)) {
+        throw new PortalValidationError(
+          422,
+          'PRIVATE_FIELD_LEAKAGE',
+          `Campo não permitido em components público: ${key}`
+        );
+      }
+    }
+  }
+
+  if (menuArtifact.orderFields !== undefined) {
+    if (
+      !menuArtifact.orderFields ||
+      typeof menuArtifact.orderFields !== 'object' ||
+      Array.isArray(menuArtifact.orderFields)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco orderFields inválido.');
+    }
+    for (const key of Object.keys(menuArtifact.orderFields)) {
+      if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_ORDER_FIELD_KEYS.has(key)) {
+        throw new PortalValidationError(
+          422,
+          'PRIVATE_FIELD_LEAKAGE',
+          `Campo não permitido em orderFields público: ${key}`
+        );
+      }
+    }
+  }
+
+  if (menuArtifact.messages !== undefined) {
+    if (
+      !menuArtifact.messages ||
+      typeof menuArtifact.messages !== 'object' ||
+      Array.isArray(menuArtifact.messages)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco messages inválido.');
+    }
+    for (const key of Object.keys(menuArtifact.messages)) {
+      if (FORBIDDEN_PUBLIC_KEYS.includes(key) || !ALLOWED_MESSAGE_KEYS.has(key)) {
+        throw new PortalValidationError(
+          422,
+          'PRIVATE_FIELD_LEAKAGE',
+          `Campo não permitido em messages público: ${key}`
+        );
+      }
     }
   }
 
@@ -170,18 +267,21 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     );
   }
 
-  const normalizedContent = {
-    ...draftContent,
-    slug: site.slug ?? draftContent.slug,
-    businessName: draftContent.businessName ?? draftContent.name ?? site.name,
-    template: draftContent.template ?? site.template ?? DEFAULT_TEMPLATE
-  };
+  const migrated = migrateLegacyDraftContent(
+    {
+      ...draftContent,
+      slug: site.slug ?? draftContent.slug,
+      businessName: draftContent.businessName ?? draftContent.name ?? site.name,
+      template: draftContent.template ?? site.template ?? DEFAULT_TEMPLATE
+    },
+    site
+  );
 
-  validateDraftContent(normalizedContent);
+  validateDraftContent(migrated);
 
   let baseMenu;
   try {
-    const publicMenuDraft = toPublicMenuDraft(normalizedContent, site);
+    const publicMenuDraft = toPublicMenuDraft(migrated, site);
     baseMenu = publicMenu(publicMenuDraft);
   } catch (err) {
     if (err instanceof PortalValidationError) {
@@ -202,11 +302,10 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     );
   }
 
-  // Build map of validated active items by id, enriched only with sanitized optional description
-  const rawDescriptionsById = new Map();
+  const rawItemExtrasById = new Map();
   let flatCounter = 0;
 
-  const collectSourceDescriptions = (itemsList) => {
+  const collectSourceExtras = (itemsList) => {
     if (!Array.isArray(itemsList)) return;
     for (const rawItem of itemsList) {
       if (!rawItem || typeof rawItem !== 'object') continue;
@@ -216,32 +315,52 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
           ? rawItem.id.trim()
           : `item-${flatCounter}`;
       if (isItemActive(rawItem)) {
+        const extras = {};
         const desc = sanitizeOptionalDescription(rawItem.description);
         if (desc !== undefined) {
-          rawDescriptionsById.set(itemId, desc);
+          extras.description = desc;
         }
+        if (typeof rawItem.imageUrl === 'string' && rawItem.imageUrl.trim()) {
+          extras.imageUrl = validateSafePublicHttpsUrl(rawItem.imageUrl.trim(), 422);
+        }
+        if (Number.isSafeInteger(rawItem.minQuantity) && rawItem.minQuantity >= 1 && rawItem.minQuantity <= 99) {
+          extras.minQuantity = rawItem.minQuantity;
+        }
+        if (
+          Number.isSafeInteger(rawItem.durationMinutes) &&
+          rawItem.durationMinutes >= 5 &&
+          rawItem.durationMinutes <= 480
+        ) {
+          extras.durationMinutes = rawItem.durationMinutes;
+        }
+        rawItemExtrasById.set(itemId, extras);
       }
     }
   };
 
-  if (Array.isArray(normalizedContent.items)) {
-    collectSourceDescriptions(normalizedContent.items);
+  if (Array.isArray(migrated.items)) {
+    collectSourceExtras(migrated.items);
   }
-  if (Array.isArray(normalizedContent.categories)) {
-    for (const cat of normalizedContent.categories) {
+  if (Array.isArray(migrated.categories)) {
+    for (const cat of migrated.categories) {
       if (cat && typeof cat === 'object') {
-        collectSourceDescriptions(cat.items);
+        collectSourceExtras(cat.items);
       }
     }
   }
 
   const validatedItemsById = new Map();
   const projectedItems = baseMenu.items.map((item) => {
-    const description = rawDescriptionsById.get(item.id);
-    const projectedItem =
-      description !== undefined
-        ? { id: item.id, name: item.name, description, priceCents: item.priceCents }
-        : { id: item.id, name: item.name, priceCents: item.priceCents };
+    const extras = rawItemExtrasById.get(item.id) ?? {};
+    const projectedItem = {
+      id: item.id,
+      name: item.name,
+      ...(extras.description !== undefined ? { description: extras.description } : {}),
+      ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),
+      priceCents: item.priceCents,
+      ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
+      ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {})
+    };
     validatedItemsById.set(item.id, projectedItem);
     return projectedItem;
   });
@@ -250,13 +369,13 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
   const projectedCategories = [];
   const seenCategoryIds = new Set();
 
-  if (Array.isArray(normalizedContent.categories)) {
-    let itemIndexCursor = Array.isArray(normalizedContent.items)
-      ? normalizedContent.items.length
+  if (Array.isArray(migrated.categories)) {
+    let itemIndexCursor = Array.isArray(migrated.items)
+      ? migrated.items.length
       : 0;
 
-    for (let catIdx = 0; catIdx < normalizedContent.categories.length; catIdx += 1) {
-      const rawCat = normalizedContent.categories[catIdx];
+    for (let catIdx = 0; catIdx < migrated.categories.length; catIdx += 1) {
+      const rawCat = migrated.categories[catIdx];
       if (!rawCat || typeof rawCat !== 'object') continue;
 
       const catName =
@@ -308,18 +427,38 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     });
   }
 
+  const sanitizedComponents = validateComponentsConfig(
+    migrated.components,
+    migrated.catalogType,
+    baseMenu.template
+  );
+  const sanitizedOrderFields = validateOrderFieldsConfig(
+    migrated.orderFields,
+    migrated.catalogType
+  );
+  const sanitizedMessages = validateMessagesConfig(
+    migrated.messages,
+    migrated.catalogType,
+    baseMenu.name,
+    baseMenu.template
+  );
+
   const menu = {
     schemaVersion: baseMenu.schemaVersion,
     template: baseMenu.template,
+    storefrontType: migrated.storefrontType,
+    catalogType: migrated.catalogType,
     slug: baseMenu.slug,
     name: baseMenu.name,
     whatsapp: baseMenu.whatsapp,
     currency: baseMenu.currency,
+    components: sanitizedComponents,
+    orderFields: sanitizedOrderFields,
+    messages: sanitizedMessages,
     items: projectedItems,
     categories: projectedCategories
   };
 
-  // Validate that every public item produces a deterministic whatsappLink
   for (const item of menu.items) {
     whatsappLink(menu, item.id);
   }
