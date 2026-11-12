@@ -1,12 +1,17 @@
 import {
+  DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
   MAX_DRAFT_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
   createInitialDraftContent,
+  formatProfileRecord,
   isValidSlug,
   measureDraftBytes,
+  migrateLegacyDraftContent,
+  validateCustomizationRequestInput,
   validateDraftContent,
+  validateProfileInput,
   validateRevision,
   validateSiteInput
 } from '../src/portal-validation.mjs';
@@ -24,6 +29,10 @@ export const STRICT_CSP_HEADER =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
 export const PORTAL_CSP_HEADER =
   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
+export const PORTAL_STORAGE_CSP_HEADER =
+  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL} data: blob:; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
+export const STOREFRONT_STORAGE_CSP_HEADER =
+  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const STOREFRONT_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
@@ -863,6 +872,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const sites = new Map();
   const drafts = new Map();
   const memberships = [];
+  const profiles = new Map();
+  const customizationRequests = [];
   const publicationsBySlug = new Map();
   const publicationsByHash = new Map();
 
@@ -911,6 +922,26 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     }
   }
 
+  if (Array.isArray(initial.profiles)) {
+    for (const profile of initial.profiles) {
+      const userId = profile?.userId ?? profile?.user_id;
+      if (userId) {
+        profiles.set(
+          userId,
+          formatProfileRecord(userId, profile, profile.interests ?? [])
+        );
+      }
+    }
+  }
+
+  if (Array.isArray(initial.customizationRequests)) {
+    for (const reqRecord of initial.customizationRequests) {
+      if (reqRecord?.id && (reqRecord.userId ?? reqRecord.user_id)) {
+        customizationRequests.push(structuredClone(reqRecord));
+      }
+    }
+  }
+
   function getRoleForSite(site, userId) {
     if (!site || !userId) return null;
     const ownerId = site.ownerUserId ?? site.owner_user_id;
@@ -926,6 +957,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       id: site.id,
       slug: site.slug,
       name: site.name,
+      storefrontType:
+        site.storefrontType ?? site.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
       template: site.template ?? DEFAULT_TEMPLATE,
       role,
       updatedAt: site.updatedAt ?? site.updated_at ?? site.createdAt ?? site.created_at
@@ -936,6 +969,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     sites,
     drafts,
     memberships,
+    profiles,
+    customizationRequests,
     publicationsBySlug,
     publicationsByHash,
 
@@ -944,6 +979,60 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       if (!exists) {
         memberships.push({ siteId, userId, role });
       }
+    },
+
+    async getProfile(userId) {
+      if (profiles.has(userId)) {
+        return structuredClone(profiles.get(userId));
+      }
+      return formatProfileRecord(userId, {}, []);
+    },
+
+    async upsertProfile(userId, input) {
+      const now = new Date().toISOString();
+      const record = formatProfileRecord(
+        userId,
+        {
+          ...input,
+          updatedAt: now
+        },
+        input.interests ?? []
+      );
+      profiles.set(userId, record);
+      return structuredClone(record);
+    },
+
+    async listCustomizationRequests(userId) {
+      return customizationRequests
+        .filter((item) => (item.userId ?? item.user_id) === userId)
+        .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
+        .map((item) => structuredClone(item));
+    },
+
+    async createCustomizationRequest(userId, input) {
+      if (input.siteId) {
+        const site = sites.get(input.siteId);
+        const role = getRoleForSite(site, userId);
+        if (!role) {
+          throw new PortalValidationError(404, 'SITE_NOT_FOUND', 'Vitrine associada não encontrada.');
+        }
+      }
+      const now = new Date().toISOString();
+      const record = {
+        id: crypto.randomUUID(),
+        userId,
+        siteId: input.siteId ?? null,
+        storefrontType: input.storefrontType,
+        templateInterest: input.templateInterest,
+        goal: input.goal,
+        referenceUrls: [...(input.referenceUrls ?? [])],
+        desiredDeadline: input.desiredDeadline ?? '',
+        status: 'novo',
+        createdAt: now,
+        updatedAt: now
+      };
+      customizationRequests.unshift(record);
+      return structuredClone(record);
     },
 
     async getSite(siteId, userId) {
@@ -999,7 +1088,15 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return result;
     },
 
-    async createSite({ userId, name, slug, template = DEFAULT_TEMPLATE, content }) {
+    async createSite({
+      userId,
+      name,
+      slug,
+      storefrontType = DEFAULT_STOREFRONT_TYPE,
+      template = DEFAULT_TEMPLATE,
+      catalogType,
+      content
+    }) {
       for (const existing of sites.values()) {
         if (existing.slug === slug) {
           throw new PortalValidationError(
@@ -1016,6 +1113,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         ownerUserId: userId,
         slug,
         name,
+        storefrontType,
         template,
         createdAt: now,
         updatedAt: now
@@ -1029,7 +1127,9 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
             createInitialDraftContent({
               slug,
               name,
-              template
+              storefrontType,
+              template,
+              catalogType
             })
         )
       };
@@ -1051,7 +1151,9 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       if (!draft) {
         return null;
       }
-      return structuredClone(draft);
+      const cloned = structuredClone(draft);
+      cloned.content = migrateLegacyDraftContent(cloned.content, site);
+      return cloned;
     },
 
     async updateDraft({ siteId, userId, revision, content }) {
@@ -1075,7 +1177,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         siteId,
         revision: current.revision + 1,
         updatedAt: now,
-        content: structuredClone(content)
+        content: migrateLegacyDraftContent(structuredClone(content), site)
       };
       drafts.set(siteId, nextDraft);
       site.updatedAt = now;
@@ -1105,9 +1207,14 @@ async function hydratePublicationRecord(row) {
   const draftLike = {
     schemaVersion: 1,
     template: rawMenu.template ?? DEFAULT_TEMPLATE,
+    ...(rawMenu.storefrontType ? { storefrontType: rawMenu.storefrontType } : {}),
+    ...(rawMenu.catalogType ? { catalogType: rawMenu.catalogType } : {}),
     slug: row.slug ?? rawMenu.slug,
     businessName: rawMenu.name ?? rawMenu.businessName,
     whatsapp: rawMenu.whatsapp,
+    ...(rawMenu.components ? { components: rawMenu.components } : {}),
+    ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
+    ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
     ...(hasCategories
       ? { categories: rawMenu.categories }
       : { items: Array.isArray(rawMenu.items) ? rawMenu.items : [] })
@@ -1118,6 +1225,7 @@ async function hydratePublicationRecord(row) {
       id: row.site_id ?? undefined,
       slug: row.slug ?? rawMenu.slug,
       name: rawMenu.name ?? rawMenu.businessName,
+      storefrontType: rawMenu.storefrontType ?? DEFAULT_STOREFRONT_TYPE,
       template: rawMenu.template ?? DEFAULT_TEMPLATE
     },
     {
@@ -1155,9 +1263,156 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
   }
 
   return {
+    async getProfile(userId, { token } = {}) {
+      const [profileRes, interestsRes] = await Promise.all([
+        fetchImpl(
+          `${baseUrl}/rest/v1/profiles?user_id=eq.${encodeURIComponent(userId)}&select=user_id,display_name,business_name,city,whatsapp,created_at,updated_at&limit=1`,
+          {
+            method: 'GET',
+            headers: authHeaders(token)
+          }
+        ),
+        fetchImpl(
+          `${baseUrl}/rest/v1/profile_interests?user_id=eq.${encodeURIComponent(userId)}&select=interest&order=created_at.asc`,
+          {
+            method: 'GET',
+            headers: authHeaders(token)
+          }
+        )
+      ]);
+
+      const profileRows = profileRes && profileRes.ok ? await profileRes.json() : [];
+      const interestRows = interestsRes && interestsRes.ok ? await interestsRes.json() : [];
+      const row = Array.isArray(profileRows) && profileRows.length > 0 ? profileRows[0] : {};
+      const interests = Array.isArray(interestRows)
+        ? interestRows.map((entry) => entry.interest).filter(Boolean)
+        : [];
+      return formatProfileRecord(userId, row, interests);
+    },
+
+    async upsertProfile(userId, input, { token } = {}) {
+      const profileRes = await fetchImpl(`${baseUrl}/rest/v1/profiles?on_conflict=user_id`, {
+        method: 'POST',
+        headers: authHeaders(token, {
+          prefer: 'resolution=merge-duplicates,return=representation'
+        }),
+        body: JSON.stringify({
+          user_id: userId,
+          display_name: input.displayName ?? '',
+          business_name: input.businessName ?? '',
+          city: input.city ?? '',
+          whatsapp: input.whatsapp ?? ''
+        })
+      });
+
+      if (!profileRes.ok) {
+        const errBody = await profileRes.json().catch(() => ({}));
+        if (errBody?.code === '23514') {
+          throw new PortalValidationError(422, 'INVALID_PROFILE', 'Dados de perfil inválidos.');
+        }
+        throw new Error(`Supabase upsertProfile error: ${profileRes.status}`);
+      }
+
+      const [savedRow] = await profileRes.json();
+
+      await fetchImpl(
+        `${baseUrl}/rest/v1/profile_interests?user_id=eq.${encodeURIComponent(userId)}`,
+        {
+          method: 'DELETE',
+          headers: authHeaders(token)
+        }
+      );
+
+      const interests = Array.isArray(input.interests) ? input.interests : [];
+      if (interests.length > 0) {
+        const insInterestsRes = await fetchImpl(`${baseUrl}/rest/v1/profile_interests`, {
+          method: 'POST',
+          headers: authHeaders(token, { prefer: 'return=representation' }),
+          body: JSON.stringify(
+            interests.map((interest) => ({
+              user_id: userId,
+              interest
+            }))
+          )
+        });
+        if (!insInterestsRes.ok) {
+          throw new Error(`Supabase profile_interests insert error: ${insInterestsRes.status}`);
+        }
+      }
+
+      return formatProfileRecord(userId, savedRow ?? input, interests);
+    },
+
+    async listCustomizationRequests(userId, { token } = {}) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/customization_requests?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,site_id,storefront_type,template_interest,goal,reference_urls,desired_deadline,status,created_at,updated_at&order=created_at.desc`,
+        {
+          method: 'GET',
+          headers: authHeaders(token)
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Supabase listCustomizationRequests error: ${response.status}`);
+      }
+      const rows = await response.json();
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
+        id: row.id,
+        siteId: row.site_id ?? null,
+        storefrontType: row.storefront_type,
+        templateInterest: row.template_interest,
+        goal: row.goal,
+        referenceUrls: Array.isArray(row.reference_urls) ? row.reference_urls : [],
+        desiredDeadline: row.desired_deadline ?? '',
+        status: row.status ?? 'novo',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at ?? row.created_at
+      }));
+    },
+
+    async createCustomizationRequest(userId, input, { token } = {}) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/customization_requests`, {
+        method: 'POST',
+        headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify({
+          user_id: userId,
+          site_id: input.siteId ?? null,
+          storefront_type: input.storefrontType,
+          template_interest: input.templateInterest,
+          goal: input.goal,
+          reference_urls: input.referenceUrls ?? [],
+          desired_deadline: input.desiredDeadline ?? ''
+        })
+      });
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        if (response.status === 403 || errBody?.code === '42501') {
+          throw new PortalValidationError(404, 'SITE_NOT_FOUND', 'Vitrine associada não encontrada.');
+        }
+        if (errBody?.code === '23514') {
+          throw new PortalValidationError(422, 'INVALID_PAYLOAD', 'Dados do pedido de customização inválidos.');
+        }
+        throw new Error(`Supabase createCustomizationRequest error: ${response.status}`);
+      }
+
+      const [row] = await response.json();
+      return {
+        id: row.id,
+        siteId: row.site_id ?? null,
+        storefrontType: row.storefront_type,
+        templateInterest: row.template_interest,
+        goal: row.goal,
+        referenceUrls: Array.isArray(row.reference_urls) ? row.reference_urls : [],
+        desiredDeadline: row.desired_deadline ?? '',
+        status: row.status ?? 'novo',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at ?? row.created_at
+      };
+    },
+
     async listSites(userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,template,created_at,updated_at&order=created_at.asc`,
+        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at&order=created_at.asc`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -1171,6 +1426,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         id: row.id,
         slug: row.slug,
         name: row.name,
+        storefrontType: row.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' : 'collaborator',
         updatedAt: row.updated_at ?? row.created_at
@@ -1179,7 +1435,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async getSite(siteId, userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,template,created_at,updated_at`,
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -1197,13 +1453,25 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         id: row.id,
         slug: row.slug,
         name: row.name,
+        storefrontType: row.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' : 'collaborator',
         updatedAt: row.updated_at ?? row.created_at
       };
     },
 
-    async createSite({ userId, name, slug, template = DEFAULT_TEMPLATE, content }, { token } = {}) {
+    async createSite(
+      {
+        userId,
+        name,
+        slug,
+        storefrontType = DEFAULT_STOREFRONT_TYPE,
+        template = DEFAULT_TEMPLATE,
+        catalogType,
+        content
+      },
+      { token } = {}
+    ) {
       const siteRes = await fetchImpl(`${baseUrl}/rest/v1/sites`, {
         method: 'POST',
         headers: authHeaders(token, { prefer: 'return=representation' }),
@@ -1211,6 +1479,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           owner_user_id: userId,
           slug,
           name,
+          storefront_type: storefrontType,
           template
         })
       });
@@ -1243,7 +1512,9 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         createInitialDraftContent({
           slug,
           name,
-          template
+          storefrontType,
+          template,
+          catalogType
         });
 
       const draftRes = await fetchImpl(`${baseUrl}/rest/v1/drafts`, {
@@ -1266,6 +1537,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           id: siteRow.id,
           slug: siteRow.slug,
           name: siteRow.name,
+          storefrontType: siteRow.storefront_type ?? storefrontType,
           template: siteRow.template ?? DEFAULT_TEMPLATE,
           role: 'owner',
           updatedAt
@@ -1274,7 +1546,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           siteId: draftRow.site_id,
           revision: draftRow.revision,
           updatedAt: draftRow.updated_at ?? updatedAt,
-          content: draftRow.content
+          content: migrateLegacyDraftContent(draftRow.content, siteRow)
         }
       };
     },
@@ -1299,7 +1571,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         siteId: row.site_id,
         revision: row.revision,
         updatedAt: row.updated_at,
-        content: row.content
+        content: migrateLegacyDraftContent(row.content)
       };
     },
 
@@ -1314,12 +1586,13 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           currentRevision: current.revision
         };
       }
+      const migratedContent = migrateLegacyDraftContent(content);
       const updateRes = await fetchImpl(
         `${baseUrl}/rest/v1/drafts?site_id=eq.${encodeURIComponent(siteId)}&revision=eq.${encodeURIComponent(String(revision))}`,
         {
           method: 'PATCH',
           headers: authHeaders(token, { prefer: 'return=representation' }),
-          body: JSON.stringify({ content })
+          body: JSON.stringify({ content: migratedContent })
         }
       );
       if (!updateRes.ok) {
@@ -1343,7 +1616,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           siteId: row.site_id,
           revision: row.revision,
           updatedAt: row.updated_at,
-          content: row.content
+          content: migrateLegacyDraftContent(row.content)
         }
       };
     },
@@ -1620,10 +1893,17 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
       (await sharedPublicPublications.getPublicationBySlug(slug));
     if (pub) {
       const html = renderStorefrontHtml(pub.menu);
+      const hasExternalStorageImages = Boolean(
+        Array.isArray(pub.menu?.items) &&
+          pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())
+      );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
         headers: {
           ...PUBLIC_SECURITY_HEADERS,
+          'content-security-policy': hasExternalStorageImages
+            ? STOREFRONT_STORAGE_CSP_HEADER
+            : STRICT_CSP_HEADER,
           'content-type': 'text/html; charset=utf-8',
           'cache-control': STOREFRONT_CACHE_CONTROL,
           etag: `"${pub.hash}"`
@@ -1686,6 +1966,41 @@ async function parseJsonRequest(request) {
     throw new PortalValidationError(400, 'INVALID_JSON', 'O corpo da requisição não contém JSON válido.');
   }
   return { rawText, parsed };
+}
+
+function validateMutationOriginAndJson(
+  request,
+  url,
+  { requireOrigin = false, requireJson = true } = {}
+) {
+  const requestOrigin = (request.headers.get('origin') || '').trim();
+  if (requireOrigin) {
+    if (!requestOrigin || requestOrigin !== url.origin) {
+      return errorResponse(
+        403,
+        'FORBIDDEN_ORIGIN',
+        'Origem da requisição inválida para esta operação.'
+      );
+    }
+  } else if (requestOrigin && requestOrigin !== url.origin) {
+    return errorResponse(
+      403,
+      'FORBIDDEN_ORIGIN',
+      'Origem da requisição inválida para esta operação.'
+    );
+  }
+
+  if (requireJson) {
+    const contentType = (request.headers.get('content-type') || '').trim();
+    if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+      return errorResponse(
+        415,
+        'UNSUPPORTED_MEDIA_TYPE',
+        'O cabeçalho Content-Type deve ser application/json.'
+      );
+    }
+  }
+  return null;
 }
 
 export function createApiHandler(deps = {}) {
@@ -1902,6 +2217,77 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/session.');
       }
 
+      if (pathname === '/api/profile' || pathname === '/api/profile/') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) {
+          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        }
+
+        if (method === 'GET') {
+          const profile = await store.getProfile(user.id, { token: user.token, env });
+          return jsonResponse(200, { profile });
+        }
+
+        if (method === 'PUT') {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true,
+            requireJson: true
+          });
+          if (guardError) return guardError;
+
+          const { parsed } = await parseJsonRequest(request);
+          const validated = validateProfileInput(parsed);
+          const profile = await store.upsertProfile(user.id, validated, {
+            token: user.token,
+            env
+          });
+          return jsonResponse(200, { profile });
+        }
+
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/profile.');
+      }
+
+      if (
+        pathname === '/api/customization-requests' ||
+        pathname === '/api/customization-requests/'
+      ) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) {
+          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        }
+
+        if (method === 'GET') {
+          const requests = await store.listCustomizationRequests(user.id, {
+            token: user.token,
+            env
+          });
+          return jsonResponse(200, { requests });
+        }
+
+        if (method === 'POST') {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true,
+            requireJson: true
+          });
+          if (guardError) return guardError;
+
+          const { parsed } = await parseJsonRequest(request);
+          const validated = validateCustomizationRequestInput(parsed);
+          const createdRequest = await store.createCustomizationRequest(
+            user.id,
+            validated,
+            { token: user.token, env }
+          );
+          return jsonResponse(201, { request: createdRequest });
+        }
+
+        return errorResponse(
+          405,
+          'METHOD_NOT_ALLOWED',
+          'Método não permitido para /api/customization-requests.'
+        );
+      }
+
       if (pathname === '/api/sites' || pathname === '/api/sites/') {
         const user = await resolveSessionUser(request, env, deps);
         if (!user) {
@@ -1914,12 +2300,43 @@ export function createApiHandler(deps = {}) {
         }
 
         if (method === 'POST') {
+          const contentTypeError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: false,
+            requireJson: true
+          });
+          if (contentTypeError) return contentTypeError;
+
           const { parsed } = await parseJsonRequest(request);
-          const { name, slug, template, whatsapp } = validateSiteInput(parsed);
+          const usesExtendedSitePayload = Boolean(
+            parsed &&
+              typeof parsed === 'object' &&
+              !Array.isArray(parsed) &&
+              (parsed.storefrontType !== undefined ||
+                parsed.catalogType !== undefined ||
+                (parsed.template !== undefined && parsed.template !== DEFAULT_TEMPLATE))
+          );
+          if (usesExtendedSitePayload) {
+            const originError = validateMutationOriginAndJson(request, url, {
+              requireOrigin: true,
+              requireJson: false
+            });
+            if (originError) return originError;
+          }
+
+          const {
+            name,
+            slug,
+            storefrontType,
+            template,
+            catalogType,
+            whatsapp
+          } = validateSiteInput(parsed);
           const content = createInitialDraftContent({
             slug,
             name,
+            storefrontType,
             template,
+            catalogType,
             whatsapp
           });
           const created = await store.createSite(
@@ -1927,7 +2344,9 @@ export function createApiHandler(deps = {}) {
               userId: user.id,
               name,
               slug,
+              storefrontType,
               template,
+              catalogType,
               content
             },
             { token: user.token, env }
@@ -1956,6 +2375,12 @@ export function createApiHandler(deps = {}) {
         }
 
         if (method === 'PUT') {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: false,
+            requireJson: true
+          });
+          if (guardError) return guardError;
+
           let site = null;
           if (typeof store.getSite === 'function') {
             site = await store.getSite(siteId, user.id, { token: user.token, env });
@@ -2048,6 +2473,12 @@ export function createApiHandler(deps = {}) {
         if (method !== 'POST') {
           return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para publicação.');
         }
+
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: false,
+          requireJson: false
+        });
+        if (guardError) return guardError;
 
         const siteId = decodeURIComponent(publishMatch[1]);
         const draft = await store.getDraft(siteId, user.id, { token: user.token, env });
