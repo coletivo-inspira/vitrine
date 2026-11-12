@@ -2992,7 +2992,7 @@ svg {
 @media (max-width: 1100px) {
   .editor-tabs-selector {
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
   }
   .mobile-only-tab {
     display: flex;
@@ -3056,14 +3056,15 @@ svg {
     padding: 0 10px;
   }
   .tab-btn {
-    min-height: 50px;
-    font-size: 11px;
-    padding: 6px 2px;
+    min-height: 48px;
+    font-size: 10px;
+    letter-spacing: -0.02em;
+    padding: 5px 1px;
     border-radius: 12px;
   }
   .tab-btn .nav-icon {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
   }
 }
 
@@ -4539,7 +4540,7 @@ svg {
 
 .structure-theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
@@ -4654,13 +4655,17 @@ svg {
 
 .structure-link-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 10px;
-  align-items: end;
-  padding: 10px 12px;
+  align-items: stretch;
+  padding: 12px;
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 12px;
+}
+
+.structure-link-row > .structure-row-actions {
+  justify-self: end;
 }
 
 .structure-row-actions {
@@ -4713,9 +4718,9 @@ svg {
 
 .structure-page-meta-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 10px;
-  align-items: end;
+  align-items: stretch;
 }
 
 .structure-toggle-pill {
@@ -4724,6 +4729,7 @@ svg {
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--paper);
+  justify-self: start;
 }
 
 .structure-section-item {
@@ -4758,7 +4764,7 @@ svg {
 
 .structure-section-fields-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 

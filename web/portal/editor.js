@@ -1392,8 +1392,7 @@ function renderItems() {
       itemPriceMode === 'offer';
     if (showPriceField) {
       const gPrice = document.createElement('div');
-      gPrice.className =
-        itemPriceMode === 'offer' ? 'form-group item-fields-full' : 'form-group';
+      gPrice.className = 'form-group item-fields-full';
       const lPrice = document.createElement('label');
       lPrice.setAttribute('for', `item-price-${item.id}`);
       lPrice.textContent =
@@ -1465,7 +1464,7 @@ function renderItems() {
 
     // New Google Forms field: Section name (grupo de agrupamento opcional)
     const gSec = document.createElement('div');
-    gSec.className = 'form-group';
+    gSec.className = 'form-group item-fields-full';
     const lSec = document.createElement('label');
     lSec.setAttribute('for', `item-section-${item.id}`);
     lSec.textContent = 'Seção (opcional)';
