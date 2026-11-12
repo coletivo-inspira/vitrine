@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brandbook | Coletivo Inspira</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo/plus.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            inspira: {
+              green: "#133824",
+              offwhite: "#F7F7F4",
+              mustard: "#E5A93C",
+              orange: "#F05D23",
+              pink: "#E5007C",
+              mint: "#A3E5C2",
+              lime: "#BAFF29",
+              cream: "#FDFBF7",
+            },
+          },
+          fontFamily: {
+            display: ["Syne", "sans-serif"],
+            body: ["DM Sans", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: #F7F7F4;
+      color: #133824;
+      background-image: radial-gradient(rgba(19, 56, 36, 0.16) 1px, transparent 1px);
+      background-size: 22px 22px;
+    }
+    .font-display { font-family: Syne, sans-serif; }
+    .nav-logo { display: inline-flex; align-items: center; gap: 0.6rem; }
+    .nav-plus {
+      display: block; width: 2.5rem; height: 2.5rem;
+      border: 2px solid #133824; box-shadow: 3px 3px 0 #133824;
+      animation: plus-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      transition: box-shadow 0.2s ease;
+    }
+    .nav-plus svg { display: block; width: 100%; height: 100%; transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .nav-logo:hover .nav-plus,
+    .nav-logo:focus-visible .nav-plus { box-shadow: 4px 4px 0 #A3E5C2; }
+    .nav-logo:hover .nav-plus svg,
+    .nav-logo:focus-visible .nav-plus svg { transform: rotate(90deg); }
+    @keyframes plus-pop {
+      0% { transform: scale(0) rotate(-90deg); }
+      100% { transform: none; }
+    }
+    .font-body { font-family: "DM Sans", sans-serif; }
+    .logo-stack { display: flex; gap: 0.08em; line-height: 0.78; user-select: none; }
+    .logo-col { display: flex; flex-direction: column; align-items: center; }
+    .logo-stack.stagger span { opacity: 0; transform: translateY(12px); animation: rise 0.55s ease forwards; }
+    .logo-stack.stagger span:nth-child(2) { animation-delay: 0.08s; }
+    .logo-col:nth-child(2) span { animation-delay: 0.12s; }
+    .logo-col:nth-child(3) span { animation-delay: 0.2s; }
+    .logo-col:nth-child(4) span { animation-delay: 0.28s; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+    .reveal { opacity: 0; transform: translateY(18px); animation: rise 0.6s ease forwards; }
+    .reveal:nth-child(2) { animation-delay: 0.08s; }
+    .swatch { transition: transform 0.2s ease; cursor: pointer; }
+    .swatch:hover { transform: translateY(-4px) scale(1.03); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: rise 0.45s ease; }
+    .ratio-bar { height: 1.25rem; width: 0; transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+    .ratio-bar.on { }
+    #toast {
+      position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%) translateY(140%);
+      background: #BAFF29; color: #133824; border: 2px solid #133824;
+      box-shadow: 4px 4px 0 rgba(19, 56, 36, 0.12);
+      padding: 0.65rem 1rem; border-radius: 999px; font-weight: 700; z-index: 80;
+      transition: transform 0.25s ease;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    .wrong-stretch { transform: scaleX(1.5); display: flex; }
+    .wrong-rotate { transform: rotate(-15deg); display: flex; }
+    .wrong-shadow { filter: drop-shadow(10px 10px 5px rgba(0,0,0,0.5)); }
+    .wrong-font { font-family: "Times New Roman", serif; font-weight: normal; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+      .reveal, .logo-stack.stagger span { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body class="font-body antialiased">
+  <nav class="fixed w-full z-50 bg-[#F7F7F4] border-b border-[#133824]/10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <a href="#inicio" class="nav-logo font-display font-extrabold text-2xl tracking-tight" aria-label="+INSPIRA">
+        <span class="nav-plus" aria-hidden="true">
+          <svg viewBox="0 0 196 196"><rect width="196" height="196" fill="#BAFF29" /><path d="M75 19 H121 V75 H177 V121 H121 V177 H75 V121 H19 V75 H75 V19 Z" fill="#133824" /></svg>
+        </span>
+        <span aria-hidden="true">INSPIRA</span>
+      </a>
+      <div class="hidden md:flex gap-6 text-sm font-bold">
+        <a href="#manifesto">Manifesto</a>
+        <a href="#logo">Logotipo</a>
+        <a href="#cores">Cores</a>
+        <a href="#tipografia">Tipografia</a>
+        <a href="#voz">Voz</a>
+        <a href="#orb">Orb</a>
+      </div>
+    </div>
+  </nav>
+
+  <header id="inicio" class="pt-32 pb-16 px-4 max-w-7xl mx-auto grid lg:grid-cols-[1.4fr_0.8fr] gap-10 items-end">
+    <div>
+      <p class="text-xs font-bold uppercase tracking-[0.18em] text-[#133824]/70">Brandbook oficial · Direção A</p>
+      <h1 class="font-display font-extrabold text-5xl md:text-7xl leading-[0.95] mt-4 max-w-[12ch]">Onde a natureza encontra a tecnologia.</h1>
+      <p class="mt-6 max-w-xl text-lg leading-relaxed text-[#133824]/80">Identidade clara, modular e em movimento. De Bonito-MS a Belo Horizonte, o hub público usa off-white, lima e menta. O verde floresta é tinta.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-[#BAFF29] border border-[#133824]/15 p-5 min-h-36"><p class="text-xs font-bold uppercase">60%</p><p class="font-display text-3xl font-extrabold leading-none mt-2">Claro</p></div>
+      <div class="bg-[#133824] text-[#F7F7F4] p-5 min-h-36"><p class="text-xs font-bold uppercase text-[#BAFF29]">30%</p><p class="font-display text-3xl font-extrabold leading-none mt-2">Floresta</p></div>
+      <div class="bg-[#A3E5C2] p-5 col-span-2"><p class="text-xs font-bold uppercase">Superfície</p><p class="font-display text-2xl font-extrabold">Menta + lima nos módulos</p></div>
+    </div>
+  </header>
+
+  <section id="manifesto" class="py-20">
+    <div class="max-w-7xl mx-auto px-4 grid md:grid-cols-2 gap-12">
+      <div class="reveal">
+        <h2 class="font-display text-4xl font-extrabold leading-[1.05]">A fluidez das águas. A precisão do código.</h2>
+        <p class="mt-6 text-lg leading-relaxed">Nascemos no epicentro do ecoturismo. Criado por amigos de infância em Bonito-MS, o Coletivo Inspira liga o Rio Formoso à energia criativa de Belo Horizonte.</p>
+        <p class="mt-4 leading-relaxed">Quatro frentes: tecnologia e código, cultura e eventos, saúde e acolhimento, diversidade e empoderamento.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <article class="bg-[#133824] text-[#BAFF29] p-5"><h3 class="font-display text-xl font-bold">Tecnologia</h3><p class="text-sm mt-2 text-[#F7F7F4]">inspira.dev.br, Pages e LINO.</p></article>
+        <article class="bg-[#F05D23] text-[#133824] p-5"><h3 class="font-display text-xl font-bold">Cultura</h3><p class="text-sm mt-2">Carnaboia, Meu Bloquinho, Guavira Photo.</p></article>
+        <article class="bg-[#A3E5C2] p-5"><h3 class="font-display text-xl font-bold">Saúde</h3><p class="text-sm mt-2">Coletivo Cuida e Respira & Inspira.</p></article>
+        <article class="bg-[#E5A93C] p-5"><h3 class="font-display text-xl font-bold">Diversidade</h3><p class="text-sm mt-2">Rede InspireELAS.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="logo" class="py-16 max-w-7xl mx-auto px-4">
+    <h2 class="font-display text-4xl font-extrabold">Logotipo vetorial oficial</h2>
+    <p class="mt-3 max-w-2xl">
+      Cinco camadas: malha pontilhada, bloco lima <code class="font-mono text-sm">#BAFF29</code> com +,
+      wordmark INS/PIRA em floresta, 22 nós menta e COLETIVO. Área de respiro mínima = largura da haste do I (63u em canvas 1000×1000).
+      Sem distorcer, rotacionar, sombrear ou trocar os traços vetoriais.
+    </p>
+
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white/80 border-2 border-[#133824] p-6 md:p-10 flex flex-col items-center justify-center">
+        <p class="self-start text-xs font-mono font-bold uppercase tracking-wide mb-4 bg-[#BAFF29] px-2 py-1 border border-[#133824]">Animada</p>
+        <img
+          id="logo-mark"
+          src="assets/logo/logo-animated.svg"
+          alt="Logo oficial +INSPIRA COLETIVO animada"
+          class="w-full max-w-md aspect-square"
+          width="1000"
+          height="1000"
+        />
+      </div>
+      <div class="bg-[linear-gradient(45deg,#e5e7eb_25%,transparent_25%),linear-gradient(-45deg,#e5e7eb_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e5e7eb_75%),linear-gradient(-45deg,transparent_75%,#e5e7eb_75%)] bg-[length:20px_20px] bg-[position:0_0,0_10px,10px_-10px,-10px_0] border-2 border-[#133824] p-6 md:p-10 flex flex-col items-center justify-center">
+        <p class="self-start text-xs font-mono font-bold uppercase tracking-wide mb-4 bg-white px-2 py-1 border border-[#133824]">Fundo transparente</p>
+        <img
+          src="assets/logo/logo-transparent.svg"
+          alt="Logo +INSPIRA COLETIVO sem fundo"
+          class="w-full max-w-md"
+          width="760"
+          height="635"
+        />
+      </div>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-3 text-xs font-mono">
+      <a class="px-3 py-2 border-2 border-[#133824] bg-[#BAFF29] font-bold" href="assets/logo/logo.svg" download>logo.svg</a>
+      <a class="px-3 py-2 border-2 border-[#133824] bg-white font-bold" href="assets/logo/logo-transparent.svg" download>logo-transparent.svg</a>
+      <a class="px-3 py-2 border-2 border-[#133824] bg-white font-bold" href="assets/logo/logo-animated.svg" download>logo-animated.svg</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 text-sm">
+      <article class="bg-[#A3E5C2]/50 border border-[#133824]/15 p-5">
+        <h3 class="font-display font-bold text-lg">01. Arquitetura</h3>
+        <p class="mt-2 text-[#133824]/80">Bloco empilhado +INS / PIRA, ponte menta entre os I’s e nós digitais orgânicos.</p>
+      </article>
+      <article class="bg-[#BAFF29]/40 border border-[#133824]/15 p-5">
+        <h3 class="font-display font-bold text-lg">02. Respiro</h3>
+        <p class="mt-2 text-[#133824]/80">Margem mínima = haste do I (63 unidades no viewBox 1000×1000).</p>
+      </article>
+      <article class="bg-white border border-[#133824]/15 p-5">
+        <h3 class="font-display font-bold text-lg">03. 60-30-10</h3>
+        <p class="mt-2 text-[#133824]/80">Off-white pontilhado, floresta/menta estrutural, lima como foco de energia.</p>
+      </article>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 text-xs">
+      <div class="bg-red-50 border border-red-100 p-4 text-center"><div class="logo-stack wrong-stretch font-display font-black text-2xl justify-center"><div class="logo-col"><span>+</span><span>P</span></div><div class="logo-col"><span>I</span><span>I</span></div></div><p class="mt-2 text-red-700">Não distorcer</p></div>
+      <div class="bg-red-50 border border-red-100 p-4 text-center"><div class="logo-stack wrong-rotate font-display font-black text-2xl justify-center"><div class="logo-col"><span>+</span><span>P</span></div><div class="logo-col"><span>I</span><span>I</span></div></div><p class="mt-2 text-red-700">Não rotacionar</p></div>
+      <div class="bg-red-50 border border-red-100 p-4 text-center"><div class="logo-stack wrong-shadow font-display font-black text-2xl justify-center"><div class="logo-col"><span>+</span><span>P</span></div><div class="logo-col"><span>I</span><span>I</span></div></div><p class="mt-2 text-red-700">Não sombrear</p></div>
+      <div class="bg-red-50 border border-red-100 p-4 text-center"><div class="logo-stack wrong-font text-2xl justify-center"><div class="logo-col"><span>+</span><span>P</span></div><div class="logo-col"><span>I</span><span>I</span></div></div><p class="mt-2 text-red-700">Não trocar a fonte</p></div>
+    </div>
+  </section>
+
+  <section id="cores" class="py-16 bg-white/70 border-y border-[#133824]/10">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h2 class="font-display text-4xl font-extrabold">Sistema de cores</h2>
+          <p class="mt-3 max-w-xl">Regra 60-30-10. A home do hub usa a base clara. Solar, Pop e Tropical são variações de projeto.</p>
+        </div>
+        <div class="flex flex-wrap gap-2" id="palette-tabs">
+          <button type="button" class="tab-btn px-3 py-2 text-sm font-bold bg-[#133824] text-[#BAFF29]" data-tab="base">Base hub</button>
+          <button type="button" class="tab-btn px-3 py-2 text-sm font-bold border border-[#133824]/20" data-tab="solar">Solar</button>
+          <button type="button" class="tab-btn px-3 py-2 text-sm font-bold border border-[#133824]/20" data-tab="pop">Pop</button>
+          <button type="button" class="tab-btn px-3 py-2 text-sm font-bold border border-[#133824]/20" data-tab="tropical">Tropical</button>
+        </div>
+      </div>
+
+      <div id="tab-base" class="tab-content active mt-8 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <button class="swatch text-left" data-hex="#133824"><span class="block h-28 bg-[#133824]"></span><span class="block p-3 text-sm font-bold">Floresta<br><span class="font-mono font-normal">#133824</span></span></button>
+        <button class="swatch text-left border border-[#133824]/10" data-hex="#F7F7F4"><span class="block h-28 bg-[#F7F7F4]"></span><span class="block p-3 text-sm font-bold">Off-white<br><span class="font-mono font-normal">#F7F7F4</span></span></button>
+        <button class="swatch text-left" data-hex="#BAFF29"><span class="block h-28 bg-[#BAFF29]"></span><span class="block p-3 text-sm font-bold">Lima<br><span class="font-mono font-normal">#BAFF29</span></span></button>
+        <button class="swatch text-left" data-hex="#A3E5C2"><span class="block h-28 bg-[#A3E5C2]"></span><span class="block p-3 text-sm font-bold">Menta<br><span class="font-mono font-normal">#A3E5C2</span></span></button>
+        <button class="swatch text-left" data-hex="#E5A93C"><span class="block h-28 bg-[#E5A93C]"></span><span class="block p-3 text-sm font-bold">Mostarda<br><span class="font-mono font-normal">#E5A93C</span></span></button>
+      </div>
+      <div id="tab-solar" class="tab-content mt-8 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <button class="swatch text-left" data-hex="#133824"><span class="block h-28 bg-[#133824]"></span><span class="block p-3 text-sm font-bold">Floresta<br>#133824</span></button>
+        <button class="swatch text-left" data-hex="#FDFCEB"><span class="block h-28 bg-[#FDFCEB]"></span><span class="block p-3 text-sm font-bold">Solar<br>#FDFCEB</span></button>
+        <button class="swatch text-left" data-hex="#8ECA73"><span class="block h-28 bg-[#8ECA73]"></span><span class="block p-3 text-sm font-bold">Folha<br>#8ECA73</span></button>
+        <button class="swatch text-left" data-hex="#E5A93C"><span class="block h-28 bg-[#E5A93C]"></span><span class="block p-3 text-sm font-bold">Mostarda<br>#E5A93C</span></button>
+        <button class="swatch text-left" data-hex="#FFD700"><span class="block h-28 bg-[#FFD700]"></span><span class="block p-3 text-sm font-bold">Ouro<br>#FFD700</span></button>
+      </div>
+      <div id="tab-pop" class="tab-content mt-8 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <button class="swatch text-left" data-hex="#133824"><span class="block h-28 bg-[#133824]"></span><span class="block p-3 text-sm font-bold">Floresta<br>#133824</span></button>
+        <button class="swatch text-left" data-hex="#F7F7F4"><span class="block h-28 bg-[#F7F7F4]"></span><span class="block p-3 text-sm font-bold">Off-white<br>#F7F7F4</span></button>
+        <button class="swatch text-left" data-hex="#E5007C"><span class="block h-28 bg-[#E5007C]"></span><span class="block p-3 text-sm font-bold">Rosa<br>#E5007C</span></button>
+        <button class="swatch text-left" data-hex="#E5A93C"><span class="block h-28 bg-[#E5A93C]"></span><span class="block p-3 text-sm font-bold">Mostarda<br>#E5A93C</span></button>
+        <button class="swatch text-left" data-hex="#BAFF29"><span class="block h-28 bg-[#BAFF29]"></span><span class="block p-3 text-sm font-bold">Lima<br>#BAFF29</span></button>
+      </div>
+      <div id="tab-tropical" class="tab-content mt-8 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <button class="swatch text-left" data-hex="#FDFBF7"><span class="block h-28 bg-[#FDFBF7]"></span><span class="block p-3 text-sm font-bold">Creme<br>#FDFBF7</span></button>
+        <button class="swatch text-left" data-hex="#E5A93C"><span class="block h-28 bg-[#E5A93C]"></span><span class="block p-3 text-sm font-bold">Mostarda<br>#E5A93C</span></button>
+        <button class="swatch text-left" data-hex="#FF7F50"><span class="block h-28 bg-[#FF7F50]"></span><span class="block p-3 text-sm font-bold">Coral<br>#FF7F50</span></button>
+        <button class="swatch text-left" data-hex="#FFFACD"><span class="block h-28 bg-[#FFFACD]"></span><span class="block p-3 text-sm font-bold">Luz<br>#FFFACD</span></button>
+        <button class="swatch text-left" data-hex="#A3E5C2"><span class="block h-28 bg-[#A3E5C2]"></span><span class="block p-3 text-sm font-bold">Menta<br>#A3E5C2</span></button>
+      </div>
+
+      <div id="ratio" class="mt-12 grid md:grid-cols-[1fr_1.4fr] gap-8 items-center">
+        <div>
+          <h3 class="font-display text-2xl font-bold">60-30-10 ao vivo</h3>
+          <p class="text-sm mt-2">As barras crescem quando a seção entra na tela e recoloram com a paleta ativa.</p>
+        </div>
+        <div class="space-y-3" id="ratio-bars" data-palette="base">
+          <div><p class="text-xs font-bold mb-1">60% claro</p><div class="h-5 bg-[#133824]/10"><div class="ratio-bar h-5 bg-[#F7F7F4] border border-[#133824]/20" data-width="60%"></div></div></div>
+          <div><p class="text-xs font-bold mb-1">30% arquitetura</p><div class="h-5 bg-[#133824]/10"><div class="ratio-bar h-5 bg-[#133824]" data-width="30%"></div></div></div>
+          <div><p class="text-xs font-bold mb-1">10% ação</p><div class="h-5 bg-[#133824]/10"><div class="ratio-bar h-5 bg-[#BAFF29]" data-width="10%"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tipografia" class="py-16 max-w-7xl mx-auto px-4">
+    <h2 class="font-display text-4xl font-extrabold">Playground tipográfico</h2>
+    <p class="mt-3 max-w-xl">Syne para título, DM Sans para corpo. O controle altera o peso ao vivo.</p>
+    <label class="mt-8 block text-sm font-bold" for="weight">Peso <span id="weight-label">800</span></label>
+    <input id="weight" type="range" min="400" max="800" step="100" value="800" class="w-full max-w-md mt-2">
+    <p id="type-sample" class="font-display text-5xl md:text-7xl leading-[1.02] mt-6" style="font-weight: 800">+INSPIRA</p>
+    <p id="body-sample" class="font-body text-xl leading-[1.55] mt-4 max-w-xl" style="font-weight: 500">A rápida correnteza do Rio Formoso encontra o código. Texto de corpo em DM Sans, com entrelinha aberta.</p>
+  </section>
+
+  <section id="voz" class="py-16">
+    <div class="max-w-7xl mx-auto px-4">
+      <h2 class="font-display text-4xl font-extrabold">Voz</h2>
+      <div class="mt-8 overflow-x-auto bg-white border border-[#133824]/10">
+        <table class="w-full text-left text-sm min-w-[720px]">
+          <thead><tr class="border-b border-[#133824]/10"><th class="p-4">Atributo</th><th class="p-4">Fazer</th><th class="p-4">Evitar</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Acolhedor</td><td class="p-4">“nossa rede”, “juntos”</td><td class="p-4">Tom frio ou autoritário</td></tr>
+            <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Vibrante</td><td class="p-4">Verbos de ação: criar, celebrar</td><td class="p-4">Entusiasmo forçado</td></tr>
+            <tr><td class="p-4 font-bold">Técnico-acessível</td><td class="p-4">Passos curtos e benefício prático</td><td class="p-4">Jargão sem contexto</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="orb" class="py-16 max-w-7xl mx-auto px-4">
+    <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-[#F05D23]">Selo de pertencimento</p>
+        <h2 class="font-display text-4xl md:text-5xl font-extrabold mt-3">Orb +INSPIRA</h2>
+        <p class="mt-5 max-w-xl text-lg leading-relaxed text-[#133824]/85">A orb é o selo que costura a rede. Todo site, subdomínio e sistema do Coletivo Inspira leva uma, e ela sempre aponta de volta para o hub oficial, <strong>inspira.dev.br</strong>.</p>
+        <p class="mt-4 max-w-xl leading-relaxed text-[#133824]/80">Ela é uma gota de vidro líquido: um contorno orgânico que respira devagar, com lima, menta e laranja fluindo por dentro. Discreta quando está parada, viva quando alguém chega perto. No hover, o maisinho do +INSPIRA surge flutuando no líquido, sem girar.</p>
+        <p class="mt-4 max-w-xl leading-relaxed text-[#133824]/80">Não é um botão de ação nem um ícone de menu. É uma assinatura: diz “isto faz parte do coletivo” sem disputar atenção com o conteúdo do projeto.</p>
+      </div>
+      <figure class="relative">
+        <div data-inspira-orb-showcase></div>
+        <figcaption class="mt-2 text-center text-sm text-[#133824]/70">Passe o mouse na orb. Vitrine ampliada: em produção ela tem 64 px.</figcaption>
+      </figure>
+    </div>
+
+    <h3 class="font-display text-2xl font-extrabold mt-16">Anatomia</h3>
+    <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+      <article class="border border-[#133824]/15 bg-white/70 p-5"><p class="font-display text-lg font-bold">Vidro</p><p class="mt-2 leading-relaxed">Brilho especular no topo, luz refletida embaixo e uma borda iluminada. É o que dá a leitura de liquid glass em fundo claro ou escuro.</p></article>
+      <article class="border border-[#133824]/15 bg-white/70 p-5"><p class="font-display text-lg font-bold">Líquido</p><p class="mt-2 leading-relaxed">Lima <span class="font-mono">#BAFF29</span>, menta <span class="font-mono">#A3E5C2</span> e laranja <span class="font-mono">#F05D23</span> se misturam e trocam de lugar num ciclo de cerca de 14 s.</p></article>
+      <article class="border border-[#133824]/15 bg-white/70 p-5"><p class="font-display text-lg font-bold">Contorno</p><p class="mt-2 leading-relaxed">Ondula de leve o tempo todo e se inclina na direção do cursor quando ele se aproxima. Nunca é um círculo perfeito.</p></article>
+      <article class="border border-[#133824]/15 bg-white/70 p-5"><p class="font-display text-lg font-bold">Maisinho</p><p class="mt-2 leading-relaxed">O + do logo, em floresta <span class="font-mono">#133824</span> com brilho de vidro. Aparece no hover e boia com o líquido. Não gira.</p></article>
+    </div>
+
+    <h3 class="font-display text-2xl font-extrabold mt-16">Comportamento</h3>
+    <div class="mt-6 overflow-x-auto bg-white border border-[#133824]/10">
+      <table class="w-full text-left text-sm min-w-[640px]">
+        <thead><tr class="border-b border-[#133824]/10"><th class="p-4">Momento</th><th class="p-4">O que acontece</th></tr></thead>
+        <tbody>
+          <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Parada</td><td class="p-4">Gota pequena, cores fluindo devagar e um halo suave da cor do momento.</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Mouse por perto</td><td class="p-4">O contorno se inclina na direção do cursor, como uma gota reagindo.</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Hover ou foco</td><td class="p-4">A gota cresce um pouco, o líquido acelera e o maisinho surge.</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Clique</td><td class="p-4">Leva ao hub oficial <strong>inspira.dev.br</strong>.</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4 font-bold">Toque (celular)</td><td class="p-4">Sem hover, então o maisinho já fica visível para indicar que dá para tocar.</td></tr>
+          <tr><td class="p-4 font-bold">Movimento reduzido</td><td class="p-4">Quem pede menos movimento no sistema vê a orb parada, sem animação.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="font-display text-2xl font-extrabold mt-16">Onde usar</h3>
+    <p class="mt-3 max-w-2xl leading-relaxed text-[#133824]/80">A orb vive na borda do site, nunca no meio do conteúdo. São só duas posições permitidas, e uma orb por página.</p>
+    <div class="mt-6 grid md:grid-cols-2 gap-3 text-sm">
+      <article class="bg-[#133824] text-[#F7F7F4] p-6">
+        <p class="font-display text-xl font-bold text-[#BAFF29]">1. Canto inferior esquerdo</p>
+        <p class="mt-2 leading-relaxed">Posição padrão. A orb fica fixa a cerca de 1 rem das bordas e acompanha a rolagem. Use em sites e sistemas onde o canto esquerdo está livre.</p>
+      </article>
+      <article class="bg-[#A3E5C2] p-6">
+        <p class="font-display text-xl font-bold">2. Final do site, no rodapé</p>
+        <p class="mt-2 leading-relaxed">Quando o canto já está ocupado (chat, cookies, botão flutuante), a orb entra no rodapé, junto da assinatura do projeto, e não fica fixa.</p>
+      </article>
+    </div>
+    <div class="mt-3 overflow-x-auto bg-white border border-[#133824]/10">
+      <table class="w-full text-left text-sm min-w-[720px]">
+        <thead><tr class="border-b border-[#133824]/10"><th class="p-4">Fazer</th><th class="p-4">Evitar</th></tr></thead>
+        <tbody>
+          <tr class="border-b border-[#133824]/10"><td class="p-4">Manter no canto inferior esquerdo ou no rodapé</td><td class="p-4">Colocar no topo, no header ou no meio do conteúdo</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4">Deixar um respiro livre de cerca de 1,25 rem em volta, para o halo</td><td class="p-4">Encostar em botões, CTAs, banners de cookies ou widgets de chat</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4">Usar o tamanho padrão de 64 px</td><td class="p-4">Ampliar em produção (o tamanho grande é só para vitrines como esta)</td></tr>
+          <tr class="border-b border-[#133824]/10"><td class="p-4">Apontar sempre para o hub oficial</td><td class="p-4">Usar a orb como botão de ação do próprio projeto</td></tr>
+          <tr><td class="p-4">Manter vidro, cores e maisinho como estão</td><td class="p-4">Trocar as cores, fazer o maisinho girar ou piscar</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="font-display text-2xl font-extrabold mt-16">Como usar</h3>
+    <div class="mt-6 grid gap-6">
+      <div>
+        <p class="text-sm font-bold uppercase tracking-[0.14em] text-[#133824]/70">No canto (padrão)</p>
+        <pre class="mt-3 overflow-x-auto bg-[#133824] text-[#BAFF29] p-5 text-sm leading-relaxed"><code>&lt;script
+  src="https://coletivo-inspira.github.io/brand-book/assets/js/inspira-orb.js"
+  data-href="https://inspira.dev.br/"
+  defer
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+      <div>
+        <p class="text-sm font-bold uppercase tracking-[0.14em] text-[#133824]/70">No rodapé</p>
+        <pre class="mt-3 overflow-x-auto bg-[#133824] text-[#BAFF29] p-5 text-sm leading-relaxed"><code>&lt;footer id="rodape"&gt; ... &lt;/footer&gt;
+
+&lt;script
+  src="https://coletivo-inspira.github.io/brand-book/assets/js/inspira-orb.js"
+  data-mount="#rodape"
+  defer
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+    </div>
+    <ul class="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+      <li class="border border-[#133824]/15 bg-white/70 p-4"><strong class="font-display">data-href</strong><br>Destino do clique (padrão: inspira.dev.br).</li>
+      <li class="border border-[#133824]/15 bg-white/70 p-4"><strong class="font-display">data-label</strong><br>Texto acessível do link.</li>
+      <li class="border border-[#133824]/15 bg-white/70 p-4"><strong class="font-display">data-mount</strong><br>Seletor do container (ex.: o rodapé). Sem ele, a orb fica fixa no canto.</li>
+      <li class="border border-[#133824]/15 bg-white/70 p-4"><strong class="font-display">data-hide-on</strong><br>Hostnames, separados por vírgula, onde a orb não aparece.</li>
+    </ul>
+    <p class="mt-6 text-sm text-[#133824]/70">No portal inspira.dev.br a orb vem do componente React <span class="font-mono">InspiraOrb</span>, com o mesmo visual. A orb fixa desta página está no canto inferior esquerdo.</p>
+  </section>
+
+  <footer class="border-t border-[#133824]/10 py-10 text-center">
+    <p class="font-display font-extrabold text-2xl">+INSPIRA</p>
+    <p class="text-sm mt-2">Coletivo Inspira · Bonito-MS / Belo Horizonte-MG</p>
+  </footer>
+  <div id="toast" role="status" aria-live="polite">HEX copiado</div>
+  <script>
+    const palettes = {
+      base: ["#F7F7F4", "#133824", "#BAFF29"],
+      solar: ["#FDFCEB", "#133824", "#FFD700"],
+      pop: ["#F7F7F4", "#133824", "#E5007C"],
+      tropical: ["#FDFBF7", "#E5A93C", "#A3E5C2"],
+    };
+    const bars = document.querySelectorAll(".ratio-bar");
+    const ratio = document.getElementById("ratio");
+    function paint(name) {
+      const colors = palettes[name];
+      bars.forEach((bar, index) => { bar.style.background = colors[index]; });
+    }
+    function showTab(name) {
+      document.querySelectorAll(".tab-content").forEach((node) => node.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("active");
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        const on = btn.dataset.tab === name;
+        btn.classList.toggle("bg-[#133824]", on);
+        btn.classList.toggle("text-[#BAFF29]", on);
+        btn.classList.toggle("border", !on);
+      });
+      paint(name);
+    }
+    document.getElementById("palette-tabs").addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-tab]");
+      if (btn) showTab(btn.dataset.tab);
+    });
+    document.querySelectorAll(".swatch").forEach((swatch) => {
+      swatch.addEventListener("click", async () => {
+        const hex = swatch.dataset.hex;
+        try { await navigator.clipboard.writeText(hex); } catch { /* ignore */ }
+        const toast = document.getElementById("toast");
+        toast.textContent = hex + " copiado";
+        toast.classList.add("show");
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toast.classList.remove("show"), 1600);
+      });
+    });
+    const weight = document.getElementById("weight");
+    weight.addEventListener("input", () => {
+      document.getElementById("weight-label").textContent = weight.value;
+      document.getElementById("type-sample").style.fontWeight = weight.value;
+      document.getElementById("body-sample").style.fontWeight = String(Math.max(400, Number(weight.value) - 200));
+    });
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        bars.forEach((bar) => { bar.style.width = bar.dataset.width; });
+        observer.disconnect();
+      });
+    }, { threshold: 0.4 });
+    observer.observe(ratio);
+    document.querySelectorAll("section, header").forEach((section) => {
+      section.classList.add("reveal");
+    });
+  </script>
+  <script src="assets/js/dot-trail.js?v=2" defer></script>
+  <script
+    src="assets/js/inspira-orb.js?v=4"
+    data-href="https://inspira.dev.br/"
+    defer
+  ></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a56dacdacd1657c9',t:'MTc5NDA2ODUzMA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a56dacdacd1657c9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4206e2fe35b6425a80526b2eff4fb5f1","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
