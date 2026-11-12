@@ -6,19 +6,69 @@ let currentUser = null;
 let sites = [];
 let activeSite = null;
 
+// New Profile & Customization state
+let profile = {
+  displayName: '',
+  businessName: '',
+  city: '',
+  whatsapp: '',
+  interests: []
+};
+let customizationRequests = [];
+let selectedInterests = new Set();
+let wizardCurrentStep = 1;
+
 // DOM Elements
 const authSection = globalThis.document?.getElementById('auth-section');
+const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
 const dashboardSection = globalThis.document?.getElementById('dashboard-section');
 const editorSection = globalThis.document?.getElementById('editor-section');
+const inicioSection = globalThis.document?.getElementById('inicio-section');
+const perfilSection = globalThis.document?.getElementById('perfil-section');
+const pedidosSection = globalThis.document?.getElementById('pedidos-section');
+const wizardSection = globalThis.document?.getElementById('wizard-section');
+
 const demoModeBadge = globalThis.document?.getElementById('demo-mode-badge');
 const logoutButton = globalThis.document?.getElementById('logout-button');
 const globalFeedback = globalThis.document?.getElementById('global-feedback');
 const sitesListContainer = globalThis.document?.getElementById('sites-list-container');
-const createSiteForm = globalThis.document?.getElementById('create-site-form');
-const newSiteNameInput = globalThis.document?.getElementById('new-site-name');
-const newSiteSlugInput = globalThis.document?.getElementById('new-site-slug');
-const slugPreview = globalThis.document?.getElementById('slug-preview');
-const slugValidationError = globalThis.document?.getElementById('slug-validation-error');
+
+// Profile DOM Elements
+const profileForm = globalThis.document?.getElementById('profile-form');
+const profileDisplayNameInput = globalThis.document?.getElementById('profile-display-name');
+const profileBusinessNameInput = globalThis.document?.getElementById('profile-business-name');
+const profileCityInput = globalThis.document?.getElementById('profile-city');
+const profileWhatsappInput = globalThis.document?.getElementById('profile-whatsapp');
+const profileWhatsappError = globalThis.document?.getElementById('profile-whatsapp-error');
+const interestsChipsContainer = globalThis.document?.getElementById('interests-chips-container');
+
+// Customization DOM Elements
+const customizationForm = globalThis.document?.getElementById('customization-request-form');
+const requestStorefrontTypeSelect = globalThis.document?.getElementById('request-storefront-type');
+const requestTemplateInterestInput = globalThis.document?.getElementById('request-template-interest');
+const requestGoalInput = globalThis.document?.getElementById('request-goal');
+const requestReferenceUrlsInput = globalThis.document?.getElementById('request-reference-urls');
+const requestReferenceError = globalThis.document?.getElementById('request-reference-error');
+const requestDesiredDeadlineInput = globalThis.document?.getElementById('request-desired-deadline');
+const requestsListContainer = globalThis.document?.getElementById('requests-list-container');
+
+// Wizard DOM Elements
+const wizardForm = globalThis.document?.getElementById('wizard-form');
+const wizardSiteNameInput = globalThis.document?.getElementById('wizard-site-name');
+const wizardSiteSlugInput = globalThis.document?.getElementById('wizard-site-slug');
+const wizardSlugPreview = globalThis.document?.getElementById('wizard-slug-preview');
+const wizardSlugValidationError = globalThis.document?.getElementById('wizard-slug-validation-error');
+const wizardOpenBtn = globalThis.document?.getElementById('wizard-open-btn');
+
+// Hub DOM Elements
+const profileProgressText = globalThis.document?.getElementById('profile-progress-text');
+const profileCompletenessBar = globalThis.document?.getElementById('profile-completeness-bar');
+const profileMissingFields = globalThis.document?.getElementById('profile-missing-fields');
+const vitrinesSummaryText = globalThis.document?.getElementById('vitrines-summary-text');
+const hubVitrinesList = globalThis.document?.getElementById('hub-vitrines-list');
+const customRequestsSummaryText = globalThis.document?.getElementById('custom-requests-summary-text');
+const hubRequestsList = globalThis.document?.getElementById('hub-requests-list');
+
 const googleLoginButton = globalThis.document?.getElementById('google-login-button');
 const localDemoButton = globalThis.document?.getElementById('local-demo-button');
 const backToDashboardButton = globalThis.document?.getElementById('back-to-dashboard');
@@ -30,13 +80,65 @@ export const DEFAULT_SUPABASE_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 // Initialize App
 globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+  setupAppShellNavigation();
+  setupProfileChips();
+  setupWizardFlow();
   await checkSession();
+  if (currentUser) {
+    await loadProfile();
+    await loadCustomizationRequests();
+    updateHubSummary();
+    showSection('inicio');
+  }
 });
+
+// Setup App Shell Navigation
+function setupAppShellNavigation() {
+  globalThis.document?.querySelectorAll('.nav-link:not(.nav-link-future)').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const section = link.getAttribute('data-section');
+      if (section) {
+        showSection(section);
+      }
+    });
+  });
+
+  // Hub shortcuts
+  globalThis.document?.getElementById('hub-complete-profile-btn')?.addEventListener('click', () => {
+    showSection('perfil');
+  });
+  globalThis.document?.getElementById('hub-create-site-btn')?.addEventListener('click', () => {
+    openWizard();
+  });
+  globalThis.document?.getElementById('hub-new-request-btn')?.addEventListener('click', () => {
+    showSection('pedidos');
+  });
+  wizardOpenBtn?.addEventListener('click', () => {
+    openWizard();
+  });
+}
+
+// Profile Chips setup
+function setupProfileChips() {
+  interestsChipsContainer?.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const interest = btn.getAttribute('data-interest');
+      if (selectedInterests.has(interest)) {
+        selectedInterests.delete(interest);
+        btn.classList.remove('active');
+      } else {
+        selectedInterests.add(interest);
+        btn.classList.add('active');
+      }
+    });
+  });
+}
 
 // Setup Events
 function setupEventListeners() {
   // Google OAuth PKCE
-  googleLoginButton.addEventListener('click', async () => {
+  googleLoginButton?.addEventListener('click', async () => {
     try {
       await startGoogleLogin();
     } catch (err) {
@@ -45,36 +147,182 @@ function setupEventListeners() {
   });
 
   // Local Demo Mode
-  localDemoButton.addEventListener('click', () => {
+  localDemoButton?.addEventListener('click', () => {
     enterLocalDemoMode();
   });
 
   // Logout
-  logoutButton.addEventListener('click', async () => {
+  logoutButton?.addEventListener('click', async () => {
     await handleLogout();
   });
 
-  // Back to Dashboard
-  backToDashboardButton.addEventListener('click', () => {
+  // Back to Dashboard from Editor
+  backToDashboardButton?.addEventListener('click', () => {
     showSection('dashboard');
   });
 
-  // Reactive Slug Input
-  newSiteSlugInput.addEventListener('input', () => {
-    const rawVal = newSiteSlugInput.value;
-    // Autoclean uppercase and whitespace, but let them type
-    const cleaned = rawVal.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (rawVal !== cleaned) {
-      newSiteSlugInput.value = cleaned;
-    }
-    validateSlug(newSiteSlugInput.value);
+  // Profile Form Submit
+  if (profileForm) {
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleSaveProfile();
+    });
+  }
+
+  // Customization Request Form Submit
+  if (customizationForm) {
+    customizationForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleCreateCustomizationRequest();
+    });
+  }
+}
+
+// 3-Step Wizard Flow setup
+function setupWizardFlow() {
+  const wizardFormEl = globalThis.document?.getElementById('wizard-form');
+
+  // Cancel Buttons
+  globalThis.document?.querySelectorAll('.wizard-cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showSection('dashboard');
+    });
   });
 
-  // Create Site Submit
-  createSiteForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await handleCreateSite();
+  // Next Buttons
+  wizardSection?.querySelectorAll('.wizard-next-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (wizardCurrentStep === 1) {
+        // Area selection
+        goToWizardStep(2);
+      } else if (wizardCurrentStep === 2) {
+        // Model selection
+        const model = wizardFormEl.elements['wizard-model'].value;
+        if (model === 'custom') {
+          // Redirect to Customization Request with pre-fill!
+          const area = wizardFormEl.elements['wizard-area'].value;
+          requestStorefrontTypeSelect.value = area;
+          requestTemplateInterestInput.value = 'Modelo Personalizado';
+          requestGoalInput.value = `Gostaria de um modelo personalizado de vitrine para o segmento de ${getAreaLabel(area)}.`;
+          requestDesiredDeadlineInput.value = '';
+          requestReferenceUrlsInput.value = '';
+          
+          showSection('pedidos');
+          showFeedback('Preencha os detalhes do seu pedido personalizado abaixo.', 'success');
+        } else {
+          goToWizardStep(3);
+        }
+      }
+    });
   });
+
+  // Prev Buttons
+  wizardSection?.querySelectorAll('.wizard-prev-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      goToWizardStep(wizardCurrentStep - 1);
+    });
+  });
+
+  // Reactive Slug Input in Wizard
+  wizardSiteSlugInput?.addEventListener('input', () => {
+    const rawVal = wizardSiteSlugInput.value;
+    const cleaned = rawVal.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (rawVal !== cleaned) {
+      wizardSiteSlugInput.value = cleaned;
+    }
+    validateWizardSlug(wizardSiteSlugInput.value);
+  });
+
+  // Automatic Slug generation on Name input
+  wizardSiteNameInput?.addEventListener('input', () => {
+    const name = wizardSiteNameInput.value;
+    const suggestedSlug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove accents
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    wizardSiteSlugInput.value = suggestedSlug.substring(0, 40);
+    validateWizardSlug(wizardSiteSlugInput.value);
+  });
+
+  // Wizard Form Submit
+  if (wizardForm) {
+    wizardForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleCreateWizardSite();
+    });
+  }
+}
+
+function getAreaLabel(area) {
+  const map = {
+    food: 'Alimentação',
+    art: 'Arte & design',
+    photo: 'Fotografia & mídia',
+    health: 'Saúde',
+    tech: 'Tecnologia'
+  };
+  return map[area] || area;
+}
+
+function openWizard() {
+  wizardSiteNameInput.value = profile.businessName || '';
+  if (profile.businessName) {
+    wizardSiteNameInput.dispatchEvent(new Event('input'));
+  } else {
+    wizardSiteSlugInput.value = '';
+    wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/sua-loja';
+    wizardSlugValidationError.hidden = true;
+  }
+  goToWizardStep(1);
+  showSection('wizard');
+}
+
+function goToWizardStep(step) {
+  wizardCurrentStep = step;
+  
+  // Show/Hide step panes
+  globalThis.document?.getElementById('wizard-step-1').toggleAttribute('hidden', step !== 1);
+  globalThis.document?.getElementById('wizard-step-2').toggleAttribute('hidden', step !== 2);
+  globalThis.document?.getElementById('wizard-step-3').toggleAttribute('hidden', step !== 3);
+
+  // Update steps indicator classes
+  globalThis.document?.getElementById('step-ind-1')?.classList.toggle('active', step >= 1);
+  globalThis.document?.getElementById('step-ind-2')?.classList.toggle('active', step >= 2);
+  globalThis.document?.getElementById('step-ind-3')?.classList.toggle('active', step >= 3);
+}
+
+function validateWizardSlug(slug) {
+  wizardSlugPreview.textContent = `Endereço: vitrine.inspira.dev.br/${slug || 'sua-loja'}`;
+
+  if (!slug) {
+    wizardSlugValidationError.hidden = true;
+    return false;
+  }
+
+  const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  if (!slugRegex.test(slug)) {
+    wizardSlugValidationError.textContent = 'O endereço deve conter apenas letras minúsculas, números e hífens, sem hífens consecutivos ou nas extremidades.';
+    wizardSlugValidationError.hidden = false;
+    return false;
+  }
+
+  if (slug.length < 3 || slug.length > 40) {
+    wizardSlugValidationError.textContent = 'O endereço deve ter entre 3 e 40 caracteres.';
+    wizardSlugValidationError.hidden = false;
+    return false;
+  }
+
+  if (RESERVED_SLUGS.includes(slug)) {
+    wizardSlugValidationError.textContent = 'Este endereço é reservado pelo sistema.';
+    wizardSlugValidationError.hidden = false;
+    return false;
+  }
+
+  wizardSlugValidationError.hidden = true;
+  return true;
 }
 
 function extractAuthCodeFromUrl(deps = {}) {
@@ -91,7 +339,7 @@ function extractAuthCodeFromUrl(deps = {}) {
         return code.trim();
       }
     } catch {
-      // Fall through to search string check
+      // Fall through
     }
   }
   const search =
@@ -247,6 +495,7 @@ export async function exchangePkceCode(code, deps = {}) {
     }
     if (demoModeBadge) demoModeBadge.hidden = true;
     if (logoutButton) logoutButton.hidden = false;
+    
     onSection('dashboard');
     await loadSitesFn();
     return { ok: true, user: sessionData.user, sites };
@@ -275,8 +524,10 @@ export async function checkSession(deps = {}) {
       currentUser = data.user;
       if (demoModeBadge) demoModeBadge.hidden = true;
       if (logoutButton) logoutButton.hidden = false;
-      onSection('dashboard');
+      
       await loadSitesFn();
+      onSection('dashboard');
+      
       return { ok: true, user: data.user, sites };
     } else if (res.status === 401) {
       isOnline = true;
@@ -284,12 +535,10 @@ export async function checkSession(deps = {}) {
       onSection('auth');
       return { ok: false, status: 401 };
     } else {
-      // Other status (like 404) implies offline static preview
       fallbackToLocalIfNoSession();
       return { ok: false, status: res.status };
     }
   } catch (err) {
-    // Network error implies offline static preview
     fallbackToLocalIfNoSession();
     return { ok: false, error: 'network_error' };
   }
@@ -297,14 +546,17 @@ export async function checkSession(deps = {}) {
 
 function fallbackToLocalIfNoSession() {
   isOnline = false;
-  // Check if already authenticated in local storage
   const localAuth = globalThis.sessionStorage?.getItem('portal_local_authenticated') === 'true';
   if (localAuth) {
     currentUser = { id: 'local-demo-user' };
     if (demoModeBadge) demoModeBadge.hidden = false;
     if (logoutButton) logoutButton.hidden = false;
-    showSection('dashboard');
+    
     loadLocalSites();
+    loadLocalProfile();
+    loadLocalCustomizationRequests();
+    updateHubSummary();
+    showSection('inicio');
   } else {
     if (logoutButton) logoutButton.hidden = true;
     showSection('auth');
@@ -363,7 +615,7 @@ export async function fetchAuthConfig(fetchImpl = globalThis.fetch) {
         }
       }
     } catch {
-      // Fall through to window fallback check
+      // Fall through
     }
   }
 
@@ -424,8 +676,12 @@ function enterLocalDemoMode() {
   demoModeBadge.hidden = false;
   logoutButton.hidden = false;
   showFeedback('Entrou no Modo Local de Demonstração (Offline)', 'success');
-  showSection('dashboard');
+  
   loadLocalSites();
+  loadLocalProfile();
+  loadLocalCustomizationRequests();
+  updateHubSummary();
+  showSection('inicio');
 }
 
 // Handle Logout
@@ -445,6 +701,15 @@ async function handleLogout() {
   currentUser = null;
   sites = [];
   activeSite = null;
+  profile = {
+    displayName: '',
+    businessName: '',
+    city: '',
+    whatsapp: '',
+    interests: []
+  };
+  customizationRequests = [];
+  selectedInterests.clear();
   
   if (demoModeBadge) demoModeBadge.hidden = true;
   if (logoutButton) logoutButton.hidden = true;
@@ -452,16 +717,38 @@ async function handleLogout() {
   showSection('auth');
 }
 
-// Section Switching
-function showSection(section) {
+// Section Switching with sidebar/bottom-nav integration
+export function showSection(section) {
+  // Toggle Auth section
   if (authSection) authSection.hidden = section !== 'auth';
-  if (dashboardSection) dashboardSection.hidden = section !== 'dashboard';
-  if (editorSection) editorSection.hidden = section !== 'editor';
+  if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
+
+  if (section !== 'auth') {
+    // Show/Hide authenticated content panes
+    if (inicioSection) inicioSection.hidden = section !== 'inicio';
+    if (dashboardSection) dashboardSection.hidden = section !== 'dashboard';
+    if (perfilSection) perfilSection.hidden = section !== 'perfil';
+    if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
+    if (wizardSection) wizardSection.hidden = section !== 'wizard';
+    if (editorSection) editorSection.hidden = section !== 'editor';
+
+    // Update active nav styling
+    globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
+      const matches = link.getAttribute('data-section') === section;
+      link.classList.toggle('active', matches);
+    });
+
+    // Handle Editor exception (hide outer top-bar and nav on small editor views if needed, or keep)
+    // For now we keep normal shell layout
+  }
 }
 
 // Show Feedback Messages
 export function showFeedback(msg, type = 'success') {
-  const feedbackEl = globalFeedback ?? globalThis.document?.getElementById('global-feedback');
+  const feedbackEl = isOnline ? 
+    (globalThis.document?.getElementById('shell-global-feedback') || globalFeedback) : 
+    (globalFeedback || globalThis.document?.getElementById('shell-global-feedback'));
+
   if (feedbackEl) {
     feedbackEl.textContent = msg;
     feedbackEl.className = `feedback-banner ${type}`;
@@ -471,42 +758,398 @@ export function showFeedback(msg, type = 'success') {
     }, 6000);
   }
 
-  // Auto-scroll to top to let user see feedback
   if (typeof globalThis.window?.scrollTo === 'function') {
     globalThis.window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
-// Slug validation reactive rules
-function validateSlug(slug) {
-  slugPreview.textContent = `Endereço: vitrine.inspira.dev.br/${slug || 'sua-loja'}`;
+// Load Profile (Online with localStorage Fallbacks)
+async function loadProfile() {
+  if (isOnline) {
+    try {
+      const res = await fetch('/api/profile');
+      if (res.ok) {
+        const data = await res.json();
+        profile = data.profile || profile;
+        localStorage.setItem('vitrine_profile', JSON.stringify(profile));
+      } else {
+        // Graceful Fallback on 404/501
+        loadLocalProfile();
+      }
+    } catch (err) {
+      loadLocalProfile();
+    }
+  } else {
+    loadLocalProfile();
+  }
+  syncProfileToForm();
+}
 
-  if (!slug) {
-    slugValidationError.hidden = true;
-    return false;
+function loadLocalProfile() {
+  const saved = localStorage.getItem('vitrine_profile');
+  if (saved) {
+    try {
+      profile = JSON.parse(saved);
+    } catch {
+      // Keep defaults
+    }
+  }
+}
+
+function syncProfileToForm() {
+  if (profileDisplayNameInput) profileDisplayNameInput.value = profile.displayName || '';
+  if (profileBusinessNameInput) profileBusinessNameInput.value = profile.businessName || '';
+  if (profileCityInput) profileCityInput.value = profile.city || '';
+  if (profileWhatsappInput) profileWhatsappInput.value = profile.whatsapp || '';
+
+  selectedInterests.clear();
+  const interestsArray = profile.interests || [];
+  interestsArray.forEach(interest => {
+    selectedInterests.add(interest);
+  });
+
+  interestsChipsContainer?.querySelectorAll('.chip-btn').forEach(btn => {
+    const interest = btn.getAttribute('data-interest');
+    btn.classList.toggle('active', selectedInterests.has(interest));
+  });
+}
+
+// Save Profile
+async function handleSaveProfile() {
+  const displayName = profileDisplayNameInput.value.trim();
+  const businessName = profileBusinessNameInput.value.trim();
+  const city = profileCityInput.value.trim();
+  const whatsapp = profileWhatsappInput.value.trim();
+  const interests = Array.from(selectedInterests);
+
+  // Validations
+  if (whatsapp && !/^[1-9]\d{7,14}$/.test(whatsapp)) {
+    profileWhatsappError.hidden = false;
+    showFeedback('Digite o número de WhatsApp no formato internacional de dígitos (ex: 5551999999999).', 'error');
+    return;
+  }
+  profileWhatsappError.hidden = true;
+
+  profile = { displayName, businessName, city, whatsapp, interests };
+  localStorage.setItem('vitrine_profile', JSON.stringify(profile));
+
+  let savedOnServer = false;
+  if (isOnline) {
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      if (res.ok) {
+        savedOnServer = true;
+      }
+    } catch (err) {
+      // Caught gracefully
+    }
   }
 
-  const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-  if (!slugRegex.test(slug)) {
-    slugValidationError.textContent = 'O endereço deve conter apenas letras minúsculas, números e hífens, sem hífens consecutivos ou nas extremidades.';
-    slugValidationError.hidden = false;
-    return false;
+  updateHubSummary();
+  if (savedOnServer) {
+    showFeedback('Perfil e interesses salvos com sucesso na nuvem!', 'success');
+  } else {
+    showFeedback('Perfil e interesses salvos com sucesso no navegador (modo offline).', 'success');
+  }
+  
+  showSection('inicio');
+}
+
+// Load Customization Requests (Online/Offline)
+async function loadCustomizationRequests() {
+  if (isOnline) {
+    try {
+      const res = await fetch('/api/customization-requests');
+      if (res.ok) {
+        const data = await res.json();
+        customizationRequests = data.requests || [];
+        localStorage.setItem('vitrine_customization_requests', JSON.stringify(customizationRequests));
+      } else {
+        loadLocalCustomizationRequests();
+      }
+    } catch (err) {
+      loadLocalCustomizationRequests();
+    }
+  } else {
+    loadLocalCustomizationRequests();
+  }
+  renderCustomizationRequests();
+}
+
+function loadLocalCustomizationRequests() {
+  const saved = localStorage.getItem('vitrine_customization_requests');
+  if (saved) {
+    try {
+      customizationRequests = JSON.parse(saved);
+    } catch {
+      customizationRequests = [];
+    }
+  } else {
+    customizationRequests = [];
+  }
+}
+
+function renderCustomizationRequests() {
+  if (!requestsListContainer) return;
+
+  if (customizationRequests.length === 0) {
+    requestsListContainer.innerHTML = '<p class="empty-msg">Nenhuma solicitação enviada ainda.</p>';
+    return;
   }
 
-  if (slug.length < 3 || slug.length > 40) {
-    slugValidationError.textContent = 'O endereço deve ter entre 3 e 40 caracteres.';
-    slugValidationError.hidden = false;
-    return false;
+  requestsListContainer.innerHTML = '';
+  customizationRequests.forEach(req => {
+    const card = document.createElement('div');
+    card.className = 'site-item request-card';
+
+    const header = document.createElement('div');
+    header.className = 'request-card-header';
+
+    const modelTitle = document.createElement('h3');
+    modelTitle.className = 'request-card-title';
+    modelTitle.textContent = `${req.templateInterest || 'Customização'} (${getAreaLabel(req.storefrontType)})`;
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'site-role-badge request-card-badge';
+    statusBadge.textContent = getRequestStatusLabel(req.status);
+
+    header.appendChild(modelTitle);
+    header.appendChild(statusBadge);
+
+    const goalPara = document.createElement('p');
+    goalPara.className = 'request-card-goal';
+    goalPara.textContent = req.goal;
+
+    const details = document.createElement('div');
+    details.className = 'request-card-details';
+
+    const deadline = document.createElement('span');
+    deadline.textContent = `Prazo: ${req.desiredDeadline || 'Não informado'}`;
+
+    const dateStr = new Date(req.createdAt || req.updatedAt || Date.now()).toLocaleDateString('pt-BR');
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = dateStr;
+
+    details.appendChild(deadline);
+    details.appendChild(dateSpan);
+
+    // Optional WhatsApp button to continue discussion
+    const actionContainer = document.createElement('div');
+    actionContainer.className = 'request-card-actions';
+
+    const waBtn = document.createElement('a');
+    waBtn.className = 'button button-small button-secondary button-pill request-card-wa-btn';
+    waBtn.target = '_blank';
+    waBtn.rel = 'noopener noreferrer';
+    
+    // Fallback or real WhatsApp discussion link
+    const waText = `Olá Coletivo Inspira! Enviei uma solicitação de customização para o segmento de ${getAreaLabel(req.storefrontType)} (${req.templateInterest}). Meu objetivo é: ${req.goal.substring(0, 100)}...`;
+    waBtn.href = `https://wa.me/5511999999999?text=${encodeURIComponent(waText)}`;
+    waBtn.textContent = 'Conversar no WhatsApp 💬';
+
+    actionContainer.appendChild(waBtn);
+
+    card.appendChild(header);
+    card.appendChild(goalPara);
+    card.appendChild(details);
+    card.appendChild(actionContainer);
+
+    requestsListContainer.appendChild(card);
+  });
+}
+
+function getRequestStatusLabel(status) {
+  const map = {
+    novo: 'Novo',
+    em_analise: 'Em Análise',
+    respondido: 'Respondido',
+    encerrado: 'Encerrado'
+  };
+  return map[status] || 'Pendente';
+}
+
+// Create Customization Request
+async function handleCreateCustomizationRequest() {
+  const storefrontType = requestStorefrontTypeSelect.value;
+  const templateInterest = requestTemplateInterestInput.value.trim();
+  const goal = requestGoalInput.value.trim();
+  const rawUrls = requestReferenceUrlsInput.value.trim();
+  const desiredDeadline = requestDesiredDeadlineInput.value.trim();
+
+  // Validations
+  if (!templateInterest || templateInterest.length > 120) {
+    showFeedback('Insira o nome do modelo/recurso desejado (máx. 120 caracteres).', 'error');
+    return;
+  }
+  if (!goal || goal.length < 10 || goal.length > 2000) {
+    showFeedback('O objetivo do projeto deve ter entre 10 e 2000 caracteres.', 'error');
+    return;
   }
 
-  if (RESERVED_SLUGS.includes(slug)) {
-    slugValidationError.textContent = 'Este endereço é reservado pelo sistema.';
-    slugValidationError.hidden = false;
-    return false;
+  // Parse Reference URLs and validate HTTPS
+  const referenceUrls = rawUrls ? rawUrls.split('\n').map(u => u.trim()).filter(Boolean) : [];
+  let urlsValid = true;
+  for (const url of referenceUrls) {
+    if (!url.startsWith('https://')) {
+      urlsValid = false;
+      break;
+    }
+  }
+  if (!urlsValid) {
+    requestReferenceError.hidden = false;
+    showFeedback('Todos os links de referência devem usar o protocolo seguro HTTPS (ex: https://site.com).', 'error');
+    return;
+  }
+  requestReferenceError.hidden = true;
+
+  const newRequest = {
+    id: `req-local-${Date.now()}`,
+    siteId: null,
+    storefrontType,
+    templateInterest,
+    goal,
+    referenceUrls,
+    desiredDeadline,
+    status: 'novo',
+    createdAt: new Date().toISOString()
+  };
+
+  customizationRequests.unshift(newRequest);
+  localStorage.setItem('vitrine_customization_requests', JSON.stringify(customizationRequests));
+
+  let savedOnServer = false;
+  if (isOnline) {
+    try {
+      const res = await fetch('/api/customization-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storefrontType,
+          templateInterest,
+          goal,
+          referenceUrls,
+          desiredDeadline
+        })
+      });
+      if (res.ok) {
+        savedOnServer = true;
+        const data = await res.json();
+        // Replace mock local request with server response
+        if (data.request) {
+          customizationRequests[0] = data.request;
+          localStorage.setItem('vitrine_customization_requests', JSON.stringify(customizationRequests));
+        }
+      }
+    } catch (err) {
+      // Caught gracefully
+    }
   }
 
-  slugValidationError.hidden = true;
-  return true;
+  customizationForm.reset();
+  renderCustomizationRequests();
+  updateHubSummary();
+
+  if (savedOnServer) {
+    showFeedback('Pedido de customização registrado com sucesso!', 'success');
+  } else {
+    showFeedback('Pedido registrado com sucesso no navegador (modo offline).', 'success');
+  }
+}
+
+// Update Home Dashboard (Início) Summary Cards
+function updateHubSummary() {
+  // 1. Profile completeness
+  let filledFields = 0;
+  let missing = [];
+  if (profile.displayName) filledFields++; else missing.push('Seu Nome');
+  if (profile.businessName) filledFields++; else missing.push('Nome do Negócio');
+  if (profile.city) filledFields++; else missing.push('Cidade');
+  if (profile.whatsapp && /^[1-9]\d{7,14}$/.test(profile.whatsapp)) filledFields++; else missing.push('WhatsApp válido');
+  if (profile.interests && profile.interests.length > 0) filledFields++; else missing.push('Áreas de interesse');
+
+  const completenessPercent = filledFields * 20;
+  if (profileProgressText) profileProgressText.textContent = `${completenessPercent}% completo`;
+  if (profileCompletenessBar) profileCompletenessBar.value = completenessPercent;
+
+  if (profileMissingFields) {
+    if (completenessPercent === 100) {
+      profileMissingFields.textContent = 'Parabéns! Seu perfil está completo.';
+      profileMissingFields.classList.add('success-text');
+      profileMissingFields.classList.remove('soft-text');
+    } else {
+      profileMissingFields.textContent = `Pendente: ${missing.join(', ')}`;
+      profileMissingFields.classList.add('soft-text');
+      profileMissingFields.classList.remove('success-text');
+    }
+  }
+
+  // 2. Vitrines list summary
+  if (vitrinesSummaryText) {
+    if (sites.length === 0) {
+      vitrinesSummaryText.textContent = 'Você não possui nenhuma vitrine cadastrada.';
+    } else if (sites.length === 1) {
+      vitrinesSummaryText.textContent = 'Você possui 1 vitrine cadastrada.';
+    } else {
+      vitrinesSummaryText.textContent = `Você possui ${sites.length} vitrines cadastradas.`;
+    }
+  }
+  if (hubVitrinesList) {
+    if (sites.length === 0) {
+      hubVitrinesList.innerHTML = '<p style="font-size: 13px; color: var(--ink-soft); margin: 0;">Nenhuma vitrine ativa.</p>';
+    } else {
+      hubVitrinesList.innerHTML = '';
+      sites.slice(0, 3).forEach(site => {
+        const item = document.createElement('div');
+        item.className = 'hub-list-item';
+        
+        const title = document.createElement('strong');
+        title.textContent = site.name;
+        
+        const badge = document.createElement('span');
+        badge.textContent = site.role === 'owner' ? 'Proprietário' : 'Colaborador';
+
+        item.appendChild(title);
+        item.appendChild(badge);
+        hubVitrinesList.appendChild(item);
+      });
+    }
+  }
+
+  // 3. Customization Requests summary
+  if (customRequestsSummaryText) {
+    if (customizationRequests.length === 0) {
+      customRequestsSummaryText.textContent = 'Nenhum pedido enviado ao coletivo.';
+    } else if (customizationRequests.length === 1) {
+      customRequestsSummaryText.textContent = '1 pedido enviado ao coletivo.';
+    } else {
+      customRequestsSummaryText.textContent = `${customizationRequests.length} pedidos enviados ao coletivo.`;
+    }
+  }
+  if (hubRequestsList) {
+    if (customizationRequests.length === 0) {
+      hubRequestsList.innerHTML = '<p style="font-size: 13px; color: var(--ink-soft); margin: 0;">Nenhuma solicitação pendente.</p>';
+    } else {
+      hubRequestsList.innerHTML = '';
+      customizationRequests.slice(0, 2).forEach(req => {
+        const item = document.createElement('div');
+        item.className = 'hub-list-item';
+        
+        const title = document.createElement('strong');
+        title.textContent = req.templateInterest || 'Customização';
+        
+        const badge = document.createElement('span');
+        badge.textContent = getRequestStatusLabel(req.status);
+
+        item.appendChild(title);
+        item.appendChild(badge);
+        hubRequestsList.appendChild(item);
+      });
+    }
+  }
 }
 
 // Load Sites (Online / Offline)
@@ -582,6 +1225,8 @@ function loadLocalSites() {
 }
 
 function renderSites() {
+  if (!sitesListContainer) return;
+
   if (sites.length === 0) {
     sitesListContainer.innerHTML = '<p class="empty-msg">Nenhuma vitrine ativa cadastrada.</p>';
     return;
@@ -610,7 +1255,7 @@ function renderSites() {
     info.appendChild(badge);
 
     const actionBtn = document.createElement('button');
-    actionBtn.className = 'button button-small button-secondary';
+    actionBtn.className = 'button button-small button-secondary button-pill';
     actionBtn.type = 'button';
     actionBtn.textContent = 'Gerenciar Cardápio';
     actionBtn.addEventListener('click', () => {
@@ -624,19 +1269,35 @@ function renderSites() {
   });
 }
 
-// Handle site creation
-async function handleCreateSite() {
-  const name = newSiteNameInput.value.trim();
-  const slug = newSiteSlugInput.value.trim();
+// Handle Wizard site creation
+async function handleCreateWizardSite() {
+  const name = wizardSiteNameInput.value.trim();
+  const slug = wizardSiteSlugInput.value.trim();
+  const area = wizardForm.elements['wizard-area'].value;
+  const model = wizardForm.elements['wizard-model'].value;
 
   if (!name) {
     showFeedback('Digite o nome do negócio.', 'error');
     return;
   }
 
-  if (!validateSlug(slug)) {
+  if (!validateWizardSlug(slug)) {
     showFeedback('Verifique o endereço da vitrine fornecido.', 'error');
     return;
+  }
+
+  // Determine template based on selected model
+  let template = 'pizzeria-v1';
+  let catalogType = 'products';
+  if (model === 'booking') {
+    template = 'booking-v1';
+    catalogType = 'booking';
+  } else if (model === 'quote') {
+    template = 'quote-v1';
+    catalogType = 'quote';
+  } else if (model === 'products') {
+    template = 'products-v1';
+    catalogType = 'products';
   }
 
   if (isOnline) {
@@ -644,26 +1305,50 @@ async function handleCreateSite() {
       const res = await fetch('/api/sites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, slug, template: 'pizzeria-v1' })
+        body: JSON.stringify({
+          name,
+          slug,
+          storefrontType: area,
+          template,
+          catalogType
+        })
       });
 
       if (res.status === 201) {
         showFeedback(`Vitrine "${name}" criada com sucesso!`, 'success');
-        createSiteForm.reset();
-        slugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
+        wizardForm.reset();
+        wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
         await loadSites();
+        updateHubSummary();
+        showSection('dashboard');
       } else if (res.status === 409) {
         showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine.', 'error');
       } else {
-        const data = await res.json();
-        showFeedback(data.error?.message || 'Erro ao criar vitrine.', 'error');
+        // Safe 404/501 retry fallback for backwards compatibility when route is not yet fully extended
+        const errorData = await res.json().catch(() => null);
+        if (res.status === 404 || res.status === 501 || errorData?.error?.code === 'INVALID_TEMPLATE') {
+          // Retry with original pizzeria-v1 template
+          const retryRes = await fetch('/api/sites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, slug, template: 'pizzeria-v1' })
+          });
+          if (retryRes.status === 201) {
+            showFeedback(`Vitrine "${name}" criada com sucesso (modelo padrão)!`, 'success');
+            wizardForm.reset();
+            await loadSites();
+            updateHubSummary();
+            showSection('dashboard');
+            return;
+          }
+        }
+        showFeedback(errorData?.error?.message || 'Erro ao criar vitrine.', 'error');
       }
     } catch (err) {
       showFeedback('Erro de rede ao criar vitrine.', 'error');
     }
   } else {
     // Local creation
-    // Check for duplicate slug
     const duplicate = sites.some(s => s.slug === slug);
     if (duplicate) {
       showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine local.', 'error');
@@ -675,7 +1360,7 @@ async function handleCreateSite() {
       id: newId,
       slug,
       name,
-      template: "pizzeria-v1",
+      template,
       role: "owner",
       updatedAt: new Date().toISOString()
     };
@@ -683,26 +1368,29 @@ async function handleCreateSite() {
     sites.push(newSite);
     localStorage.setItem('vitrine_local_sites', JSON.stringify(sites));
 
-    // Create default local draft
+    // Create default local draft matching selected template
     const defaultDraft = {
       siteId: newId,
       revision: 1,
       updatedAt: new Date().toISOString(),
       content: {
         schemaVersion: 1,
-        template: "pizzeria-v1",
+        template,
         slug,
         businessName: name,
-        whatsapp: "5511999999999",
+        whatsapp: profile.whatsapp || "5511999999999",
         categories: []
       }
     };
     localStorage.setItem(`vitrine_local_draft_${newId}`, JSON.stringify(defaultDraft));
 
     showFeedback(`Vitrine "${name}" criada com sucesso no modo local!`, 'success');
-    createSiteForm.reset();
-    slugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
+    wizardForm.reset();
+    wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
+    
     loadLocalSites();
+    updateHubSummary();
+    showSection('dashboard');
   }
 }
 
