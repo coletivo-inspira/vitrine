@@ -35,11 +35,26 @@ test('QA Test Suite - Spec 008 CSS Contracts and Static Assets', async (t) => {
 
   await t.test('2. Marketing UI stylesheet (web/styles.css) must NOT contain glass glass effects ("no glass" Direction A)', async () => {
     const stylesCss = await readFile(STYLES_CSS_PATH, 'utf-8');
-    assert.strictEqual(
-      stylesCss.includes('backdrop-filter: blur') || stylesCss.includes('backdrop-filter:blur'),
-      false,
-      'Site de divulgação should preserve Direction A (solid surfaces) and have NO glass/blur effects'
-    );
+    
+    // Allow backdrop-filter ONLY on the site header selector (.site-header).
+    // Lino's decision (2026-11-12) explicitly allowed Liquid Glass ONLY on the site header selector.
+    const backdropFilterRegex = /(?:-webkit-)?backdrop-filter:[^;}]+/g;
+    let match;
+    while ((match = backdropFilterRegex.exec(stylesCss)) !== null) {
+      const matchIndex = match.index;
+      const beforeMatch = stylesCss.substring(0, matchIndex);
+      const openCurlyIndex = beforeMatch.lastIndexOf('{');
+      const beforeCurly = beforeMatch.substring(0, openCurlyIndex);
+      const lastCloseCurly = beforeCurly.lastIndexOf('}');
+      const lastOpenCurly = beforeCurly.lastIndexOf('{');
+      const selectorStart = Math.max(0, lastCloseCurly + 1, lastOpenCurly + 1);
+      const selector = beforeCurly.substring(selectorStart).trim();
+      
+      assert.ok(
+        selector.includes('.site-header'),
+        `backdrop-filter was found in selector "${selector}", but it is only allowed on the site header selector.`
+      );
+    }
   });
 
   await t.test('3. CSV Template Models (modelo-produtos.csv and modelo-servicos.csv) validation', async () => {
