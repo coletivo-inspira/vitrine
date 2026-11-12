@@ -250,7 +250,7 @@ Este guia passo a passo foi pensado para quem utiliza **Windows** (pelo navegado
 
 ### 6.3 Onde encontrar o Account ID da Cloudflare (`CLOUDFLARE_ACCOUNT_ID`)
 
-Você pode copiar o **Account ID** (32 caracteres alfanuméricos) em qualquer um destes dois caminhos no painel da Cloudflare:
+Você pode copiar o **Account ID** (32 caracteres hexadecimais minúsculos, `0-9` e `a-f`) em qualquer um destes dois caminhos no painel da Cloudflare:
 
 - **Caminho A (Direto em Workers & Pages)**:
   1. No menu lateral esquerdo do painel da Cloudflare ([https://dash.cloudflare.com](https://dash.cloudflare.com)), clique em **Workers & Pages** (ou **Compute (Workers)** → **Workers & Pages**).
@@ -259,6 +259,8 @@ Você pode copiar o **Account ID** (32 caracteres alfanuméricos) em qualquer um
 - **Caminho B (Pela URL do Navegador no Windows)**:
   1. Ao fazer login em `https://dash.cloudflare.com`, observe a barra de endereços do navegador: o endereço terá o formato `https://dash.cloudflare.com/<32-caracteres-hexadecimais>/home`.
   2. Esse código de 32 caracteres logo após `dash.cloudflare.com/` é exatamente o seu `CLOUDFLARE_ACCOUNT_ID`.
+
+> **Importante ao copiar e colar**: Cole **apenas** os 32 caracteres do **Account ID**, sem espaço nem `Enter` (quebra de linha) no final.
 
 ### 6.4 Como criar o Token de Acesso do Supabase (`SUPABASE_ACCESS_TOKEN`) e obter `SUPABASE_DB_PASSWORD`
 
@@ -284,7 +286,7 @@ Você pode copiar o **Account ID** (32 caracteres alfanuméricos) em qualquer um
      - **Secret**: cole (`Ctrl + V`) o token criado na Seção 6.2 e clique em **Add secret**.
    - **2º segredo**:
      - **Name**: `CLOUDFLARE_ACCOUNT_ID`
-     - **Secret**: cole (`Ctrl + V`) o ID de 32 caracteres copiado na Seção 6.3 e clique em **Add secret**.
+     - **Secret**: cole (`Ctrl + V`) **apenas** os 32 caracteres do Account ID copiado na Seção 6.3, **sem espaço nem `Enter` (quebra de linha) no final**, e clique em **Add secret**.
    - **3º segredo**:
      - **Name**: `SUPABASE_ACCESS_TOKEN`
      - **Secret**: cole (`Ctrl + V`) o token `sbp_...` criado na Seção 6.4 e clique em **Add secret**.
