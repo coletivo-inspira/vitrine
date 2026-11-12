@@ -20,7 +20,7 @@ Evoluir a **Vitrine Inspira** para uma plataforma SaaS multi-inquilino de vitrin
 
 **Primary Dependencies**: Zero pacotes npm adicionais de runtime. Runtime nativo Cloudflare Workers / Node.js 24 (`Request`, `Response`, `URL`, `crypto.subtle`, `caches.default`, `fetch`), `OffscreenCanvas` / Canvas API nativa do navegador para compressão WebP `<= 200 KB`, e PGlite embarcado em `devDependencies` para testes determinísticos de banco e RLS.
 
-**Storage**: Supabase Postgres Free (500 MB) com migrações append-only (`202611120005_multi_tenant_rbac_audit.sql`, `202611120006_cms_pages_sections_releases.sql`, `202611120007_assets_sandbox_domains.sql`), Supabase Storage Free (1 GB, bucket `catalog-images` com cache imutável na borda como padrão sem cartão) e adaptador plugável para Cloudflare R2 Free (10 GB, zero egress).
+**Storage**: Supabase Postgres Free (500 MB) com migrações append-only (`202611120005_multi_tenant_rbac_audit.sql`, `202611120006_cms_pages_sections_releases.sql`, `202611120007_assets_sandbox_domains.sql`, `202611120008_platform_operations.sql`), Supabase Storage Free (1 GB, bucket `catalog-images` com cache imutável na borda como padrão sem cartão) e adaptador plugável para Cloudflare R2 Free (10 GB, zero egress).
 
 **Testing**: `node --test` com PGlite executando toda a cadeia de migrações SQL, testes de isolamento multi-inquilino e RBAC (`owner`, `admin`, `editor`, `viewer`, `platform_admin`), testes de contrato HTTP no Worker, testes de herança de templates/módulos, testes de prévia HMAC e rollback, testes de sandboxing em origem opaca e validação de trava de 95 domínios gratuitos.
 
@@ -78,13 +78,17 @@ supabase/
 └── migrations/
     ├── 202611120005_multi_tenant_rbac_audit.sql       # [Fase 1] tenants, platform_operators, papéis expandidos e audit_logs
     ├── 202611120006_cms_pages_sections_releases.sql   # [Fase 2 & 3] platform_cms, templates, modules, pages, sections, menus e retenção de 5 releases
-    └── 202611120007_assets_sandbox_domains.sql        # [Fase 4 & 5] assets, custom_components e custom_domains (trava de 95 domínios)
+    ├── 202611120007_assets_sandbox_domains.sql        # [Fase 4 & 5] assets, custom_components e custom_domains (trava de 95 domínios)
+    └── 202611120008_platform_operations.sql           # [Fase 2 & 5] read_platform_overview e transições auditadas de pedidos
 
 src/
-├── portal-validation.mjs                        # Validações de papéis, páginas/seções/menus, CMS, ativos e domínios
+├── portal-validation.mjs                        # Validações de papéis, rascunhos, ativos e caminhos seguros
 ├── publication-engine.mjs                       # Compilação em cascata (Template -> Vertical -> Overrides), SHA-256 e assertNoPrivateLeakage
+├── showcase-structure.mjs                       # Resolvedor em cascata, extração de overrides e projeção pública de estrutura
+├── platform-cms.mjs                             # Validação declarativa das seções do CMS institucional
+├── custom-domains.mjs                           # Validação RFC 1123, desafios DNS TXT/CNAME, verificação DoH e cliente Cloudflare for SaaS
 ├── storefront-renderer.mjs                      # Renderizador modular de seções e contêineres de sandbox opaco
-├── preview-token.mjs                            # Assinatura e verificação HMAC-SHA256 para links de prévia (/ __preview/:siteId)
+├── preview-token.mjs                            # Assinatura e verificação HMAC-SHA256 para links de prévia (/__preview/:siteId)
 └── storage-adapter.mjs                          # Abstração de armazenamento (Supabase Storage padrão sem cartão + Cloudflare R2 plugável)
 
 workers/
@@ -94,12 +98,14 @@ web/
 ├── index.html, styles.css, app.js               # Página institucional alimentada por public.platform_cms com fallback estático
 ├── portal/
 │   ├── index.html, portal.css, portal.js        # App Shell Liquid Glass, seletor de vitrines, gestão de equipe, domínios e Administração da Plataforma
-│   └── editor.js                                # Editor modular de páginas/seções/menus, quick-toggle, prévia e histórico de rollback
+│   ├── editor.js                                # Editor modular de páginas/seções/menus, quick-toggle, prévia e histórico de rollback
+│   ├── showcase-structure.js                    # Gerenciador visual de modelo, identidade visual, menus, páginas e seções
+│   └── platform-cms.js                          # Painel de Administração da Plataforma, CMS institucional e modelos visuais
 └── vitrine/
     └── index.html, vitrine.css, vitrine.js      # Vitrine pública modular com suporte a páginas, seções e sandbox seguro
 
 test/
-├── multi-tenant-rbac-audit.test.mjs             # [Fase 1] Testes PGlite e API para tenants, papéis por vitrine, platform_admin e audit_logs
+├── portal-redesign-backend.test.mjs             # [Fase 1–5] Testes PGlite para RBAC, audit_logs, platform_cms, retenção de 5 releases, 95 domínios e overview
 ├── cms-preview-rollback.test.mjs                # [Fase 2] Testes de CMS institucional, quick-toggle, token HMAC de prévia e rollback de 5 versões
 ├── template-inheritance-modules.test.mjs        # [Fase 3] Testes de herança em cascata, reordenação de seções e compatibilidade retroativa
 ├── assets-opaque-sandbox.test.mjs               # [Fase 4] Testes de cota WebP, adaptador de storage e isolamento de iframe em origem opaca
