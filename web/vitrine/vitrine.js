@@ -15,6 +15,8 @@ const RESERVED_PATHS = new Set([
   'vitrine'
 ]);
 
+const MAX_BATCH_EVENTS = 25;
+
 export function formatPriceCentsBRL(priceCents) {
   if (!Number.isSafeInteger(priceCents) || priceCents < 0) {
     return 'R$ 0,00';
@@ -73,11 +75,116 @@ function resolveCatalogTagLabel(catalogType) {
   return 'Cardápio Digital';
 }
 
+export function createStorefrontMetricsCollector({
+  slug,
+  validItemIds = [],
+  navigatorObj = globalThis.navigator,
+  fetchImpl = globalThis.fetch,
+  nowFn = () => new Date()
+} = {}) {
+  const allowedItems = new Set(validItemIds);
+  const viewedItems = new Set();
+  let visitQueued = false;
+  let queue = [];
+
+  function buildEventHour() {
+    const d = nowFn();
+    return d instanceof Date ? d.getHours() : new Date().getHours();
+  }
+
+  function flush() {
+    if (queue.length === 0 || !slug) {
+      return false;
+    }
+    const batch = queue.splice(0, MAX_BATCH_EVENTS);
+    const bodyText = JSON.stringify({
+      slug,
+      events: batch
+    });
+
+    if (navigatorObj && typeof navigatorObj.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([bodyText], { type: 'application/json' });
+        const sent = navigatorObj.sendBeacon('/api/events', blob);
+        if (sent) {
+          return true;
+        }
+      } catch {
+        // Fallback to fetch with keepalive
+      }
+    }
+
+    if (typeof fetchImpl === 'function') {
+      try {
+        fetchImpl('/api/events', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: bodyText,
+          keepalive: true
+        }).catch(() => {});
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  function record(type, payload = {}) {
+    const hour = Number.isInteger(payload.hour) ? payload.hour : buildEventHour();
+
+    if (type === 'visit') {
+      if (visitQueued) return false;
+      visitQueued = true;
+      queue.push({ type: 'visit', hour });
+    } else if (type === 'item_view') {
+      const itemId = typeof payload.itemId === 'string' ? payload.itemId.trim() : '';
+      if (!itemId || (allowedItems.size > 0 && !allowedItems.has(itemId))) return false;
+      if (viewedItems.has(itemId)) return false;
+      viewedItems.add(itemId);
+      queue.push({ type: 'item_view', itemId, hour });
+    } else if (type === 'item_select') {
+      const itemId = typeof payload.itemId === 'string' ? payload.itemId.trim() : '';
+      if (!itemId || (allowedItems.size > 0 && !allowedItems.has(itemId))) return false;
+      const count =
+        Number.isSafeInteger(payload.count) && payload.count >= 1
+          ? Math.min(payload.count, 99)
+          : 1;
+      queue.push({ type: 'item_select', itemId, count, hour });
+    } else if (type === 'whatsapp_order') {
+      const estimatedCents =
+        Number.isSafeInteger(payload.estimatedCents) && payload.estimatedCents >= 0
+          ? payload.estimatedCents
+          : 0;
+      queue.push({ type: 'whatsapp_order', estimatedCents, hour });
+      flush();
+      return true;
+    } else {
+      return false;
+    }
+
+    if (queue.length >= MAX_BATCH_EVENTS) {
+      flush();
+    }
+    return true;
+  }
+
+  return {
+    record,
+    flush,
+    getQueue() {
+      return [...queue];
+    }
+  };
+}
+
 export async function bootStorefront(deps = {}) {
   const doc = deps.document ?? globalThis.document;
   if (!doc) return null;
 
   const fetchImpl = deps.fetch ?? globalThis.fetch;
+  const navigatorObj = deps.navigator ?? globalThis.navigator;
   const slug =
     deps.slug ??
     resolveStorefrontSlug(deps.pathname ?? globalThis.location?.pathname, deps.search ?? globalThis.location?.search);
@@ -135,6 +242,37 @@ export async function bootStorefront(deps = {}) {
     }
 
     const categories = normalizeStorefrontCategories(menu);
+    const validItemIds = [];
+    for (const cat of categories) {
+      for (const item of cat.items ?? []) {
+        if (item?.id) validItemIds.push(String(item.id));
+      }
+    }
+
+    const collector = createStorefrontMetricsCollector({
+      slug,
+      validItemIds,
+      navigatorObj,
+      fetchImpl
+    });
+
+    globalThis.recordStorefrontEvent = (type, payload) => collector.record(type, payload);
+    collector.record('visit');
+    for (const itemId of validItemIds.slice(0, 12)) {
+      collector.record('item_view', { itemId });
+    }
+
+    if (typeof doc.addEventListener === 'function') {
+      doc.addEventListener('visibilitychange', () => {
+        if (doc.visibilityState === 'hidden') {
+          collector.flush();
+        }
+      });
+    }
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('pagehide', () => collector.flush());
+    }
+
     if (categoryNav) {
       categoryNav.replaceChildren();
       categories.forEach((category, idx) => {
@@ -158,6 +296,7 @@ export async function bootStorefront(deps = {}) {
         }
       }
     });
+    renderer.metricsCollector = collector;
     renderer.render();
     return renderer;
   } catch {

@@ -3,16 +3,21 @@ import {
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
   MAX_DRAFT_BYTES,
+  MAX_EVENTS_BATCH_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
+  computeStorefrontInsights,
   createInitialDraftContent,
   formatProfileRecord,
+  isBotUserAgent,
   isValidSlug,
   measureDraftBytes,
   migrateLegacyDraftContent,
   validateCatalogImagePath,
   validateCustomizationRequestInput,
   validateDraftContent,
+  validateEventsBatchPayload,
+  validateInsightsPeriod,
   validateProfileInput,
   validateRevision,
   validateSiteInput
@@ -234,8 +239,17 @@ function getPilotLoja1Publication() {
   if (!cachedPilotLoja1PublicationPromise) {
     cachedPilotLoja1PublicationPromise = compilePublicStorefront(
       PILOT_LOJA1_DRAFT,
-      { slug: 'loja1', name: 'Forno & Praça Pizzaria Artesanal', template: 'pizzeria-v1' },
-      { revision: 1, publishedAt: '2026-11-11T00:00:00.000Z' }
+      {
+        id: '00000000-0000-0000-0000-000000000101',
+        slug: 'loja1',
+        name: 'Forno & Praça Pizzaria Artesanal',
+        template: 'pizzeria-v1'
+      },
+      {
+        siteId: '00000000-0000-0000-0000-000000000101',
+        revision: 1,
+        publishedAt: '2026-11-11T00:00:00.000Z'
+      }
     ).then((res) => res.publication);
   }
   return cachedPilotLoja1PublicationPromise;
@@ -878,6 +892,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const customizationRequests = [];
   const publicationsBySlug = new Map();
   const publicationsByHash = new Map();
+  const metricsDaily = new Map();
 
   if (initial.sites instanceof Map) {
     for (const [key, value] of initial.sites.entries()) {
@@ -944,6 +959,29 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     }
   }
 
+  if (Array.isArray(initial.metricsDaily)) {
+    for (const row of initial.metricsDaily) {
+      const siteId = row?.siteId ?? row?.site_id;
+      const metricDate = row?.metricDate ?? row?.metric_date;
+      const metricHour = Number(row?.metricHour ?? row?.metric_hour ?? 0);
+      const itemKey = String(row?.itemKey ?? row?.item_key ?? '');
+      const metricName = String(row?.metricName ?? row?.metric_name ?? '');
+      if (siteId && metricDate && metricName) {
+        const key = `${siteId}:${metricDate}:${metricHour}:${itemKey}:${metricName}`;
+        metricsDaily.set(key, {
+          site_id: siteId,
+          metric_date: metricDate,
+          metric_hour: metricHour,
+          item_key: itemKey,
+          metric_name: metricName,
+          count_value: Number(row.countValue ?? row.count_value ?? 0),
+          estimated_cents: Number(row.estimatedCents ?? row.estimated_cents ?? 0),
+          updated_at: row.updatedAt ?? row.updated_at ?? new Date().toISOString()
+        });
+      }
+    }
+  }
+
   function getRoleForSite(site, userId) {
     if (!site || !userId) return null;
     const ownerId = site.ownerUserId ?? site.owner_user_id;
@@ -975,6 +1013,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     customizationRequests,
     publicationsBySlug,
     publicationsByHash,
+    metricsDaily,
 
     addMembership(siteId, userId, role = 'collaborator') {
       const exists = memberships.some(m => m.siteId === siteId && m.userId === userId);
@@ -1187,6 +1226,124 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         status: 'ok',
         draft: structuredClone(nextDraft)
       };
+    },
+
+    async recordSiteMetricBatch(slug, events, { now = new Date() } = {}) {
+      const pub =
+        (await this.getPublicationBySlug(slug)) ??
+        (await sharedPublicPublications.getPublicationBySlug(slug));
+      if (!pub || !pub.menu) {
+        throw new PortalValidationError(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+      }
+
+      let siteId = pub.siteId ?? null;
+      if (!siteId) {
+        for (const site of sites.values()) {
+          if (site.slug === slug) {
+            siteId = site.id;
+            break;
+          }
+        }
+      }
+      if (!siteId) {
+        siteId = `pub-${slug}`;
+      }
+
+      const validItemIds = new Set(
+        Array.isArray(pub.menu.items)
+          ? pub.menu.items.map((item) => item?.id).filter(Boolean)
+          : []
+      );
+
+      for (const ev of events) {
+        if (ev.type === 'item_view' || ev.type === 'item_select') {
+          if (!ev.itemId || !validItemIds.has(ev.itemId)) {
+            throw new PortalValidationError(
+              422,
+              'INVALID_EVENT_ITEM',
+              `Item inexistente na vitrine publicada: ${String(ev.itemId || '')}.`
+            );
+          }
+        }
+      }
+
+      // 13-month retention purge
+      const nowDate = now instanceof Date ? now : new Date(now);
+      const retentionCutoff = new Date(
+        Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() - 13, nowDate.getUTCDate())
+      )
+        .toISOString()
+        .slice(0, 10);
+      const tomorrowIso = new Date(
+        Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() + 1)
+      )
+        .toISOString()
+        .slice(0, 10);
+
+      for (const [k, row] of metricsDaily.entries()) {
+        if (row.site_id === siteId && row.metric_date < retentionCutoff) {
+          metricsDaily.delete(k);
+        }
+      }
+
+      let accepted = 0;
+      for (const ev of events) {
+        if (ev.date < retentionCutoff || ev.date > tomorrowIso) {
+          continue;
+        }
+        const itemKey = ev.type === 'item_view' || ev.type === 'item_select' ? ev.itemId : '';
+        const cents = ev.type === 'whatsapp_order' ? ev.estimatedCents ?? 0 : 0;
+        const key = `${siteId}:${ev.date}:${ev.hour}:${itemKey}:${ev.type}`;
+        const existing = metricsDaily.get(key);
+        if (existing) {
+          existing.count_value += ev.count ?? 1;
+          existing.estimated_cents += cents;
+          existing.updated_at = nowDate.toISOString();
+        } else {
+          metricsDaily.set(key, {
+            site_id: siteId,
+            metric_date: ev.date,
+            metric_hour: ev.hour,
+            item_key: itemKey,
+            metric_name: ev.type,
+            count_value: ev.count ?? 1,
+            estimated_cents: cents,
+            updated_at: nowDate.toISOString()
+          });
+        }
+        accepted += 1;
+      }
+
+      return { accepted };
+    },
+
+    async getSiteInsights(siteId, userId, period = '7d', { referenceDate = new Date() } = {}) {
+      const site = sites.get(siteId);
+      const role = getRoleForSite(site, userId);
+      if (!role) {
+        return null;
+      }
+      const validPeriod = validateInsightsPeriod(period);
+      const rows = [];
+      for (const row of metricsDaily.values()) {
+        if (row.site_id === siteId) {
+          rows.push(structuredClone(row));
+        }
+      }
+
+      const pub =
+        (await this.getPublicationBySlug(site.slug)) ??
+        (await sharedPublicPublications.getPublicationBySlug(site.slug));
+      const draft = drafts.get(siteId);
+      const catalogSource = pub?.menu ?? draft?.content ?? {};
+
+      return computeStorefrontInsights({
+        siteId,
+        period: validPeriod,
+        rows,
+        catalogSource,
+        referenceDate
+      });
     }
   };
 }
@@ -1760,6 +1917,108 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       }
 
       return sharedPublicPublications.getPublicationByHash(slug, hash);
+    },
+
+    async recordSiteMetricBatch(slug, events, { now = new Date() } = {}) {
+      if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
+        const rpcRes = await fetchImpl(`${baseUrl}/rest/v1/rpc/record_site_metric_batch`, {
+          method: 'POST',
+          headers: anonHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({
+            target_slug: slug,
+            events
+          })
+        });
+        if (rpcRes && rpcRes.ok) {
+          const acceptedCount = await rpcRes.json().catch(() => events.length);
+          return {
+            accepted:
+              typeof acceptedCount === 'number' && Number.isFinite(acceptedCount)
+                ? acceptedCount
+                : events.length
+          };
+        }
+        if (rpcRes && rpcRes.status !== 404) {
+          const errBody = await rpcRes.json().catch(() => ({}));
+          const msg = String(errBody?.message ?? '');
+          if (rpcRes.status === 404 || errBody?.code === 'P0002' || msg.includes('PUBLICATION_NOT_FOUND')) {
+            throw new PortalValidationError(
+              404,
+              'PUBLICATION_NOT_FOUND',
+              'Vitrine publicada não encontrada.'
+            );
+          }
+          if (errBody?.code === '23514' || msg.includes('INVALID_EVENT_ITEM')) {
+            throw new PortalValidationError(
+              422,
+              'INVALID_EVENT_ITEM',
+              'Item inexistente na vitrine publicada.'
+            );
+          }
+          if (errBody?.code === '22023' || msg.includes('INVALID_EVENTS_BATCH')) {
+            throw new PortalValidationError(
+              400,
+              'INVALID_EVENTS_BATCH',
+              'Lote de eventos inválido.'
+            );
+          }
+        }
+      }
+
+      return sharedPublicPublications.recordSiteMetricBatch(slug, events, { now });
+    },
+
+    async getSiteInsights(
+      siteId,
+      userId,
+      period = '7d',
+      { token, referenceDate = new Date() } = {}
+    ) {
+      const site = await this.getSite(siteId, userId, { token });
+      if (!site) {
+        return null;
+      }
+      const validPeriod = validateInsightsPeriod(period);
+      const daysCount = validPeriod === '90d' ? 90 : validPeriod === '30d' ? 30 : 7;
+      const refIso =
+        typeof referenceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(referenceDate)
+          ? referenceDate
+          : (referenceDate instanceof Date ? referenceDate : new Date(referenceDate))
+              .toISOString()
+              .slice(0, 10);
+      const [ry, rm, rd] = refIso.split('-').map(Number);
+      const minDateIso = new Date(Date.UTC(ry, rm - 1, rd - (daysCount * 2)))
+        .toISOString()
+        .slice(0, 10);
+
+      let rows = [];
+      if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
+        const metricsRes = await fetchImpl(
+          `${baseUrl}/rest/v1/site_metrics_daily?site_id=eq.${encodeURIComponent(siteId)}&metric_date=gte.${encodeURIComponent(minDateIso)}&select=site_id,metric_date,metric_hour,item_key,metric_name,count_value,estimated_cents&order=metric_date.asc`,
+          {
+            method: 'GET',
+            headers: authHeaders(token)
+          }
+        );
+        if (metricsRes && metricsRes.ok) {
+          const data = await metricsRes.json();
+          if (Array.isArray(data)) {
+            rows = data;
+          }
+        }
+      }
+
+      const pub = await this.getPublicationBySlug(site.slug);
+      const draft = !pub ? await this.getDraft(siteId, userId, { token }) : null;
+      const catalogSource = pub?.menu ?? draft?.content ?? {};
+
+      return computeStorefrontInsights({
+        siteId,
+        period: validPeriod,
+        rows,
+        catalogSource,
+        referenceDate
+      });
     }
   };
 }
@@ -2288,6 +2547,129 @@ export function createApiHandler(deps = {}) {
           'METHOD_NOT_ALLOWED',
           'Método não permitido para /api/customization-requests.'
         );
+      }
+
+      if (pathname === '/api/events' || pathname === '/api/events/') {
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/events.');
+        }
+
+        const contentType = (request.headers.get('content-type') || '').trim();
+        if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+          return errorResponse(
+            415,
+            'UNSUPPORTED_MEDIA_TYPE',
+            'O cabeçalho Content-Type deve ser application/json.'
+          );
+        }
+
+        const declaredLength = Number(request.headers.get('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_EVENTS_BATCH_BYTES) {
+          return errorResponse(
+            400,
+            'INVALID_EVENTS_BATCH',
+            'O lote de eventos excede o limite máximo de 16 KiB.'
+          );
+        }
+
+        let rawText = '';
+        try {
+          rawText = await request.text();
+        } catch {
+          return errorResponse(400, 'INVALID_EVENTS_BATCH', 'Não foi possível ler o lote de eventos.');
+        }
+
+        const rawByteLength = utf8Encoder.encode(rawText).byteLength;
+        if (!rawText || !rawText.trim() || rawByteLength > MAX_EVENTS_BATCH_BYTES) {
+          return errorResponse(
+            400,
+            'INVALID_EVENTS_BATCH',
+            'Lote de eventos vazio ou acima do limite permitido.'
+          );
+        }
+
+        const userAgent = request.headers.get('user-agent') || '';
+        if (isBotUserAgent(userAgent)) {
+          return jsonResponse(202, {
+            accepted: 0,
+            ignored: 'bot'
+          });
+        }
+
+        let parsed;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {
+          return errorResponse(
+            400,
+            'INVALID_EVENTS_BATCH',
+            'O corpo da requisição não contém JSON válido.'
+          );
+        }
+
+        const nowSeconds =
+          typeof deps?.nowSeconds === 'function'
+            ? deps.nowSeconds()
+            : deps?.nowSeconds;
+        const effectiveNow =
+          typeof nowSeconds === 'number' && Number.isFinite(nowSeconds)
+            ? new Date(nowSeconds * 1000)
+            : new Date();
+
+        const { slug, events } = validateEventsBatchPayload(parsed, {
+          rawByteLength,
+          now: effectiveNow
+        });
+
+        const result = await store.recordSiteMetricBatch(slug, events, {
+          now: effectiveNow,
+          env
+        });
+
+        return jsonResponse(202, {
+          accepted: result.accepted
+        });
+      }
+
+      const insightsMatch = pathname.match(/^\/api\/sites\/([^/]+)\/insights\/?$/);
+      if (insightsMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) {
+          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        }
+
+        if (method !== 'GET') {
+          return errorResponse(
+            405,
+            'METHOD_NOT_ALLOWED',
+            'Método não permitido para consulta de insights.'
+          );
+        }
+
+        const siteId = decodeURIComponent(insightsMatch[1]);
+        const periodParam = url.searchParams.get('period') ?? '7d';
+        const validPeriod = validateInsightsPeriod(periodParam, 400);
+
+        const nowSeconds =
+          typeof deps?.nowSeconds === 'function'
+            ? deps.nowSeconds()
+            : deps?.nowSeconds;
+        const referenceDate =
+          typeof nowSeconds === 'number' && Number.isFinite(nowSeconds)
+            ? new Date(nowSeconds * 1000)
+            : new Date();
+
+        const insights = await store.getSiteInsights(siteId, user.id, validPeriod, {
+          token: user.token,
+          referenceDate,
+          env
+        });
+
+        if (!insights) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+
+        return jsonResponse(200, { insights });
       }
 
       if (pathname === '/api/sites' || pathname === '/api/sites/') {

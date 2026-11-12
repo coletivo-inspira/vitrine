@@ -65,9 +65,9 @@
             </a>
           </li>
           <li>
-            <a href="#insights" class="nav-link nav-link-future" data-section="insights" aria-disabled="true" tabindex="-1">
+            <a href="#insights" class="nav-link" data-section="insights">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              Insights <span class="badge-future">Em breve</span>
+              Insights
             </a>
           </li>
           <li>
@@ -161,15 +161,15 @@
               <button id="hub-new-request-btn" class="button button-small button-secondary button-pill hub-btn-spaced" type="button">Fazer Solicitação</button>
             </div>
 
-            <!-- Insights Summary Card (Room for future) -->
-            <div class="portal-card hub-card insights-future-card">
+            <!-- Insights Summary Card -->
+            <div class="portal-card hub-card insights-highlight-card">
               <div class="card-eyebrow">Inteligência</div>
               <h3>Destaques da Semana</h3>
-              <div class="insights-placeholder">
-                <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true" class="insights-placeholder-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                <p><strong>Métricas em breve</strong></p>
-                <p class="insights-placeholder-text">Acompanhe visualizações, cliques e conversões de pedidos no WhatsApp direto no painel assim que publicar.</p>
+              <p id="hub-insights-highlight-text" class="summary-text-spaced">Acompanhe visitas, pedidos no WhatsApp e itens mais escolhidos da sua vitrine.</p>
+              <div id="hub-insights-stats-list" class="hub-list">
+                <!-- Populated dynamically via JS -->
               </div>
+              <button id="hub-open-insights-btn" class="button button-small button-secondary button-pill hub-btn-spaced" type="button">Ver Painel de Insights</button>
             </div>
           </div>
         </section>
@@ -189,6 +189,122 @@
             <div id="sites-list-container" class="sites-list">
               <p class="loading-msg">Carregando vitrines...</p>
             </div>
+          </div>
+        </section>
+
+        <!-- Section 2B: Insights Panel -->
+        <section id="insights-section" class="shell-section" hidden>
+          <div class="section-header insights-header-flex">
+            <div>
+              <h1 class="display-title">Painel de Insights</h1>
+              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens e pedidos enviados ao WhatsApp, sem cookies nem coleta de dados pessoais.</p>
+            </div>
+            <div class="insights-toolbar" role="group" aria-label="Filtros de insights">
+              <div class="form-group-inline">
+                <label for="insights-site-select">Vitrine:</label>
+                <select id="insights-site-select" class="select-styled compact-select">
+                  <!-- Populated via JS -->
+                </select>
+              </div>
+              <div class="insights-period-pills" role="group" aria-label="Período de análise">
+                <button type="button" class="chip-btn insights-period-btn active" data-period="7d" aria-pressed="true">7 dias</button>
+                <button type="button" class="chip-btn insights-period-btn" data-period="30d" aria-pressed="false">30 dias</button>
+                <button type="button" class="chip-btn insights-period-btn" data-period="90d" aria-pressed="false">90 dias</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Automatic Weekly Highlight Sentences -->
+          <div class="portal-card insights-highlights-banner">
+            <div class="card-eyebrow">Leitura Automática do Período</div>
+            <ul id="insights-highlights-list" class="insights-highlights-list">
+              <li>Carregando destaques do período...</li>
+            </ul>
+          </div>
+
+          <!-- 4 KPI Summary Cards -->
+          <div class="insights-kpi-grid" aria-label="Resumo do período">
+            <article class="portal-card insights-kpi-card">
+              <span class="card-eyebrow">Alcance</span>
+              <span class="insights-kpi-label">Visitas à vitrine</span>
+              <strong id="insights-kpi-visits" class="insights-kpi-value">0</strong>
+              <span id="insights-kpi-visits-delta" class="insights-kpi-delta">Período anterior: 0</span>
+            </article>
+
+            <article class="portal-card insights-kpi-card">
+              <span class="card-eyebrow">Intenção</span>
+              <span class="insights-kpi-label">Pedidos no WhatsApp</span>
+              <strong id="insights-kpi-orders" class="insights-kpi-value">0</strong>
+              <span id="insights-kpi-orders-delta" class="insights-kpi-delta">Período anterior: 0</span>
+            </article>
+
+            <article class="portal-card insights-kpi-card">
+              <span class="card-eyebrow">Eficiência</span>
+              <span class="insights-kpi-label">Taxa de conversão</span>
+              <strong id="insights-kpi-conversion" class="insights-kpi-value">0,0%</strong>
+              <span id="insights-kpi-conversion-delta" class="insights-kpi-delta">Pedidos sobre visitas</span>
+            </article>
+
+            <article class="portal-card insights-kpi-card">
+              <span class="card-eyebrow">Receita Estimada</span>
+              <span class="insights-kpi-label">Valor estimado em pedidos</span>
+              <strong id="insights-kpi-estimated" class="insights-kpi-value">R$ 0,00</strong>
+              <span id="insights-kpi-estimated-delta" class="insights-kpi-delta">Período anterior: R$ 0,00</span>
+            </article>
+          </div>
+
+          <!-- Charts Row: By Day & By Hour (Plain SVG/CSS) -->
+          <div class="insights-charts-grid">
+            <section class="portal-card insights-chart-card" aria-labelledby="insights-day-chart-title">
+              <div class="insights-card-header">
+                <div>
+                  <span class="card-eyebrow">Evolução Diária</span>
+                  <h2 id="insights-day-chart-title">Visitas e pedidos por dia</h2>
+                </div>
+                <div class="insights-chart-legend" aria-hidden="true">
+                  <span class="legend-item"><span class="legend-swatch swatch-visits"></span> Visitas</span>
+                  <span class="legend-item"><span class="legend-swatch swatch-orders"></span> Pedidos</span>
+                </div>
+              </div>
+              <div id="insights-day-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de visitas e pedidos por dia">
+                <!-- Rendered via plain SVG -->
+              </div>
+            </section>
+
+            <section class="portal-card insights-chart-card" aria-labelledby="insights-hour-chart-title">
+              <div class="insights-card-header">
+                <div>
+                  <span class="card-eyebrow">Concentração de Horário</span>
+                  <h2 id="insights-hour-chart-title">Acessos e pedidos por faixa de hora</h2>
+                </div>
+                <span class="insights-chart-unit">0h às 23h</span>
+              </div>
+              <div id="insights-hour-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de atividade por hora do dia">
+                <!-- Rendered via plain SVG -->
+              </div>
+            </section>
+          </div>
+
+          <!-- Rankings Row: Top Items & Top Categories -->
+          <div class="insights-rankings-grid">
+            <section class="portal-card insights-ranking-card" aria-labelledby="insights-top-items-title">
+              <span class="card-eyebrow">Preferência da Clientela</span>
+              <h2 id="insights-top-items-title">Itens mais escolhidos e vistos</h2>
+              <div id="insights-top-items-list" class="insights-ranking-list">
+                <!-- Populated via JS -->
+              </div>
+            </section>
+
+            <section class="portal-card insights-ranking-card" aria-labelledby="insights-top-categories-title">
+              <span class="card-eyebrow">Distribuição por Seção</span>
+              <h2 id="insights-top-categories-title">Categorias em destaque</h2>
+              <div id="insights-top-categories-list" class="insights-ranking-list">
+                <!-- Populated via JS -->
+              </div>
+              <p class="insights-privacy-footnote">
+                Contadores diários agregados com retenção de 13 meses. Nenhum IP, cookie ou dado pessoal é armazenado.
+              </p>
+            </section>
           </div>
         </section>
 
@@ -756,6 +872,12 @@
           <a href="#vitrines" class="nav-link" data-section="dashboard">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
             <span>Vitrines</span>
+          </a>
+        </li>
+        <li>
+          <a href="#insights" class="nav-link" data-section="insights">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span>Insights</span>
           </a>
         </li>
         <li>

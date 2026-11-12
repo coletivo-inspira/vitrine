@@ -67,6 +67,21 @@ export const ALLOWED_WHATSAPP_VARIABLES = Object.freeze([
 export const CATALOG_IMAGES_BUCKET = 'catalog-images';
 export const MAX_CATALOG_IMAGE_BYTES = 262144;
 
+export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
+  'visit',
+  'item_view',
+  'item_select',
+  'whatsapp_order'
+]);
+export const ALLOWED_INSIGHTS_PERIODS = Object.freeze(['7d', '30d', '90d']);
+export const MAX_EVENTS_BATCH_SIZE = 25;
+export const MAX_EVENTS_BATCH_BYTES = 16384;
+export const METRICS_RETENTION_MONTHS = 13;
+
+const BOT_USER_AGENT_PATTERN =
+  /bot|crawler|spider|headless|slurp|facebookexternalhit|whatsapp|preview|curl|wget|python/i;
+const ISO_DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export const DEFAULT_WHATSAPP = '5511999999999';
 export const MAX_ACTIVE_ITEMS = 20;
 export const FREE_PLAN_ACTIVE_ITEMS_LIMIT = MAX_ACTIVE_ITEMS;
@@ -1398,3 +1413,510 @@ export function toPublicMenuDraft(content, site = {}) {
 export function projectDraftToPublicMenu(content, site = {}) {
   return publicMenu(toPublicMenuDraft(content, site));
 }
+
+export function isBotUserAgent(userAgent) {
+  if (typeof userAgent !== 'string' || !userAgent.trim()) {
+    return false;
+  }
+  return BOT_USER_AGENT_PATTERN.test(userAgent);
+}
+
+export function validateInsightsPeriod(rawPeriod = '7d', errorStatus = 400) {
+  const normalized =
+    rawPeriod === undefined || rawPeriod === null || rawPeriod === ''
+      ? '7d'
+      : String(rawPeriod).trim().toLowerCase();
+  if (!ALLOWED_INSIGHTS_PERIODS.includes(normalized)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_PERIOD',
+      `Período inválido. Períodos suportados: ${ALLOWED_INSIGHTS_PERIODS.join(', ')}.`
+    );
+  }
+  return normalized;
+}
+
+export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = new Date() } = {}) {
+  if (rawByteLength > MAX_EVENTS_BATCH_BYTES) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_EVENTS_BATCH',
+      'O lote de eventos excede o limite máximo de 16 KiB.'
+    );
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_EVENTS_BATCH',
+      'O corpo da requisição de eventos deve ser um objeto JSON válido.'
+    );
+  }
+  if (typeof payload.slug !== 'string') {
+    throw new PortalValidationError(
+      400,
+      'INVALID_EVENTS_BATCH',
+      'Informe o identificador (slug) da vitrine publicada.'
+    );
+  }
+  const slug = validateSlug(payload.slug.trim().toLowerCase());
+
+  if (
+    !Array.isArray(payload.events) ||
+    payload.events.length < 1 ||
+    payload.events.length > MAX_EVENTS_BATCH_SIZE
+  ) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_EVENTS_BATCH',
+      `O lote deve conter entre 1 e ${MAX_EVENTS_BATCH_SIZE} eventos.`
+    );
+  }
+
+  const nowDateObj = now instanceof Date ? now : new Date(now);
+  const defaultDateStr = nowDateObj.toISOString().slice(0, 10);
+  const defaultHour = nowDateObj.getUTCHours();
+
+  const normalizedEvents = [];
+
+  for (const rawEvent of payload.events) {
+    if (!rawEvent || typeof rawEvent !== 'object' || Array.isArray(rawEvent)) {
+      throw new PortalValidationError(
+        400,
+        'INVALID_EVENTS_BATCH',
+        'Cada evento do lote deve ser um objeto JSON válido.'
+      );
+    }
+
+    const type = typeof rawEvent.type === 'string' ? rawEvent.type.trim() : '';
+    if (!ALLOWED_METRIC_EVENT_TYPES.includes(type)) {
+      throw new PortalValidationError(
+        400,
+        'INVALID_EVENTS_BATCH',
+        `Tipo de evento inválido: ${String(rawEvent.type)}.`
+      );
+    }
+
+    let hour = defaultHour;
+    if (rawEvent.hour !== undefined && rawEvent.hour !== null) {
+      if (!Number.isSafeInteger(rawEvent.hour) || rawEvent.hour < 0 || rawEvent.hour > 23) {
+        throw new PortalValidationError(
+          400,
+          'INVALID_EVENTS_BATCH',
+          'O campo hour do evento deve ser um número inteiro entre 0 e 23.'
+        );
+      }
+      hour = rawEvent.hour;
+    }
+
+    let dateStr = defaultDateStr;
+    if (rawEvent.date !== undefined && rawEvent.date !== null) {
+      if (typeof rawEvent.date !== 'string' || !ISO_DATE_ONLY_PATTERN.test(rawEvent.date.trim())) {
+        throw new PortalValidationError(
+          400,
+          'INVALID_EVENTS_BATCH',
+          'O campo date do evento deve estar no formato YYYY-MM-DD.'
+        );
+      }
+      dateStr = rawEvent.date.trim();
+    }
+
+    let count = 1;
+    if (rawEvent.count !== undefined && rawEvent.count !== null) {
+      if (!Number.isSafeInteger(rawEvent.count) || rawEvent.count < 1 || rawEvent.count > 99) {
+        throw new PortalValidationError(
+          400,
+          'INVALID_EVENTS_BATCH',
+          'O campo count do evento deve ser um número inteiro entre 1 e 99.'
+        );
+      }
+      count = rawEvent.count;
+    }
+
+    let itemId = '';
+    if (type === 'item_view' || type === 'item_select') {
+      if (typeof rawEvent.itemId !== 'string' || !rawEvent.itemId.trim() || rawEvent.itemId.trim().length > 64) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_EVENT_ITEM',
+          'Informe um itemId válido para eventos de visualização ou seleção de item.'
+        );
+      }
+      assertNoDangerousTextPayload(rawEvent.itemId, 422, 'INVALID_EVENT_ITEM');
+      itemId = rawEvent.itemId.trim();
+    }
+
+    let estimatedCents = 0;
+    if (type === 'whatsapp_order' && rawEvent.estimatedCents !== undefined && rawEvent.estimatedCents !== null) {
+      if (
+        !Number.isSafeInteger(rawEvent.estimatedCents) ||
+        rawEvent.estimatedCents < 0 ||
+        rawEvent.estimatedCents > 100000000
+      ) {
+        throw new PortalValidationError(
+          400,
+          'INVALID_EVENTS_BATCH',
+          'O valor estimado (estimatedCents) deve ser um número inteiro não-negativo.'
+        );
+      }
+      estimatedCents = rawEvent.estimatedCents;
+    }
+
+    normalizedEvents.push({
+      type,
+      itemId,
+      hour,
+      date: dateStr,
+      count,
+      estimatedCents
+    });
+  }
+
+  return {
+    slug,
+    events: normalizedEvents
+  };
+}
+
+function addUtcDays(isoDateStr, deltaDays) {
+  const [y, m, d] = isoDateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
+  return dt.toISOString().slice(0, 10);
+}
+
+function buildCatalogLookup(catalogSource = {}) {
+  const itemMetaById = new Map();
+  const categoryNameById = new Map();
+
+  const categories = Array.isArray(catalogSource?.categories) ? catalogSource.categories : [];
+  for (let cIdx = 0; cIdx < categories.length; cIdx += 1) {
+    const cat = categories[cIdx];
+    if (!cat || typeof cat !== 'object') continue;
+    const catId =
+      typeof cat.id === 'string' && cat.id.trim()
+        ? cat.id.trim()
+        : `categoria-${cIdx + 1}`;
+    const catName =
+      typeof cat.name === 'string' && cat.name.trim()
+        ? cat.name.trim()
+        : `Categoria ${cIdx + 1}`;
+    categoryNameById.set(catId, catName);
+
+    if (Array.isArray(cat.items)) {
+      for (const item of cat.items) {
+        if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id.trim()) {
+          continue;
+        }
+        const itemId = item.id.trim();
+        itemMetaById.set(itemId, {
+          itemId,
+          name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : itemId,
+          categoryId: catId,
+          categoryName: catName
+        });
+      }
+    }
+  }
+
+  if (Array.isArray(catalogSource?.items)) {
+    for (const item of catalogSource.items) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id.trim()) {
+        continue;
+      }
+      const itemId = item.id.trim();
+      if (!itemMetaById.has(itemId)) {
+        itemMetaById.set(itemId, {
+          itemId,
+          name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : itemId,
+          categoryId: 'cardapio',
+          categoryName: 'Cardápio'
+        });
+      }
+    }
+  }
+
+  return { itemMetaById, categoryNameById };
+}
+
+export function computeStorefrontInsights({
+  siteId,
+  period = '7d',
+  rows = [],
+  catalogSource = {},
+  referenceDate = new Date()
+} = {}) {
+  const validPeriod = validateInsightsPeriod(period);
+  const daysCount = validPeriod === '90d' ? 90 : validPeriod === '30d' ? 30 : 7;
+  const periodLabel =
+    validPeriod === '90d'
+      ? 'nestes 90 dias'
+      : validPeriod === '30d'
+        ? 'nestes 30 dias'
+        : 'nesta semana';
+  const previousLabel =
+    validPeriod === '90d'
+      ? 'nos 90 dias anteriores'
+      : validPeriod === '30d'
+        ? 'nos 30 dias anteriores'
+        : 'na anterior';
+
+  const todayIso =
+    typeof referenceDate === 'string' && ISO_DATE_ONLY_PATTERN.test(referenceDate)
+      ? referenceDate
+      : (referenceDate instanceof Date ? referenceDate : new Date(referenceDate))
+          .toISOString()
+          .slice(0, 10);
+
+  const currentStartIso = addUtcDays(todayIso, -(daysCount - 1));
+  const previousEndIso = addUtcDays(currentStartIso, -1);
+  const previousStartIso = addUtcDays(previousEndIso, -(daysCount - 1));
+
+  const { itemMetaById } = buildCatalogLookup(catalogSource);
+
+  let visits = 0;
+  let previousVisits = 0;
+  let orders = 0;
+  let previousOrders = 0;
+  let estimatedCents = 0;
+  let previousEstimatedCents = 0;
+
+  const dayMap = new Map();
+  for (let i = 0; i < daysCount; i += 1) {
+    const dateKey = addUtcDays(currentStartIso, i);
+    dayMap.set(dateKey, { date: dateKey, visits: 0, orders: 0 });
+  }
+
+  const hourMap = new Map();
+  for (let h = 0; h < 24; h += 1) {
+    hourMap.set(h, { hour: h, visits: 0, orders: 0 });
+  }
+
+  const itemStatsMap = new Map();
+
+  const ensureItemStat = (itemKey) => {
+    if (!itemStatsMap.has(itemKey)) {
+      const meta = itemMetaById.get(itemKey) ?? {
+        itemId: itemKey,
+        name: itemKey,
+        categoryId: 'cardapio',
+        categoryName: 'Cardápio'
+      };
+      itemStatsMap.set(itemKey, {
+        itemId: itemKey,
+        name: meta.name,
+        categoryId: meta.categoryId,
+        categoryName: meta.categoryName,
+        views: 0,
+        previousViews: 0,
+        selections: 0,
+        previousSelections: 0
+      });
+    }
+    return itemStatsMap.get(itemKey);
+  };
+
+  for (const rawRow of Array.isArray(rows) ? rows : []) {
+    if (!rawRow || typeof rawRow !== 'object') continue;
+    const rawDate = String(rawRow.metric_date ?? rawRow.metricDate ?? '').slice(0, 10);
+    if (!ISO_DATE_ONLY_PATTERN.test(rawDate)) continue;
+
+    const isCurrent = rawDate >= currentStartIso && rawDate <= todayIso;
+    const isPrevious = rawDate >= previousStartIso && rawDate <= previousEndIso;
+    if (!isCurrent && !isPrevious) continue;
+
+    const metricName = String(rawRow.metric_name ?? rawRow.metricName ?? '');
+    const countVal = Math.max(0, Number(rawRow.count_value ?? rawRow.countValue ?? 0) || 0);
+    const centsVal = Math.max(0, Number(rawRow.estimated_cents ?? rawRow.estimatedCents ?? 0) || 0);
+    const hourVal = Number(rawRow.metric_hour ?? rawRow.metricHour ?? 0);
+    const itemKey = String(rawRow.item_key ?? rawRow.itemKey ?? '').trim();
+
+    if (metricName === 'visit') {
+      if (isCurrent) {
+        visits += countVal;
+        if (dayMap.has(rawDate)) {
+          dayMap.get(rawDate).visits += countVal;
+        }
+        if (Number.isInteger(hourVal) && hourMap.has(hourVal)) {
+          hourMap.get(hourVal).visits += countVal;
+        }
+      } else if (isPrevious) {
+        previousVisits += countVal;
+      }
+    } else if (metricName === 'whatsapp_order') {
+      if (isCurrent) {
+        orders += countVal;
+        estimatedCents += centsVal;
+        if (dayMap.has(rawDate)) {
+          dayMap.get(rawDate).orders += countVal;
+        }
+        if (Number.isInteger(hourVal) && hourMap.has(hourVal)) {
+          hourMap.get(hourVal).orders += countVal;
+        }
+      } else if (isPrevious) {
+        previousOrders += countVal;
+        previousEstimatedCents += centsVal;
+      }
+    } else if (metricName === 'item_view' && itemKey) {
+      const stat = ensureItemStat(itemKey);
+      if (isCurrent) {
+        stat.views += countVal;
+      } else if (isPrevious) {
+        stat.previousViews += countVal;
+      }
+    } else if (metricName === 'item_select' && itemKey) {
+      const stat = ensureItemStat(itemKey);
+      if (isCurrent) {
+        stat.selections += countVal;
+      } else if (isPrevious) {
+        stat.previousSelections += countVal;
+      }
+    }
+  }
+
+  const conversionPercent =
+    visits > 0 ? Math.round((orders / visits) * 1000) / 10 : 0;
+  const previousConversionPercent =
+    previousVisits > 0 ? Math.round((previousOrders / previousVisits) * 1000) / 10 : 0;
+
+  const topItems = [...itemStatsMap.values()]
+    .filter((entry) => entry.views > 0 || entry.selections > 0 || entry.previousSelections > 0)
+    .map((entry) => {
+      const deltaPercent =
+        entry.previousSelections > 0
+          ? Math.round(
+              ((entry.selections - entry.previousSelections) / entry.previousSelections) * 1000
+            ) / 10
+          : null;
+      return {
+        itemId: entry.itemId,
+        name: entry.name,
+        categoryName: entry.categoryName,
+        views: entry.views,
+        selections: entry.selections,
+        previousSelections: entry.previousSelections,
+        deltaPercent
+      };
+    })
+    .sort((a, b) => {
+      if (b.selections !== a.selections) return b.selections - a.selections;
+      if (b.views !== a.views) return b.views - a.views;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    })
+    .slice(0, 10);
+
+  const categorySelectionsMap = new Map();
+  for (const entry of itemStatsMap.values()) {
+    if (entry.selections <= 0) continue;
+    const existing = categorySelectionsMap.get(entry.categoryId) ?? {
+      categoryId: entry.categoryId,
+      name: entry.categoryName,
+      selections: 0
+    };
+    existing.selections += entry.selections;
+    categorySelectionsMap.set(entry.categoryId, existing);
+  }
+
+  const topCategories = [...categorySelectionsMap.values()]
+    .sort((a, b) => {
+      if (b.selections !== a.selections) return b.selections - a.selections;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    })
+    .slice(0, 6);
+
+  const byDay = [...dayMap.values()];
+  const byHour = [...hourMap.values()];
+
+  const highlights = [];
+
+  if (topItems.length > 0 && topItems[0].selections > 0) {
+    const leader = topItems[0];
+    if (leader.previousSelections > 0 && leader.deltaPercent !== null) {
+      const roundedDelta = Math.round(Math.abs(leader.deltaPercent));
+      if (roundedDelta === 0) {
+        highlights.push(
+          `${leader.name} foi o item mais escolhido ${periodLabel}, mantendo o mesmo ritmo ${previousLabel}.`
+        );
+      } else if (leader.deltaPercent > 0) {
+        highlights.push(
+          `${leader.name} foi o item mais escolhido ${periodLabel}, ${roundedDelta}% a mais que ${previousLabel}.`
+        );
+      } else {
+        highlights.push(
+          `${leader.name} foi o item mais escolhido ${periodLabel}, ${roundedDelta}% a menos que ${previousLabel}.`
+        );
+      }
+    } else {
+      highlights.push(
+        `Esta semana o item mais pedido foi ${leader.name}, com ${leader.selections} ${leader.selections === 1 ? 'escolha' : 'escolhas'}.`
+      );
+    }
+  } else if (topItems.length > 0 && topItems[0].views > 0) {
+    highlights.push(
+      `${topItems[0].name} foi o item mais visto ${periodLabel} (${topItems[0].views} visualizações).`
+    );
+  }
+
+  // Peak 2-hour window for orders or visits
+  let bestWindowStart = -1;
+  let bestWindowOrders = 0;
+  let bestWindowVisits = 0;
+  for (let h = 0; h < 23; h += 1) {
+    const h1 = hourMap.get(h);
+    const h2 = hourMap.get(h + 1);
+    const sumOrders = (h1?.orders ?? 0) + (h2?.orders ?? 0);
+    const sumVisits = (h1?.visits ?? 0) + (h2?.visits ?? 0);
+    if (
+      sumOrders > bestWindowOrders ||
+      (sumOrders === bestWindowOrders && sumVisits > bestWindowVisits)
+    ) {
+      bestWindowOrders = sumOrders;
+      bestWindowVisits = sumVisits;
+      bestWindowStart = h;
+    }
+  }
+
+  if (bestWindowStart >= 0 && bestWindowOrders > 0) {
+    highlights.push(
+      `Seus pedidos se concentram entre ${bestWindowStart}h e ${bestWindowStart + 2}h.`
+    );
+  } else if (bestWindowStart >= 0 && bestWindowVisits > 0) {
+    highlights.push(
+      `Seus acessos se concentram entre ${bestWindowStart}h e ${bestWindowStart + 2}h.`
+    );
+  }
+
+  if (visits > 0 && previousVisits > 0) {
+    const visitDelta = Math.round(((visits - previousVisits) / previousVisits) * 100);
+    if (visitDelta > 0) {
+      highlights.push(
+        `As visitas cresceram ${visitDelta}% ${periodLabel} em relação ao período anterior.`
+      );
+    }
+  }
+
+  if (highlights.length === 0) {
+    highlights.push(
+      'Ainda não há eventos registrados neste período. Divulgue o link da sua vitrine para acompanhar visitas e pedidos aqui.'
+    );
+  }
+
+  return {
+    siteId,
+    period: validPeriod,
+    summary: {
+      visits,
+      previousVisits,
+      orders,
+      previousOrders,
+      conversionPercent,
+      previousConversionPercent,
+      estimatedCents,
+      previousEstimatedCents
+    },
+    topItems,
+    topCategories,
+    byDay,
+    byHour,
+    highlights
+  };
+}
+

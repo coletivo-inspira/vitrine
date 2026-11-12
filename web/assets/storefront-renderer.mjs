@@ -271,6 +271,12 @@ export class StorefrontRenderer {
 
     if (current === 0 && delta > 0) {
       this.cart.set(item.id, minQty);
+      if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+        globalThis.recordStorefrontEvent('item_select', {
+          itemId: item.id,
+          count: minQty
+        });
+      }
     } else {
       const next = current + delta;
       if (next < minQty && delta < 0) {
@@ -278,7 +284,19 @@ export class StorefrontRenderer {
       } else if (next <= 0) {
         this.cart.delete(item.id);
       } else {
-        this.cart.set(item.id, Math.min(next, 99));
+        const clampedNext = Math.min(next, 99);
+        const addedCount = clampedNext - current;
+        this.cart.set(item.id, clampedNext);
+        if (
+          addedCount > 0 &&
+          this.options.isPublicPage &&
+          typeof globalThis.recordStorefrontEvent === 'function'
+        ) {
+          globalThis.recordStorefrontEvent('item_select', {
+            itemId: item.id,
+            count: addedCount
+          });
+        }
       }
     }
 
@@ -299,6 +317,12 @@ export class StorefrontRenderer {
           ? item.minQuantity
           : 1;
       this.cart.set(item.id, minQty);
+      if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+        globalThis.recordStorefrontEvent('item_select', {
+          itemId: item.id,
+          count: minQty
+        });
+      }
     }
     if (typeof this.options.onUpdate === 'function') {
       this.options.onUpdate(this);

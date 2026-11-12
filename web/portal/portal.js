@@ -17,11 +17,15 @@ let profile = {
 let customizationRequests = [];
 let selectedInterests = new Set();
 let wizardCurrentStep = 1;
+let insightsPeriod = '7d';
+let insightsSelectedSiteId = null;
+let currentInsightsData = null;
 
 // DOM Elements
 const authSection = globalThis.document?.getElementById('auth-section');
 const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
 const dashboardSection = globalThis.document?.getElementById('dashboard-section');
+const insightsSection = globalThis.document?.getElementById('insights-section');
 const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
@@ -68,6 +72,24 @@ const vitrinesSummaryText = globalThis.document?.getElementById('vitrines-summar
 const hubVitrinesList = globalThis.document?.getElementById('hub-vitrines-list');
 const customRequestsSummaryText = globalThis.document?.getElementById('custom-requests-summary-text');
 const hubRequestsList = globalThis.document?.getElementById('hub-requests-list');
+const hubInsightsHighlightText = globalThis.document?.getElementById('hub-insights-highlight-text');
+const hubInsightsStatsList = globalThis.document?.getElementById('hub-insights-stats-list');
+
+// Insights DOM Elements
+const insightsSiteSelect = globalThis.document?.getElementById('insights-site-select');
+const insightsHighlightsList = globalThis.document?.getElementById('insights-highlights-list');
+const insightsKpiVisits = globalThis.document?.getElementById('insights-kpi-visits');
+const insightsKpiVisitsDelta = globalThis.document?.getElementById('insights-kpi-visits-delta');
+const insightsKpiOrders = globalThis.document?.getElementById('insights-kpi-orders');
+const insightsKpiOrdersDelta = globalThis.document?.getElementById('insights-kpi-orders-delta');
+const insightsKpiConversion = globalThis.document?.getElementById('insights-kpi-conversion');
+const insightsKpiConversionDelta = globalThis.document?.getElementById('insights-kpi-conversion-delta');
+const insightsKpiEstimated = globalThis.document?.getElementById('insights-kpi-estimated');
+const insightsKpiEstimatedDelta = globalThis.document?.getElementById('insights-kpi-estimated-delta');
+const insightsDayChartContainer = globalThis.document?.getElementById('insights-day-chart-container');
+const insightsHourChartContainer = globalThis.document?.getElementById('insights-hour-chart-container');
+const insightsTopItemsList = globalThis.document?.getElementById('insights-top-items-list');
+const insightsTopCategoriesList = globalThis.document?.getElementById('insights-top-categories-list');
 
 const googleLoginButton = globalThis.document?.getElementById('google-login-button');
 const localDemoButton = globalThis.document?.getElementById('local-demo-button');
@@ -83,10 +105,12 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupAppShellNavigation();
   setupProfileChips();
   setupWizardFlow();
+  setupInsightsControls();
   await checkSession();
   if (currentUser) {
     await loadProfile();
     await loadCustomizationRequests();
+    await loadInsightsForActiveSite();
     updateHubSummary();
     showSection('inicio');
   }
@@ -94,7 +118,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
 
 // Setup App Shell Navigation
 function setupAppShellNavigation() {
-  globalThis.document?.querySelectorAll('.nav-link:not(.nav-link-future)').forEach(link => {
+  globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const section = link.getAttribute('data-section');
@@ -113,6 +137,9 @@ function setupAppShellNavigation() {
   });
   globalThis.document?.getElementById('hub-new-request-btn')?.addEventListener('click', () => {
     showSection('pedidos');
+  });
+  globalThis.document?.getElementById('hub-open-insights-btn')?.addEventListener('click', () => {
+    showSection('insights');
   });
   wizardOpenBtn?.addEventListener('click', () => {
     openWizard();
@@ -555,6 +582,7 @@ function fallbackToLocalIfNoSession() {
     loadLocalSites();
     loadLocalProfile();
     loadLocalCustomizationRequests();
+    loadInsightsForActiveSite();
     updateHubSummary();
     showSection('inicio');
   } else {
@@ -680,6 +708,7 @@ function enterLocalDemoMode() {
   loadLocalSites();
   loadLocalProfile();
   loadLocalCustomizationRequests();
+  loadInsightsForActiveSite();
   updateHubSummary();
   showSection('inicio');
 }
@@ -727,6 +756,7 @@ export function showSection(section) {
     // Show/Hide authenticated content panes
     if (inicioSection) inicioSection.hidden = section !== 'inicio';
     if (dashboardSection) dashboardSection.hidden = section !== 'dashboard';
+    if (insightsSection) insightsSection.hidden = section !== 'insights';
     if (perfilSection) perfilSection.hidden = section !== 'perfil';
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
     if (wizardSection) wizardSection.hidden = section !== 'wizard';
@@ -738,8 +768,10 @@ export function showSection(section) {
       link.classList.toggle('active', matches);
     });
 
-    // Handle Editor exception (hide outer top-bar and nav on small editor views if needed, or keep)
-    // For now we keep normal shell layout
+    if (section === 'insights') {
+      syncInsightsSiteSelector();
+      loadInsightsForActiveSite();
+    }
   }
 }
 
@@ -1099,9 +1131,13 @@ function updateHubSummary() {
   }
   if (hubVitrinesList) {
     if (sites.length === 0) {
-      hubVitrinesList.innerHTML = '<p style="font-size: 13px; color: var(--ink-soft); margin: 0;">Nenhuma vitrine ativa.</p>';
+      hubVitrinesList.replaceChildren();
+      const emptyP = document.createElement('p');
+      emptyP.className = 'soft-text';
+      emptyP.textContent = 'Nenhuma vitrine ativa.';
+      hubVitrinesList.appendChild(emptyP);
     } else {
-      hubVitrinesList.innerHTML = '';
+      hubVitrinesList.replaceChildren();
       sites.slice(0, 3).forEach(site => {
         const item = document.createElement('div');
         item.className = 'hub-list-item';
@@ -1131,9 +1167,13 @@ function updateHubSummary() {
   }
   if (hubRequestsList) {
     if (customizationRequests.length === 0) {
-      hubRequestsList.innerHTML = '<p style="font-size: 13px; color: var(--ink-soft); margin: 0;">Nenhuma solicitação pendente.</p>';
+      hubRequestsList.replaceChildren();
+      const emptyReqP = document.createElement('p');
+      emptyReqP.className = 'soft-text';
+      emptyReqP.textContent = 'Nenhuma solicitação pendente.';
+      hubRequestsList.appendChild(emptyReqP);
     } else {
-      hubRequestsList.innerHTML = '';
+      hubRequestsList.replaceChildren();
       customizationRequests.slice(0, 2).forEach(req => {
         const item = document.createElement('div');
         item.className = 'hub-list-item';
@@ -1150,6 +1190,9 @@ function updateHubSummary() {
       });
     }
   }
+
+  // 4. Insights Weekly Highlight Card on Home Dashboard
+  renderHubInsightsCard(currentInsightsData);
 }
 
 // Load Sites (Online / Offline)
@@ -1400,3 +1443,632 @@ function openEditor(site) {
   showSection('editor');
   loadEditor(site, isOnline);
 }
+
+// ==========================================
+// Insights Panel & Weekly Highlight Logic
+// ==========================================
+
+function formatInsightsCurrencyBRL(cents) {
+  const safe = Number.isFinite(cents) && cents >= 0 ? Math.round(cents) : 0;
+  const reais = Math.floor(safe / 100);
+  const dec = String(safe % 100).padStart(2, '0');
+  return `R$ ${reais.toLocaleString('pt-BR')},${dec}`;
+}
+
+function formatInsightsPercent(value) {
+  const num = Number.isFinite(value) ? value : 0;
+  return `${num.toFixed(1).replace('.', ',')}%`;
+}
+
+export function buildDemoInsightsDataset(siteId = 'demo-site-pastus', period = '7d') {
+  const multiplier = period === '90d' ? 9 : period === '30d' ? 3.5 : 1;
+  const visits = Math.round(186 * multiplier);
+  const previousVisits = Math.round(142 * multiplier);
+  const orders = Math.round(38 * multiplier);
+  const previousOrders = Math.round(27 * multiplier);
+  const estimatedCents = Math.round(182400 * multiplier);
+  const previousEstimatedCents = Math.round(129600 * multiplier);
+  const conversionPercent = Math.round((orders / visits) * 1000) / 10;
+  const previousConversionPercent = Math.round((previousOrders / previousVisits) * 1000) / 10;
+
+  const baseDays = [
+    { date: '2026-11-06', visits: 21, orders: 4 },
+    { date: '2026-11-07', visits: 29, orders: 6 },
+    { date: '2026-11-08', visits: 34, orders: 8 },
+    { date: '2026-11-09', visits: 24, orders: 5 },
+    { date: '2026-11-10', visits: 19, orders: 3 },
+    { date: '2026-11-11', visits: 26, orders: 5 },
+    { date: '2026-11-12', visits: 33, orders: 7 }
+  ];
+
+  const byHour = Array.from({ length: 24 }, (_, hour) => {
+    if (hour === 12 || hour === 13) {
+      return { hour, visits: Math.round(16 * multiplier), orders: Math.round(4 * multiplier) };
+    }
+    if (hour === 18) {
+      return { hour, visits: Math.round(34 * multiplier), orders: Math.round(9 * multiplier) };
+    }
+    if (hour === 19) {
+      return { hour, visits: Math.round(48 * multiplier), orders: Math.round(13 * multiplier) };
+    }
+    if (hour === 20) {
+      return { hour, visits: Math.round(39 * multiplier), orders: Math.round(8 * multiplier) };
+    }
+    if (hour === 21) {
+      return { hour, visits: Math.round(22 * multiplier), orders: Math.round(3 * multiplier) };
+    }
+    if (hour >= 10 && hour <= 22) {
+      return { hour, visits: Math.round(5 * multiplier), orders: Math.round(1 * multiplier) };
+    }
+    return { hour, visits: 0, orders: 0 };
+  });
+
+  return {
+    siteId,
+    period,
+    summary: {
+      visits,
+      previousVisits,
+      orders,
+      previousOrders,
+      conversionPercent,
+      previousConversionPercent,
+      estimatedCents,
+      previousEstimatedCents
+    },
+    topItems: [
+      {
+        itemId: 'item-3',
+        name: 'Refrigerante Lata',
+        categoryName: 'Bebidas',
+        views: Math.round(112 * multiplier),
+        selections: Math.round(42 * multiplier),
+        previousSelections: Math.round(30 * multiplier),
+        deltaPercent: 40.0
+      },
+      {
+        itemId: 'item-1',
+        name: 'Margherita',
+        categoryName: 'Pizzas Tradicionais',
+        views: Math.round(98 * multiplier),
+        selections: Math.round(34 * multiplier),
+        previousSelections: Math.round(26 * multiplier),
+        deltaPercent: 30.8
+      },
+      {
+        itemId: 'item-2',
+        name: 'Calabresa',
+        categoryName: 'Pizzas Tradicionais',
+        views: Math.round(84 * multiplier),
+        selections: Math.round(28 * multiplier),
+        previousSelections: Math.round(22 * multiplier),
+        deltaPercent: 27.3
+      }
+    ],
+    topCategories: [
+      {
+        categoryId: 'pizzas-tradicionais',
+        name: 'Pizzas Tradicionais',
+        selections: Math.round(62 * multiplier)
+      },
+      {
+        categoryId: 'bebidas',
+        name: 'Bebidas',
+        selections: Math.round(42 * multiplier)
+      }
+    ],
+    byDay: baseDays.map((d) => ({
+      date: d.date,
+      visits: Math.round(d.visits * multiplier),
+      orders: Math.round(d.orders * multiplier)
+    })),
+    byHour,
+    highlights: [
+      'Refrigerante Lata foi o item mais escolhido nesta semana, 40% a mais que na anterior.',
+      'Seus pedidos se concentram entre 18h e 20h.',
+      'As visitas cresceram 31% nesta semana em relação ao período anterior.'
+    ]
+  };
+}
+
+function setupInsightsControls() {
+  if (insightsSiteSelect) {
+    insightsSiteSelect.addEventListener('change', () => {
+      insightsSelectedSiteId = insightsSiteSelect.value;
+      loadInsightsForActiveSite();
+    });
+  }
+
+  globalThis.document?.querySelectorAll('.insights-period-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextPeriod = btn.getAttribute('data-period') || '7d';
+      insightsPeriod = nextPeriod;
+      globalThis.document?.querySelectorAll('.insights-period-btn').forEach((b) => {
+        const isCurrent = b.getAttribute('data-period') === nextPeriod;
+        b.classList.toggle('active', isCurrent);
+        b.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+      });
+      loadInsightsForActiveSite();
+    });
+  });
+}
+
+function syncInsightsSiteSelector() {
+  if (!insightsSiteSelect || !globalThis.document) return;
+  insightsSiteSelect.replaceChildren();
+
+  if (!Array.isArray(sites) || sites.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Nenhuma vitrine cadastrada';
+    insightsSiteSelect.appendChild(opt);
+    insightsSelectedSiteId = null;
+    return;
+  }
+
+  if (!insightsSelectedSiteId || !sites.some((s) => s.id === insightsSelectedSiteId)) {
+    insightsSelectedSiteId = sites[0].id;
+  }
+
+  for (const site of sites) {
+    const opt = document.createElement('option');
+    opt.value = site.id;
+    opt.textContent = `${site.name} (/${site.slug})`;
+    opt.selected = site.id === insightsSelectedSiteId;
+    insightsSiteSelect.appendChild(opt);
+  }
+}
+
+export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
+  syncInsightsSiteSelector();
+  const targetSiteId = insightsSelectedSiteId || sites[0]?.id || 'demo-site-pastus';
+
+  if (isOnline && targetSiteId && typeof fetchImpl === 'function') {
+    try {
+      const res = await fetchImpl(
+        `/api/sites/${encodeURIComponent(targetSiteId)}/insights?period=${encodeURIComponent(insightsPeriod)}`,
+        {
+          headers: { Accept: 'application/json' }
+        }
+      );
+      if (res && res.ok) {
+        const body = await res.json();
+        if (body?.insights) {
+          currentInsightsData = body.insights;
+          renderInsightsPanel(currentInsightsData);
+          renderHubInsightsCard(currentInsightsData);
+          return currentInsightsData;
+        }
+      }
+    } catch {
+      // Fallback to demo dataset below
+    }
+  }
+
+  currentInsightsData = buildDemoInsightsDataset(targetSiteId, insightsPeriod);
+  renderInsightsPanel(currentInsightsData);
+  renderHubInsightsCard(currentInsightsData);
+  return currentInsightsData;
+}
+
+function renderHubInsightsCard(insights) {
+  if (!hubInsightsHighlightText || !hubInsightsStatsList || !globalThis.document) return;
+  const data = insights || buildDemoInsightsDataset(insightsSelectedSiteId || 'demo-site-pastus', '7d');
+  const firstHighlight =
+    Array.isArray(data.highlights) && data.highlights.length > 0
+      ? data.highlights[0]
+      : 'Acompanhe visitas, pedidos no WhatsApp e itens mais escolhidos da sua vitrine.';
+
+  hubInsightsHighlightText.textContent = firstHighlight;
+  hubInsightsStatsList.replaceChildren();
+
+  const rows = [
+    {
+      label: 'Visitas (7 dias)',
+      badge: `${data.summary?.visits ?? 0} acessos`
+    },
+    {
+      label: 'Pedidos no WhatsApp',
+      badge: `${data.summary?.orders ?? 0} (${formatInsightsPercent(data.summary?.conversionPercent ?? 0)})`
+    },
+    {
+      label: 'Valor estimado',
+      badge: formatInsightsCurrencyBRL(data.summary?.estimatedCents ?? 0)
+    }
+  ];
+
+  for (const r of rows) {
+    const item = document.createElement('div');
+    item.className = 'hub-list-item';
+
+    const strong = document.createElement('strong');
+    strong.textContent = r.label;
+
+    const span = document.createElement('span');
+    span.textContent = r.badge;
+
+    item.appendChild(strong);
+    item.appendChild(span);
+    hubInsightsStatsList.appendChild(item);
+  }
+}
+
+function createSvgElement(tag, attrs = {}) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    el.setAttribute(k, String(v));
+  }
+  return el;
+}
+
+function renderDaySvgChart(container, byDay = []) {
+  if (!container || !globalThis.document) return;
+  container.replaceChildren();
+
+  const items = Array.isArray(byDay) && byDay.length > 0 ? byDay.slice(-14) : [];
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = 'Sem dados diários para exibir neste período.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const width = 520;
+  const height = 200;
+  const padLeft = 32;
+  const padRight = 14;
+  const padTop = 22;
+  const padBottom = 34;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  const maxVal = Math.max(
+    1,
+    ...items.map((d) => Math.max(Number(d.visits) || 0, Number(d.orders) || 0))
+  );
+
+  const svg = createSvgElement('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    class: 'insights-svg-chart',
+    'aria-hidden': 'true'
+  });
+
+  // Horizontal grid lines
+  for (const ratio of [0, 0.5, 1]) {
+    const y = Math.round(padTop + plotH * (1 - ratio));
+    svg.appendChild(
+      createSvgElement('line', {
+        x1: padLeft,
+        y1: y,
+        x2: width - padRight,
+        y2: y,
+        class: 'svg-grid-line'
+      })
+    );
+    const label = createSvgElement('text', {
+      x: padLeft - 6,
+      y: y + 4,
+      'text-anchor': 'end',
+      class: 'svg-axis-label'
+    });
+    label.textContent = String(Math.round(maxVal * ratio));
+    svg.appendChild(label);
+  }
+
+  const slotW = plotW / items.length;
+  const barW = Math.max(6, Math.min(18, Math.floor(slotW * 0.34)));
+
+  items.forEach((day, idx) => {
+    const centerX = padLeft + idx * slotW + slotW / 2;
+    const visitsVal = Math.max(0, Number(day.visits) || 0);
+    const ordersVal = Math.max(0, Number(day.orders) || 0);
+
+    const vH = Math.max(visitsVal > 0 ? 3 : 0, Math.round((visitsVal / maxVal) * plotH));
+    const oH = Math.max(ordersVal > 0 ? 3 : 0, Math.round((ordersVal / maxVal) * plotH));
+
+    if (vH > 0) {
+      svg.appendChild(
+        createSvgElement('rect', {
+          x: Math.round(centerX - barW - 1),
+          y: padTop + plotH - vH,
+          width: barW,
+          height: vH,
+          rx: 4,
+          class: 'svg-bar-visits'
+        })
+      );
+    }
+
+    if (oH > 0) {
+      svg.appendChild(
+        createSvgElement('rect', {
+          x: Math.round(centerX + 1),
+          y: padTop + plotH - oH,
+          width: barW,
+          height: oH,
+          rx: 4,
+          class: 'svg-bar-orders'
+        })
+      );
+
+      const valLabel = createSvgElement('text', {
+        x: Math.round(centerX + 1 + barW / 2),
+        y: Math.max(12, padTop + plotH - oH - 5),
+        'text-anchor': 'middle',
+        class: 'svg-bar-value'
+      });
+      valLabel.textContent = String(ordersVal);
+      svg.appendChild(valLabel);
+    }
+
+    if (items.length <= 7 || idx % 2 === 0 || idx === items.length - 1) {
+      const shortDate = String(day.date || '').slice(5).split('-').reverse().join('/');
+      const xLabel = createSvgElement('text', {
+        x: Math.round(centerX),
+        y: height - 10,
+        'text-anchor': 'middle',
+        class: 'svg-axis-label'
+      });
+      xLabel.textContent = shortDate;
+      svg.appendChild(xLabel);
+    }
+  });
+
+  container.appendChild(svg);
+}
+
+function renderHourSvgChart(container, byHour = []) {
+  if (!container || !globalThis.document) return;
+  container.replaceChildren();
+
+  const hours = Array.from({ length: 24 }, (_, h) => {
+    const found = Array.isArray(byHour) ? byHour.find((entry) => Number(entry.hour) === h) : null;
+    return {
+      hour: h,
+      visits: Math.max(0, Number(found?.visits) || 0),
+      orders: Math.max(0, Number(found?.orders) || 0)
+    };
+  });
+
+  const width = 460;
+  const height = 200;
+  const padLeft = 28;
+  const padRight = 12;
+  const padTop = 20;
+  const padBottom = 34;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  const maxActivity = Math.max(1, ...hours.map((h) => h.visits + h.orders));
+
+  // Identify top peak hours
+  const peakThreshold = maxActivity * 0.65;
+
+  const svg = createSvgElement('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    class: 'insights-svg-chart',
+    'aria-hidden': 'true'
+  });
+
+  for (const ratio of [0, 0.5, 1]) {
+    const y = Math.round(padTop + plotH * (1 - ratio));
+    svg.appendChild(
+      createSvgElement('line', {
+        x1: padLeft,
+        y1: y,
+        x2: width - padRight,
+        y2: y,
+        class: 'svg-grid-line'
+      })
+    );
+  }
+
+  const slotW = plotW / 24;
+  const barW = Math.max(6, Math.floor(slotW * 0.68));
+
+  hours.forEach((hObj, idx) => {
+    const total = hObj.visits + hObj.orders;
+    const barH = Math.max(total > 0 ? 3 : 2, Math.round((total / maxActivity) * plotH));
+    const x = Math.round(padLeft + idx * slotW + (slotW - barW) / 2);
+    const y = padTop + plotH - barH;
+    const isPeak = total > 0 && total >= peakThreshold;
+
+    svg.appendChild(
+      createSvgElement('rect', {
+        x,
+        y,
+        width: barW,
+        height: barH,
+        rx: 3,
+        class: isPeak ? 'svg-bar-hour-peak' : 'svg-bar-hour'
+      })
+    );
+
+    if (idx % 3 === 0 || idx === 23) {
+      const lbl = createSvgElement('text', {
+        x: Math.round(x + barW / 2),
+        y: height - 10,
+        'text-anchor': 'middle',
+        class: 'svg-axis-label'
+      });
+      lbl.textContent = `${hObj.hour}h`;
+      svg.appendChild(lbl);
+    }
+  });
+
+  container.appendChild(svg);
+}
+
+export function renderInsightsPanel(insights) {
+  if (!globalThis.document || !insights) return;
+
+  const summary = insights.summary || {};
+  if (insightsKpiVisits) {
+    insightsKpiVisits.textContent = String(summary.visits ?? 0);
+  }
+  if (insightsKpiVisitsDelta) {
+    const prev = summary.previousVisits ?? 0;
+    const diff = (summary.visits ?? 0) - prev;
+    insightsKpiVisitsDelta.textContent =
+      prev > 0
+        ? `${diff >= 0 ? '+' : ''}${Math.round((diff / prev) * 100)}% vs. período anterior (${prev})`
+        : `Período anterior: ${prev}`;
+    insightsKpiVisitsDelta.classList.toggle('is-positive', diff > 0);
+  }
+
+  if (insightsKpiOrders) {
+    insightsKpiOrders.textContent = String(summary.orders ?? 0);
+  }
+  if (insightsKpiOrdersDelta) {
+    const prev = summary.previousOrders ?? 0;
+    const diff = (summary.orders ?? 0) - prev;
+    insightsKpiOrdersDelta.textContent =
+      prev > 0
+        ? `${diff >= 0 ? '+' : ''}${Math.round((diff / prev) * 100)}% vs. período anterior (${prev})`
+        : `Período anterior: ${prev}`;
+    insightsKpiOrdersDelta.classList.toggle('is-positive', diff > 0);
+  }
+
+  if (insightsKpiConversion) {
+    insightsKpiConversion.textContent = formatInsightsPercent(summary.conversionPercent ?? 0);
+  }
+  if (insightsKpiConversionDelta) {
+    insightsKpiConversionDelta.textContent = `Anterior: ${formatInsightsPercent(summary.previousConversionPercent ?? 0)}`;
+    insightsKpiConversionDelta.classList.toggle(
+      'is-positive',
+      (summary.conversionPercent ?? 0) >= (summary.previousConversionPercent ?? 0) &&
+        (summary.conversionPercent ?? 0) > 0
+    );
+  }
+
+  if (insightsKpiEstimated) {
+    insightsKpiEstimated.textContent = formatInsightsCurrencyBRL(summary.estimatedCents ?? 0);
+  }
+  if (insightsKpiEstimatedDelta) {
+    insightsKpiEstimatedDelta.textContent = `Anterior: ${formatInsightsCurrencyBRL(summary.previousEstimatedCents ?? 0)}`;
+    insightsKpiEstimatedDelta.classList.toggle(
+      'is-positive',
+      (summary.estimatedCents ?? 0) > (summary.previousEstimatedCents ?? 0)
+    );
+  }
+
+  if (insightsHighlightsList) {
+    insightsHighlightsList.replaceChildren();
+    const list =
+      Array.isArray(insights.highlights) && insights.highlights.length > 0
+        ? insights.highlights
+        : ['Nenhum evento registrado neste período.'];
+    for (const sentence of list) {
+      const li = document.createElement('li');
+      li.textContent = sentence;
+      insightsHighlightsList.appendChild(li);
+    }
+  }
+
+  renderDaySvgChart(insightsDayChartContainer, insights.byDay);
+  renderHourSvgChart(insightsHourChartContainer, insights.byHour);
+
+  if (insightsTopItemsList) {
+    insightsTopItemsList.replaceChildren();
+    const topItems = Array.isArray(insights.topItems) ? insights.topItems : [];
+    if (topItems.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-msg';
+      empty.textContent = 'Nenhum item visualizado ou selecionado neste período.';
+      insightsTopItemsList.appendChild(empty);
+    } else {
+      topItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'insights-rank-row';
+
+        const main = document.createElement('div');
+        main.className = 'insights-rank-main';
+
+        const pos = document.createElement('span');
+        pos.className = 'insights-rank-pos';
+        pos.textContent = `${idx + 1}º`;
+
+        const info = document.createElement('div');
+        info.className = 'insights-rank-info';
+
+        const nameStrong = document.createElement('strong');
+        nameStrong.textContent = item.name || item.itemId;
+
+        const catSpan = document.createElement('span');
+        catSpan.textContent = `${item.categoryName || 'Cardápio'} · ${item.views ?? 0} visualizações`;
+
+        info.appendChild(nameStrong);
+        info.appendChild(catSpan);
+        main.appendChild(pos);
+        main.appendChild(info);
+
+        const metrics = document.createElement('div');
+        metrics.className = 'insights-rank-metrics';
+
+        const selPill = document.createElement('span');
+        selPill.className = 'insights-metric-pill';
+        selPill.textContent = `${item.selections ?? 0} escolhas`;
+        metrics.appendChild(selPill);
+
+        if (typeof item.deltaPercent === 'number' && Number.isFinite(item.deltaPercent)) {
+          const deltaPill = document.createElement('span');
+          deltaPill.className = 'insights-delta-pill';
+          const rounded = Math.round(item.deltaPercent);
+          deltaPill.textContent = `${rounded >= 0 ? '+' : ''}${rounded}%`;
+          metrics.appendChild(deltaPill);
+        }
+
+        row.appendChild(main);
+        row.appendChild(metrics);
+        insightsTopItemsList.appendChild(row);
+      });
+    }
+  }
+
+  if (insightsTopCategoriesList) {
+    insightsTopCategoriesList.replaceChildren();
+    const topCats = Array.isArray(insights.topCategories) ? insights.topCategories : [];
+    if (topCats.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-msg';
+      empty.textContent = 'Nenhuma categoria com seleções registradas neste período.';
+      insightsTopCategoriesList.appendChild(empty);
+    } else {
+      topCats.forEach((cat, idx) => {
+        const row = document.createElement('div');
+        row.className = 'insights-rank-row';
+
+        const main = document.createElement('div');
+        main.className = 'insights-rank-main';
+
+        const pos = document.createElement('span');
+        pos.className = 'insights-rank-pos';
+        pos.textContent = `${idx + 1}º`;
+
+        const info = document.createElement('div');
+        info.className = 'insights-rank-info';
+
+        const nameStrong = document.createElement('strong');
+        nameStrong.textContent = cat.name || cat.categoryId;
+
+        info.appendChild(nameStrong);
+        main.appendChild(pos);
+        main.appendChild(info);
+
+        const metrics = document.createElement('div');
+        metrics.className = 'insights-rank-metrics';
+
+        const selPill = document.createElement('span');
+        selPill.className = 'insights-metric-pill';
+        selPill.textContent = `${cat.selections ?? 0} itens escolhidos`;
+        metrics.appendChild(selPill);
+
+        row.appendChild(main);
+        row.appendChild(metrics);
+        insightsTopCategoriesList.appendChild(row);
+      });
+    }
+  }
+}
+

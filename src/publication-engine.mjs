@@ -642,6 +642,9 @@ ${sectionsHtml}
       <p class="storefront-footer-note">
         Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
       </p>
+      <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">
+        Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais.
+      </p>
     </div>
   </footer>
   <script type="module" src="/vitrine/vitrine.js"></script>
