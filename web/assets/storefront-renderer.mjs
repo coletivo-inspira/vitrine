@@ -64,6 +64,9 @@ export class StorefrontRenderer {
     this.options = options || {};
     this.stage = 1; // 1: Escolher, 2: Dados, 3: Revisar e enviar
     this.cart = new Map(); // itemId -> quantity
+    this.offers = new Map(); // itemId -> offerCents
+    this.tradeProposals = new Map(); // itemId -> text
+    this.itemErrors = new Map(); // itemId -> error message
     this.validationMessage = '';
     this.idPrefix = this.options.isPreview ? 'preview-sf' : 'public-sf';
 
@@ -76,6 +79,33 @@ export class StorefrontRenderer {
       customerName: '',
       notes: ''
     };
+  }
+
+  getItemPriceMode(item) {
+    if (this.getCatalogType() === 'booking') return 'fixed';
+    const raw = typeof item?.priceMode === 'string' ? item.priceMode.trim() : 'fixed';
+    if (raw === 'offer' || raw === 'donation' || raw === 'trade') {
+      return raw;
+    }
+    return 'fixed';
+  }
+
+  hasSelectedOffers() {
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'offer') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  hasSelectedFixedPriceItems() {
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'fixed') {
+        return true;
+      }
+    }
+    return false;
   }
 
   getCatalogType() {
@@ -235,7 +265,7 @@ export class StorefrontRenderer {
   getCartTotal() {
     let total = 0;
     for (const item of this.getAllActiveItems()) {
-      if (this.cart.has(item.id)) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'fixed') {
         total += (item.priceCents || 0) * this.cart.get(item.id);
       }
     }
@@ -567,10 +597,15 @@ export class StorefrontRenderer {
       info.appendChild(countStrong);
 
       const cartTotal = this.getCartTotal();
-      if (resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0)) {
+      if (
+        resolvedComponents.price &&
+        (cartTotal > 0 || (catalogType !== 'quote' && this.hasSelectedFixedPriceItems()))
+      ) {
         const totalVal = document.createElement('span');
         totalVal.className = 'cart-bar-total';
-        totalVal.textContent = this.formatPrice(cartTotal);
+        totalVal.textContent = this.hasSelectedOffers()
+          ? `${this.formatPrice(cartTotal)} (sem os lances)`
+          : this.formatPrice(cartTotal);
         info.appendChild(totalVal);
       } else if (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0) {
         const durVal = document.createElement('span');
@@ -597,11 +632,76 @@ export class StorefrontRenderer {
     }
   }
 
+  submitOffer(item, rawText) {
+    if (!item || item.active === false) return false;
+    const digits = String(rawText ?? '').replace(/\D/g, '');
+    const cents = parseInt(digits, 10) || 0;
+    const minCents = Number.isInteger(item.priceCents) && item.priceCents > 0 ? item.priceCents : 0;
+
+    if (cents <= 0) {
+      this.itemErrors.set(item.id, 'Informe o valor do seu lance.');
+      this.cart.delete(item.id);
+      this.render();
+      return false;
+    }
+
+    if (minCents > 0 && cents < minCents) {
+      this.itemErrors.set(
+        item.id,
+        `O lance mínimo para este item é ${this.formatPrice(minCents)}.`
+      );
+      this.cart.delete(item.id);
+      this.render();
+      return false;
+    }
+
+    this.itemErrors.delete(item.id);
+    this.offers.set(item.id, cents);
+    this.cart.set(item.id, 1);
+    if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+      globalThis.recordStorefrontEvent('item_select', {
+        itemId: item.id,
+        count: 1
+      });
+    }
+    if (typeof this.options.onUpdate === 'function') {
+      this.options.onUpdate(this);
+    }
+    this.render();
+    return true;
+  }
+
+  submitTrade(item, proposalText) {
+    if (!item || item.active === false) return false;
+    const cleaned = String(proposalText ?? '').trim();
+    if (!cleaned) {
+      this.itemErrors.set(item.id, 'Informe o que você oferece em troca.');
+      this.cart.delete(item.id);
+      this.render();
+      return false;
+    }
+    this.itemErrors.delete(item.id);
+    this.tradeProposals.set(item.id, cleaned);
+    this.cart.set(item.id, 1);
+    if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+      globalThis.recordStorefrontEvent('item_select', {
+        itemId: item.id,
+        count: 1
+      });
+    }
+    if (typeof this.options.onUpdate === 'function') {
+      this.options.onUpdate(this);
+    }
+    this.render();
+    return true;
+  }
+
   renderItemCard(item, grid, resolvedComponents, catalogType) {
     if (!item) return;
     const isInactive = item.active === false;
     if (isInactive && !this.options.isPreview) return;
 
+    const priceMode = this.getItemPriceMode(item);
     const qty = this.cart.get(item.id) || 0;
     const card = document.createElement('article');
     card.className = isInactive
@@ -634,6 +734,18 @@ export class StorefrontRenderer {
       title.textContent = item.name || 'Item sem nome';
       titleRow.appendChild(title);
 
+      if (priceMode !== 'fixed') {
+        const modeBadge = document.createElement('span');
+        modeBadge.className = `sf-mode-badge sf-mode-${priceMode}`;
+        modeBadge.textContent =
+          priceMode === 'offer'
+            ? 'Lance'
+            : priceMode === 'donation'
+              ? 'Doação'
+              : 'Troca';
+        titleRow.appendChild(modeBadge);
+      }
+
       if (isInactive) {
         const hiddenBadge = document.createElement('span');
         hiddenBadge.className = 'sf-hidden-badge';
@@ -651,8 +763,24 @@ export class StorefrontRenderer {
       body.appendChild(desc);
     }
 
+    if (priceMode === 'donation' && typeof item.conditions === 'string' && item.conditions.trim()) {
+      const condP = document.createElement('p');
+      condP.className = 'sf-item-condition-note';
+      condP.textContent = `Condições: ${item.conditions.trim()}`;
+      body.appendChild(condP);
+    }
+
+    if (priceMode === 'trade' && typeof item.tradeFor === 'string' && item.tradeFor.trim()) {
+      const tradeP = document.createElement('p');
+      tradeP.className = 'sf-item-condition-note';
+      tradeP.textContent = `Aceito em troca: ${item.tradeFor.trim()}`;
+      body.appendChild(tradeP);
+    }
+
     const showDuration = Boolean(resolvedComponents.durationMinutes && item.durationMinutes > 0);
-    const showMinQty = Boolean(resolvedComponents.minQuantity && item.minQuantity > 1);
+    const showMinQty = Boolean(
+      priceMode === 'fixed' && resolvedComponents.minQuantity && item.minQuantity > 1
+    );
     if (showDuration || showMinQty) {
       const metaRow = document.createElement('div');
       metaRow.className = 'sf-item-meta-row';
@@ -675,67 +803,241 @@ export class StorefrontRenderer {
     footer.className = 'menu-item-footer';
 
     const hasPositivePrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
-    if (resolvedComponents.price && (catalogType !== 'quote' || hasPositivePrice)) {
-      const price = document.createElement('span');
-      price.className = 'menu-item-price';
-      price.textContent = this.formatPrice(item.priceCents || 0);
-      footer.appendChild(price);
-    } else if (catalogType === 'quote') {
-      const quoteLabel = document.createElement('span');
-      quoteLabel.className = 'sf-quote-tag';
-      quoteLabel.textContent = 'Sob consulta';
-      footer.appendChild(quoteLabel);
-    }
 
-    const useStepper = Boolean(
-      resolvedComponents.quantitySelector ||
-        (resolvedComponents.minQuantity && item.minQuantity > 1)
-    );
+    if (priceMode === 'offer') {
+      footer.classList.add('sf-footer-stacked');
+      const offerHeader = document.createElement('div');
+      offerHeader.className = 'sf-offer-header';
 
-    if (useStepper) {
-      const qtyDiv = document.createElement('div');
-      qtyDiv.className = 'qty-selector';
-      qtyDiv.setAttribute('role', 'group');
-      qtyDiv.setAttribute('aria-label', `Quantidade de ${item.name || 'item'}`);
+      const offerLabel = document.createElement('span');
+      offerLabel.className = 'menu-item-price sf-offer-headline';
+      offerLabel.textContent = 'Faça sua oferta';
+      offerHeader.appendChild(offerLabel);
 
-      const decBtn = document.createElement('button');
-      decBtn.type = 'button';
-      decBtn.className = 'btn-qty';
-      decBtn.textContent = '−';
-      decBtn.disabled = qty === 0 || isInactive;
-      decBtn.setAttribute('aria-label', `Diminuir quantidade de ${item.name || 'item'}`);
-      decBtn.addEventListener('click', () => this.setQuantity(item, -1));
+      if (hasPositivePrice) {
+        const minSpan = document.createElement('span');
+        minSpan.className = 'sf-offer-min';
+        minSpan.textContent = `a partir de ${this.formatPrice(item.priceCents)}`;
+        offerHeader.appendChild(minSpan);
+      }
+      footer.appendChild(offerHeader);
 
-      const qtyVal = document.createElement('span');
-      qtyVal.className = 'qty-val';
-      qtyVal.textContent = String(qty);
+      const offerFormRow = document.createElement('div');
+      offerFormRow.className = 'sf-inline-interaction';
 
-      const incBtn = document.createElement('button');
-      incBtn.type = 'button';
-      incBtn.className = 'btn-qty';
-      incBtn.textContent = '+';
-      incBtn.disabled = isInactive;
-      incBtn.setAttribute('aria-label', `Adicionar ${item.name || 'item'}`);
-      incBtn.addEventListener('click', () => this.setQuantity(item, 1));
+      const inputId = `${this.idPrefix}-offer-${item.id}`;
+      const inputLabel = document.createElement('label');
+      inputLabel.className = 'sf-field-label';
+      inputLabel.setAttribute('for', inputId);
+      inputLabel.textContent = 'Seu lance';
 
-      qtyDiv.appendChild(decBtn);
-      qtyDiv.appendChild(qtyVal);
-      qtyDiv.appendChild(incBtn);
-      footer.appendChild(qtyDiv);
+      const offerInput = document.createElement('input');
+      offerInput.type = 'text';
+      offerInput.id = inputId;
+      offerInput.inputMode = 'numeric';
+      offerInput.className = 'sf-input sf-offer-input';
+      offerInput.placeholder = hasPositivePrice
+        ? `Ex.: ${this.formatPrice(item.priceCents)}`
+        : 'Ex.: R$ 50,00';
+      offerInput.disabled = isInactive;
+      const savedOffer = this.offers.get(item.id);
+      if (savedOffer > 0) {
+        offerInput.value = this.formatPrice(savedOffer);
+      }
+      offerInput.addEventListener('input', () => {
+        const rawDigits = offerInput.value.replace(/\D/g, '');
+        if (!rawDigits) {
+          offerInput.value = '';
+          return;
+        }
+        const intPart = parseInt(rawDigits.slice(0, -2) || '0', 10).toLocaleString('pt-BR');
+        const decPart = rawDigits.slice(-2).padStart(2, '0');
+        offerInput.value = `R$ ${intPart},${decPart}`;
+      });
+
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
+      actionBtn.disabled = isInactive;
+      actionBtn.textContent = qty > 0 ? 'Atualizar lance' : 'Incluir lance';
+      actionBtn.addEventListener('click', () => {
+        this.submitOffer(item, offerInput.value);
+      });
+
+      offerFormRow.appendChild(inputLabel);
+      offerFormRow.appendChild(offerInput);
+      offerFormRow.appendChild(actionBtn);
+
+      if (qty > 0) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'sf-secondary-button sf-remove-inline-btn';
+        removeBtn.textContent = 'Remover';
+        removeBtn.addEventListener('click', () => {
+          this.cart.delete(item.id);
+          this.offers.delete(item.id);
+          this.itemErrors.delete(item.id);
+          this.render();
+        });
+        offerFormRow.appendChild(removeBtn);
+      }
+
+      footer.appendChild(offerFormRow);
+
+      const errText = this.itemErrors.get(item.id);
+      if (errText) {
+        const errEl = document.createElement('p');
+        errEl.className = 'sf-item-error';
+        errEl.setAttribute('role', 'alert');
+        errEl.textContent = errText;
+        footer.appendChild(errEl);
+      }
+    } else if (priceMode === 'donation') {
+      const donationBadge = document.createElement('span');
+      donationBadge.className = 'sf-quote-tag sf-donation-tag';
+      donationBadge.textContent = 'Doação';
+      footer.appendChild(donationBadge);
+
+      const donateBtn = document.createElement('button');
+      donateBtn.type = 'button';
+      donateBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
+      donateBtn.disabled = isInactive;
+      donateBtn.setAttribute('aria-pressed', qty > 0 ? 'true' : 'false');
+      donateBtn.textContent = qty > 0 ? 'Selecionado' : 'Quero receber';
+      donateBtn.addEventListener('click', () => this.toggleSingleSelect(item));
+      footer.appendChild(donateBtn);
+    } else if (priceMode === 'trade') {
+      footer.classList.add('sf-footer-stacked');
+      const tradeHeader = document.createElement('div');
+      tradeHeader.className = 'sf-offer-header';
+
+      const tradeBadge = document.createElement('span');
+      tradeBadge.className = 'sf-quote-tag sf-trade-tag';
+      tradeBadge.textContent = 'Troca';
+      tradeHeader.appendChild(tradeBadge);
+      footer.appendChild(tradeHeader);
+
+      const tradeFormRow = document.createElement('div');
+      tradeFormRow.className = 'sf-inline-interaction';
+
+      const inputId = `${this.idPrefix}-trade-${item.id}`;
+      const inputLabel = document.createElement('label');
+      inputLabel.className = 'sf-field-label';
+      inputLabel.setAttribute('for', inputId);
+      inputLabel.textContent = 'O que você oferece?';
+
+      const tradeInput = document.createElement('input');
+      tradeInput.type = 'text';
+      tradeInput.id = inputId;
+      tradeInput.maxLength = 160;
+      tradeInput.className = 'sf-input sf-trade-input';
+      tradeInput.placeholder = 'Ex.: Livros ou mudas de plantas';
+      tradeInput.disabled = isInactive;
+      tradeInput.value = this.tradeProposals.get(item.id) || '';
+      tradeInput.addEventListener('input', () => {
+        this.tradeProposals.set(item.id, tradeInput.value);
+      });
+
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
+      actionBtn.disabled = isInactive;
+      actionBtn.textContent = qty > 0 ? 'Atualizar proposta' : 'Propor troca';
+      actionBtn.addEventListener('click', () => {
+        this.submitTrade(item, tradeInput.value);
+      });
+
+      tradeFormRow.appendChild(inputLabel);
+      tradeFormRow.appendChild(tradeInput);
+      tradeFormRow.appendChild(actionBtn);
+
+      if (qty > 0) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'sf-secondary-button sf-remove-inline-btn';
+        removeBtn.textContent = 'Remover';
+        removeBtn.addEventListener('click', () => {
+          this.cart.delete(item.id);
+          this.tradeProposals.delete(item.id);
+          this.itemErrors.delete(item.id);
+          this.render();
+        });
+        tradeFormRow.appendChild(removeBtn);
+      }
+
+      footer.appendChild(tradeFormRow);
+
+      const errText = this.itemErrors.get(item.id);
+      if (errText) {
+        const errEl = document.createElement('p');
+        errEl.className = 'sf-item-error';
+        errEl.setAttribute('role', 'alert');
+        errEl.textContent = errText;
+        footer.appendChild(errEl);
+      }
     } else {
-      const selectBtn = document.createElement('button');
-      selectBtn.type = 'button';
-      selectBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
-      selectBtn.disabled = isInactive;
-      selectBtn.setAttribute('aria-pressed', qty > 0 ? 'true' : 'false');
-      selectBtn.textContent =
-        qty > 0
-          ? 'Selecionado'
-          : catalogType === 'booking'
-            ? 'Escolher serviço'
-            : 'Selecionar';
-      selectBtn.addEventListener('click', () => this.toggleSingleSelect(item));
-      footer.appendChild(selectBtn);
+      if (resolvedComponents.price && (catalogType !== 'quote' || hasPositivePrice)) {
+        const price = document.createElement('span');
+        price.className = 'menu-item-price';
+        price.textContent = this.formatPrice(item.priceCents || 0);
+        footer.appendChild(price);
+      } else if (catalogType === 'quote') {
+        const quoteLabel = document.createElement('span');
+        quoteLabel.className = 'sf-quote-tag';
+        quoteLabel.textContent = 'Sob consulta';
+        footer.appendChild(quoteLabel);
+      }
+
+      const useStepper = Boolean(
+        resolvedComponents.quantitySelector ||
+          (resolvedComponents.minQuantity && item.minQuantity > 1)
+      );
+
+      if (useStepper) {
+        const qtyDiv = document.createElement('div');
+        qtyDiv.className = 'qty-selector';
+        qtyDiv.setAttribute('role', 'group');
+        qtyDiv.setAttribute('aria-label', `Quantidade de ${item.name || 'item'}`);
+
+        const decBtn = document.createElement('button');
+        decBtn.type = 'button';
+        decBtn.className = 'btn-qty';
+        decBtn.textContent = '−';
+        decBtn.disabled = qty === 0 || isInactive;
+        decBtn.setAttribute('aria-label', `Diminuir quantidade de ${item.name || 'item'}`);
+        decBtn.addEventListener('click', () => this.setQuantity(item, -1));
+
+        const qtyVal = document.createElement('span');
+        qtyVal.className = 'qty-val';
+        qtyVal.textContent = String(qty);
+
+        const incBtn = document.createElement('button');
+        incBtn.type = 'button';
+        incBtn.className = 'btn-qty';
+        incBtn.textContent = '+';
+        incBtn.disabled = isInactive;
+        incBtn.setAttribute('aria-label', `Adicionar ${item.name || 'item'}`);
+        incBtn.addEventListener('click', () => this.setQuantity(item, 1));
+
+        qtyDiv.appendChild(decBtn);
+        qtyDiv.appendChild(qtyVal);
+        qtyDiv.appendChild(incBtn);
+        footer.appendChild(qtyDiv);
+      } else {
+        const selectBtn = document.createElement('button');
+        selectBtn.type = 'button';
+        selectBtn.className = qty > 0 ? 'whatsapp-order-button is-selected' : 'whatsapp-order-button';
+        selectBtn.disabled = isInactive;
+        selectBtn.setAttribute('aria-pressed', qty > 0 ? 'true' : 'false');
+        selectBtn.textContent =
+          qty > 0
+            ? 'Selecionado'
+            : catalogType === 'booking'
+              ? 'Escolher serviço'
+              : 'Selecionar';
+        selectBtn.addEventListener('click', () => this.toggleSingleSelect(item));
+        footer.appendChild(selectBtn);
+      }
     }
 
     card.appendChild(body);
@@ -1035,21 +1337,40 @@ export class StorefrontRenderer {
     for (const item of this.getAllActiveItems()) {
       if (!this.cart.has(item.id)) continue;
       const qty = this.cart.get(item.id);
-      const parts = [`- ${qty}x ${item.name || 'Item'}`];
-      if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
-        parts.push(`(${item.durationMinutes} min)`);
+      const priceMode = this.getItemPriceMode(item);
+
+      if (priceMode === 'offer') {
+        const offerCents = this.offers.get(item.id) || item.priceCents || 0;
+        itemLines.push(`- ${item.name || 'Item'} — Lance: ${this.formatPrice(offerCents)}`);
+      } else if (priceMode === 'donation') {
+        itemLines.push(`- Doação: ${item.name || 'Item'}`);
+      } else if (priceMode === 'trade') {
+        const proposal = (this.tradeProposals.get(item.id) || '').trim();
+        itemLines.push(
+          proposal
+            ? `- Troca: ${item.name || 'Item'}, ofereço: ${proposal}`
+            : `- Troca: ${item.name || 'Item'}`
+        );
+      } else {
+        const parts = [`- ${qty}x ${item.name || 'Item'}`];
+        if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
+          parts.push(`(${item.durationMinutes} min)`);
+        }
+        const hasPrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
+        if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
+          parts.push(`— ${this.formatPrice((item.priceCents || 0) * qty)}`);
+        }
+        itemLines.push(parts.join(' '));
       }
-      const hasPrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
-      if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
-        parts.push(`— ${this.formatPrice((item.priceCents || 0) * qty)}`);
-      }
-      itemLines.push(parts.join(' '));
     }
 
     const cartTotal = this.getCartTotal();
+    const hasOffers = this.hasSelectedOffers();
     const totalStr =
-      resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0)
-        ? this.formatPrice(cartTotal)
+      resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
+        ? hasOffers
+          ? `${this.formatPrice(cartTotal)} (sem os lances)`
+          : this.formatPrice(cartTotal)
         : resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0
           ? `${this.getCartTotalDuration()} min`
           : 'Sob orçamento';
@@ -1060,7 +1381,33 @@ export class StorefrontRenderer {
         : 'Retirada no local'
       : '';
 
-    return interpolateWhatsappTemplate(messages.whatsappTemplate, {
+    let rawTemplate =
+      typeof messages.whatsappTemplate === 'string' && messages.whatsappTemplate.trim()
+        ? messages.whatsappTemplate
+        : 'Olá! Tenho interesse nestes itens:\n{itens}\nTotal estimado: {total}';
+
+    if (hasOffers) {
+      rawTemplate = rawTemplate
+        .replace(/Total estimado:/gi, 'Total (sem os lances):')
+        .replace(/Total:/gi, 'Total (sem os lances):');
+      const totalForOfferTemplate = this.formatPrice(cartTotal);
+      return interpolateWhatsappTemplate(rawTemplate, {
+        itens: itemLines.join('\n'),
+        total: rawTemplate.includes('Total (sem os lances):')
+          ? totalForOfferTemplate
+          : `${totalForOfferTemplate} (sem os lances)`,
+        data: resolvedFields.date ? formatDateBR(this.customerDetails.date) : '',
+        horario:
+          Array.isArray(resolvedFields.timeSlots) && resolvedFields.timeSlots.length > 0
+            ? this.customerDetails.timeSlot
+            : '',
+        endereco: enderecoStr,
+        nome: resolvedFields.customerName ? this.customerDetails.customerName.trim() : '',
+        observacoes: resolvedFields.notes ? this.customerDetails.notes.trim() : ''
+      });
+    }
+
+    return interpolateWhatsappTemplate(rawTemplate, {
       itens: itemLines.join('\n'),
       total: totalStr,
       data: resolvedFields.date ? formatDateBR(this.customerDetails.date) : '',
@@ -1094,25 +1441,45 @@ export class StorefrontRenderer {
     for (const item of this.getAllActiveItems()) {
       if (!this.cart.has(item.id)) continue;
       const qty = this.cart.get(item.id);
+      const priceMode = this.getItemPriceMode(item);
 
       const itemRow = document.createElement('div');
       itemRow.className = 'review-item-row';
 
       const titleSpan = document.createElement('span');
       titleSpan.className = 'review-item-title-qty';
-      let labelText = `${qty}x ${item.name || 'Item'}`;
-      if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
-        labelText += ` (${item.durationMinutes} min)`;
-      }
-      titleSpan.textContent = labelText;
-      itemRow.appendChild(titleSpan);
 
-      const hasPrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
-      if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
+      if (priceMode === 'offer') {
+        titleSpan.textContent = item.name || 'Item';
+        itemRow.appendChild(titleSpan);
         const priceSpan = document.createElement('span');
         priceSpan.className = 'review-item-price';
-        priceSpan.textContent = this.formatPrice((item.priceCents || 0) * qty);
+        priceSpan.textContent = `Lance: ${this.formatPrice(this.offers.get(item.id) || item.priceCents || 0)}`;
         itemRow.appendChild(priceSpan);
+      } else if (priceMode === 'donation') {
+        titleSpan.textContent = `Doação: ${item.name || 'Item'}`;
+        itemRow.appendChild(titleSpan);
+      } else if (priceMode === 'trade') {
+        const proposal = (this.tradeProposals.get(item.id) || '').trim();
+        titleSpan.textContent = proposal
+          ? `Troca: ${item.name || 'Item'} (ofereço: ${proposal})`
+          : `Troca: ${item.name || 'Item'}`;
+        itemRow.appendChild(titleSpan);
+      } else {
+        let labelText = `${qty}x ${item.name || 'Item'}`;
+        if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
+          labelText += ` (${item.durationMinutes} min)`;
+        }
+        titleSpan.textContent = labelText;
+        itemRow.appendChild(titleSpan);
+
+        const hasPrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
+        if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
+          const priceSpan = document.createElement('span');
+          priceSpan.className = 'review-item-price';
+          priceSpan.textContent = this.formatPrice((item.priceCents || 0) * qty);
+          itemRow.appendChild(priceSpan);
+        }
       }
 
       summaryList.appendChild(itemRow);
@@ -1120,8 +1487,9 @@ export class StorefrontRenderer {
     card.appendChild(summaryList);
 
     const cartTotal = this.getCartTotal();
+    const hasOffers = this.hasSelectedOffers();
     if (
-      (resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0)) ||
+      (resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)) ||
       (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0)
     ) {
       const totalDiv = document.createElement('div');
@@ -1129,15 +1497,17 @@ export class StorefrontRenderer {
 
       const totalLabel = document.createElement('strong');
       totalLabel.textContent =
-        resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0)
-          ? 'Total estimado'
+        resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
+          ? hasOffers
+            ? 'Total (sem os lances)'
+            : 'Total estimado'
           : 'Duração estimada';
       totalDiv.appendChild(totalLabel);
 
       const totalVal = document.createElement('span');
       totalVal.className = 'review-total-val';
       totalVal.textContent =
-        resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0)
+        resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
           ? this.formatPrice(cartTotal)
           : `${this.getCartTotalDuration()} min`;
       totalDiv.appendChild(totalVal);

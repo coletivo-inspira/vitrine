@@ -59,6 +59,9 @@ const ALLOWED_ITEM_KEYS = new Set([
   'id',
   'name',
   'priceCents',
+  'priceMode',
+  'conditions',
+  'tradeFor',
   'description',
   'imageUrl',
   'minQuantity',
@@ -127,6 +130,20 @@ function sanitizeOptionalSection(raw) {
       422,
       'INVALID_ITEM',
       'A seção do item (section) deve ter no máximo 160 caracteres.'
+    );
+  }
+  return trimmed;
+}
+
+function sanitizeOptionalItemShortText(raw, errorCode, label) {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > 240) {
+    throw new PortalValidationError(
+      422,
+      errorCode,
+      `${label} deve ter no máximo 240 caracteres.`
     );
   }
   return trimmed;
@@ -344,6 +361,28 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
           : `item-${flatCounter}`;
       if (isItemActive(rawItem)) {
         const extras = {};
+        if (
+          typeof rawItem.priceMode === 'string' &&
+          ['offer', 'donation', 'trade'].includes(rawItem.priceMode.trim())
+        ) {
+          extras.priceMode = rawItem.priceMode.trim();
+        }
+        const conditions = sanitizeOptionalItemShortText(
+          rawItem.conditions,
+          'INVALID_ITEM_CONDITIONS',
+          'As condições do item'
+        );
+        if (conditions !== undefined) {
+          extras.conditions = conditions;
+        }
+        const tradeFor = sanitizeOptionalItemShortText(
+          rawItem.tradeFor,
+          'INVALID_ITEM_TRADE_FOR',
+          'O campo "Aceito em troca"'
+        );
+        if (tradeFor !== undefined) {
+          extras.tradeFor = tradeFor;
+        }
         const desc = sanitizeOptionalDescription(rawItem.description);
         if (desc !== undefined) {
           extras.description = desc;
@@ -387,6 +426,9 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     const projectedItem = {
       id: item.id,
       name: item.name,
+      ...(extras.priceMode !== undefined ? { priceMode: extras.priceMode } : {}),
+      ...(extras.conditions !== undefined ? { conditions: extras.conditions } : {}),
+      ...(extras.tradeFor !== undefined ? { tradeFor: extras.tradeFor } : {}),
       ...(extras.description !== undefined ? { description: extras.description } : {}),
       ...(extras.section !== undefined ? { section: extras.section } : {}),
       ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),

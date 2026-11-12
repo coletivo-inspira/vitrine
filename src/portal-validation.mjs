@@ -41,6 +41,14 @@ export const ALLOWED_CATALOG_TYPES = Object.freeze([
   'quote'
 ]);
 
+export const DEFAULT_ITEM_PRICE_MODE = 'fixed';
+export const ALLOWED_ITEM_PRICE_MODES = Object.freeze([
+  'fixed',
+  'offer',
+  'donation',
+  'trade'
+]);
+
 export const ALLOWED_PROFILE_INTERESTS = Object.freeze([
   'cardapio-digital',
   'agendamento',
@@ -1356,11 +1364,47 @@ export function validateDraftContent(content, options = {}) {
   for (let index = 0; index < allItems.length; index += 1) {
     const item = allItems[index];
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new PortalValidationError(422, 'INVALID_ITEM', 'Item do cardápio inválido.');
+      throw new PortalValidationError(422, 'INVALID_ITEM', 'Item da vitrine inválido.');
+    }
+
+    let itemPriceMode = DEFAULT_ITEM_PRICE_MODE;
+    if (item.priceMode !== undefined && item.priceMode !== null) {
+      if (typeof item.priceMode !== 'string' || !ALLOWED_ITEM_PRICE_MODES.includes(item.priceMode.trim())) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_PRICE_MODE',
+          `Modo de preço do item inválido. Modos suportados: ${ALLOWED_ITEM_PRICE_MODES.join(', ')}.`
+        );
+      }
+      itemPriceMode = item.priceMode.trim();
     }
 
     validateOptionalUrlFields(item, 422);
-    validatePriceCents(item.priceCents, { allowZero: allowZeroPrice });
+    validatePriceCents(item.priceCents, {
+      allowZero: allowZeroPrice || itemPriceMode !== 'fixed'
+    });
+
+    if (item.conditions !== undefined && item.conditions !== null) {
+      if (typeof item.conditions !== 'string' || item.conditions.trim().length > 240) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM_CONDITIONS',
+          'As condições do item devem ter no máximo 240 caracteres.'
+        );
+      }
+      assertNoDangerousTextPayload(item.conditions, 422, 'INVALID_ITEM');
+    }
+
+    if (item.tradeFor !== undefined && item.tradeFor !== null) {
+      if (typeof item.tradeFor !== 'string' || item.tradeFor.trim().length > 240) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ITEM_TRADE_FOR',
+          'O campo "Aceito em troca" deve ter no máximo 240 caracteres.'
+        );
+      }
+      assertNoDangerousTextPayload(item.tradeFor, 422, 'INVALID_ITEM');
+    }
 
     if (item.name !== undefined) {
       if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 160) {
