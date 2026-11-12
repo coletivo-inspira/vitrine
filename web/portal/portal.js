@@ -1714,12 +1714,12 @@ function renderDaySvgChart(container, byDay = []) {
     return;
   }
 
-  const width = 520;
-  const height = 200;
-  const padLeft = 32;
+  const width = 440;
+  const height = 220;
+  const padLeft = 36;
   const padRight = 14;
-  const padTop = 22;
-  const padBottom = 34;
+  const padTop = 24;
+  const padBottom = 38;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
@@ -1730,6 +1730,9 @@ function renderDaySvgChart(container, byDay = []) {
 
   const svg = createSvgElement('svg', {
     viewBox: `0 0 ${width} ${height}`,
+    width: String(width),
+    height: String(height),
+    preserveAspectRatio: 'xMidYMid meet',
     class: 'insights-svg-chart',
     'aria-hidden': 'true'
   });
@@ -1747,7 +1750,7 @@ function renderDaySvgChart(container, byDay = []) {
       })
     );
     const label = createSvgElement('text', {
-      x: padLeft - 6,
+      x: padLeft - 8,
       y: y + 4,
       'text-anchor': 'end',
       class: 'svg-axis-label'
@@ -1757,20 +1760,20 @@ function renderDaySvgChart(container, byDay = []) {
   }
 
   const slotW = plotW / items.length;
-  const barW = Math.max(6, Math.min(18, Math.floor(slotW * 0.34)));
+  const barW = Math.max(10, Math.min(20, Math.floor(slotW * 0.36)));
 
   items.forEach((day, idx) => {
     const centerX = padLeft + idx * slotW + slotW / 2;
     const visitsVal = Math.max(0, Number(day.visits) || 0);
     const ordersVal = Math.max(0, Number(day.orders) || 0);
 
-    const vH = Math.max(visitsVal > 0 ? 3 : 0, Math.round((visitsVal / maxVal) * plotH));
-    const oH = Math.max(ordersVal > 0 ? 3 : 0, Math.round((ordersVal / maxVal) * plotH));
+    const vH = Math.max(visitsVal > 0 ? 8 : 0, Math.round((visitsVal / maxVal) * plotH));
+    const oH = Math.max(ordersVal > 0 ? 12 : 0, Math.round((ordersVal / maxVal) * plotH));
 
     if (vH > 0) {
       svg.appendChild(
         createSvgElement('rect', {
-          x: Math.round(centerX - barW - 1),
+          x: Math.round(centerX - barW - 2),
           y: padTop + plotH - vH,
           width: barW,
           height: vH,
@@ -1778,12 +1781,23 @@ function renderDaySvgChart(container, byDay = []) {
           class: 'svg-bar-visits'
         })
       );
+
+      if (items.length <= 7) {
+        const visitLabel = createSvgElement('text', {
+          x: Math.round(centerX - barW / 2 - 2),
+          y: Math.max(13, padTop + plotH - vH - 5),
+          'text-anchor': 'middle',
+          class: 'svg-bar-value-soft'
+        });
+        visitLabel.textContent = String(visitsVal);
+        svg.appendChild(visitLabel);
+      }
     }
 
     if (oH > 0) {
       svg.appendChild(
         createSvgElement('rect', {
-          x: Math.round(centerX + 1),
+          x: Math.round(centerX + 2),
           y: padTop + plotH - oH,
           width: barW,
           height: oH,
@@ -1793,8 +1807,8 @@ function renderDaySvgChart(container, byDay = []) {
       );
 
       const valLabel = createSvgElement('text', {
-        x: Math.round(centerX + 1 + barW / 2),
-        y: Math.max(12, padTop + plotH - oH - 5),
+        x: Math.round(centerX + 2 + barW / 2),
+        y: Math.max(13, padTop + plotH - oH - 5),
         'text-anchor': 'middle',
         class: 'svg-bar-value'
       });
@@ -1831,12 +1845,12 @@ function renderHourSvgChart(container, byHour = []) {
     };
   });
 
-  const width = 460;
-  const height = 200;
+  const width = 440;
+  const height = 220;
   const padLeft = 28;
   const padRight = 12;
-  const padTop = 20;
-  const padBottom = 34;
+  const padTop = 22;
+  const padBottom = 38;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
@@ -1847,6 +1861,9 @@ function renderHourSvgChart(container, byHour = []) {
 
   const svg = createSvgElement('svg', {
     viewBox: `0 0 ${width} ${height}`,
+    width: String(width),
+    height: String(height),
+    preserveAspectRatio: 'xMidYMid meet',
     class: 'insights-svg-chart',
     'aria-hidden': 'true'
   });
