@@ -1,3 +1,4 @@
+import { renderStructureFields } from './showcase-structure.js';
 const section = globalThis.document?.getElementById('platform-cms-section');
 const open = globalThis.document?.getElementById('platform-cms-open');
 const fields = globalThis.document?.getElementById('platform-cms-fields');
@@ -168,6 +169,11 @@ export async function detectPlatformCms(authenticated) {
     requestList.replaceChildren();
     auditList.replaceChildren();
   }
+  if (templatePanel) {
+    templatePanel.open = false;
+    templateSelect.replaceChildren();
+    templateFields.replaceChildren();
+  }
   if (!authenticated) return;
   try {
     const { sections } = await request();
@@ -248,3 +254,63 @@ async function loadOperations() {
   }
 }
 operations?.addEventListener('toggle', loadOperations);
+
+const templatePanel = globalThis.document?.getElementById('platform-templates');
+const templateStatus = globalThis.document?.getElementById('platform-templates-status');
+const templateSelect = globalThis.document?.getElementById('platform-template-select');
+const templateFields = globalThis.document?.getElementById('platform-template-fields');
+let availableTemplates = [];
+
+async function templateRequest(payload) {
+  const response = await fetch('/api/admin/templates', payload ? {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  } : {});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message ?? 'Não foi possível acessar os modelos.');
+  return data;
+}
+
+function showSelectedTemplate() {
+  const template = availableTemplates.find(entry => entry.code === templateSelect.value);
+  if (!template) {
+    templateFields.replaceChildren();
+    return;
+  }
+  renderStructureFields(templateFields, {
+    theme: template.default_tokens,
+    navigation: {},
+    pages: [{ slug: 'home', title: 'Início', active: true, sections: template.default_sections }]
+  }, async ({ name, themeOverrides, pages }) => {
+    const currentGeneration = generation;
+    try {
+      const { template: saved } = await templateRequest({
+        code: template.code, name, defaultTokens: themeOverrides, defaultSections: pages[0].sections
+      });
+      if (currentGeneration !== generation) return;
+      availableTemplates = availableTemplates.map(entry => entry.code === saved.code ? saved : entry);
+      templateSelect.querySelectorAll('option').forEach(option => {
+        if (option.value === saved.code) option.textContent = saved.name;
+      });
+      templateStatus.textContent = 'Modelo salvo. Os novos padrões serão usados na próxima prévia ou publicação.';
+    } catch (error) {
+      if (currentGeneration === generation) templateStatus.textContent = error.message;
+    }
+  }, [], template.name);
+}
+
+templateSelect?.addEventListener('change', showSelectedTemplate);
+templatePanel?.addEventListener('toggle', async () => {
+  if (!templatePanel.open || section.hidden) return;
+  const currentGeneration = generation;
+  templateStatus.textContent = 'Carregando modelos…';
+  try {
+    const { templates } = await templateRequest();
+    if (currentGeneration !== generation || !templatePanel.open) return;
+    availableTemplates = templates;
+    templateSelect.replaceChildren(...templates.map(entry => new Option(entry.name, entry.code)));
+    templateStatus.textContent = templates.length ? '' : 'Nenhum modelo disponível.';
+    showSelectedTemplate();
+  } catch (error) {
+    if (currentGeneration === generation) templateStatus.textContent = error.message;
+  }
+});

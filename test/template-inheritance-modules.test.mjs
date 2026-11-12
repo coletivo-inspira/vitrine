@@ -83,3 +83,33 @@ test('Editor salva somente alterações e o Worker herda novos padrões ao publi
   const republished = await (await send('/publish', 'POST')).json();
   assert.deepEqual(republished.publication.menu.structure.pages[0].sections, []);
 });
+
+test('Operador atualiza modelo suportado e o Worker recusa estrutura insegura', async () => {
+  const { createApiHandler } = await import('../workers/api.mjs');
+  const store = createMemoryStore();
+  store.isPlatformAdmin = userId => userId === '10000000-0000-0000-0000-000000000001';
+  store.listPlatformTemplates = async () => [{ code: 'products-v1' }];
+  store.updatePlatformTemplate = async (code, patch) => ({ code, ...patch });
+  const api = createApiHandler({ store });
+  const origin = 'https://vitrine.inspira.dev.br';
+  const template = {
+    code: 'products-v1', name: 'Cardápio atualizado',
+    defaultTokens: { accentColor: '#272A38' },
+    defaultSections: [{ id: 'sec-about', moduleCode: 'about_story', config: { bio: 'Bem-vindo' } }]
+  };
+  const send = (method, token, payload) => api(new Request(origin + '/api/admin/templates', {
+    method, headers: { origin, authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    ...(payload ? { body: JSON.stringify(payload) } : {})
+  }));
+  assert.equal((await send('GET', 'token-member')).status, 403);
+  assert.deepEqual(await (await send('GET', 'token-owner')).json(), { templates: [{ code: 'products-v1' }] });
+  assert.equal((await send('POST', 'token-member', template)).status, 403);
+  assert.equal((await send('POST', 'token-owner', {
+    ...template, defaultTokens: { accentColor: 'javascript:alert(1)' }
+  })).status, 422);
+  const response = await send('POST', 'token-owner', template);
+  assert.equal(response.status, 200);
+  const { template: saved } = await response.json();
+  assert.equal(saved.name, template.name);
+  assert.equal(saved.default_sections[0].config.bio, 'Bem-vindo');
+});

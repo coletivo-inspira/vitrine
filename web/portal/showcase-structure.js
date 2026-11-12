@@ -49,8 +49,14 @@ function checkbox(parent, text, checked) {
   return element;
 }
 
-export function renderStructureFields(root, structure, onSave, widgets = []) {
+export function renderStructureFields(root, structure, onSave, widgets = [], templateName = null) {
   const form = document.createElement('form');
+  const editingTemplate = templateName !== null;
+  const name = editingTemplate ? input(form, 'Nome do modelo', templateName) : null;
+  if (name) {
+    name.required = true;
+    name.maxLength = 120;
+  }
   const theme = document.createElement('fieldset');
   theme.append(control('legend', 'Identidade visual'));
   const accent = input(theme, 'Cor de destaque em hexadecimal', structure.theme.accentColor);
@@ -64,7 +70,7 @@ export function renderStructureFields(root, structure, onSave, widgets = []) {
   });
   form.append(theme);
 
-  const navReaders = Object.fromEntries([['header', 'Menu do cabeçalho'], ['footer', 'Menu do rodapé']].map(([key, title]) => {
+  const navReaders = Object.fromEntries((editingTemplate ? [] : [['header', 'Menu do cabeçalho'], ['footer', 'Menu do rodapé']]).map(([key, title]) => {
     const group = document.createElement('fieldset');
     group.append(control('legend', title));
     const list = document.createElement('div');
@@ -93,12 +99,17 @@ export function renderStructureFields(root, structure, onSave, widgets = []) {
 
   function appendPage(page = { slug: '', title: '', active: true, sections: [] }) {
     const card = document.createElement('fieldset');
-    card.append(control('legend', page.title || 'Nova página'));
+    card.append(control('legend', editingTemplate ? 'Seções padrão' : page.title || 'Nova página'));
     const title = input(card, 'Título', page.title);
     const slug = input(card, 'Identificador', page.slug);
     title.required = true;
     slug.required = true;
+    if (editingTemplate) {
+      title.parentElement.hidden = true;
+      slug.parentElement.hidden = true;
+    }
     const visible = checkbox(card, ' Exibir página', page.active);
+    if (editingTemplate) visible.parentElement.hidden = true;
     const sections = document.createElement('div');
 
     function appendSection(section) {
@@ -143,9 +154,9 @@ export function renderStructureFields(root, structure, onSave, widgets = []) {
         const config = module.value === 'custom_sandbox' ? { widgetId: widget.id, bundleHash: widget.hash } : {};
         appendSection({ id: 'sec-' + crypto.randomUUID().slice(0, 12), moduleCode: module.value, config });
       }),
-      sections,
-      action('Remover página', () => card.remove())
+      sections
     );
+    if (!editingTemplate) card.append(action('Remover página', () => card.remove()));
     card.read = () => ({
       title: title.value, slug: slug.value, active: visible.checked,
       sections: [...sections.children].map(row => row.read())
@@ -154,10 +165,11 @@ export function renderStructureFields(root, structure, onSave, widgets = []) {
   }
 
   structure.pages.forEach(appendPage);
-  pages.append(pageList, action('Adicionar página', () => {
+  pages.append(pageList);
+  if (!editingTemplate) pages.append(action('Adicionar página', () => {
     if (pageList.children.length < 5) appendPage();
   }));
-  const save = control('button', 'Salvar estrutura');
+  const save = control('button', editingTemplate ? 'Salvar modelo' : 'Salvar estrutura');
   save.type = 'submit';
   save.className = 'button button-small button-pill';
   form.append(pages, save);
@@ -170,7 +182,8 @@ export function renderStructureFields(root, structure, onSave, widgets = []) {
           accentColor: accent.value.trim(), fontPair: font.value, buttonStyle: shape.value
         }).filter(([, value]) => value)),
         navigationMenus: Object.fromEntries(Object.entries(navReaders).map(([key, read]) => [key, read()])),
-        pages: [...pageList.children].map(row => row.read())
+        pages: [...pageList.children].map(row => row.read()),
+        ...(name ? { name: name.value } : {})
       });
     } finally {
       save.disabled = false;

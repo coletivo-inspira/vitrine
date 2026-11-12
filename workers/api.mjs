@@ -4,6 +4,7 @@ import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapt
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import {
+  ALLOWED_TEMPLATES,
   CATALOG_IMAGES_BUCKET,
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
@@ -11,6 +12,7 @@ import {
   MAX_EVENTS_BATCH_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
+  assertNoDangerousTextPayload,
   computeStorefrontInsights,
   createInitialDraftContent,
   extractDraftItems,
@@ -1944,6 +1946,25 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       if (!response.ok) throw new Error('Falha ao remover o arquivo da biblioteca.');
     },
 
+    async listPlatformTemplates({ token }) {
+      const fields = 'code,name,storefront_type,catalog_type,default_tokens,default_sections';
+      const query = new URLSearchParams({
+        select: fields, code: `in.(${ALLOWED_TEMPLATES.join(',')})`, order: 'name.asc'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar os modelos.');
+      return response.json();
+    },
+
+    async updatePlatformTemplate(code, template, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(code)}`, {
+        method: 'PATCH', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify(template)
+      });
+      if (!response.ok) throw new Error('Falha ao salvar o modelo.');
+      return (await response.json())[0] ?? null;
+    },
+
     async getStructureDefaults(template, { token }) {
       const [templateResult, moduleResult] = await Promise.all([
         fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&select=default_tokens,default_sections`,
@@ -3016,6 +3037,35 @@ export function createApiHandler(deps = {}) {
           return jsonResponse(200, { request: updated });
         }
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para administração.');
+      }
+
+      if (pathname === '/api/admin/templates') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method === 'GET') return jsonResponse(200, { templates: await store.listPlatformTemplates(options) });
+        if (method !== 'POST') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para modelos.');
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        const { parsed } = await parseJsonRequest(request);
+        const { code, name, defaultTokens, defaultSections } = parsed ?? {};
+        if (!ALLOWED_TEMPLATES.includes(code) || typeof name !== 'string' || !name.trim() || name.trim().length > 120 ||
+            !defaultTokens || !Array.isArray(defaultSections) ||
+            defaultSections.some(entry => entry?.moduleCode === 'custom_sandbox')) {
+          return errorResponse(422, 'INVALID_TEMPLATE', 'Informe um modelo suportado, nome e estrutura válidos.');
+        }
+        assertNoDangerousTextPayload(name);
+        const validated = resolveShowcaseManifest({ themeOverrides: defaultTokens }, { defaultSections });
+        const template = await store.updatePlatformTemplate(code, {
+          name: name.trim(),
+          default_tokens: validated.theme,
+          default_sections: validated.pages[0].sections
+        }, options);
+        if (!template) return errorResponse(404, 'TEMPLATE_NOT_FOUND', 'Modelo não encontrado.');
+        return jsonResponse(200, { template });
       }
 
       if (pathname === '/api/admin/custom-components') {

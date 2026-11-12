@@ -43,4 +43,20 @@ after update of status on public.customization_requests
 for each row when (old.status is distinct from new.status)
 execute function private.audit_customization_status();
 
+create function private.audit_template_change()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is not null then
+    perform private.record_audit_log(null, 'template_updated', 'template', new.code, '{}'::jsonb);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function private.audit_template_change() from public, anon, authenticated;
+create trigger audit_template_change
+after update on public.templates
+for each row when (old is distinct from new)
+execute function private.audit_template_change();
+
 commit;
