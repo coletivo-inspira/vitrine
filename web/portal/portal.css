@@ -2855,7 +2855,7 @@ svg {
 
 .swatch-visits {
   background: var(--ink-soft);
-  opacity: 0.55;
+  opacity: 0.8;
 }
 
 .swatch-orders {
@@ -2873,16 +2873,15 @@ svg {
 
 .insights-svg-wrap {
   width: 100%;
-  min-height: 210px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 190px;
+  display: block;
 }
 
 .insights-svg-chart {
   width: 100%;
   height: auto;
-  max-height: 230px;
+  min-height: 180px;
+  max-height: 240px;
   overflow: visible;
   display: block;
 }
@@ -2898,11 +2897,19 @@ svg {
   stroke: none;
   font-family: var(--font-body);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .svg-bar-value {
-  fill: var(--ink);
+  fill: var(--orange);
+  stroke: none;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.svg-bar-value-soft {
+  fill: var(--ink-soft);
   stroke: none;
   font-family: var(--font-body);
   font-size: 10px;
@@ -2911,8 +2918,13 @@ svg {
 
 .svg-bar-visits {
   fill: var(--ink-soft);
-  opacity: 0.42;
+  opacity: 0.72;
   stroke: none;
+}
+
+:root[data-theme="dark"] .svg-bar-visits {
+  fill: #96ab9d;
+  opacity: 0.78;
 }
 
 .svg-bar-orders {
@@ -2922,8 +2934,13 @@ svg {
 
 .svg-bar-hour {
   fill: var(--ink-soft);
-  opacity: 0.4;
+  opacity: 0.58;
   stroke: none;
+}
+
+:root[data-theme="dark"] .svg-bar-hour {
+  fill: #96ab9d;
+  opacity: 0.65;
 }
 
 .svg-bar-hour-peak {
