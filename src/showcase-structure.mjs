@@ -59,7 +59,7 @@ function validateValue(value, type) {
   throw invalid();
 }
 
-function validateSections(sections, moduleDefaults) {
+function validateSections(sections, moduleDefaults, inheritedSections = []) {
   if (!Array.isArray(sections) || sections.length > 15) throw invalid();
   const ids = new Set();
   return sections.map(section => {
@@ -68,9 +68,12 @@ function validateSections(sections, moduleDefaults) {
         (section.active !== undefined && typeof section.active !== 'boolean')) throw invalid();
     ids.add(section.id);
     const defaults = section.moduleCode === 'custom_sandbox' ? {} : moduleDefaults[section.moduleCode] ?? {};
+    const inherited = inheritedSections.find(entry => entry.id === section.id && entry.moduleCode === section.moduleCode);
+    const fields = moduleFields[section.moduleCode];
     const config = {
-      ...validateValue(defaults, moduleFields[section.moduleCode]),
-      ...validateValue(section.config ?? {}, moduleFields[section.moduleCode])
+      ...validateValue(defaults, fields),
+      ...validateValue(inherited?.config ?? {}, fields),
+      ...validateValue(section.config ?? {}, fields)
     };
     if (section.moduleCode === 'custom_sandbox' && (!config.widgetId || !config.bundleHash)) throw invalid();
     return { id: section.id, moduleCode: section.moduleCode, config, active: section.active !== false };
@@ -85,8 +88,9 @@ export function resolveShowcaseManifest(structure, template = {}, vertical = {},
     ...validateValue(structure.themeOverrides ?? {}, themeFields)
   };
   const navigation = validateValue(structure.navigationMenus ?? {}, navFields);
+  const inheritedSections = vertical.sections ?? template.defaultSections ?? [];
   const sourcePages = structure.pages ?? [{
-    slug: 'home', title: 'Início', sections: vertical.sections ?? template.defaultSections ?? []
+    slug: 'home', title: 'Início', sections: inheritedSections
   }];
   if (!Array.isArray(sourcePages) || sourcePages.length > 5) throw invalid();
   const slugs = new Set();
@@ -97,10 +101,35 @@ export function resolveShowcaseManifest(structure, template = {}, vertical = {},
     slugs.add(page.slug);
     return {
       slug: page.slug, title: validateValue(page.title, 'text'),
-      sections: validateSections(page.sections ?? [], moduleDefaults), active: page.active !== false
+      sections: validateSections(page.sections ?? [], moduleDefaults, page.slug === 'home' ? inheritedSections : []),
+      active: page.active !== false
     };
   });
   return { theme, navigation, pages };
+}
+
+export function extractShowcaseOverrides(resolved, template, vertical, moduleDefaults) {
+  const baseline = resolveShowcaseManifest({}, template, vertical, moduleDefaults);
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  const changes = (selected, defaults) => Object.fromEntries(
+    Object.entries(selected).filter(([key, value]) => !same(value, defaults[key]))
+  );
+  const layout = resolved.pages.map(page => ({
+    ...page,
+    sections: page.sections.map(section => {
+      const basePage = baseline.pages.find(entry => entry.slug === page.slug);
+      const baseSection = basePage?.sections.find(entry => entry.id === section.id && entry.moduleCode === section.moduleCode);
+      return {
+        ...section,
+        config: changes(section.config, baseSection?.config ?? moduleDefaults?.[section.moduleCode] ?? {})
+      };
+    })
+  }));
+  return {
+    themeOverrides: changes(resolved.theme, baseline.theme),
+    navigationMenus: resolved.navigation,
+    ...(!same(resolved.pages, baseline.pages) ? { pages: layout } : {})
+  };
 }
 
 export function projectShowcaseManifest(structure) {

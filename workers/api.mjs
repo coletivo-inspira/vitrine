@@ -1,5 +1,5 @@
 import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
-import { resolveShowcaseManifest } from '../src/showcase-structure.mjs';
+import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
@@ -2754,6 +2754,17 @@ function validateMutationOriginAndJson(
   return null;
 }
 
+async function resolveDraftForPublication(store, site, draft, options) {
+  if (!draft.content.structure) return draft.content;
+  const defaults = await store.getStructureDefaults?.(site.template, options);
+  const resolved = resolveShowcaseManifest(draft.content.structure, defaults?.template, {}, defaults?.modules);
+  await assertApprovedWidgets(store, site.id, resolved.pages, options);
+  return {
+    ...draft.content,
+    structure: { themeOverrides: resolved.theme, navigationMenus: resolved.navigation, pages: resolved.pages }
+  };
+}
+
 async function assertApprovedWidgets(store, siteId, pages, options) {
   const widgets = (Array.isArray(pages) ? pages : []).flatMap(page => Array.isArray(page?.sections) ? page.sections : [])
     .filter(section => section?.moduleCode === 'custom_sandbox' && section.active !== false);
@@ -2906,8 +2917,8 @@ export function createApiHandler(deps = {}) {
         const site = await store.getSite(siteId, user.id, options);
         const draft = site && await store.getDraft(siteId, user.id, options);
         if (draft?.revision !== revision) return new Response(null, { status: 404, headers });
-        await assertApprovedWidgets(store, siteId, draft.content.structure?.pages, options);
-        const { menu } = await compilePublicStorefront(draft.content, site, { revision });
+        const content = await resolveDraftForPublication(store, site, draft, options);
+        const { menu } = await compilePublicStorefront(content, site, { revision });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
         const status = error instanceof PortalValidationError ? 422 : 500;
@@ -3598,7 +3609,7 @@ export function createApiHandler(deps = {}) {
         const defaults = await store.getStructureDefaults?.(site.template, options);
         const resolved = resolveShowcaseManifest(parsed, defaults?.template, {}, defaults?.modules);
         await assertApprovedWidgets(store, siteId, resolved.pages, options);
-        const structure = { themeOverrides: resolved.theme, navigationMenus: resolved.navigation, pages: resolved.pages };
+        const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         const content = { ...draft.content, structure };
         validateDraftContent(content);
         const updated = await store.updateDraft({ siteId, userId: user.id, revision, content }, options);
@@ -3634,15 +3645,20 @@ export function createApiHandler(deps = {}) {
           return errorResponse(422, 'INVALID_TOGGLE', 'Informe o tipo, identificador e estado desejado.');
         }
         const content = structuredClone(draft.content);
+        const defaults = targetType === 'section' ? await store.getStructureDefaults?.(site.template, options) : undefined;
+        const resolved = targetType === 'section'
+          ? resolveShowcaseManifest(content.structure ?? {}, defaults?.template, {}, defaults?.modules)
+          : null;
         const targets = targetType === 'item' ? extractDraftItems(content)
           : targetType === 'category' ? content.categories ?? []
-          : Array.isArray(content.structure?.pages)
-            ? content.structure.pages.flatMap(page => Array.isArray(page?.sections) ? page.sections : [])
-            : [];
-        const target = targets.find(entry => entry?.id === targetId);
-        if (!target) return errorResponse(404, 'TARGET_NOT_FOUND', 'O elemento não foi encontrado no rascunho.');
+          : resolved.pages.flatMap(page => page.sections);
+        const matching = targets.filter(entry => entry?.id === targetId);
+        if (!matching.length) return errorResponse(404, 'TARGET_NOT_FOUND', 'O elemento não foi encontrado no rascunho.');
+        if (matching.length > 1) return errorResponse(409, 'AMBIGUOUS_TARGET', 'O identificador corresponde a mais de um elemento.');
+        const [target] = matching;
         target.active = active;
         if (targetType === 'item' && Object.hasOwn(target, 'available')) target.available = active;
+        if (resolved) content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         validateDraftContent(content);
         const updated = await store.updateDraft({ siteId, userId: user.id, revision: draft.revision, content }, options);
         if (updated.status === 'conflict') {
@@ -3897,9 +3913,9 @@ export function createApiHandler(deps = {}) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
-        await assertApprovedWidgets(store, siteId, draft.content.structure?.pages, { token: user.token, env });
+        const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
-        const compiled = await compilePublicStorefront(draft.content, site, {
+        const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
           siteId: site.id
         });

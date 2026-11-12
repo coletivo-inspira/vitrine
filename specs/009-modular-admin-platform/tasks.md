@@ -102,7 +102,7 @@ description: "Lista de tarefas ordenada por dependências para a feature 009-mod
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Incluir na migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` as tabelas `public.templates`, `public.modules`, `public.pages`, `public.sections` e `public.navigation_menus` com os modelos iniciais das verticais (Cardápio/Produtos, Agendamento de Serviços, Portfólio/Orçamento, Catálogo/Link-in-Bio)
+- [X] T020 [US4] Incluir na migração `supabase/migrations/202611120006_cms_pages_sections_releases.sql` as tabelas `public.templates`, `public.modules`, `public.pages`, `public.sections` e `public.navigation_menus` com os modelos iniciais das verticais (Cardápio/Produtos, Agendamento de Serviços, Portfólio/Orçamento, Catálogo/Link-in-Bio)
 - [ ] T021 [P] [US4] Implementar em `src/publication-engine.mjs` e `src/portal-validation.mjs` o resolvedor em cascata (`resolveShowcaseManifest`) combinando `templates.default_tokens`, módulos da vertical e `sites.theme_overrides` / `pages` / `sections` / `navigation_menus`
 - [ ] T022 [US4] Atualizar `src/storefront-renderer.mjs`, `web/vitrine/vitrine.js` e `web/vitrine/vitrine.css` para renderizar páginas, menus configuráveis, tokens de tema herdados e seções modulares ordenadas (`hero`, `catalog_grid`, `about_story`, `testimonials`, `faq`, `hours_location`, `links_bio`)
 - [ ] T023 [US4] Adicionar em `web/portal/editor.js` o gerenciador visual de **Identidade Visual (Tema/Cores/Fontes)**, **Menus de Navegação** e **Páginas e Seções** (incluir, ativar/desativar e reordenar seções com atualização instantânea na prévia)

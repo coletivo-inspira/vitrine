@@ -34,3 +34,52 @@ test('Manifesto combina defaults, preserva os dados da vitrine e filtra estrutur
     navigationMenus: { header: [{ label: 'X', href: 'javascript:alert(1)' }] }
   }));
 });
+
+test('Editor salva somente alterações e o Worker herda novos padrões ao publicar', async () => {
+  const { createApiHandler } = await import('../workers/api.mjs');
+  const store = createMemoryStore();
+  const site = [...store.sites.values()][0];
+  let template = {
+    defaultTokens: { accentColor: '#1E3A8A', fontPair: 'editorial-syne' },
+    defaultSections: [{ id: 'sec-hero', moduleCode: 'hero', config: { headline: 'Antes' } }]
+  };
+  store.getStructureDefaults = async () => ({ template, modules: { hero: { subtitle: 'Texto padrão' } } });
+  const api = createApiHandler({ store });
+  const origin = 'https://vitrine.inspira.dev.br';
+  const endpoint = `${origin}/api/sites/${site.id}`;
+  const send = (path, method = 'GET', body) => api(new Request(endpoint + path, {
+    method,
+    headers: { origin, authorization: 'Bearer token-owner', 'content-type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  }));
+  const { revision, resolved } = await (await send('/structure')).json();
+  const response = await send('/structure', 'PUT', {
+    expectedRevision: revision,
+    themeOverrides: { ...resolved.theme, accentColor: '#272A38' },
+    pages: resolved.pages,
+    navigationMenus: { header: [{ label: 'Início', href: '#sec-hero' }] }
+  });
+  assert.equal(response.status, 200);
+  const { draft } = await response.json();
+  assert.deepEqual(draft.content.structure, {
+    themeOverrides: { accentColor: '#272A38' },
+    navigationMenus: { header: [{ label: 'Início', href: '#sec-hero' }] }
+  });
+  template = {
+    defaultTokens: { accentColor: '#102132', fontPair: 'classic-garamond' },
+    defaultSections: [{ id: 'sec-hero', moduleCode: 'hero', config: { headline: 'Depois' } }]
+  };
+  const published = await send('/publish', 'POST');
+  assert.equal(published.status, 200);
+  const { publication } = await published.json();
+  const { theme, pages } = publication.menu.structure;
+  assert.deepEqual(theme, { accentColor: '#272A38', fontPair: 'classic-garamond' });
+  assert.equal(pages[0].sections[0].config.headline, 'Depois');
+  assert.ok(publication.menu.items.length > 0);
+  const toggled = await send('/quick-toggle', 'PATCH', {
+    targetType: 'section', targetId: 'sec-hero', active: false
+  });
+  assert.equal(toggled.status, 200);
+  const republished = await (await send('/publish', 'POST')).json();
+  assert.deepEqual(republished.publication.menu.structure.pages[0].sections, []);
+});
