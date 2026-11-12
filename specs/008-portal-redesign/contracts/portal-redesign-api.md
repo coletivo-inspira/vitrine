@@ -218,3 +218,28 @@
     }
   }
   ```
+
+---
+
+## 6. Upload de Fotos do Catálogo (`/api/sites/:siteId/upload`) — PR (c)
+
+- **Método**: `POST`
+- **Autenticação**: Exige sessão válida (`401 UNAUTHORIZED`) via cookie HttpOnly `__Host-vitrine_session` (ou `Authorization: Bearer`) onde o usuário é proprietário ou colaborador da vitrine `:siteId` (caso contrário, `404 SITE_NOT_FOUND`). O token de sessão jamais é exposto ao JavaScript cliente em `/api/auth/session`.
+- **Headers Obrigatórios**:
+  - `Origin`: presente e idêntico a `new URL(request.url).origin` (`403 FORBIDDEN_ORIGIN`).
+  - `Content-Type`: `image/webp` (`415 UNSUPPORTED_MEDIA_TYPE`).
+- **Parâmetros de Consulta (Query)**:
+  - `itemId`: opcional (`^[a-z0-9][a-z0-9._-]{0,63}$`, sem `..`; inválido retorna `422 INVALID_IMAGE_PATH`).
+- **Corpo da Requisição e Validação Server-Side**:
+  - Binário WebP válido (assinatura mágica `RIFF....WEBP`, caso contrário `422 INVALID_IMAGE`).
+  - Não vazio (`400 EMPTY_FILE`) e tamanho `<= 204800` bytes (`200 KiB`; payloads maiores retornam `413 FILE_TOO_LARGE`).
+  - O Worker encaminha o upload ao bucket `catalog-images` no Supabase Storage usando o JWT de sessão no servidor (`502 STORAGE_UPLOAD_ERROR` em falha upstream).
+- **Resposta (`200 OK`)**:
+  ```json
+  {
+    "imageUrl": "https://qawlpsrfewosxsfgmmpm.supabase.co/storage/v1/object/public/catalog-images/20000000-0000-0000-0000-000000000001/item-123-a1b2c3d4.webp",
+    "path": "20000000-0000-0000-0000-000000000001/item-123-a1b2c3d4.webp",
+    "bytes": 18432
+  }
+  ```
+

@@ -677,6 +677,175 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       STOREFRONT_STORAGE_CSP_HEADER
     );
     assert.match(PORTAL_STORAGE_CSP_HEADER, /img-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co data: blob:/);
+
+    // Regressão de segurança (Constituição Princípio III): /api/auth/session jamais expõe token no JSON
+    const sessionCheckRes = await api.fetch(
+      new Request(`${origin}/api/auth/session`, {
+        method: 'GET',
+        headers: { Cookie: '__Host-vitrine_session=token-owner' }
+      })
+    );
+    assert.equal(sessionCheckRes.status, 200);
+    const sessionCheckBody = await sessionCheckRes.json();
+    assert.equal(sessionCheckBody.authenticated, true);
+    assert.equal('token' in sessionCheckBody, false);
+    assert.equal('accessToken' in sessionCheckBody, false);
+    assert.equal('access_token' in sessionCheckBody, false);
+
+    // Helper para gerar binário WebP mínimo com assinatura RIFF....WEBP
+    function makeWebpBuffer(byteLength = 1024) {
+      const bytes = new Uint8Array(byteLength);
+      // 'RIFF'
+      bytes[0] = 0x52;
+      bytes[1] = 0x49;
+      bytes[2] = 0x46;
+      bytes[3] = 0x46;
+      // 'WEBP'
+      bytes[8] = 0x57;
+      bytes[9] = 0x45;
+      bytes[10] = 0x42;
+      bytes[11] = 0x50;
+      return bytes.buffer;
+    }
+
+    // Teste 4.x: POST /api/sites/:siteId/upload (proxy autenticado por cookie HttpOnly)
+    const uploadPath = `/api/sites/${bookingCreated.site.id}/upload`;
+
+    // 4.x.1: Sem autenticação -> 401
+    const uploadNoAuthRes = await api.fetch(
+      new Request(`${origin}${uploadPath}`, {
+        method: 'POST'
+      })
+    );
+    assert.equal(uploadNoAuthRes.status, 401);
+
+    // 4.x.2: Sem Origin ou Origin inválido -> 403
+    for (const badOrigin of [null, 'https://evil.com']) {
+      const headers = new Headers({
+        Cookie: '__Host-vitrine_session=token-owner',
+        'Content-Type': 'image/webp'
+      });
+      if (badOrigin) headers.set('Origin', badOrigin);
+      const uploadBadOriginRes = await api.fetch(
+        new Request(`${origin}${uploadPath}`, {
+          method: 'POST',
+          headers,
+          body: makeWebpBuffer(64)
+        })
+      );
+      assert.equal(uploadBadOriginRes.status, 403);
+    }
+
+    // 4.x.3: Usuário estranho tentando upload na vitrine de outro tenant -> 404 SITE_NOT_FOUND
+    const uploadStrangerRes = await api.fetch(
+      new Request(`${origin}${uploadPath}`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-stranger',
+          Origin: origin,
+          'Content-Type': 'image/webp'
+        },
+        body: makeWebpBuffer(64)
+      })
+    );
+    assert.equal(uploadStrangerRes.status, 404);
+
+    // 4.x.4: Content-Type inválido -> 415
+    const uploadBadTypeRes = await api.fetch(
+      new Request(`${origin}${uploadPath}`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin,
+          'Content-Type': 'image/png'
+        },
+        body: makeWebpBuffer(64)
+      })
+    );
+    assert.equal(uploadBadTypeRes.status, 415);
+
+    // 4.x.5: Arquivo > 200 KB (204801 bytes) -> 413
+    const uploadTooLargeRes = await api.fetch(
+      new Request(`${origin}${uploadPath}`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin,
+          'Content-Type': 'image/webp'
+        },
+        body: makeWebpBuffer(204801)
+      })
+    );
+    assert.equal(uploadTooLargeRes.status, 413);
+
+    // 4.x.6: Binário sem assinatura RIFF/WEBP (ex.: SVG disfarçado) -> 422 INVALID_IMAGE
+    const spoofedSvgBytes = new TextEncoder().encode('<svg onload="alert(1)"></svg>');
+    const uploadSpoofedRes = await api.fetch(
+      new Request(`${origin}${uploadPath}`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin,
+          'Content-Type': 'image/webp'
+        },
+        body: spoofedSvgBytes
+      })
+    );
+    assert.equal(uploadSpoofedRes.status, 422);
+    assert.equal((await uploadSpoofedRes.json()).error.code, 'INVALID_IMAGE');
+
+    // 4.x.7: Path traversal em itemId -> 422 INVALID_IMAGE_PATH
+    const uploadTraversalRes = await api.fetch(
+      new Request(`${origin}${uploadPath}?itemId=../../outro-site/evil`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin,
+          'Content-Type': 'image/webp'
+        },
+        body: makeWebpBuffer(64)
+      })
+    );
+    assert.equal(uploadTraversalRes.status, 422);
+    assert.equal((await uploadTraversalRes.json()).error.code, 'INVALID_IMAGE_PATH');
+
+    // 4.x.8: Upload válido via cookie HttpOnly -> 200 encaminhando Bearer server-side ao bucket catalog-images
+    let capturedStorageCall = null;
+    const mockFetch = async (urlStr, options) => {
+      if (urlStr.includes('/storage/v1/object/catalog-images/')) {
+        capturedStorageCall = { url: urlStr, headers: options.headers };
+        return {
+          ok: true,
+          status: 200,
+          text: async () => '{"Key":"catalog-images/ok.webp"}'
+        };
+      }
+      return { ok: false, status: 404 };
+    };
+
+    const apiWithMockFetch = createApiHandler({ store: api.store, fetch: mockFetch });
+    const uploadValidRes = await apiWithMockFetch.fetch(
+      new Request(`${origin}${uploadPath}?itemId=item-123`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin,
+          'Content-Type': 'image/webp'
+        },
+        body: makeWebpBuffer(1024)
+      })
+    );
+    assert.equal(uploadValidRes.status, 200);
+    const uploadJson = await uploadValidRes.json();
+    assert.ok(
+      uploadJson.imageUrl.startsWith(
+        `${SUPABASE_PUBLIC_PROJECT_URL}/storage/v1/object/public/catalog-images/${bookingCreated.site.id}/item-123-`
+      )
+    );
+    assert.equal(uploadJson.bytes, 1024);
+    assert.ok(capturedStorageCall);
+    assert.equal(capturedStorageCall.headers.Authorization, 'Bearer token-owner');
+    assert.equal(capturedStorageCall.headers['Content-Type'], 'image/webp');
   });
 
   await t.test('5. Validação de catálogo no modo quote (preço opcional/zero), variáveis do WhatsApp e migração de pizzeria-v1', async () => {

@@ -1,87 +1,70 @@
 import { chromium } from 'playwright-chromium';
-import { resolve } from 'node:path';
-import { exec } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
-(async () => {
-  console.log('Starting preview server...');
-  const serverProcess = exec('node scripts/serve.mjs');
+const targetDir = '/cursor/stores/bc-eda3ac10-4053-4841-9e17-ee3927f2a123/media/portal-editor';
 
-  // Wait 2 seconds for server to boot
-  await new Promise(r => setTimeout(r, 2000));
+const server = spawn(process.execPath, ['scripts/serve.mjs'], {
+  stdio: 'ignore',
+  detached: false
+});
 
-  const targetDir = '/cursor/stores/bc-eda3ac10-4053-4841-9e17-ee3927f2a123/media/portal-editor';
+function fail(message) {
+  server.kill('SIGTERM');
+  throw new Error(message);
+}
+
+try {
+  await new Promise((r) => setTimeout(r, 800));
   await mkdir(targetDir, { recursive: true });
-
   const browser = await chromium.launch({ headless: true });
 
-  // 1. Capture Editor on Desktop (1440x900)
-  console.log('Capturing editor desktop screens...');
-  const pageDesktop = await browser.newPage({
-    viewport: { width: 1440, height: 900 },
-    isMobile: false
-  });
+  const desktop = await browser.newPage({ viewport: { width: 1440, height: 1400 } });
+  await desktop.goto('http://127.0.0.1:4173/portal/', { waitUntil: 'load' });
+  await desktop.locator('#local-demo-button').click();
+  await desktop.locator('a[data-section="dashboard"]').first().click();
+  await desktop.locator('button:has-text("Gerenciar Cardápio")').first().click();
+  await desktop.locator('#live-storefront-preview').getByText('Margherita').waitFor();
+  await desktop.locator('#items-container input').first().waitFor();
 
-  await pageDesktop.goto('http://127.0.0.1:4173/portal/', { waitUntil: 'load' });
-  await pageDesktop.locator('#local-demo-button').click();
-  await pageDesktop.waitForTimeout(1000);
+  const editorLight = resolve(targetDir, 'portal-editor-desktop-light.png');
+  await desktop.screenshot({ path: editorLight });
+  await desktop.locator('.theme-toggle').first().click();
+  await desktop.locator('#live-storefront-preview').getByRole('heading', { name: 'Calabresa', exact: true }).waitFor();
+  const editorDark = resolve(targetDir, 'portal-editor-desktop-dark.png');
+  await desktop.screenshot({ path: editorDark });
+  await desktop.close();
 
-  // Navigate to Minhas Vitrines section to make buttons visible
-  await pageDesktop.locator('a[data-section="dashboard"]').first().click();
-  await pageDesktop.waitForTimeout(1000);
-
-  // Click on "Gerenciar Cardápio" to open the editor
-  await pageDesktop.locator('button:has-text("Gerenciar Cardápio")').first().click();
-  await pageDesktop.waitForTimeout(1000);
-
-  // Save Editor Desktop Light Mode
-  const editorLightPath = resolve(targetDir, 'portal-editor-desktop-light.png');
-  await pageDesktop.screenshot({ path: editorLightPath });
-  console.log(`Saved: ${editorLightPath}`);
-
-  // Toggle Theme to Dark
-  await pageDesktop.locator('.theme-toggle').first().click();
-  await pageDesktop.waitForTimeout(1000);
-
-  // Save Editor Desktop Dark Mode
-  const editorDarkPath = resolve(targetDir, 'portal-editor-desktop-dark.png');
-  await pageDesktop.screenshot({ path: editorDarkPath });
-  console.log(`Saved: ${editorDarkPath}`);
-
-  await pageDesktop.close();
-
-  // 2. Capture Public Storefront Flow on Mobile (390x844)
-  console.log('Capturing public flow mobile screens...');
-  const pageMobile = await browser.newPage({
+  const mobile = await browser.newPage({
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true
   });
+  await mobile.goto('http://127.0.0.1:4173/loja1', { waitUntil: 'load' });
+  await mobile.locator('#storefront-catalog').getByText('Margherita Verace').waitFor();
+  await mobile.locator('.btn-qty[aria-label="Adicionar Margherita Verace"]').click();
+  await mobile.getByText('1 item selecionado').waitFor();
+  const flowLight = resolve(targetDir, 'public-flow-mobile-light.png');
+  await mobile.screenshot({ path: flowLight });
 
-  await pageMobile.goto('http://127.0.0.1:4173/loja1', { waitUntil: 'load' });
-  await pageMobile.waitForTimeout(1000);
+  await mobile.getByRole('button', { name: 'Preencher dados' }).click();
+  await mobile.getByText('Dados do seu pedido').waitFor();
+  await mobile.locator('.theme-toggle').first().click();
+  await mobile.locator('#public-sf-cust-name').fill('Ana Souza');
+  const flowDark = resolve(targetDir, 'public-flow-mobile-dark.png');
+  await mobile.screenshot({ path: flowDark });
 
-  // Save Public Flow Mobile Light Mode
-  const flowLightPath = resolve(targetDir, 'public-flow-mobile-light.png');
-  await pageMobile.screenshot({ path: flowLightPath });
-  console.log(`Saved: ${flowLightPath}`);
-
-  // Toggle Theme to Dark
-  await pageMobile.locator('.theme-toggle').first().click();
-  await pageMobile.waitForTimeout(1000);
-
-  // Save Public Flow Mobile Dark Mode
-  const flowDarkPath = resolve(targetDir, 'public-flow-mobile-dark.png');
-  await pageMobile.screenshot({ path: flowDarkPath });
-  console.log(`Saved: ${flowDarkPath}`);
-
-  await pageMobile.close();
-
-  // Cleanup
   await browser.close();
-  serverProcess.kill();
-  console.log('Screenshots completed!');
-})().catch(e => {
-  console.error('Error during screenshot capture:', e);
-  process.exit(1);
-});
+  console.log('saved', editorLight);
+  console.log('saved', editorDark);
+  console.log('saved', flowLight);
+  console.log('saved', flowDark);
+} catch (error) {
+  console.error(error);
+  process.exitCode = 1;
+} finally {
+  server.kill('SIGTERM');
+}
+
+if (process.exitCode) fail('screenshot capture failed');
