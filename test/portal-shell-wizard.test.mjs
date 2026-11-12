@@ -36,4 +36,27 @@ test('PR (b) - App Shell and Wizard Flow Validation', async (t) => {
     assert.ok(validAreas.includes('health'));
     assert.ok(validAreas.includes('tech'));
   });
+
+  await t.test('4. Valida mapeamento e resolução de hashes para seções do portal', () => {
+    function getSectionFromHash(hash) {
+      const hashToSection = {
+        '#inicio': 'inicio',
+        '#vitrines': 'vitrines',
+        '#dashboard': 'vitrines',
+        '#insights': 'insights',
+        '#perfil': 'perfil',
+        '#pedidos': 'pedidos',
+        '#wizard': 'wizard',
+        '#editor': 'editor'
+      };
+      return hashToSection[hash] || 'inicio';
+    }
+
+    assert.equal(getSectionFromHash('#inicio'), 'inicio');
+    assert.equal(getSectionFromHash('#vitrines'), 'vitrines');
+    assert.equal(getSectionFromHash('#dashboard'), 'vitrines');
+    assert.equal(getSectionFromHash('#insights'), 'insights');
+    assert.equal(getSectionFromHash(''), 'inicio');
+    assert.equal(getSectionFromHash('#unknown'), 'inicio');
+  });
 });
