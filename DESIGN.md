@@ -250,3 +250,43 @@ quatro capturas em uma pilha de folhas com controles de pausa e avanço. O rodap
 usa superfície neutra com duas colunas e linha de apoio; a Orb oficial fica fixa
 no canto inferior esquerdo, conforme solicitação posterior do usuário. Este
 registro substitui a orientação anterior de montar a Orb dentro do rodapé.
+
+---
+
+## Portal
+
+**Escopo estrito de superfície:** Os tokens e efeitos **Liquid Glass** definidos nesta seção aplicam-se **exclusivamente ao portal administrativo** (`web/portal/` / `painel.inspira.dev.br/portal`). O site de divulgação (`web/index.html` e `web/styles.css`) e a página `404.html` **mantêm estritamente a direção "no glass"** (superfícies sólidas sem `backdrop-filter`).
+
+### Referências e Identidade
+- **Base funcional e composição:** seção "Vitrine de soluções" e pilares do hub `inspira.dev.br` (cards com linha superior de categoria e status, eyebrow, título, descrição, rodapé com tags e filtros em pílula).
+- **Estética de material:** superfícies translúcidas em estilo Liquid Glass com luz suave, paleta quase monocromática em floresta e grafite, botões arredondados em pílula e composição equilibrada.
+- **Tipografia e Marca:** `Syne` (títulos) e `DM Sans` (corpo, controles e tabelas) permanecem inalteradas. A caixa verde-lima com o V em duas lâminas e as variantes oficiais da logo (`vitrine-animated.svg` no claro e `vitrine-animated-inverse.svg` no escuro) não mudam.
+
+### Paleta Monocromática Floresta/Grafite e Único Acento
+- **Base e atmosfera:** tons neutros de floresta e grafite, iluminados por gradientes radiais discretos no fundo da aplicação (sem cores vivas ou saturadas no plano de fundo).
+- **Acento único:** laranja (`#C74414`, hover `#A9360E`) no tema claro e pêssego (`#FFB18A`, hover `#FFC4A7`, texto escuro `#171E1A` / `#231B15`) no tema escuro. Nenhuma cor secundária de ação (como azul de terceiros) deve competir com o acento único.
+- **Contraste mínimo:** todo texto sobre superfícies translúcidas ou sólidas deve atingir no mínimo **WCAG AA** (`4.5:1` para texto normal e `3:1` para texto grande e componentes de interface).
+
+### Tokens de Superfície Liquid Glass (`web/portal/portal.css`)
+- **Variáveis de material:**
+  - Tema claro: `--glass: 255 255 255`, `--glass-border: rgb(255 255 255 / .68)`, `--glass-highlight: inset 0 1px 0 0 rgb(255 255 255 / .75)`, `--glass-shadow: 0 20px 48px -20px rgb(19 56 36 / .14)`.
+  - Tema escuro (`[data-theme="dark"]`): `--glass: 32 42 35`, `--glass-border: rgb(247 247 244 / .14)`, `--glass-highlight: inset 0 1px 0 0 rgb(247 247 244 / .12)`, `--glass-shadow: 0 24px 52px -20px rgb(0 0 0 / .55)`.
+- **Regra padrão da superfície de vidro:**
+  - `background: rgb(var(--glass) / .55);`
+  - `backdrop-filter: blur(20px) saturate(140%);`
+  - `-webkit-backdrop-filter: blur(20px) saturate(140%);`
+  - `border: 1px solid var(--glass-border);`
+  - `box-shadow: var(--glass-highlight), var(--glass-shadow);`
+
+### Fallbacks Obrigatórios de Transparência e Suporte
+- **Sem suporte a `backdrop-filter`:**
+  - `@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))` troca o fundo das superfícies `.glass-surface` / `.portal-card` / `.app-sidebar` / `.editor-action-bar` por superfície sólida (`background: var(--white)` no claro e `#202A23` no escuro).
+- **Preferência de transparência reduzida:**
+  - `@media (prefers-reduced-transparency: reduce)` remove `backdrop-filter` / `-webkit-backdrop-filter` e aplica superfície sólida com `background: var(--white)` (claro) ou `#202A23` (escuro) e borda `1px solid var(--line)`.
+
+### Formas, Ergonomia e Segurança
+- **Raios de superfície:** `20px` a `28px` (`--radius-portal-surface: 24px`, cards compactos `20px`, painéis principais e barra flutuante `28px`).
+- **Botões e chips em pílula:** `border-radius: 999px` em botões de ação, seletores de aba, filtros e chips de interesse.
+- **Acessibilidade e movimento:** foco de teclado visível (`outline: 3px solid var(--orange); outline-offset: 4px`), alvos de toque e clique com mínimo de `44×44px` e respeito integral a `@media (prefers-reduced-motion: reduce)`.
+- **Segurança e custo zero:** manutenção estrita de `script-src 'self'` sem scripts inline, gráficos de Insights construídos em SVG e CSS próprios e zero dependências pagas.
+
