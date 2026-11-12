@@ -831,6 +831,10 @@ function populateCategorySelect() {
     selectedCategoryForItems = categories[0].id;
   }
   editorCategorySelect.value = selectedCategoryForItems;
+  const activeCat = categories.find((c) => c.id === selectedCategoryForItems);
+  if (activeCat?.items?.length > 0 && (!activeEditingItemId || !activeCat.items.some((i) => i.id === activeEditingItemId))) {
+    activeEditingItemId = activeCat.items[0].id;
+  }
 }
 
 function renderCategories() {
@@ -968,6 +972,21 @@ function renderItems() {
   const comp = currentDraft.content.components || {};
   const isQuote = currentDraft.content.catalogType === 'quote';
 
+  // Google Forms-style header card (storefront title and short description)
+  const formHeaderCard = document.createElement('div');
+  formHeaderCard.className = 'google-forms-header-card';
+  const formTitle = document.createElement('h3');
+  formTitle.className = 'forms-header-title';
+  formTitle.textContent = currentDraft.content.businessName || currentSite?.name || 'Minha Vitrine';
+  const formSubtitle = document.createElement('p');
+  formSubtitle.className = 'forms-header-subtitle';
+  formSubtitle.textContent =
+    currentDraft.content.messages?.welcomeText ||
+    `Categoria: ${category.name || 'Itens'} · ${category.items.length} ${category.items.length === 1 ? 'item' : 'itens'} na vitrine`;
+  formHeaderCard.appendChild(formTitle);
+  formHeaderCard.appendChild(formSubtitle);
+  itemsContainer.appendChild(formHeaderCard);
+
   category.items.forEach((item, itemIdx) => {
     const card = document.createElement('div');
     // Accent bar visual highlight like Google Forms
@@ -997,9 +1016,7 @@ function renderItems() {
         thumbImg.alt = item.name || 'Foto';
         thumb.appendChild(thumbImg);
       } else {
-        const thumbIcon = document.createElement('span');
-        thumbIcon.textContent = '📷';
-        thumb.appendChild(thumbIcon);
+        thumb.innerHTML = `<svg width="20" height="20" class="svg-icon-gray"><use href="#icon-image"/></svg>`;
       }
       previewHeader.appendChild(thumb);
 
@@ -1115,7 +1132,7 @@ function renderItems() {
 
     // Column 1: Nome do item
     const gName = document.createElement('div');
-    gName.className = 'form-group';
+    gName.className = 'form-group item-fields-full';
     const lName = document.createElement('label');
     lName.setAttribute('for', `item-name-${item.id}`);
     lName.textContent = 'Nome do item';
@@ -1141,7 +1158,7 @@ function renderItems() {
       gPrice.className = 'form-group';
       const lPrice = document.createElement('label');
       lPrice.setAttribute('for', `item-price-${item.id}`);
-      lPrice.textContent = isQuote ? 'Preço (opcional no orçamento)' : 'Preço (BRL)';
+      lPrice.textContent = isQuote ? 'Preço (opcional)' : 'Preço (BRL)';
       const priceInput = document.createElement('input');
       priceInput.type = 'text';
       priceInput.id = `item-price-${item.id}`;
@@ -1163,7 +1180,7 @@ function renderItems() {
     gSec.className = 'form-group';
     const lSec = document.createElement('label');
     lSec.setAttribute('for', `item-section-${item.id}`);
-    lSec.textContent = 'Seção / Agrupamento (opcional)';
+    lSec.textContent = 'Seção (opcional)';
     const secInput = document.createElement('input');
     secInput.type = 'text';
     secInput.id = `item-section-${item.id}`;
@@ -1362,13 +1379,27 @@ function renderItems() {
     const footerRight = document.createElement('div');
     footerRight.className = 'footer-right-actions';
 
+    // Duplicate button in footer (Google Forms style)
+    const footerDupBtn = document.createElement('button');
+    footerDupBtn.type = 'button';
+    footerDupBtn.className = 'icon-btn';
+    footerDupBtn.setAttribute('aria-label', 'Duplicar item');
+    footerDupBtn.title = 'Duplicar item';
+    footerDupBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-copy"/></svg>`;
+    footerDupBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      duplicateItem(selectedCategoryForItems, itemIdx);
+    });
+
     // Delete Trash icon
     const trashBtn = document.createElement('button');
     trashBtn.type = 'button';
     trashBtn.className = 'icon-btn trash-color-btn';
     trashBtn.setAttribute('aria-label', 'Excluir item');
-    trashBtn.innerHTML = `<svg width="20" height="20"><use href="#icon-trash"/></svg>`;
-    trashBtn.addEventListener('click', () => {
+    trashBtn.title = 'Excluir item';
+    trashBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-trash"/></svg>`;
+    trashBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (item.name && !confirm(`Deseja excluir o item "${item.name}"?`)) {
         return;
       }
@@ -1385,14 +1416,17 @@ function renderItems() {
 
     const activeCheckbox = document.createElement('input');
     activeCheckbox.type = 'checkbox';
+    activeCheckbox.setAttribute('role', 'switch');
+    activeCheckbox.setAttribute('aria-checked', item.active !== false ? 'true' : 'false');
     activeCheckbox.checked = item.active !== false;
     activeCheckbox.addEventListener('change', () => {
       item.active = activeCheckbox.checked;
+      activeCheckbox.setAttribute('aria-checked', item.active ? 'true' : 'false');
       updateDraftAndPreview();
     });
 
     const activeLabelText = document.createElement('span');
-    activeLabelText.textContent = 'Visível';
+    activeLabelText.textContent = 'Visível na vitrine';
 
     activeLabel.appendChild(activeCheckbox);
     activeLabel.appendChild(activeLabelText);
@@ -1400,14 +1434,15 @@ function renderItems() {
     // Save and collapse card button
     const collapseBtn = document.createElement('button');
     collapseBtn.type = 'button';
-    collapseBtn.className = 'button button-small button-pill';
-    collapseBtn.textContent = 'OK';
+    collapseBtn.className = 'button button-small button-secondary button-pill';
+    collapseBtn.textContent = 'Concluir';
     collapseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       activeEditingItemId = null;
       renderItems();
     });
 
+    footerRight.appendChild(footerDupBtn);
     footerRight.appendChild(trashBtn);
     footerRight.appendChild(sep);
     footerRight.appendChild(activeLabel);
