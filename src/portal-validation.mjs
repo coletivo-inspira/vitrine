@@ -842,6 +842,42 @@ export function computeProfileCompleteness(profile = {}) {
   };
 }
 
+export function normalizeProfileInterestEntry(entry) {
+  if (typeof entry !== 'string') {
+    throw new PortalValidationError(
+      422,
+      'INVALID_INTERESTS',
+      `Interesse inválido: ${String(entry)}.`
+    );
+  }
+  const trimmed = entry.trim();
+  if (ALLOWED_PROFILE_INTERESTS.includes(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('outro:')) {
+    const rawCustom = trimmed.slice('outro:'.length);
+    assertNoDangerousTextPayload(rawCustom, 422, 'INVALID_INTERESTS');
+    const cleaned = rawCustom
+      .replace(/[\u0000-\u001F\u007F]+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (/[<>]/.test(cleaned) || cleaned.length < 2 || cleaned.length > 40) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_INTERESTS',
+        'A área de interesse personalizada deve ter entre 2 e 40 caracteres e não conter HTML.'
+      );
+    }
+    assertNoDangerousTextPayload(cleaned, 422, 'INVALID_INTERESTS');
+    return `outro:${cleaned}`;
+  }
+  throw new PortalValidationError(
+    422,
+    'INVALID_INTERESTS',
+    `Interesse inválido: ${String(entry)}.`
+  );
+}
+
 export function formatProfileRecord(userId, raw = {}, interests = []) {
   const displayName = typeof raw.displayName === 'string'
     ? raw.displayName.trim()
@@ -855,9 +891,21 @@ export function formatProfileRecord(userId, raw = {}, interests = []) {
       : '';
   const city = typeof raw.city === 'string' ? raw.city.trim() : '';
   const whatsapp = typeof raw.whatsapp === 'string' ? raw.whatsapp.trim() : '';
-  const normalizedInterests = Array.isArray(interests)
-    ? [...new Set(interests.filter((item) => ALLOWED_PROFILE_INTERESTS.includes(item)))]
-    : [];
+  const normalizedInterests = [];
+  if (Array.isArray(interests)) {
+    const seen = new Set();
+    for (const item of interests) {
+      try {
+        const normalized = normalizeProfileInterestEntry(item);
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          normalizedInterests.push(normalized);
+        }
+      } catch {
+        // Ignore invalid stored entries when formatting record
+      }
+    }
+  }
   const updatedAt = raw.updatedAt ?? raw.updated_at ?? raw.createdAt ?? raw.created_at ?? null;
 
   return {
@@ -930,14 +978,8 @@ export function validateProfileInput(payload) {
     }
     const seen = new Set();
     for (const entry of payload.interests) {
-      if (typeof entry !== 'string' || !ALLOWED_PROFILE_INTERESTS.includes(entry.trim())) {
-        throw new PortalValidationError(
-          422,
-          'INVALID_INTERESTS',
-          `Interesse inválido: ${String(entry)}.`
-        );
-      }
-      seen.add(entry.trim());
+      const normalized = normalizeProfileInterestEntry(entry);
+      seen.add(normalized);
     }
     interests = [...seen];
   }

@@ -1,5 +1,7 @@
 import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './platform-cms.js';
 import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
+import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
+import { createInterestsMultiSelect } from './multi-select.mjs';
 
 // State variables
 let isOnline = false;
@@ -79,15 +81,15 @@ const wizardSlugValidationError = globalThis.document?.getElementById('wizard-sl
 const wizardOpenBtn = globalThis.document?.getElementById('wizard-open-btn');
 
 // Hub DOM Elements
-const profileProgressText = globalThis.document?.getElementById('profile-progress-text');
-const profileCompletenessBar = globalThis.document?.getElementById('profile-completeness-bar');
-const profileMissingFields = globalThis.document?.getElementById('profile-missing-fields');
 const vitrinesSummaryText = globalThis.document?.getElementById('vitrines-summary-text');
 const hubVitrinesList = globalThis.document?.getElementById('hub-vitrines-list');
 const customRequestsSummaryText = globalThis.document?.getElementById('custom-requests-summary-text');
 const hubRequestsList = globalThis.document?.getElementById('hub-requests-list');
 const hubInsightsHighlightText = globalThis.document?.getElementById('hub-insights-highlight-text');
 const hubInsightsStatsList = globalThis.document?.getElementById('hub-insights-stats-list');
+
+let profileInterestsMultiSelect = null;
+let gateInterestsMultiSelect = null;
 
 // Insights DOM Elements
 const insightsSiteSelect = globalThis.document?.getElementById('insights-site-select');
@@ -216,9 +218,6 @@ function setupAppShellNavigation() {
   });
 
   // Hub shortcuts
-  globalThis.document?.getElementById('hub-complete-profile-btn')?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#perfil';
-  });
   globalThis.document?.getElementById('hub-create-site-btn')?.addEventListener('click', () => {
     if (globalThis.window) globalThis.window.location.hash = '#wizard';
   });
@@ -233,25 +232,34 @@ function setupAppShellNavigation() {
   });
 }
 
-// Profile Chips setup
+// Profile Interests & Phone Mask setup
 function setupProfileChips() {
-  const wireChips = (container) => {
-    container?.querySelectorAll('.chip-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const interest = btn.getAttribute('data-interest');
-        if (selectedInterests.has(interest)) {
-          selectedInterests.delete(interest);
-          btn.classList.remove('active');
-        } else {
-          selectedInterests.add(interest);
-          btn.classList.add('active');
-        }
-      });
-    });
+  const syncBoth = (values) => {
+    selectedInterests = new Set(values);
+    profileInterestsMultiSelect?.setValues(values);
+    gateInterestsMultiSelect?.setValues(values);
   };
 
-  wireChips(interestsChipsContainer);
-  wireChips(gateInterestsChipsContainer);
+  if (interestsChipsContainer) {
+    profileInterestsMultiSelect = createInterestsMultiSelect(interestsChipsContainer, {
+      inputId: 'profile-interests-combobox',
+      onChange: syncBoth
+    });
+  }
+
+  if (gateInterestsChipsContainer) {
+    gateInterestsMultiSelect = createInterestsMultiSelect(gateInterestsChipsContainer, {
+      inputId: 'gate-interests-combobox',
+      onChange: syncBoth
+    });
+  }
+
+  attachWhatsappMask(gateWhatsappInput, () => {
+    if (gateWhatsappError) gateWhatsappError.hidden = true;
+  });
+  attachWhatsappMask(profileWhatsappInput, () => {
+    if (profileWhatsappError) profileWhatsappError.hidden = true;
+  });
 }
 
 // Setup Events
@@ -829,7 +837,6 @@ async function handleLogout() {
   sites = [];
   activeSite = null;
   clearEditor();
-  syncShowcaseSwitcher();
   profile = {
     displayName: '',
     businessName: '',
@@ -839,6 +846,8 @@ async function handleLogout() {
   };
   customizationRequests = [];
   selectedInterests.clear();
+  profileInterestsMultiSelect?.setValues([]);
+  gateInterestsMultiSelect?.setValues([]);
   
   if (demoModeBadge) demoModeBadge.hidden = true;
   if (logoutButton) logoutButton.hidden = true;
@@ -930,21 +939,47 @@ function loadLocalProfile() {
   }
 }
 
-function prefillProfileWithGoogleCredentials() {
-  if (!currentUser) return;
+export function renderAccountEmailStatus(emailSpan, googleName, googleEmail) {
+  if (!emailSpan) return;
+  const doc = emailSpan.ownerDocument || globalThis.document;
+  emailSpan.replaceChildren();
+  const cleanName = typeof googleName === 'string' ? googleName.trim() : '';
+  const cleanEmail = typeof googleEmail === 'string' ? googleEmail.trim() : '';
+
+  if (cleanName && cleanEmail) {
+    emailSpan.appendChild(doc.createTextNode('Conectado como '));
+    const strong = doc.createElement('strong');
+    strong.textContent = cleanName;
+    emailSpan.appendChild(strong);
+    emailSpan.appendChild(doc.createTextNode(` · ${cleanEmail}`));
+  } else if (cleanName) {
+    emailSpan.appendChild(doc.createTextNode('Conectado como '));
+    const strong = doc.createElement('strong');
+    strong.textContent = cleanName;
+    emailSpan.appendChild(strong);
+  } else if (cleanEmail) {
+    emailSpan.textContent = `Conectado como ${cleanEmail}`;
+  } else {
+    emailSpan.textContent = 'Conta Google conectada';
+  }
+}
+
+export function prefillProfileWithGoogleCredentials(userOverride = currentUser, profileTarget = profile) {
+  const userObj = userOverride ?? currentUser;
+  if (!userObj) return;
   
-  const googleName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
-  const googleAvatar = currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || '';
-  const googleEmail = currentUser.email || '';
+  const googleName = userObj.user_metadata?.full_name || userObj.user_metadata?.name || '';
+  const googleAvatar = userObj.user_metadata?.avatar_url || userObj.user_metadata?.picture || '';
+  const googleEmail = userObj.email || '';
 
   // Prefill ONLY empty fields!
-  if (!profile.displayName && googleName) {
-    profile.displayName = googleName;
+  if (profileTarget && !profileTarget.displayName && googleName) {
+    profileTarget.displayName = googleName;
   }
 
   // Update read-only account cards in UI
   const updateAccountCard = (avatarImg, placeholderDiv, emailSpan) => {
-    if (emailSpan) emailSpan.textContent = `Conectado como ${googleEmail || '...'}`;
+    renderAccountEmailStatus(emailSpan, googleName, googleEmail);
     if (googleAvatar) {
       if (avatarImg) {
         avatarImg.src = googleAvatar;
@@ -990,28 +1025,21 @@ function syncProfileToForm() {
   if (profileDisplayNameInput) profileDisplayNameInput.value = profile.displayName || '';
   if (profileBusinessNameInput) profileBusinessNameInput.value = profile.businessName || '';
   if (profileCityInput) profileCityInput.value = profile.city || '';
-  if (profileWhatsappInput) profileWhatsappInput.value = profile.whatsapp || '';
+  if (profileWhatsappInput) profileWhatsappInput.value = formatWhatsappBR(profile.whatsapp || '');
 
   if (gateDisplayNameInput) gateDisplayNameInput.value = profile.displayName || '';
   if (gateBusinessNameInput) gateBusinessNameInput.value = profile.businessName || '';
   if (gateCityInput) gateCityInput.value = profile.city || '';
-  if (gateWhatsappInput) gateWhatsappInput.value = profile.whatsapp || '';
+  if (gateWhatsappInput) gateWhatsappInput.value = formatWhatsappBR(profile.whatsapp || '');
 
   selectedInterests.clear();
-  const interestsArray = profile.interests || [];
+  const interestsArray = Array.isArray(profile.interests) ? profile.interests : [];
   interestsArray.forEach(interest => {
     selectedInterests.add(interest);
   });
 
-  const updateChips = (container) => {
-    container?.querySelectorAll('.chip-btn').forEach(btn => {
-      const interest = btn.getAttribute('data-interest');
-      btn.classList.toggle('active', selectedInterests.has(interest));
-    });
-  };
-
-  updateChips(interestsChipsContainer);
-  updateChips(gateInterestsChipsContainer);
+  profileInterestsMultiSelect?.setValues(interestsArray);
+  gateInterestsMultiSelect?.setValues(interestsArray);
 }
 
 // Save Profile Gate
@@ -1019,8 +1047,10 @@ async function handleSaveProfileGate() {
   const displayName = gateDisplayNameInput.value.trim();
   const businessName = gateBusinessNameInput.value.trim();
   const city = gateCityInput.value.trim();
-  const whatsapp = gateWhatsappInput.value.trim();
-  const interests = Array.from(selectedInterests);
+  const whatsapp = extractPhoneDigits(gateWhatsappInput.value);
+  const interests = gateInterestsMultiSelect
+    ? gateInterestsMultiSelect.getValues()
+    : Array.from(selectedInterests);
 
   // Validations
   if (!displayName || !businessName || !city || !whatsapp) {
@@ -1030,7 +1060,7 @@ async function handleSaveProfileGate() {
 
   if (whatsapp && !/^[1-9]\d{7,14}$/.test(whatsapp)) {
     gateWhatsappError.hidden = false;
-    showFeedback('Digite o número de WhatsApp no formato internacional de dígitos (ex: 5551999999999).', 'error');
+    showFeedback('Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).', 'error');
     return;
   }
   gateWhatsappError.hidden = true;
@@ -1039,6 +1069,7 @@ async function handleSaveProfileGate() {
   localStorage.setItem('vitrine_profile', JSON.stringify(profile));
 
   let savedOnServer = false;
+  let serverErrorMsg = '';
   if (isOnline) {
     try {
       const res = await fetch('/api/profile', {
@@ -1048,6 +1079,9 @@ async function handleSaveProfileGate() {
       });
       if (res.ok) {
         savedOnServer = true;
+      } else {
+        const errBody = await res.json().catch(() => null);
+        serverErrorMsg = errBody?.error?.message || '';
       }
     } catch (err) {
       // Caught gracefully
@@ -1061,7 +1095,10 @@ async function handleSaveProfileGate() {
       globalThis.window.location.hash = '#inicio';
     }
   } else {
-    showFeedback('Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.', 'error');
+    showFeedback(
+      serverErrorMsg || 'Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.',
+      'error'
+    );
   }
 }
 
@@ -1070,13 +1107,15 @@ async function handleSaveProfile() {
   const displayName = profileDisplayNameInput.value.trim();
   const businessName = profileBusinessNameInput.value.trim();
   const city = profileCityInput.value.trim();
-  const whatsapp = profileWhatsappInput.value.trim();
-  const interests = Array.from(selectedInterests);
+  const whatsapp = extractPhoneDigits(profileWhatsappInput.value);
+  const interests = profileInterestsMultiSelect
+    ? profileInterestsMultiSelect.getValues()
+    : Array.from(selectedInterests);
 
   // Validations
   if (whatsapp && !/^[1-9]\d{7,14}$/.test(whatsapp)) {
     profileWhatsappError.hidden = false;
-    showFeedback('Digite o número de WhatsApp no formato internacional de dígitos (ex: 5551999999999).', 'error');
+    showFeedback('Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).', 'error');
     return;
   }
   profileWhatsappError.hidden = true;
@@ -1085,6 +1124,7 @@ async function handleSaveProfile() {
   localStorage.setItem('vitrine_profile', JSON.stringify(profile));
 
   let savedOnServer = false;
+  let serverErrorMsg = '';
   if (isOnline) {
     try {
       const res = await fetch('/api/profile', {
@@ -1094,6 +1134,9 @@ async function handleSaveProfile() {
       });
       if (res.ok) {
         savedOnServer = true;
+      } else {
+        const errBody = await res.json().catch(() => null);
+        serverErrorMsg = errBody?.error?.message || '';
       }
     } catch (err) {
       // Caught gracefully
@@ -1105,7 +1148,10 @@ async function handleSaveProfile() {
     showFeedback('Perfil e interesses salvos com sucesso na nuvem!', 'success');
     showSection('inicio');
   } else {
-    showFeedback('Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.', 'error');
+    showFeedback(
+      serverErrorMsg || 'Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.',
+      'error'
+    );
   }
 }
 
@@ -1342,35 +1388,10 @@ function updateOnboardingChecklist() {
 
 // Update Home Dashboard (Início) Summary Cards
 function updateHubSummary() {
-  // 1. Profile completeness based only on optional fields (Áreas de interesse)
-  let filledFields = 0;
-  let missing = [];
-  if (profile.interests && profile.interests.length > 0) {
-    filledFields = 1;
-  } else {
-    missing.push('Áreas de interesse');
-  }
-
-  const completenessPercent = filledFields * 100;
-  if (profileProgressText) profileProgressText.textContent = `${completenessPercent}% completo`;
-  if (profileCompletenessBar) profileCompletenessBar.value = completenessPercent;
-
-  if (profileMissingFields) {
-    if (completenessPercent === 100) {
-      profileMissingFields.textContent = 'Parabéns! Seu perfil de interesses está completo.';
-      profileMissingFields.classList.add('success-text');
-      profileMissingFields.classList.remove('soft-text');
-    } else {
-      profileMissingFields.textContent = `Pendente opcional: ${missing.join(', ')}`;
-      profileMissingFields.classList.add('soft-text');
-      profileMissingFields.classList.remove('success-text');
-    }
-  }
-
   // Update onboarding checklist
   updateOnboardingChecklist();
 
-  // 2. Vitrines list summary
+  // 1. Vitrines list summary
   if (vitrinesSummaryText) {
     if (sites.length === 0) {
       vitrinesSummaryText.textContent = 'Você não possui nenhuma vitrine cadastrada.';
@@ -1518,25 +1539,7 @@ function loadLocalSites() {
   renderSites();
 }
 
-const showcaseSwitcher = globalThis.document?.getElementById('showcase-switcher');
-const showcaseSelect = globalThis.document?.getElementById('showcase-switcher-select');
-
-function syncShowcaseSwitcher() {
-  if (!showcaseSelect) return;
-  showcaseSwitcher.hidden = sites.length < 2;
-  showcaseSelect.replaceChildren(new Option('Escolher vitrine', ''));
-  for (const site of sites) showcaseSelect.add(new Option(`${site.name} · /${site.slug}`, site.id));
-  showcaseSelect.value = sites.some(site => site.id === activeSite?.id) ? activeSite.id : '';
-}
-
-showcaseSelect?.addEventListener('change', () => {
-  const site = sites.find(entry => entry.id === showcaseSelect.value);
-  if (site) openEditor(site);
-  else syncShowcaseSwitcher();
-});
-
 function renderSites() {
-  syncShowcaseSwitcher();
   if (!sitesListContainer) return;
 
   if (sites.length === 0) {
@@ -1717,15 +1720,12 @@ async function handleCreateWizardSite() {
 // Open Catalog Editor screen
 function openEditor(site) {
   if (activeSite?.id === site.id && !editorSection?.hidden) {
-    syncShowcaseSwitcher();
     return;
   }
   if (hasUnsavedDraftChanges() && !globalThis.window.confirm('Trocar de vitrine e descartar as alterações ainda não salvas?')) {
-    syncShowcaseSwitcher();
     return;
   }
   activeSite = site;
-  syncShowcaseSwitcher();
   if (globalThis.window && globalThis.window.location.hash !== '#editor') {
     globalThis.window.location.hash = '#editor';
   }
