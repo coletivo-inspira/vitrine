@@ -3,13 +3,17 @@ import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showca
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
+import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
+import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
   CATALOG_IMAGES_BUCKET,
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
+  ITEM_LIKE_LIMITS,
   MAX_DRAFT_BYTES,
   MAX_EVENTS_BATCH_BYTES,
+  MAX_LIKE_REQUEST_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
   assertNoDangerousTextPayload,
@@ -26,8 +30,10 @@ import {
   validateCatalogImagePath,
   validateCustomizationRequestInput,
   validateDraftContent,
+  resolveInsightsPeriodStart,
   validateEventsBatchPayload,
   validateInsightsPeriod,
+  validateItemLikePayload,
   validateProfileInput,
   validateRevision,
   validateSiteInput
@@ -37,6 +43,25 @@ import {
   computeSha256Hex,
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
+import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import {
+  CITY_PAGE_SIZE,
+  cityFromSummaryRow,
+  finalizeCityListingPage,
+  isValidCitySlug,
+  paginateCityListings,
+  parseCityListingQuery,
+  projectCityListings,
+  sortCities,
+  summarizeCities,
+  toPublicListing
+} from '../src/city-listings.mjs';
+import {
+  renderCityIndexHtml,
+  renderCityNotFoundHtml,
+  renderCityPageHtml,
+  renderCityUnavailableHtml
+} from '../src/city-page.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -48,6 +73,10 @@ const SESSION_COOKIE_NAME = '__Host-vitrine_session';
 const DEFAULT_SESSION_MAX_AGE_SECONDS = 3600;
 const MAX_SESSION_MAX_AGE_SECONDS = 86400;
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
+export const LIKE_VISITOR_COOKIE_NAME = 'vitrine_curtidas';
+const LIKE_VISITOR_COOKIE_MAX_AGE_SECONDS = 31536000;
+const LIKE_VISITOR_TOKEN_PATTERN = /^[a-f0-9]{32}$/;
+const LIKE_VISITOR_HASH_PATTERN = /^[a-f0-9]{64}$/;
 export const SUPABASE_PUBLIC_PROJECT_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 export const PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
 export const PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
@@ -788,6 +817,33 @@ export function extractSessionToken(request) {
   return null;
 }
 
+export function extractLikeVisitorToken(request) {
+  const cookieHeader = request.headers.get('cookie');
+  if (typeof cookieHeader !== 'string' || !cookieHeader.trim()) return null;
+  for (const part of cookieHeader.split(';')) {
+    const eqIdx = part.indexOf('=');
+    if (eqIdx === -1) continue;
+    if (part.slice(0, eqIdx).trim() !== LIKE_VISITOR_COOKIE_NAME) continue;
+    const value = part.slice(eqIdx + 1).trim().toLowerCase();
+    return LIKE_VISITOR_TOKEN_PATTERN.test(value) ? value : null;
+  }
+  return null;
+}
+
+function createLikeVisitorToken() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function buildLikeVisitorCookieHeader(token) {
+  return `${LIKE_VISITOR_COOKIE_NAME}=${token}; Path=/api/likes; Max-Age=${LIKE_VISITOR_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export async function hashLikeVisitorToken(token) {
+  return computeSha256Hex(`vitrine-curtidas:v1:${token}`);
+}
+
 function sanitizeVerifiedUserMetadata(rawMeta) {
   if (!rawMeta || typeof rawMeta !== 'object' || Array.isArray(rawMeta)) {
     return undefined;
@@ -971,6 +1027,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const publicationsBySlug = new Map();
   const publicationsByHash = new Map();
   const metricsDaily = new Map();
+  const itemLikes = new Map();
+  const auctionBook = createAuctionBook();
 
   if (initial.sites instanceof Map) {
     for (const [key, value] of initial.sites.entries()) {
@@ -1060,6 +1118,46 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     }
   }
 
+  if (Array.isArray(initial.itemLikes)) {
+    for (const row of initial.itemLikes) {
+      const siteId = row?.siteId ?? row?.site_id;
+      const itemKey = String(row?.itemKey ?? row?.item_key ?? '');
+      const visitorHash = String(row?.visitorHash ?? row?.visitor_hash ?? '');
+      if (siteId && itemKey && LIKE_VISITOR_HASH_PATTERN.test(visitorHash)) {
+        itemLikes.set(`${siteId}:${itemKey}:${visitorHash}`, {
+          site_id: siteId,
+          item_key: itemKey,
+          visitor_hash: visitorHash,
+          created_at: row.createdAt ?? row.created_at ?? new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  async function resolveLikeTarget(storeApi, slug) {
+    const pub =
+      (await storeApi.getPublicationBySlug(slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(slug));
+    if (!pub || !pub.menu) {
+      throw new PortalValidationError(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+    }
+    let siteId = pub.siteId ?? null;
+    if (!siteId) {
+      for (const site of sites.values()) {
+        if (site.slug === slug) {
+          siteId = site.id;
+          break;
+        }
+      }
+    }
+    const itemIds = new Set(
+      Array.isArray(pub.menu.items)
+        ? pub.menu.items.map((item) => (typeof item?.id === 'string' ? item.id.trim() : '')).filter(Boolean)
+        : []
+    );
+    return { siteId: siteId ?? `pub-${slug}`, itemIds };
+  }
+
   function getRoleForSite(site, userId) {
     if (!site || !userId) return null;
     const ownerId = site.ownerUserId ?? site.owner_user_id;
@@ -1092,6 +1190,89 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     publicationsBySlug,
     publicationsByHash,
     metricsDaily,
+    itemLikes,
+
+    async getItemLikes(slug, visitorHash = null) {
+      const { siteId, itemIds } = await resolveLikeTarget(this, slug);
+      const counts = {};
+      const liked = [];
+      for (const row of itemLikes.values()) {
+        if (row.site_id !== siteId || !itemIds.has(row.item_key)) continue;
+        counts[row.item_key] = (counts[row.item_key] ?? 0) + 1;
+        if (visitorHash && row.visitor_hash === visitorHash) {
+          liked.push(row.item_key);
+        }
+      }
+      liked.sort();
+      return { counts, liked };
+    },
+
+    async setItemLike(slug, itemId, visitorHash, liked, { now = new Date() } = {}) {
+      if (!LIKE_VISITOR_HASH_PATTERN.test(String(visitorHash ?? '')) || typeof liked !== 'boolean') {
+        throw new PortalValidationError(400, 'INVALID_LIKE_REQUEST', 'Curtida inválida.');
+      }
+      const { siteId, itemIds } = await resolveLikeTarget(this, slug);
+      if (!itemIds.has(itemId)) {
+        throw new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Item inexistente na vitrine publicada.');
+      }
+
+      const nowMs = (now instanceof Date ? now : new Date(now)).getTime();
+      const key = `${siteId}:${itemId}:${visitorHash}`;
+      if (liked && !itemLikes.has(key)) {
+        const windowStartMs = nowMs - 3600 * 1000;
+        let siteRecent = 0;
+        let itemRecent = 0;
+        for (const row of itemLikes.values()) {
+          if (row.site_id !== siteId || Date.parse(row.created_at) <= windowStartMs) continue;
+          siteRecent += 1;
+          if (row.item_key === itemId) itemRecent += 1;
+        }
+        if (
+          itemRecent >= ITEM_LIKE_LIMITS.perItemPerHour ||
+          siteRecent >= ITEM_LIKE_LIMITS.perSitePerHour
+        ) {
+          throw new PortalValidationError(
+            429,
+            'LIKE_RATE_LIMITED',
+            'Muitas curtidas nesta vitrine agora. Tente novamente em alguns minutos.'
+          );
+        }
+        itemLikes.set(key, {
+          site_id: siteId,
+          item_key: itemId,
+          visitor_hash: visitorHash,
+          created_at: new Date(nowMs).toISOString()
+        });
+      } else if (!liked) {
+        itemLikes.delete(key);
+      }
+
+      let count = 0;
+      for (const row of itemLikes.values()) {
+        if (row.site_id === siteId && row.item_key === itemId) count += 1;
+      }
+      return { itemId, liked, count };
+    },
+
+    async getSiteItemLikeStats(siteId, userId, sinceIso) {
+      if (!getRoleForSite(sites.get(siteId), userId)) {
+        return [];
+      }
+      const sinceMs = Date.parse(sinceIso);
+      const byItem = new Map();
+      for (const row of itemLikes.values()) {
+        if (row.site_id !== siteId) continue;
+        const stat = byItem.get(row.item_key) ?? {
+          item_key: row.item_key,
+          total_likes: 0,
+          period_likes: 0
+        };
+        stat.total_likes += 1;
+        if (Date.parse(row.created_at) >= sinceMs) stat.period_likes += 1;
+        byItem.set(row.item_key, stat);
+      }
+      return [...byItem.values()];
+    },
 
     addMembership(siteId, userId, role = 'collaborator') {
       const exists = memberships.some(m => m.siteId === siteId && m.userId === userId);
@@ -1228,6 +1409,20 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return null;
     },
 
+    listCityListingRows() {
+      return [...publicationsBySlug.values()].flatMap((publication) =>
+        projectCityListings(publication.menu, publication.publishedAt)
+      );
+    },
+
+    async listCityIndex() {
+      return summarizeCities(this.listCityListingRows());
+    },
+
+    async listCityListings({ citySlug, priceMode = null, cursor = null, limit = CITY_PAGE_SIZE }) {
+      return paginateCityListings(this.listCityListingRows(), { citySlug, priceMode, cursor, limit });
+    },
+
     async getPublicationByHash(slug, hash) {
       const key = `${slug}:${hash}`;
       if (publicationsByHash.has(key)) {
@@ -1251,6 +1446,18 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         }
       }
       return result;
+    },
+
+    async lookupMilaRelay(code) {
+      const matches = [];
+      for (const publication of publicationsBySlug.values()) {
+        if (publication.menu?.orderRelay?.code !== code) continue;
+        const site = [...sites.values()].find((entry) => entry.slug === publication.slug);
+        const whatsapp = site ? drafts.get(site.id)?.content?.whatsapp : null;
+        if (!isValidWhatsapp(whatsapp)) continue;
+        matches.push({ slug: publication.slug, name: publication.menu.name, whatsapp: whatsapp.trim() });
+      }
+      return matches;
     },
 
     async createSite({
@@ -1441,6 +1648,56 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return { accepted };
     },
 
+    async resolveAuctionPublication(slug) {
+      const pub =
+        (await this.getPublicationBySlug(slug)) ??
+        (await sharedPublicPublications.getPublicationBySlug(slug));
+      if (!pub || !pub.menu) throw new AuctionError('PUBLICATION_NOT_FOUND');
+      let siteId = pub.siteId ?? null;
+      if (!siteId) {
+        for (const site of sites.values()) {
+          if (site.slug === slug) {
+            siteId = site.id;
+            break;
+          }
+        }
+      }
+      const ownerWhatsapp = siteId ? drafts.get(siteId)?.content?.whatsapp : null;
+      return { siteId: siteId ?? `pub-${slug}`, menu: pub.menu, ownerWhatsapps: ownerWhatsapp ? [ownerWhatsapp] : [] };
+    },
+
+    async readAuctionBoard(slug, { now = Date.now() } = {}) {
+      const { siteId, menu } = await this.resolveAuctionPublication(slug);
+      return auctionBook.readBoard({ siteId, menu, now });
+    },
+
+    async placeAuctionBid(slug, bid, { visitorKey, now = Date.now() } = {}) {
+      const { siteId, menu, ownerWhatsapps } = await this.resolveAuctionPublication(slug);
+      return auctionBook.placeBid({ siteId, menu, ...bid, visitorKey, ownerWhatsapps, now });
+    },
+
+    async listSiteAuctions(siteId, userId, { now = Date.now() } = {}) {
+      if (!TEAM_ROLES.includes(getRoleForSite(sites.get(siteId), userId))) return null;
+      return auctionBook.listSiteAuctions({ siteId, now });
+    },
+
+    async voidAuctionBid(siteId, userId, bidId, { reason, block = false, now = Date.now() } = {}) {
+      if (!TEAM_ROLES.includes(getRoleForSite(sites.get(siteId), userId))) return { status: 'site_not_found' };
+      const result = auctionBook.voidBid({ siteId, bidId, reason, block, now });
+      if (result.status === 'ok') {
+        auditLogs.push({
+          siteId,
+          actorUserId: userId,
+          action: 'auction.bid_void',
+          entityType: 'auction_bid',
+          entityId: bidId,
+          summary: { itemId: result.auction.itemId, blocked: Boolean(block) },
+          createdAt: new Date(now).toISOString()
+        });
+      }
+      return result;
+    },
+
     async getSiteInsights(siteId, userId, period = '7d', { referenceDate = new Date() } = {}) {
       const site = sites.get(siteId);
       const role = getRoleForSite(site, userId);
@@ -1460,11 +1717,17 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         (await sharedPublicPublications.getPublicationBySlug(site.slug));
       const draft = drafts.get(siteId);
       const catalogSource = pub?.menu ?? draft?.content ?? {};
+      const likeRows = await this.getSiteItemLikeStats(
+        siteId,
+        userId,
+        `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`
+      );
 
       return computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
+        likeRows,
         catalogSource,
         referenceDate
       });
@@ -1474,8 +1737,15 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
 
 export const PUBLICATION_CACHE_TTL_MS = 30 * 1000;
 const publicationFetchedAtBySlug = new Map();
+const CITY_INDEX_CACHE_TTL_MS = 60 * 1000;
+const CITY_INDEX_MAX_ROWS = 1000;
+const CITY_LISTING_COLUMNS =
+  'city_slug,city,uf,site_slug,site_name,item_id,item_position,item_name,price_mode,price_cents,description,conditions,trade_for,image_url,published_at,sort_key';
+const cityIndexCache = { value: null, fetchedAt: 0 };
 
 export function clearPublicationsCache() {
+  cityIndexCache.value = null;
+  cityIndexCache.fetchedAt = 0;
   sharedPublicPublications.publicationsBySlug.clear();
   sharedPublicPublications.publicationsByHash.clear();
   publicationFetchedAtBySlug.clear();
@@ -1495,9 +1765,11 @@ async function hydratePublicationRecord(row) {
     slug: row.slug ?? rawMenu.slug,
     businessName: rawMenu.name ?? rawMenu.businessName,
     whatsapp: rawMenu.whatsapp,
+    ...(rawMenu.orderRelay?.via === ORDER_RELAY_MILA ? { orderRelay: ORDER_RELAY_MILA } : {}),
     ...(rawMenu.components ? { components: rawMenu.components } : {}),
     ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
     ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
+    ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
@@ -1575,6 +1847,65 @@ function createUpstreamStoreError(operation, errInfo) {
   const err = new Error(`Supabase ${operation} error: ${errInfo.status}`);
   err.upstream = errInfo;
   return err;
+}
+
+function likesUnavailableError() {
+  return new PortalValidationError(
+    503,
+    'LIKES_UNAVAILABLE',
+    'As curtidas estão indisponíveis no momento.'
+  );
+}
+
+async function mapItemLikeRpcError(operation, response) {
+  const errInfo = await readUpstreamErrorDetails(response);
+  const code = errInfo.code ?? '';
+  const message = errInfo.message ?? '';
+  if (code === 'P0002' || message.includes('PUBLICATION_NOT_FOUND')) {
+    return new PortalValidationError(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+  }
+  if (code === '23514' || message.includes('INVALID_LIKE_ITEM')) {
+    return new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Item inexistente na vitrine publicada.');
+  }
+  if (code === '22023' || message.includes('INVALID_LIKE_REQUEST')) {
+    return new PortalValidationError(400, 'INVALID_LIKE_REQUEST', 'Curtida inválida.');
+  }
+  if (errInfo.status === 429 || code === 'PT429' || message.includes('LIKE_RATE_LIMITED')) {
+    return new PortalValidationError(
+      429,
+      'LIKE_RATE_LIMITED',
+      'Muitas curtidas nesta vitrine agora. Tente novamente em alguns minutos.'
+    );
+  }
+  logUpstreamError(operation, errInfo);
+  return likesUnavailableError();
+}
+
+const AUCTION_RPC_ERROR_CODES = new Set([
+  'INVALID_BID',
+  'BIDDER_BLOCKED',
+  'BIDDER_IS_OWNER',
+  'PUBLICATION_NOT_FOUND',
+  'AUCTION_NOT_FOUND',
+  'AUCTION_CLOSED',
+  'ALREADY_LEADING',
+  'AUCTION_BID_LIMIT',
+  'BID_TOO_LOW',
+  'BID_TOO_HIGH',
+  'BID_RATE_LIMITED',
+  'TOO_MANY_IDENTITIES'
+]);
+
+async function mapAuctionRpcError(operation, response) {
+  if (!response) return new AuctionError('AUCTIONS_UNAVAILABLE');
+  const errInfo = await readUpstreamErrorDetails(response);
+  const code = String(errInfo.message ?? '').trim();
+  if (AUCTION_RPC_ERROR_CODES.has(code)) {
+    const requiredCents = Number.parseInt(String(errInfo.details ?? ''), 10);
+    return new AuctionError(code, Number.isSafeInteger(requiredCents) ? { requiredCents } : {});
+  }
+  logUpstreamError(operation, errInfo);
+  return new AuctionError('AUCTIONS_UNAVAILABLE');
 }
 
 export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: customFetch } = {}) {
@@ -1824,6 +2155,19 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       );
       if (!response.ok) throw new Error('Falha ao consultar a autorização da plataforma.');
       return (await response.json()).length > 0;
+    },
+
+    async lookupMilaRelay(code, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/lookup_mila_relay`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ target_code: code })
+      });
+      if (!response.ok) throw new Error('Falha ao localizar a vitrine pelo código da Mila.');
+      const rows = await response.json();
+      return (Array.isArray(rows) ? rows : [])
+        .filter((row) => isValidWhatsapp(row?.whatsapp))
+        .map((row) => ({ slug: row.slug, name: row.name, whatsapp: row.whatsapp.trim() }));
     },
 
     async listCms({ token }) {
@@ -2527,6 +2871,55 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return sharedPublicPublications.getPublicationByHash(slug, hash);
     },
 
+    async listCityIndex() {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.listCityIndex();
+      }
+      const nowMs = Date.now();
+      if (cityIndexCache.value && nowMs - cityIndexCache.fetchedAt < CITY_INDEX_CACHE_TTL_MS) {
+        return cityIndexCache.value;
+      }
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/city_listing_cities?select=city_slug,city,uf,offer_count,donation_count,trade_count,total_count&order=uf.asc,city.asc&limit=${CITY_INDEX_MAX_ROWS}`,
+        { method: 'GET', headers: anonHeaders() }
+      );
+      if (!response?.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        logUpstreamError('listCityIndex', errInfo);
+        throw createUpstreamStoreError('listCityIndex', errInfo);
+      }
+      const rows = await response.json();
+      const cities = sortCities((Array.isArray(rows) ? rows : []).map(cityFromSummaryRow));
+      cityIndexCache.value = cities;
+      cityIndexCache.fetchedAt = nowMs;
+      return cities;
+    },
+
+    async listCityListings({ citySlug, priceMode = null, cursor = null, limit = CITY_PAGE_SIZE }) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.listCityListings({ citySlug, priceMode, cursor, limit });
+      }
+      const params = new URLSearchParams({
+        select: CITY_LISTING_COLUMNS,
+        city_slug: `eq.${citySlug}`,
+        order: 'sort_key.desc',
+        limit: String(limit + 1)
+      });
+      if (priceMode) params.set('price_mode', `eq.${priceMode}`);
+      if (cursor) params.set('sort_key', `lt.${cursor}`);
+      const response = await fetchImpl(`${baseUrl}/rest/v1/city_listings?${params}`, {
+        method: 'GET',
+        headers: anonHeaders()
+      });
+      if (!response?.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        logUpstreamError('listCityListings', errInfo);
+        throw createUpstreamStoreError('listCityListings', errInfo);
+      }
+      const rows = await response.json();
+      return finalizeCityListingPage(Array.isArray(rows) ? rows : [], limit);
+    },
+
     async recordSiteMetricBatch(slug, events, { now = new Date() } = {}) {
       if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
         const rpcRes = await fetchImpl(`${baseUrl}/rest/v1/rpc/record_site_metric_batch`, {
@@ -2576,6 +2969,170 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return sharedPublicPublications.recordSiteMetricBatch(slug, events, { now });
     },
 
+    async getItemLikes(slug, visitorHash = null) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.getItemLikes(slug, visitorHash);
+      }
+      let res;
+      try {
+        res = await fetchImpl(`${baseUrl}/rest/v1/rpc/get_item_likes`, {
+          method: 'POST',
+          headers: anonHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({ target_slug: slug, visitor_key: visitorHash })
+        });
+      } catch {
+        throw likesUnavailableError();
+      }
+      if (!res || !res.ok) {
+        throw await mapItemLikeRpcError('get_item_likes', res);
+      }
+      const body = await res.json().catch(() => null);
+      return {
+        counts: body?.counts && typeof body.counts === 'object' && !Array.isArray(body.counts) ? body.counts : {},
+        liked: Array.isArray(body?.liked) ? body.liked.filter((id) => typeof id === 'string') : []
+      };
+    },
+
+    async setItemLike(slug, itemId, visitorHash, liked, { now = new Date() } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.setItemLike(slug, itemId, visitorHash, liked, { now });
+      }
+      let res;
+      try {
+        res = await fetchImpl(`${baseUrl}/rest/v1/rpc/set_item_like`, {
+          method: 'POST',
+          headers: anonHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({
+            target_slug: slug,
+            target_item: itemId,
+            visitor_key: visitorHash,
+            liked
+          })
+        });
+      } catch {
+        throw likesUnavailableError();
+      }
+      if (!res || !res.ok) {
+        throw await mapItemLikeRpcError('set_item_like', res);
+      }
+      const body = await res.json().catch(() => null);
+      const count = Number(body?.count);
+      return {
+        itemId,
+        liked: typeof body?.liked === 'boolean' ? body.liked : liked,
+        count: Number.isSafeInteger(count) && count >= 0 ? count : 0
+      };
+    },
+
+    async getSiteItemLikeStats(siteId, _userId, sinceIso, { token } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return [];
+      }
+      try {
+        const res = await fetchImpl(`${baseUrl}/rest/v1/rpc/site_item_like_stats`, {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ target_site_id: siteId, since: sinceIso })
+        });
+        if (res && res.ok) {
+          const rows = await res.json();
+          return Array.isArray(rows) ? rows : [];
+        }
+        logUpstreamError('site_item_like_stats', await readUpstreamErrorDetails(res));
+      } catch {
+        // Insights continue without likes when the stats RPC is unavailable.
+      }
+      return [];
+    },
+
+    async readAuctionBoard(slug) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.readAuctionBoard(slug);
+      }
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_auction_board`, {
+        method: 'POST',
+        headers: anonHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ target_slug: slug })
+      }).catch(() => null);
+      if (response?.ok) return response.json();
+      throw await mapAuctionRpcError('readAuctionBoard', response);
+    },
+
+    async placeAuctionBid(slug, bid, { visitorKey, env = {} } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        throw new AuctionError('AUCTIONS_UNAVAILABLE');
+      }
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/place_auction_bid`, {
+        method: 'POST',
+        headers: anonHeaders({
+          'content-type': 'application/json',
+          'x-vitrine-bid-key': String(env.AUCTION_BID_SECRET ?? '')
+        }),
+        body: JSON.stringify({
+          target_slug: slug,
+          target_item_id: bid.itemId,
+          bidder_name: bid.name,
+          bidder_whatsapp: bid.whatsapp,
+          amount_cents: bid.amountCents,
+          visitor_key: visitorKey
+        })
+      }).catch(() => null);
+      if (response?.ok) return response.json();
+      throw await mapAuctionRpcError('placeAuctionBid', response);
+    },
+
+    async listSiteAuctions(siteId, userId, { token, now = Date.now() } = {}) {
+      const site = await this.getSite(siteId, userId, { token });
+      if (!site || !TEAM_ROLES.includes(site.role)) return null;
+      const id = encodeURIComponent(siteId);
+      const [lotsRes, bidsRes] = await Promise.all([
+        fetchImpl(
+          `${baseUrl}/rest/v1/auction_lots?site_id=eq.${id}&select=id,item_id,item_name,start_cents,increment_cents,scheduled_ends_at,ends_at,highest_bid_id,highest_cents,bid_count,personal_data_purged_at&order=ends_at.desc&limit=200`,
+          { method: 'GET', headers: authHeaders(token) }
+        ),
+        fetchImpl(
+          `${baseUrl}/rest/v1/auction_bids?site_id=eq.${id}&select=id,lot_id,amount_cents,bidder_name,bidder_whatsapp,status,void_reason,voided_at,created_at&order=created_at.desc&limit=2000`,
+          { method: 'GET', headers: authHeaders(token) }
+        )
+      ]);
+      if (!lotsRes?.ok || !bidsRes?.ok) {
+        const errInfo = await readUpstreamErrorDetails(lotsRes?.ok ? bidsRes : lotsRes);
+        logUpstreamError('listSiteAuctions', errInfo);
+        throw createUpstreamStoreError('listSiteAuctions', errInfo);
+      }
+      return teamAuctionViewsFromRows(await lotsRes.json(), await bidsRes.json(), now);
+    },
+
+    async voidAuctionBid(siteId, userId, bidId, { token, reason, block = false, now = Date.now() } = {}) {
+      const site = await this.getSite(siteId, userId, { token });
+      if (!site || !TEAM_ROLES.includes(site.role)) return { status: 'site_not_found' };
+      const ownedRes = await fetchImpl(
+        `${baseUrl}/rest/v1/auction_bids?id=eq.${encodeURIComponent(bidId)}&site_id=eq.${encodeURIComponent(siteId)}&select=id,lot_id,status&limit=1`,
+        { method: 'GET', headers: authHeaders(token) }
+      );
+      const [owned] = ownedRes?.ok ? await ownedRes.json() : [];
+      if (!owned) return { status: 'not_found' };
+      if (owned.status === 'void') return { status: 'already_void' };
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/void_auction_bid`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ target_bid: bidId, void_reason: reason, block_bidder: Boolean(block) })
+      });
+      if (!response.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        const message = String(errInfo.message ?? '');
+        if (message.includes('BID_ALREADY_VOID')) return { status: 'already_void' };
+        if (message.includes('BID_NOT_FOUND')) return { status: 'not_found' };
+        if (message.includes('INVALID_VOID_REASON')) {
+          throw new PortalValidationError(422, 'INVALID_VOID_REASON', 'Informe o motivo com 3 a 200 caracteres.');
+        }
+        logUpstreamError('voidAuctionBid', errInfo);
+        throw createUpstreamStoreError('voidAuctionBid', errInfo);
+      }
+      const auctions = await this.listSiteAuctions(siteId, userId, { token, now });
+      return { status: 'ok', auction: auctions?.find((entry) => entry.lotId === owned.lot_id) ?? null };
+    },
+
     async getSiteInsights(
       siteId,
       userId,
@@ -2619,11 +3176,18 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       const pub = await this.getPublicationBySlug(site.slug);
       const draft = !pub ? await this.getDraft(siteId, userId, { token }) : null;
       const catalogSource = pub?.menu ?? draft?.content ?? {};
+      const likeRows = await this.getSiteItemLikeStats(
+        siteId,
+        userId,
+        `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`,
+        { token }
+      );
 
       return computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
+        likeRows,
         catalogSource,
         referenceDate
       });
@@ -2791,6 +3355,118 @@ const RESERVED_PUBLIC_PATHS = new Set([
   'dot-trail.js',
   'favicon.ico'
 ]);
+
+const CITY_INDEX_PATHS = new Set(['/por-cidade', '/por-cidade/', '/data/por-cidade/index.json']);
+const CITY_PAGE_PATTERN = /^\/por-cidade\/([a-z0-9-]+)\/?$/;
+const CITY_JSON_PATTERN = /^\/data\/por-cidade\/([a-z0-9-]+)\.json$/;
+const CITY_EDGE_REFRESH_MS = 300_000;
+
+function matchCityRoute(pathname) {
+  if (CITY_INDEX_PATHS.has(pathname)) {
+    return { kind: 'index', json: pathname.endsWith('.json') };
+  }
+  const page = pathname.match(CITY_PAGE_PATTERN);
+  if (page) return { kind: 'city', json: false, citySlug: page[1] };
+  const data = pathname.match(CITY_JSON_PATTERN);
+  if (data && data[1] !== 'index') return { kind: 'city', json: true, citySlug: data[1] };
+  return null;
+}
+
+function cityResponse(status, body, { json = false, hasImages = false, cacheable = true } = {}) {
+  return new Response(body, {
+    status,
+    headers: {
+      ...PUBLIC_SECURITY_HEADERS,
+      'content-security-policy': hasImages ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER,
+      'content-type': json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8',
+      'cache-control': cacheable ? STOREFRONT_CACHE_CONTROL : 'no-store'
+    }
+  });
+}
+
+async function renderCityRoute(route, query, store) {
+  const listCityIndex = store.listCityIndex
+    ? (...args) => store.listCityIndex(...args)
+    : (...args) => sharedPublicPublications.listCityIndex(...args);
+  const listCityListings = store.listCityListings
+    ? (...args) => store.listCityListings(...args)
+    : (...args) => sharedPublicPublications.listCityListings(...args);
+  try {
+    const cities = await listCityIndex();
+    if (route.kind === 'index') {
+      return route.json
+        ? cityResponse(200, JSON.stringify({ schemaVersion: 1, cities }), { json: true })
+        : cityResponse(200, renderCityIndexHtml({ cities }));
+    }
+    const city = isValidCitySlug(route.citySlug)
+      ? cities.find((entry) => entry.citySlug === route.citySlug)
+      : null;
+    if (!city) {
+      return route.json
+        ? cityResponse(404, JSON.stringify({ error: { code: 'CITY_NOT_FOUND', message: 'Cidade sem itens listados.' } }), { json: true, cacheable: false })
+        : cityResponse(404, renderCityNotFoundHtml(), { cacheable: false });
+    }
+    const page = await listCityListings({
+      citySlug: city.citySlug,
+      priceMode: query.priceMode,
+      cursor: query.cursor,
+      limit: CITY_PAGE_SIZE
+    });
+    const listings = page.rows.map(toPublicListing);
+    const hasImages = listings.some((listing) => listing.item.imageUrl);
+    if (route.json) {
+      return cityResponse(200, JSON.stringify({
+        schemaVersion: 1,
+        city,
+        mode: query.modeKey,
+        items: listings,
+        nextCursor: page.nextCursor
+      }), { json: true });
+    }
+    return cityResponse(200, renderCityPageHtml({
+      city,
+      listings,
+      modeKey: query.modeKey,
+      cursor: query.cursor,
+      nextCursor: page.nextCursor
+    }), { hasImages });
+  } catch (error) {
+    if (!error?.upstream) console.error(JSON.stringify({ event: 'city_page_error', message: sanitizeDiagnosticText(String(error?.message ?? '')) }));
+    return route.json
+      ? cityResponse(503, JSON.stringify({ error: { code: 'CITY_PAGE_UNAVAILABLE', message: 'Página por cidade indisponível.' } }), { json: true, cacheable: false })
+      : cityResponse(503, renderCityUnavailableHtml(), { cacheable: false });
+  }
+}
+
+async function handleCityRequest(request, url, method, store, context) {
+  const route = matchCityRoute(url.pathname);
+  if (!route) return null;
+  if (method !== 'GET' && method !== 'HEAD') {
+    return new Response(null, { status: 405, headers: { ...PUBLIC_SECURITY_HEADERS, allow: 'GET, HEAD' } });
+  }
+  const query = route.kind === 'city' ? parseCityListingQuery(url.searchParams) : { modeKey: 'todos', priceMode: null, cursor: null };
+  const normalizedSearch = new URLSearchParams();
+  if (query.priceMode) normalizedSearch.set('modo', query.modeKey);
+  if (query.cursor) normalizedSearch.set('depois', query.cursor);
+  const cacheKey = new Request(`${url.origin}${url.pathname}${normalizedSearch.size ? `?${normalizedSearch}` : ''}`);
+  const cache = globalThis.caches?.default;
+  const refresh = async () => {
+    const response = await renderCityRoute(route, query, store);
+    if (response.status === 200 && cache) {
+      const headers = new Headers(response.headers);
+      headers.set('x-vitrine-cached-at', String(Date.now()));
+      await cache.put(cacheKey, new Response(response.clone().body, { status: 200, headers })).catch(() => {});
+    }
+    return response;
+  };
+  const cached = await cache?.match(cacheKey).catch(() => null);
+  if (cached && Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) > CITY_EDGE_REFRESH_MS && context?.waitUntil) {
+    context.waitUntil(refresh().catch(() => {}));
+  }
+  const response = cached ?? await refresh();
+  if (method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
+  return response;
+}
 
 async function handlePublicStorefrontOrMenuRequest(request, pathname, method, store, assetsFetcher) {
   if (method !== 'GET' && method !== 'HEAD') {
@@ -3059,7 +3735,99 @@ function isExternalHostname(hostname) {
     hostname !== 'inspira.dev.br' && hostname !== '127.0.0.1';
 }
 
-async function handleCustomHostname(request, url, store, assets, context) {
+const PUBLIC_AUCTION_PATH = /^\/api\/public\/auctions\/([a-z0-9-]{1,63})(\/bids)?\/?$/;
+const MAX_AUCTION_BID_BYTES = 2048;
+const utf8AuctionEncoder = new TextEncoder();
+
+function resolveNowMs(deps = {}) {
+  const raw = typeof deps.nowMs === 'function' ? deps.nowMs() : deps.nowMs;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : Date.now();
+}
+
+export async function deriveAuctionVisitorKey(secret, clientAddress) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    utf8AuctionEncoder.encode(String(secret)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, utf8AuctionEncoder.encode(`visitor:${clientAddress}`));
+  return [...new Uint8Array(signature)]
+    .slice(0, 16)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function handlePublicAuctionRequest(request, url, env, store, deps, slug, isBidRoute) {
+  const method = (request.method || 'GET').toUpperCase();
+  if (!isValidSlug(slug)) {
+    return errorResponse(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+  }
+  if (typeof store.readAuctionBoard !== 'function' || typeof store.placeAuctionBid !== 'function') {
+    return errorResponse(503, 'AUCTIONS_UNAVAILABLE', 'Leilões indisponíveis no momento. Tente mais tarde.');
+  }
+  const now = resolveNowMs(deps);
+  try {
+    if (!isBidRoute) {
+      if (method !== 'GET') {
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para o quadro de leilões.');
+      }
+      return jsonResponse(200, await store.readAuctionBoard(slug, { now, env }));
+    }
+    if (method !== 'POST') {
+      return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para lances.');
+    }
+    const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+    if (guardError) return guardError;
+
+    const declaredLength = Number(request.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_AUCTION_BID_BYTES) {
+      throw new AuctionError('INVALID_BID');
+    }
+    const rawText = await request.text().catch(() => '');
+    if (!rawText || utf8AuctionEncoder.encode(rawText).byteLength > MAX_AUCTION_BID_BYTES) {
+      throw new AuctionError('INVALID_BID');
+    }
+    if (isBotUserAgent(request.headers.get('user-agent') || '')) {
+      return jsonResponse(202, { accepted: false });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new AuctionError('INVALID_BID');
+    }
+    if (typeof parsed?.website === 'string' && parsed.website.trim()) {
+      return jsonResponse(202, { accepted: false });
+    }
+
+    const secret = typeof env?.AUCTION_BID_SECRET === 'string' ? env.AUCTION_BID_SECRET.trim() : '';
+    if (secret.length < 16) throw new AuctionError('AUCTIONS_UNAVAILABLE');
+
+    const bid = validateBidPayload(parsed);
+    const clientAddress = (request.headers.get('cf-connecting-ip') || 'sem-endereco').trim();
+    const visitorKey = await deriveAuctionVisitorKey(secret, clientAddress);
+    const result = await store.placeAuctionBid(slug, bid, { visitorKey, now, env });
+    return jsonResponse(201, result);
+  } catch (error) {
+    if (error instanceof AuctionError) {
+      const extra = Number.isSafeInteger(error.details?.requiredCents)
+        ? { requiredCents: error.details.requiredCents }
+        : {};
+      return errorResponse(error.status, error.code, error.message, extra);
+    }
+    throw error;
+  }
+}
+
+async function handleCustomHostname(request, url, store, assets, context, env = {}, deps = {}) {
+  const auctionMatch = url.pathname.match(PUBLIC_AUCTION_PATH);
+  if (auctionMatch && typeof store.resolveDomain === 'function') {
+    const domainSlug = await store.resolveDomain(url.hostname);
+    if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
+    return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
+  }
   if (!['GET', 'HEAD'].includes(request.method) || typeof store.resolveDomain !== 'function') {
     return new Response(null, { status: 404 });
   }
@@ -3132,9 +3900,10 @@ export function createApiHandler(deps = {}) {
 
     if (url.hostname === SANDBOX_HOST) return handleSandboxPage(request, url, store);
 
-    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname)) {
+    const isItemLikesRoute = pathname === '/api/likes' || pathname === '/api/likes/';
+    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname) && !isItemLikesRoute) {
       try {
-        return await handleCustomHostname(request, url, store, assetsFetcher, _ctx);
+        return await handleCustomHostname(request, url, store, assetsFetcher, _ctx, env, deps);
       } catch {
         return new Response(null, { status: 503 });
       }
@@ -3277,6 +4046,11 @@ export function createApiHandler(deps = {}) {
         return renderNotFoundPageResponse(request, method, assetsFetcher);
       }
 
+      const cityPageResponse = await handleCityRequest(request, url, method, store, _ctx);
+      if (cityPageResponse) {
+        return cityPageResponse;
+      }
+
       const publicResponse = await handlePublicStorefrontOrMenuRequest(
         request,
         pathname,
@@ -3398,6 +4172,24 @@ export function createApiHandler(deps = {}) {
           return jsonResponse(200, { request: updated });
         }
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para administração.');
+      }
+
+      if (pathname === '/api/admin/mila-relay') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para a Mila.');
+        const code = normalizeMilaRelayCode(url.searchParams.get('code') ?? '');
+        if (!code) {
+          return errorResponse(422, 'INVALID_MILA_CODE', 'Informe um código no formato #VI-XXXXXX-XXXX.');
+        }
+        const matches = typeof store.lookupMilaRelay === 'function'
+          ? await store.lookupMilaRelay(code, options)
+          : [];
+        return jsonResponse(200, { code, matches }, { 'cache-control': 'no-store' });
       }
 
       if (pathname === '/api/admin/templates') {
@@ -3725,6 +4517,128 @@ export function createApiHandler(deps = {}) {
           'METHOD_NOT_ALLOWED',
           'Método não permitido para /api/customization-requests.'
         );
+      }
+
+      if (pathname === '/api/likes' || pathname === '/api/likes/') {
+        if (method === 'GET') {
+          const slug = (url.searchParams.get('slug') ?? '').trim().toLowerCase();
+          if (!isValidSlug(slug)) {
+            return errorResponse(400, 'INVALID_SLUG', 'Identificador (slug) da vitrine inválido.');
+          }
+          const token = extractLikeVisitorToken(request);
+          const visitorHash = token ? await hashLikeVisitorToken(token) : null;
+          const { counts, liked } = await store.getItemLikes(slug, visitorHash);
+          return jsonResponse(200, { slug, counts, liked }, { 'cache-control': 'private, no-store' });
+        }
+
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/likes.');
+        }
+
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true,
+          requireJson: true
+        });
+        if (guardError) return guardError;
+
+        if (isBotUserAgent(request.headers.get('user-agent') || '')) {
+          return errorResponse(403, 'LIKE_NOT_ALLOWED', 'Curtidas automáticas não são aceitas.');
+        }
+
+        const declaredLength = Number(request.headers.get('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_LIKE_REQUEST_BYTES) {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'A curtida excede o limite de 1 KiB.');
+        }
+        let rawText = '';
+        try {
+          rawText = await request.text();
+        } catch {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'Não foi possível ler a curtida.');
+        }
+        if (!rawText.trim() || utf8Encoder.encode(rawText).byteLength > MAX_LIKE_REQUEST_BYTES) {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'Curtida vazia ou acima do limite de 1 KiB.');
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {
+          return errorResponse(400, 'INVALID_LIKE_REQUEST', 'O corpo da requisição não contém JSON válido.');
+        }
+        const { slug, itemId, liked } = validateItemLikePayload(parsed);
+
+        const nowSeconds =
+          typeof deps?.nowSeconds === 'function' ? deps.nowSeconds() : deps?.nowSeconds;
+        const effectiveNow =
+          typeof nowSeconds === 'number' && Number.isFinite(nowSeconds)
+            ? new Date(nowSeconds * 1000)
+            : new Date();
+
+        const existingToken = extractLikeVisitorToken(request);
+        const token = existingToken ?? createLikeVisitorToken();
+        const visitorHash = await hashLikeVisitorToken(token);
+        const result = await store.setItemLike(slug, itemId, visitorHash, liked, {
+          now: effectiveNow,
+          env
+        });
+        return jsonResponse(
+          200,
+          { itemId: result.itemId, liked: result.liked, count: result.count },
+          !existingToken && liked ? { 'set-cookie': buildLikeVisitorCookieHeader(token) } : {}
+        );
+      }
+
+      const publicAuctionMatch = pathname.match(PUBLIC_AUCTION_PATH);
+      if (publicAuctionMatch) {
+        return await handlePublicAuctionRequest(
+          request,
+          url,
+          env,
+          store,
+          deps,
+          publicAuctionMatch[1],
+          Boolean(publicAuctionMatch[2])
+        );
+      }
+
+      const siteAuctionsMatch = pathname.match(/^\/api\/sites\/([^/]+)\/auctions(?:\/bids\/([^/]+)\/void)?\/?$/);
+      if (siteAuctionsMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const siteId = decodeURIComponent(siteAuctionsMatch[1]);
+        const bidId = siteAuctionsMatch[2] ? decodeURIComponent(siteAuctionsMatch[2]) : null;
+        const options = { token: user.token, env, now: resolveNowMs(deps) };
+        if (typeof store.listSiteAuctions !== 'function') {
+          return errorResponse(503, 'AUCTIONS_UNAVAILABLE', 'Leilões indisponíveis neste ambiente.');
+        }
+        if (!bidId) {
+          if (method !== 'GET') {
+            return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para leilões.');
+          }
+          const auctions = await store.listSiteAuctions(siteId, user.id, options);
+          if (!auctions) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+          return jsonResponse(200, { auctions });
+        }
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para desconsiderar lances.');
+        }
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        const { parsed } = await parseJsonRequest(request);
+        const reason = typeof parsed?.reason === 'string' ? parsed.reason.replace(/\s+/g, ' ').trim() : '';
+        if (
+          reason.length < AUCTION_RULES.voidReasonMinLength ||
+          reason.length > AUCTION_RULES.voidReasonMaxLength
+        ) {
+          return errorResponse(422, 'INVALID_VOID_REASON', 'Informe o motivo com 3 a 200 caracteres.');
+        }
+        assertNoDangerousTextPayload(reason, 422, 'INVALID_VOID_REASON');
+        const result = UUID_PATTERN.test(bidId)
+          ? await store.voidAuctionBid(siteId, user.id, bidId, { ...options, reason, block: parsed?.block === true })
+          : { status: 'not_found' };
+        if (result?.status === 'site_not_found') return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (result?.status === 'already_void') return errorResponse(409, 'BID_ALREADY_VOID', 'Este lance já foi desconsiderado.');
+        if (result?.status !== 'ok') return errorResponse(404, 'BID_NOT_FOUND', 'Lance não encontrado.');
+        return jsonResponse(200, { auction: result.auction });
       }
 
       if (pathname === '/api/events' || pathname === '/api/events/') {

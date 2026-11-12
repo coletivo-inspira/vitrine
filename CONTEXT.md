@@ -29,6 +29,9 @@ _Evitar_: negócio para designar o modelo.
 
 **Item ativo**: Item do cardápio selecionado para aparecer na próxima publicação.
 
+**Cota de apoio**: Parte igual de uma meta (equipamento, projeto ou lote de compra coletiva) reservada pelo visitante pelo WhatsApp. Toda cota garante o mesmo benefício declarado, sem sorteio, prêmio ou retorno financeiro; o pagamento é combinado direto com o proprietário. Ver `specs/014-cotas/research.md`.
+_Evitar_: rifa, sorteio, bilhete, número da sorte.
+
 **Assinatura**: Contratação periódica de benefícios para uma vitrine, como endereço personalizado; não equivale à compra de um domínio.
 
 **Vínculo de domínio**: Associação de um endereço verificado à vitrine, sem transferência de propriedade do domínio.
@@ -36,6 +39,10 @@ _Evitar_: negócio para designar o modelo.
 **Customização**: Alteração específica de apresentação ou funcionalidade contratada com escopo próprio.
 
 **Case**: Exemplo autorizado de um trabalho realizado, publicado no portfólio da Inspira.
+
+**Mila**: Assistente da equipe Vitrine Inspira no WhatsApp. É uma pessoa, não um robô (ADR 0012). Faz a triagem de orçamentos e repassa ao dono os pedidos das vitrines com "Receber pedidos pela Mila" ligado.
+
+**Código da vitrine**: Identificador público `#VI-XXXXXX-XXXX`, derivado do slug, que abre cada pedido enviado à Mila e permite localizar a vitrine sem expor o número do dono.
 
 **Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento, CMS institucional e benefícios comerciais; não se confunde com proprietário de vitrine.
 
@@ -53,4 +60,18 @@ _Evitar_: negócio para designar o modelo.
 
 **Sandbox de extensão**: Contêiner isolado em origem opaca (`<iframe sandbox="allow-scripts">` sem `allow-same-origin`) onde componentes personalizados em HTML/CSS/JS ou de repositórios externos executam sem acesso a cookies ou dados de outros clientes.
 
-**Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.
+**Curtida**: Marcação anônima de um visitante em um item da vitrine publicada, contada no servidor uma vez por visitante e item; o visitante é lembrado só por um cookie funcional, sem login, IP ou dados pessoais.
+
+**Página por cidade**: Página pública (`/por-cidade`) que reúne os itens de lance, doação e troca das vitrines publicadas que autorizaram aparecer na sua cidade; mostra só dados públicos da vitrine e dos itens, e o contato acontece na vitrine.
+
+**Localidade da vitrine**: Cidade e UF informadas pelo proprietário em Ajustes, com autorização explícita para a página por cidade; não se confunde com a cidade do perfil pessoal.
+
+**Leilão**: Item de lance com data de encerramento; os lances ficam registrados e o maior lance válido no encerramento vence. Item de lance sem data continua como oferta enviada pelo WhatsApp.
+
+**Lance**: Valor oferecido por um visitante em um leilão, com nome e WhatsApp visíveis só para proprietário e administradores da vitrine.
+
+**Lance desconsiderado**: Lance anulado pela equipe da vitrine com motivo registrado; o próximo maior lance válido passa a valer.
+
+**Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing. Peças do Instagram podem nomear o modelo "Cardápio"; no site a mesma demonstração se chama "Pratos".
+
+**Demonstração de modelo**: Animação ilustrativa de 4 s de um modelo (Pratos/Cardápio, Lanches, Serviços, Portfólio), com negócio e valores fictícios, usada na página Possibilidades e na campanha do Instagram.

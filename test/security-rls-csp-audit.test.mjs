@@ -1185,7 +1185,9 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
     const portalCombinedJs =
       (jsContentsByPath.get('portal/portal.js') || '') +
       '\n' +
-      (jsContentsByPath.get('portal/editor.js') || '');
+      (jsContentsByPath.get('portal/editor.js') || '') +
+      '\n' +
+      (jsContentsByPath.get('portal/platform-cms.js') || '');
     const portalForms = [...portalHtml.matchAll(/<form\b[^>]*\bid=["']([^"']+)["'][^>]*>/gi)];
     assert.ok(portalForms.length >= 2, 'dist/portal/index.html deve conter os formulários do portal');
     for (const [, formId] of portalForms) {

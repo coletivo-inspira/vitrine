@@ -81,6 +81,12 @@
       <polyline points="7 23 3 19 7 15"/>
       <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
     </symbol>
+    <symbol id="icon-users-quota" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
   </svg>
   
   <!-- Auth / Login Section (Unauthenticated screen) -->
@@ -140,6 +146,12 @@
             <a href="#insights" class="nav-link" data-section="insights">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
               Insights
+            </a>
+          </li>
+          <li>
+            <a href="#leiloes" class="nav-link" data-section="leiloes">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><path d="m21 11-8-8"/></svg>
+              Leilões
             </a>
           </li>
           <li>
@@ -337,6 +349,23 @@
             <h2>Atividade recente</h2>
             <ul id="platform-audit"></ul>
           </details>
+          <details id="platform-mila" class="portal-card mila-console">
+            <summary>Pedidos pela Mila</summary>
+            <p class="form-help">Cole a mensagem que chegou no WhatsApp da Mila, ou só o código (#VI-XXXXXX-XXXX). O painel localiza a vitrine e monta o repasse para o dono. Nada do que você cola aqui é salvo.</p>
+            <form id="platform-mila-form" class="form-flex-col mila-console-form" novalidate>
+              <div class="form-group">
+                <label for="platform-mila-message">Mensagem do cliente</label>
+                <textarea id="platform-mila-message" class="textarea-goal" rows="6" maxlength="4000" placeholder="#VI-PIZZAR-7F3K · Pedido para Pizzaria do Zé&#10;&#10;Olá! Tenho interesse nestes itens..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="platform-mila-customer">WhatsApp do cliente (opcional)</label>
+                <input type="text" id="platform-mila-customer" inputmode="tel" autocomplete="off" maxlength="20" placeholder="+55 (31) 99999-9999" class="item-input input-styled-height">
+              </div>
+              <button type="submit" class="button button-pill mila-console-submit">Localizar vitrine</button>
+            </form>
+            <p id="platform-mila-status" class="form-help" role="status"></p>
+            <ul id="platform-mila-results" class="mila-console-results"></ul>
+          </details>
           <details id="platform-templates" class="portal-card">
             <summary>Modelos de vitrine</summary>
             <p id="platform-templates-status" role="status"></p>
@@ -353,7 +382,7 @@
           <div class="section-header insights-header-flex">
             <div>
               <h1 class="display-title">Painel de Insights</h1>
-              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens e pedidos enviados ao WhatsApp, sem cookies nem coleta de dados pessoais.</p>
+              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens, curtidas e pedidos enviados ao WhatsApp, sem coleta de IP ou de dados pessoais.</p>
             </div>
             <div class="insights-toolbar" role="group" aria-label="Filtros de insights">
               <div class="form-group-inline">
@@ -462,6 +491,43 @@
               </p>
             </section>
           </div>
+
+          <section class="portal-card insights-ranking-card insights-likes-card" aria-labelledby="insights-likes-title">
+            <div class="insights-card-header">
+              <div>
+                <span class="card-eyebrow">Curtidas na Vitrine</span>
+                <h2 id="insights-likes-title">Itens mais curtidos</h2>
+              </div>
+              <div class="insights-likes-summary">
+                <span class="insights-metric-pill"><strong id="insights-likes-total">0</strong> no total</span>
+                <span class="insights-delta-pill"><strong id="insights-likes-period">0</strong> novas no período</span>
+              </div>
+            </div>
+            <div id="insights-likes-list" class="insights-ranking-list">
+              <!-- Populated via JS -->
+            </div>
+            <p class="insights-privacy-footnote">
+              Cada visitante curte um item uma única vez, lembrado por um cookie funcional e anônimo. Nenhum IP ou dado pessoal é armazenado.
+            </p>
+          </section>
+        </section>
+
+        <section id="leiloes-section" class="shell-section" hidden>
+          <div class="section-header insights-header-flex">
+            <div>
+              <h1 class="display-title">Leilões</h1>
+              <p class="section-desc">Acompanhe os lances, o encerramento e quem venceu cada item em leilão. Nome e WhatsApp de quem deu lance aparecem só para proprietário e administradores.</p>
+            </div>
+            <div class="auctions-toolbar">
+              <div class="form-group-inline">
+                <label for="auctions-site-select">Vitrine:</label>
+                <select id="auctions-site-select" class="select-styled compact-select"></select>
+              </div>
+              <button id="auctions-refresh" type="button" class="button button-small button-secondary button-pill">Atualizar</button>
+            </div>
+          </div>
+          <p id="auctions-status" class="auction-empty" role="status"></p>
+          <div id="auctions-list" class="auctions-list"></div>
         </section>
 
         <!-- Section 3: Perfil e Interesses -->
@@ -994,6 +1060,13 @@
                           </span>
                           <span>Combinar troca pelo WhatsApp</span>
                         </button>
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="quota">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-users-quota"/></svg>
+                            <strong>Cotas de apoio</strong>
+                          </span>
+                          <span>Meta dividida em partes iguais, sem sorteio</span>
+                        </button>
                       </div>
                     </div>
                     <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar seção" aria-label="Adicionar seção">
@@ -1036,6 +1109,62 @@
                     <input type="text" id="editor-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="+55 (51) 99999-9999" class="item-input input-styled-height">
                     <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
                   </div>
+
+                  <div class="form-group mila-relay-group">
+                    <label class="checkbox-label-styled mila-relay-toggle" for="editor-mila-relay">
+                      <input type="checkbox" id="editor-mila-relay" role="switch" aria-checked="false" aria-describedby="editor-mila-relay-help">
+                      <span>Receber pedidos pela Mila (meu número não aparece na vitrine)</span>
+                    </label>
+                    <span id="editor-mila-relay-help" class="form-help" aria-live="polite">Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.</span>
+                  </div>
+                  <fieldset class="form-group locality-fieldset" id="editor-locality-group">
+                    <legend class="locality-legend">Página por cidade</legend>
+                    <span class="form-help">Seus itens de lance, doação e troca podem aparecer na página pública da sua cidade, junto com outras vitrines. Lá aparecem só o nome da vitrine, a cidade e os dados públicos dos itens; nada de nome, telefone ou endereço.</span>
+                    <label class="checkbox-label-styled locality-optin">
+                      <input type="checkbox" id="editor-locality-listed"> Mostrar meus itens de lance, doação e troca na página da cidade
+                    </label>
+                    <div class="locality-fields-row">
+                      <div class="locality-field locality-field-city">
+                        <label for="editor-locality-city">Cidade</label>
+                        <input type="text" id="editor-locality-city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Porto Alegre" class="item-input input-styled-height">
+                      </div>
+                      <div class="locality-field locality-field-uf">
+                        <label for="editor-locality-uf">Estado</label>
+                        <select id="editor-locality-uf" class="select-styled input-styled-height">
+                          <option value="">UF</option>
+                          <option value="AC">AC</option>
+                          <option value="AL">AL</option>
+                          <option value="AP">AP</option>
+                          <option value="AM">AM</option>
+                          <option value="BA">BA</option>
+                          <option value="CE">CE</option>
+                          <option value="DF">DF</option>
+                          <option value="ES">ES</option>
+                          <option value="GO">GO</option>
+                          <option value="MA">MA</option>
+                          <option value="MT">MT</option>
+                          <option value="MS">MS</option>
+                          <option value="MG">MG</option>
+                          <option value="PA">PA</option>
+                          <option value="PB">PB</option>
+                          <option value="PR">PR</option>
+                          <option value="PE">PE</option>
+                          <option value="PI">PI</option>
+                          <option value="RJ">RJ</option>
+                          <option value="RN">RN</option>
+                          <option value="RS">RS</option>
+                          <option value="RO">RO</option>
+                          <option value="RR">RR</option>
+                          <option value="SC">SC</option>
+                          <option value="SP">SP</option>
+                          <option value="SE">SE</option>
+                          <option value="TO">TO</option>
+                        </select>
+                      </div>
+                    </div>
+                    <span id="editor-locality-error" class="form-error-msg" role="alert" hidden>Informe a cidade e o estado para aparecer na página da cidade.</span>
+                    <span class="form-help">Vale a partir da próxima publicação. <a id="editor-locality-link" class="text-link" href="/por-cidade" target="_blank" rel="noopener noreferrer">Ver página por cidade</a></span>
+                  </fieldset>
 
                   <div class="form-group">
                     <span class="label-spaced">Componentes Visíveis do Item</span>
@@ -1153,8 +1282,41 @@
                   </div>
 
                   <div class="form-group" id="field-timeslots-config-group">
-                    <label for="editor-timeslots">Horários disponíveis para preferência (um por linha no formato HH:MM, deixe vazio para não pedir horário)</label>
-                    <textarea id="editor-timeslots" class="textarea-goal" placeholder="09:00&#10;10:00&#10;14:00&#10;15:00"></textarea>
+                    <div class="timeslots-header-row">
+                      <label for="timeslot-picker-input">Horários disponíveis para preferência</label>
+                      <span id="timeslots-status-note" class="timeslots-count-badge">0 / 24 horários</span>
+                    </div>
+                    <div class="timeslots-picker-controls">
+                      <input type="time" id="timeslot-picker-input" value="09:00" class="item-input input-styled-height timeslot-time-input" aria-label="Escolher horário">
+                      <button type="button" id="timeslot-add-btn" class="button button-small button-secondary button-pill">Adicionar horário</button>
+                      <button type="button" id="timeslot-generator-toggle-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Gerar horários</button>
+                    </div>
+                    <div id="timeslot-generator-panel" class="timeslot-generator-panel" hidden>
+                      <div class="timeslot-generator-grid">
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-start" class="structure-field-label">Das</label>
+                          <input type="time" id="timeslot-gen-start" value="09:00" class="item-input input-styled-height">
+                        </div>
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-end" class="structure-field-label">Às</label>
+                          <input type="time" id="timeslot-gen-end" value="17:00" class="item-input input-styled-height">
+                        </div>
+                        <div class="form-group structure-field-group">
+                          <label for="timeslot-gen-step" class="structure-field-label">A cada</label>
+                          <select id="timeslot-gen-step" class="select-styled">
+                            <option value="30">30 minutos</option>
+                            <option value="60" selected>60 minutos</option>
+                            <option value="90">90 minutos</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="timeslot-generator-actions">
+                        <button type="button" id="timeslot-gen-apply-btn" class="button button-small button-pill">Preencher horários</button>
+                        <button type="button" id="timeslot-clear-all-btn" class="button button-small button-secondary button-pill">Limpar todos</button>
+                      </div>
+                    </div>
+                    <div id="timeslots-chips-list" class="timeslots-chips-list" role="list" aria-label="Horários cadastrados"></div>
+                    <textarea id="editor-timeslots" class="textarea-goal" hidden aria-hidden="true"></textarea>
                   </div>
 
                   <div class="form-group">
@@ -1173,9 +1335,34 @@
                   </div>
 
                   <div class="form-group">
-                    <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
-                    <textarea id="editor-whatsapp-template" class="textarea-goal" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
-                    <span class="form-help">Variáveis disponíveis: <code>{itens}</code>, <code>{total}</code>, <code>{data}</code>, <code>{horario}</code>, <code>{endereco}</code> e <code>{nome}</code>.</span>
+                    <div class="template-header-row">
+                      <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
+                      <button type="button" id="simulate-whatsapp-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Simular mensagem</button>
+                    </div>
+                    <div class="template-editor-wrap">
+                      <div id="editor-whatsapp-backdrop" class="template-editor-backdrop" aria-hidden="true"></div>
+                      <textarea id="editor-whatsapp-template" class="textarea-goal template-editor-textarea" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
+                    </div>
+                    <div class="template-vars-section">
+                      <span class="form-help">Variáveis disponíveis (clique para inserir ou remover, ou arraste para o texto):</span>
+                      <div id="whatsapp-template-vars" class="template-vars-bar" role="group" aria-label="Variáveis disponíveis"></div>
+                    </div>
+                    <div id="whatsapp-simulation-panel" class="whatsapp-simulation-panel" hidden>
+                      <div class="whatsapp-sim-header">
+                        <strong>Prévia da mensagem no WhatsApp</strong>
+                        <button type="button" id="whatsapp-sim-close-btn" class="button button-small button-secondary button-pill">Fechar</button>
+                      </div>
+                      <p id="whatsapp-sim-warning" class="whatsapp-sim-warning" role="alert" hidden></p>
+                      <div class="whatsapp-chat-stage">
+                        <div class="whatsapp-bubble">
+                          <pre id="whatsapp-sim-bubble-text" class="whatsapp-bubble-text"></pre>
+                          <span class="whatsapp-bubble-meta" aria-hidden="true">14:32 ✓✓</span>
+                        </div>
+                      </div>
+                      <div class="whatsapp-sim-actions">
+                        <a id="whatsapp-sim-open-link" class="button button-small button-pill" href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">Abrir no meu WhatsApp</a>
+                      </div>
+                    </div>
                   </div>
                 </form>
               </div>

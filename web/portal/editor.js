@@ -2,6 +2,25 @@ import { renderStructureFields } from './showcase-structure.js';
 import { showFeedback } from './portal.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
+import { MILA_WHATSAPP, ORDER_RELAY_MILA, buildPublicOrderRelay } from '../assets/mila-relay.mjs';
+import {
+  addTimeSlot,
+  buildHighlightedTemplateNodes,
+  buildSimulatedWhatsappPreview,
+  generateTimeSlotInterval,
+  getAvailableTemplateVariables,
+  handleAtomicVariableKeydown,
+  normalizeTimeSlots,
+  removeTimeSlot,
+  toggleVariableInTemplate
+} from './order-message-tools.mjs';
+import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
+import {
+  QUOTA_MAX_TOTAL,
+  QUOTA_MIN_TOTAL,
+  QUOTA_TEXT_MAX_LENGTH,
+  findProhibitedQuotaTerm
+} from '../assets/quota-rules.mjs';
 import {
   parseImportCatalogCSV,
   applyCSVToCatalog,
@@ -67,7 +86,15 @@ const editorOrderMsgForm = globalThis.document?.getElementById('editor-order-msg
 const editorBusinessName = globalThis.document?.getElementById('editor-business-name');
 const editorWhatsapp = globalThis.document?.getElementById('editor-whatsapp');
 const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp-error');
+const editorMilaRelay = globalThis.document?.getElementById('editor-mila-relay');
+const editorMilaRelayHelp = globalThis.document?.getElementById('editor-mila-relay-help');
 const editorCatalogType = globalThis.document?.getElementById('editor-catalog-type');
+const editorLocalityListed = globalThis.document?.getElementById('editor-locality-listed');
+const editorLocalityCity = globalThis.document?.getElementById('editor-locality-city');
+const editorLocalityUf = globalThis.document?.getElementById('editor-locality-uf');
+const editorLocalityError = globalThis.document?.getElementById('editor-locality-error');
+const editorLocalityLink = globalThis.document?.getElementById('editor-locality-link');
+const LOCALITY_CITY_PATTERN = /^[\p{L}][\p{L}\s.'’-]{0,58}[\p{L}.]$/u;
 const addCategoryButton = globalThis.document?.getElementById('add-category-button');
 const categoriesContainer = globalThis.document?.getElementById('categories-container');
 const liveStorefrontPreview = globalThis.document?.getElementById('live-storefront-preview');
@@ -97,6 +124,26 @@ const editorHeroTitle = globalThis.document?.getElementById('editor-hero-title')
 const editorWelcomeText = globalThis.document?.getElementById('editor-welcome-text');
 const editorCtaLabel = globalThis.document?.getElementById('editor-cta-label');
 const editorWhatsappTemplate = globalThis.document?.getElementById('editor-whatsapp-template');
+const editorWhatsappBackdrop = globalThis.document?.getElementById('editor-whatsapp-backdrop');
+const whatsappTemplateVars = globalThis.document?.getElementById('whatsapp-template-vars');
+const simulateWhatsappBtn = globalThis.document?.getElementById('simulate-whatsapp-btn');
+const whatsappSimulationPanel = globalThis.document?.getElementById('whatsapp-simulation-panel');
+const whatsappSimCloseBtn = globalThis.document?.getElementById('whatsapp-sim-close-btn');
+const whatsappSimWarning = globalThis.document?.getElementById('whatsapp-sim-warning');
+const whatsappSimBubbleText = globalThis.document?.getElementById('whatsapp-sim-bubble-text');
+const whatsappSimOpenLink = globalThis.document?.getElementById('whatsapp-sim-open-link');
+
+const timeslotPickerInput = globalThis.document?.getElementById('timeslot-picker-input');
+const timeslotAddBtn = globalThis.document?.getElementById('timeslot-add-btn');
+const timeslotGeneratorToggleBtn = globalThis.document?.getElementById('timeslot-generator-toggle-btn');
+const timeslotGeneratorPanel = globalThis.document?.getElementById('timeslot-generator-panel');
+const timeslotGenStart = globalThis.document?.getElementById('timeslot-gen-start');
+const timeslotGenEnd = globalThis.document?.getElementById('timeslot-gen-end');
+const timeslotGenStep = globalThis.document?.getElementById('timeslot-gen-step');
+const timeslotGenApplyBtn = globalThis.document?.getElementById('timeslot-gen-apply-btn');
+const timeslotClearAllBtn = globalThis.document?.getElementById('timeslot-clear-all-btn');
+const timeslotsChipsList = globalThis.document?.getElementById('timeslots-chips-list');
+const timeslotsStatusNote = globalThis.document?.getElementById('timeslots-status-note');
 
 // CSV Tool Elements
 const csvDownloadPrimaryLink = globalThis.document?.getElementById('csv-download-primary-link');
@@ -634,6 +681,17 @@ function setupEditorEvents() {
     updateDraftAndPreview();
   });
 
+  [editorLocalityListed, editorLocalityUf].forEach((control) => {
+    control?.addEventListener('change', () => {
+      syncLocalityFromUI();
+      updateDraftAndPreview();
+    });
+  });
+  editorLocalityCity?.addEventListener('input', () => {
+    syncLocalityFromUI();
+    updateDraftAndPreview();
+  });
+
   attachWhatsappMask(editorWhatsapp, (rawPhone) => {
     if (!currentDraft) return;
     currentDraft.content.whatsapp = rawPhone;
@@ -644,11 +702,23 @@ function setupEditorEvents() {
     updateDraftAndPreview();
   });
 
+  editorMilaRelay?.addEventListener('change', () => {
+    if (!currentDraft) return;
+    if (editorMilaRelay.checked) {
+      currentDraft.content.orderRelay = ORDER_RELAY_MILA;
+    } else {
+      delete currentDraft.content.orderRelay;
+    }
+    syncMilaRelayUI();
+    updateDraftAndPreview();
+  });
+
   [compDescription, compPhoto, compPrice, compMinQuantity, compQuantitySelector, compDuration].forEach(
     (checkbox) => {
       checkbox?.addEventListener('change', () => {
         syncComponentsFromUI();
         renderItems();
+        renderTemplateVarsAndHighlight();
         updateDraftAndPreview();
       });
     }
@@ -657,6 +727,7 @@ function setupEditorEvents() {
   [fieldCustName, fieldDate, fieldDeliveryPickup, fieldNotes].forEach((checkbox) => {
     checkbox?.addEventListener('change', () => {
       syncOrderFieldsFromUI();
+      renderTemplateVarsAndHighlight();
       updateDraftAndPreview();
     });
   });
@@ -724,20 +795,163 @@ function setupEditorEvents() {
 
   editorTimeslots?.addEventListener('input', () => {
     if (!currentDraft) return;
-    const lines = editorTimeslots.value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => /^([01]\d|2[0-3]):[0-5]\d$/.test(line))
-      .slice(0, 24);
+    const lines = normalizeTimeSlots(editorTimeslots.value.split('\n'));
     currentDraft.content.orderFields.timeSlots = lines;
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+  });
+
+  timeslotAddBtn?.addEventListener('click', () => {
+    if (!currentDraft || !timeslotPickerInput) return;
+    const currentSlots = currentDraft.content.orderFields?.timeSlots || [];
+    const result = addTimeSlot(currentSlots, timeslotPickerInput.value);
+    if (!result.added) {
+      if (result.reason === 'limit') {
+        showFeedback('O limite máximo é de 24 horários disponíveis.', 'error');
+      } else if (result.reason === 'duplicate') {
+        showFeedback('Este horário já está na lista.', 'info');
+      } else {
+        showFeedback('Informe um horário válido no formato HH:MM.', 'error');
+      }
+      return;
+    }
+    currentDraft.content.orderFields.timeSlots = result.slots;
+    if (editorTimeslots) editorTimeslots.value = result.slots.join('\n');
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+  });
+
+  timeslotGeneratorToggleBtn?.addEventListener('click', () => {
+    if (!timeslotGeneratorPanel) return;
+    const nextOpen = timeslotGeneratorPanel.hidden;
+    timeslotGeneratorPanel.hidden = !nextOpen;
+    timeslotGeneratorToggleBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+  });
+
+  timeslotGenApplyBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    const startVal = timeslotGenStart?.value || '09:00';
+    const endVal = timeslotGenEnd?.value || '17:00';
+    const stepVal = Number(timeslotGenStep?.value || 60);
+    const result = generateTimeSlotInterval(startVal, endVal, stepVal, []);
+    if (result.error) {
+      showFeedback(result.error, 'error');
+      return;
+    }
+    currentDraft.content.orderFields.timeSlots = result.slots;
+    if (editorTimeslots) editorTimeslots.value = result.slots.join('\n');
+    if (timeslotGeneratorPanel) timeslotGeneratorPanel.hidden = true;
+    timeslotGeneratorToggleBtn?.setAttribute('aria-expanded', 'false');
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
+    updateDraftAndPreview();
+    if (result.truncated) {
+      showFeedback('Horários gerados (limitados aos primeiros 24 horários).', 'info');
+    }
+  });
+
+  timeslotClearAllBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    currentDraft.content.orderFields.timeSlots = [];
+    if (editorTimeslots) editorTimeslots.value = '';
+    renderTimeslotsUI();
+    renderTemplateVarsAndHighlight();
     updateDraftAndPreview();
   });
 
   [editorHeroTitle, editorWelcomeText, editorCtaLabel, editorWhatsappTemplate].forEach((input) => {
     input?.addEventListener('input', () => {
       syncMessagesFromUI();
+      if (input === editorWhatsappTemplate) {
+        renderTemplateVarsAndHighlight();
+      }
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
       updateDraftAndPreview();
     });
+  });
+
+  editorWhatsappTemplate?.addEventListener('scroll', () => {
+    if (editorWhatsappBackdrop && editorWhatsappTemplate) {
+      editorWhatsappBackdrop.scrollTop = editorWhatsappTemplate.scrollTop;
+      editorWhatsappBackdrop.scrollLeft = editorWhatsappTemplate.scrollLeft;
+    }
+  });
+
+  editorWhatsappTemplate?.addEventListener('keydown', (e) => {
+    if (!editorWhatsappTemplate) return;
+    const atomic = handleAtomicVariableKeydown(
+      editorWhatsappTemplate.value,
+      editorWhatsappTemplate.selectionStart ?? 0,
+      editorWhatsappTemplate.selectionEnd ?? 0,
+      e.key
+    );
+    if (atomic) {
+      e.preventDefault();
+      editorWhatsappTemplate.value = atomic.text;
+      try {
+        editorWhatsappTemplate.setSelectionRange(atomic.cursor, atomic.cursor);
+      } catch {
+        // Ignore on unsupported environments
+      }
+      syncMessagesFromUI();
+      renderTemplateVarsAndHighlight();
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
+      updateDraftAndPreview();
+    }
+  });
+
+  editorWhatsappTemplate?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  editorWhatsappTemplate?.addEventListener('drop', (e) => {
+    const token = e.dataTransfer?.getData('text/plain') || '';
+    if (!/^\{(itens|total|data|horario|endereco|nome)\}$/.test(token.trim())) {
+      return;
+    }
+    e.preventDefault();
+    const cleanToken = token.trim();
+    const pos =
+      typeof editorWhatsappTemplate.selectionStart === 'number'
+        ? editorWhatsappTemplate.selectionStart
+        : editorWhatsappTemplate.value.length;
+    const before = editorWhatsappTemplate.value.slice(0, pos);
+    const after = editorWhatsappTemplate.value.slice(pos);
+    editorWhatsappTemplate.value = `${before}${cleanToken}${after}`;
+    const nextPos = pos + cleanToken.length;
+    editorWhatsappTemplate.focus();
+    try {
+      editorWhatsappTemplate.setSelectionRange(nextPos, nextPos);
+    } catch {
+      // Ignore
+    }
+    syncMessagesFromUI();
+    renderTemplateVarsAndHighlight();
+    if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+      renderWhatsappSimulation();
+    }
+    updateDraftAndPreview();
+  });
+
+  simulateWhatsappBtn?.addEventListener('click', () => {
+    if (!whatsappSimulationPanel) return;
+    const nextOpen = whatsappSimulationPanel.hidden;
+    whatsappSimulationPanel.hidden = !nextOpen;
+    simulateWhatsappBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    if (nextOpen) {
+      renderWhatsappSimulation();
+    }
+  });
+
+  whatsappSimCloseBtn?.addEventListener('click', () => {
+    if (whatsappSimulationPanel) whatsappSimulationPanel.hidden = true;
+    simulateWhatsappBtn?.setAttribute('aria-expanded', 'false');
   });
 
   reloadConflictButton?.addEventListener('click', async () => {
@@ -868,9 +1082,15 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (editorWhatsappError) {
     editorWhatsappError.hidden = true;
   }
+  syncMilaRelayUI();
   if (editorCatalogType) {
     editorCatalogType.value = currentDraft.content.catalogType || 'products';
   }
+  const locality = currentDraft.content.locality || {};
+  if (editorLocalityListed) editorLocalityListed.checked = locality.listed === true;
+  if (editorLocalityCity) editorLocalityCity.value = locality.city || '';
+  if (editorLocalityUf) editorLocalityUf.value = locality.uf || '';
+  renderLocalityState();
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;
@@ -884,10 +1104,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (fieldCustName) fieldCustName.checked = fields.customerName !== false;
   if (fieldDate) fieldDate.checked = Boolean(fields.date);
   if (fieldDeliveryPickup) fieldDeliveryPickup.checked = Boolean(fields.deliveryOrPickup);
-  if (fieldNotes) fieldNotes.checked = fields.notes !== false;
+  if (fieldNotes) fieldNotes.checked = Boolean(fields.notes !== false);
 
+  const normalizedSlots = normalizeTimeSlots(fields.timeSlots || []);
+  currentDraft.content.orderFields.timeSlots = normalizedSlots;
   if (editorTimeslots) {
-    editorTimeslots.value = (fields.timeSlots || []).join('\n');
+    editorTimeslots.value = normalizedSlots.join('\n');
   }
   if (timeslotsConfigGroup) {
     timeslotsConfigGroup.hidden = false;
@@ -907,6 +1129,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     editorWhatsappTemplate.value = msgs.whatsappTemplate || '';
   }
 
+  renderTimeslotsUI();
+  renderTemplateVarsAndHighlight();
+  if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+    renderWhatsappSimulation();
+  }
+
   updateCsvModelLink();
   populateCategorySelect();
   renderCategories();
@@ -918,6 +1146,51 @@ function syncCatalogTypeDefaults() {
   if (!currentDraft) return;
   applyCatalogTypeSwitch(currentDraft.content, currentDraft.content.catalogType);
   initializeEditorWorkspace();
+}
+
+function slugifyLocality(city, uf) {
+  const base = city
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base && uf ? `${base}-${uf.toLowerCase()}` : '';
+}
+
+function readLocalityFromUI() {
+  const city = (editorLocalityCity?.value || '').trim().replace(/\s+/g, ' ');
+  const uf = editorLocalityUf?.value || '';
+  const cityValid = !city || LOCALITY_CITY_PATTERN.test(city);
+  const wantsListing = Boolean(editorLocalityListed?.checked);
+  return { city, uf, cityValid, wantsListing, complete: Boolean(city && uf && cityValid) };
+}
+
+function renderLocalityState() {
+  const state = readLocalityFromUI();
+  if (editorLocalityError) {
+    editorLocalityError.hidden = state.cityValid && (!state.wantsListing || state.complete);
+    editorLocalityError.textContent = state.cityValid
+      ? 'Informe a cidade e o estado para aparecer na página da cidade.'
+      : 'Use só letras no nome da cidade (2 a 60 caracteres).';
+  }
+  if (editorLocalityLink) {
+    const slug = state.complete ? slugifyLocality(state.city, state.uf) : '';
+    editorLocalityLink.href = slug ? `/por-cidade/${slug}` : '/por-cidade';
+    editorLocalityLink.textContent = slug ? `Ver página de ${state.city} – ${state.uf}` : 'Ver página por cidade';
+  }
+  return state;
+}
+
+// Incomplete or invalid input stays local (listed=false) so autosave never sends a draft the API rejects.
+function syncLocalityFromUI() {
+  if (!currentDraft) return;
+  const state = renderLocalityState();
+  currentDraft.content.locality = {
+    listed: state.wantsListing && state.complete,
+    city: state.cityValid ? state.city : '',
+    uf: state.uf
+  };
 }
 
 function syncComponentsFromUI() {
@@ -949,6 +1222,150 @@ function syncMessagesFromUI() {
     ctaLabel: editorCtaLabel?.value || '',
     whatsappTemplate: editorWhatsappTemplate?.value || ''
   };
+}
+
+function renderTimeslotsUI() {
+  if (!currentDraft) return;
+  const slots = normalizeTimeSlots(currentDraft.content.orderFields?.timeSlots || []);
+  currentDraft.content.orderFields.timeSlots = slots;
+
+  if (timeslotsStatusNote) {
+    timeslotsStatusNote.textContent = `${slots.length} / 24 horários`;
+  }
+  if (timeslotAddBtn) {
+    timeslotAddBtn.disabled = slots.length >= 24;
+  }
+  if (!timeslotsChipsList) return;
+
+  timeslotsChipsList.replaceChildren();
+  if (slots.length === 0) {
+    const emptySpan = document.createElement('span');
+    emptySpan.className = 'timeslots-empty-hint';
+    emptySpan.textContent = 'Lista vazia: não pedir horário ao visitante.';
+    timeslotsChipsList.appendChild(emptySpan);
+    return;
+  }
+
+  slots.forEach((slot) => {
+    const chip = document.createElement('span');
+    chip.className = 'timeslot-chip';
+    chip.setAttribute('role', 'listitem');
+    chip.setAttribute('data-slot', slot);
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = slot;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'timeslot-chip-remove';
+    removeBtn.setAttribute('aria-label', `Remover horário ${slot}`);
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      const next = removeTimeSlot(currentDraft.content.orderFields.timeSlots, slot);
+      currentDraft.content.orderFields.timeSlots = next;
+      if (editorTimeslots) editorTimeslots.value = next.join('\n');
+      renderTimeslotsUI();
+      renderTemplateVarsAndHighlight();
+      updateDraftAndPreview();
+    });
+
+    chip.appendChild(textSpan);
+    chip.appendChild(removeBtn);
+    timeslotsChipsList.appendChild(chip);
+  });
+}
+
+function renderTemplateVarsAndHighlight() {
+  if (!currentDraft) return;
+  const text = editorWhatsappTemplate?.value || '';
+
+  if (editorWhatsappBackdrop) {
+    const nodes = buildHighlightedTemplateNodes(document, text);
+    editorWhatsappBackdrop.replaceChildren(...nodes);
+  }
+
+  if (!whatsappTemplateVars) return;
+  whatsappTemplateVars.replaceChildren();
+
+  const available = getAvailableTemplateVariables(
+    currentDraft.content.catalogType,
+    currentDraft.content.orderFields,
+    currentDraft.content.components
+  );
+
+  available.forEach((varMeta) => {
+    const isUsed = text.includes(varMeta.token);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.draggable = true;
+    btn.className = `template-var-chip ${varMeta.colorClass} ${isUsed ? 'is-used' : ''}`.trim();
+    btn.setAttribute('data-var-token', varMeta.token);
+    btn.setAttribute('aria-pressed', isUsed ? 'true' : 'false');
+    btn.title = isUsed
+      ? `Remover ${varMeta.token} do modelo`
+      : `Inserir ${varMeta.token} no modelo`;
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'template-var-chip-label';
+    labelSpan.textContent = varMeta.label;
+
+    const codeSpan = document.createElement('code');
+    codeSpan.className = 'template-var-chip-code';
+    codeSpan.textContent = varMeta.token;
+
+    btn.appendChild(labelSpan);
+    btn.appendChild(codeSpan);
+
+    btn.addEventListener('dragstart', (e) => {
+      e.dataTransfer?.setData('text/plain', varMeta.token);
+    });
+
+    btn.addEventListener('click', () => {
+      if (!editorWhatsappTemplate) return;
+      const res = toggleVariableInTemplate(
+        editorWhatsappTemplate.value,
+        varMeta.token,
+        editorWhatsappTemplate.selectionStart,
+        editorWhatsappTemplate.selectionEnd
+      );
+      editorWhatsappTemplate.value = res.text;
+      editorWhatsappTemplate.focus();
+      try {
+        editorWhatsappTemplate.setSelectionRange(res.cursor, res.cursor);
+      } catch {
+        // Ignore
+      }
+      syncMessagesFromUI();
+      renderTemplateVarsAndHighlight();
+      if (whatsappSimulationPanel && !whatsappSimulationPanel.hidden) {
+        renderWhatsappSimulation();
+      }
+      updateDraftAndPreview();
+    });
+
+    whatsappTemplateVars.appendChild(btn);
+  });
+}
+
+function renderWhatsappSimulation() {
+  if (!currentDraft || !whatsappSimulationPanel) return;
+  const sim = buildSimulatedWhatsappPreview(currentDraft.content);
+  if (whatsappSimBubbleText) {
+    whatsappSimBubbleText.textContent = sim.message;
+  }
+  if (whatsappSimOpenLink) {
+    whatsappSimOpenLink.href = sim.waHref;
+  }
+  if (whatsappSimWarning) {
+    if (sim.unsupported.length > 0) {
+      const tokens = sim.unsupported.map((u) => u.token).join(', ');
+      whatsappSimWarning.textContent = `Atenção: seu modelo usa ${tokens}, que este tipo de vitrine ou configuração de campos não preenche.`;
+      whatsappSimWarning.hidden = false;
+    } else {
+      whatsappSimWarning.textContent = '';
+      whatsappSimWarning.hidden = true;
+    }
+  }
 }
 
 function populateCategorySelect() {
@@ -1130,6 +1547,7 @@ function renderItems() {
     if (mode === 'offer') return 'Item de lance';
     if (mode === 'donation') return 'Doação';
     if (mode === 'trade') return 'Troca';
+    if (mode === 'quota') return 'Cotas de apoio';
     return 'Item à venda';
   };
 
@@ -1204,20 +1622,24 @@ function renderItems() {
 
       const previewSub = document.createElement('p');
       previewSub.className = 'item-preview-subtitle soft-text';
+      const quotaText = `Cotas de ${item.priceCents ? formatCentsToReais(item.priceCents) : 'R$ 0,00'} · ${item.quotaFilled || 0}/${item.quotaTotal || 0} confirmadas`;
       const priceText =
-        itemPriceMode === 'donation'
-          ? 'Doação'
-          : itemPriceMode === 'trade'
-            ? item.tradeFor
-              ? `Aceito: ${item.tradeFor}`
-              : 'Troca'
-            : itemPriceMode === 'offer'
-              ? item.priceCents
-                ? `Lance mín.: ${formatCentsToReais(item.priceCents)}`
-                : 'Faça sua oferta'
-              : item.priceCents
-                ? formatCentsToReais(item.priceCents)
-                : '';
+        itemPriceMode === 'quota'
+          ? quotaText
+          : itemPriceMode === 'donation'
+            ? 'Doação'
+            : itemPriceMode === 'trade'
+              ? item.tradeFor
+                ? `Aceito: ${item.tradeFor}`
+                : 'Troca'
+              : itemPriceMode === 'offer'
+                ? [
+                    item.auctionEndsAt ? `Leilão até ${formatAuctionDeadline(item.auctionEndsAt)}` : '',
+                    item.priceCents ? `Lance mín.: ${formatCentsToReais(item.priceCents)}` : item.auctionEndsAt ? '' : 'Faça sua oferta'
+                  ].filter(Boolean).join(' · ')
+                : item.priceCents
+                  ? formatCentsToReais(item.priceCents)
+                  : '';
       const sectionText = item.section ? `Seção: ${item.section}` : '';
       const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
       previewSub.textContent = details.join(' · ');
@@ -1346,6 +1768,11 @@ function renderItems() {
     gName.appendChild(nameInput);
     fields.appendChild(gName);
 
+    const termWarning = document.createElement('p');
+    termWarning.className = 'item-quota-term-warning item-fields-full';
+    termWarning.setAttribute('role', 'status');
+    fields.appendChild(termWarning);
+
     // Selector: Tipo do item (Products & Quote)
     if (!isBooking) {
       const gMode = document.createElement('div');
@@ -1360,7 +1787,8 @@ function renderItems() {
         ['fixed', 'Item à venda (preço fixo)'],
         ['offer', 'Item de lance'],
         ['donation', 'Doação'],
-        ['trade', 'Troca']
+        ['trade', 'Troca'],
+        ['quota', 'Cotas de apoio (sem sorteio)']
       ]) {
         const opt = document.createElement('option');
         opt.value = val;
@@ -1377,6 +1805,13 @@ function renderItems() {
         }
         if (nextMode === 'donation' || nextMode === 'trade') {
           item.priceCents = 0;
+        }
+        if (nextMode === 'quota') {
+          applyQuotaDefaults(item);
+        }
+        if (nextMode !== 'offer') {
+          delete item.auctionEndsAt;
+          delete item.bidIncrementCents;
         }
         renderItems();
         updateDraftAndPreview();
@@ -1420,6 +1855,63 @@ function renderItems() {
       gPrice.appendChild(lPrice);
       gPrice.appendChild(priceInput);
       fields.appendChild(gPrice);
+
+      if (itemPriceMode === 'offer') {
+        const gEnds = document.createElement('div');
+        gEnds.className = 'form-group item-fields-full';
+        const lEnds = document.createElement('label');
+        lEnds.setAttribute('for', `item-auction-ends-${item.id}`);
+        lEnds.textContent = 'Encerramento do leilão';
+        const endsInput = document.createElement('input');
+        endsInput.type = 'datetime-local';
+        endsInput.id = `item-auction-ends-${item.id}`;
+        endsInput.className = 'item-input input-styled-height';
+        endsInput.value = isoToLocalDateTimeInput(item.auctionEndsAt);
+        const endsHelp = document.createElement('span');
+        endsHelp.className = 'form-help';
+        endsHelp.id = `item-auction-ends-help-${item.id}`;
+        endsHelp.textContent = 'Com data, os lances ficam registrados e você vê o vencedor em Leilões. Sem data, as ofertas chegam só pelo WhatsApp.';
+        endsInput.setAttribute('aria-describedby', endsHelp.id);
+        endsInput.addEventListener('change', () => {
+          const iso = localDateTimeInputToIso(endsInput.value);
+          if (iso) {
+            item.auctionEndsAt = iso;
+          } else {
+            delete item.auctionEndsAt;
+          }
+          updateDraftAndPreview();
+        });
+        gEnds.appendChild(lEnds);
+        gEnds.appendChild(endsInput);
+        gEnds.appendChild(endsHelp);
+        fields.appendChild(gEnds);
+
+        const gIncrement = document.createElement('div');
+        gIncrement.className = 'form-group item-fields-full';
+        const lIncrement = document.createElement('label');
+        lIncrement.setAttribute('for', `item-bid-increment-${item.id}`);
+        lIncrement.textContent = 'Incremento mínimo entre lances (opcional)';
+        const incrementInput = document.createElement('input');
+        incrementInput.type = 'text';
+        incrementInput.inputMode = 'numeric';
+        incrementInput.id = `item-bid-increment-${item.id}`;
+        incrementInput.className = 'item-input input-styled-height';
+        incrementInput.placeholder = 'Padrão: R$ 1,00';
+        incrementInput.value = item.bidIncrementCents ? formatCentsToReais(item.bidIncrementCents) : '';
+        incrementInput.addEventListener('input', () => {
+          maskMoneyInput(incrementInput);
+          const cents = parseReaisToCents(incrementInput.value);
+          if (cents > 0) {
+            item.bidIncrementCents = cents;
+          } else {
+            delete item.bidIncrementCents;
+          }
+          updateDraftAndPreview();
+        });
+        gIncrement.appendChild(lIncrement);
+        gIncrement.appendChild(incrementInput);
+        fields.appendChild(gIncrement);
+      }
     } else if (itemPriceMode === 'donation') {
       const gCond = document.createElement('div');
       gCond.className = 'form-group item-fields-full';
@@ -1460,6 +1952,8 @@ function renderItems() {
       gTrade.appendChild(lTrade);
       gTrade.appendChild(tradeInput);
       fields.appendChild(gTrade);
+    } else if (itemPriceMode === 'quota') {
+      renderQuotaFields(item, fields);
     }
 
     // New Google Forms field: Section name (grupo de agrupamento opcional)
@@ -1629,6 +2123,19 @@ function renderItems() {
       fields.appendChild(gPhoto);
     }
 
+    const refreshTermWarning = () => {
+      const term = findProhibitedQuotaTerm(
+        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+        { quota: itemPriceMode === 'quota' }
+      );
+      termWarning.hidden = !term;
+      termWarning.textContent = term
+        ? `Remova "${term}": a vitrine não aceita rifa, sorteio, prêmio ou promessa de retorno financeiro.`
+        : '';
+    };
+    refreshTermWarning();
+    card.addEventListener('input', refreshTermWarning);
+
     card.appendChild(fields);
 
     // CARD FOOTER (Google Forms style)
@@ -1639,7 +2146,7 @@ function renderItems() {
     const quickAddLinks = document.createElement('div');
     quickAddLinks.className = 'quick-add-links';
     
-    if (item._showPrice === false) {
+    if (item._showPrice === false && itemPriceMode !== 'quota') {
       const addPriceLink = document.createElement('button');
       addPriceLink.type = 'button';
       addPriceLink.className = 'text-link-btn';
@@ -1847,6 +2354,19 @@ async function uploadImageToSupabaseStorage(blob, itemId) {
   return data.imageUrl;
 }
 
+function isoToLocalDateTimeInput(iso) {
+  const date = typeof iso === 'string' ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localDateTimeInputToIso(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function formatCentsToReais(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents)) return 'R$ 0,00';
   const reais = cents / 100;
@@ -1904,6 +2424,113 @@ function moveCategory(catIndex, direction) {
   }
 }
 
+function applyQuotaDefaults(item) {
+  if (!Number.isSafeInteger(item.quotaTotal)) item.quotaTotal = 10;
+  if (!Number.isSafeInteger(item.quotaFilled)) item.quotaFilled = 0;
+  if (!Number.isSafeInteger(item.priceCents)) item.priceCents = 0;
+  item._showPrice = true;
+}
+
+function parseQuotaInteger(raw, min, max) {
+  const parsed = parseInt(String(raw ?? '').replace(/\D/g, ''), 10);
+  if (!Number.isSafeInteger(parsed)) return min;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function renderQuotaFields(item, fields) {
+  const callout = document.createElement('p');
+  callout.className = 'item-quota-legal-callout item-fields-full';
+  callout.textContent =
+    'Cotas de apoio dividem uma meta em partes iguais, sem sorteio: toda cota garante o mesmo benefício. ' +
+    'Não use para rifa, sorteio, prêmio ou promessa de retorno financeiro (exigem autorização federal). ' +
+    'Combine o pagamento direto com cada apoiador.';
+  fields.appendChild(callout);
+
+  const makeGroup = (id, labelText, input) => {
+    const group = document.createElement('div');
+    group.className = 'form-group item-fields-full';
+    const label = document.createElement('label');
+    label.setAttribute('for', id);
+    label.textContent = labelText;
+    input.id = id;
+    group.appendChild(label);
+    group.appendChild(input);
+    fields.appendChild(group);
+    return group;
+  };
+
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text';
+  priceInput.inputMode = 'numeric';
+  priceInput.className = 'item-input input-styled-height';
+  priceInput.placeholder = 'Ex: R$ 20,00';
+  priceInput.value = item.priceCents ? formatCentsToReais(item.priceCents) : '';
+  priceInput.addEventListener('input', () => {
+    maskMoneyInput(priceInput);
+    item.priceCents = parseReaisToCents(priceInput.value);
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-price-${item.id}`, 'Valor de cada cota (BRL)', priceInput);
+
+  const totalInput = document.createElement('input');
+  totalInput.type = 'number';
+  totalInput.inputMode = 'numeric';
+  totalInput.min = String(QUOTA_MIN_TOTAL);
+  totalInput.max = String(QUOTA_MAX_TOTAL);
+  totalInput.className = 'item-input input-styled-height';
+  totalInput.value = String(item.quotaTotal ?? 10);
+
+  const filledInput = document.createElement('input');
+  filledInput.type = 'number';
+  filledInput.inputMode = 'numeric';
+  filledInput.min = '0';
+  filledInput.max = String(item.quotaTotal ?? 10);
+  filledInput.className = 'item-input input-styled-height';
+  filledInput.value = String(item.quotaFilled ?? 0);
+
+  totalInput.addEventListener('change', () => {
+    item.quotaTotal = parseQuotaInteger(totalInput.value, QUOTA_MIN_TOTAL, QUOTA_MAX_TOTAL);
+    totalInput.value = String(item.quotaTotal);
+    filledInput.max = String(item.quotaTotal);
+    if ((item.quotaFilled ?? 0) > item.quotaTotal) {
+      item.quotaFilled = item.quotaTotal;
+      filledInput.value = String(item.quotaFilled);
+    }
+    updateDraftAndPreview();
+  });
+  filledInput.addEventListener('change', () => {
+    item.quotaFilled = parseQuotaInteger(filledInput.value, 0, item.quotaTotal ?? QUOTA_MAX_TOTAL);
+    filledInput.value = String(item.quotaFilled);
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-total-${item.id}`, `Total de cotas (${QUOTA_MIN_TOTAL} a ${QUOTA_MAX_TOTAL})`, totalInput);
+  makeGroup(`item-quota-filled-${item.id}`, 'Cotas já confirmadas', filledInput);
+
+  const rewardInput = document.createElement('input');
+  rewardInput.type = 'text';
+  rewardInput.maxLength = QUOTA_TEXT_MAX_LENGTH;
+  rewardInput.className = 'item-input input-styled-height';
+  rewardInput.placeholder = 'Ex: 1 pão de fermentação natural por cota';
+  rewardInput.value = item.quotaReward || '';
+  rewardInput.addEventListener('input', () => {
+    item.quotaReward = rewardInput.value;
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-reward-${item.id}`, 'O que cada cota garante (opcional)', rewardInput);
+
+  const condInput = document.createElement('input');
+  condInput.type = 'text';
+  condInput.maxLength = QUOTA_TEXT_MAX_LENGTH;
+  condInput.className = 'item-input input-styled-height';
+  condInput.placeholder = 'Ex: entrega quando a meta fechar; devolução se não fechar';
+  condInput.value = item.conditions || '';
+  condInput.addEventListener('input', () => {
+    item.conditions = condInput.value;
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-conditions-${item.id}`, 'Condições (opcional)', condInput);
+}
+
 function addItem(type = 'price', priceMode = 'fixed') {
   const category = (currentDraft.content.categories || []).find(
     (c) => c.id === selectedCategoryForItems
@@ -1939,6 +2566,8 @@ function addItem(type = 'price', priceMode = 'fixed') {
     item._showPrice = true;
     item._showPhoto = true;
   }
+
+  if (priceMode === 'quota') applyQuotaDefaults(item);
 
   if (currentDraft.content.components?.minQuantity && priceMode === 'fixed') item.minQuantity = 1;
   if (currentDraft.content.components?.durationMinutes) item.durationMinutes = 30;
@@ -2142,10 +2771,39 @@ function updateDraftAndPreview({ skipAutosave = false } = {}) {
   }, 1200);
 }
 
+function resolveDraftMilaRelay() {
+  if (currentDraft?.content?.orderRelay !== ORDER_RELAY_MILA) return null;
+  try {
+    return buildPublicOrderRelay(currentDraft.content.slug || currentSite?.slug || '');
+  } catch {
+    return null;
+  }
+}
+
+function syncMilaRelayUI() {
+  if (!editorMilaRelay || !currentDraft) return;
+  const relay = resolveDraftMilaRelay();
+  const enabled = currentDraft.content.orderRelay === ORDER_RELAY_MILA;
+  editorMilaRelay.checked = enabled;
+  editorMilaRelay.setAttribute('aria-checked', enabled ? 'true' : 'false');
+  if (editorMilaRelayHelp) {
+    editorMilaRelayHelp.textContent = enabled
+      ? `Ligado: o botão de pedido abre o WhatsApp da Mila, da equipe Vitrine Inspira, e a mensagem começa com o código #${relay?.code ?? 'da sua vitrine'}. A Mila repassa cada pedido para o WhatsApp acima. O repasse é feito por uma pessoa, então pode levar alguns minutos. Vale a partir da próxima publicação.`
+      : 'Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.';
+  }
+}
+
 function renderLivePreview() {
   if (!liveStorefrontPreview || !currentDraft) return;
 
   const menuConfig = structuredClone(currentDraft.content);
+  const milaRelay = resolveDraftMilaRelay();
+  if (milaRelay) {
+    menuConfig.whatsapp = MILA_WHATSAPP;
+    menuConfig.orderRelay = milaRelay;
+  } else {
+    delete menuConfig.orderRelay;
+  }
 
   if (!activePreviewRenderer || activePreviewRenderer.container !== liveStorefrontPreview) {
     activePreviewRenderer = new StorefrontRenderer(liveStorefrontPreview, menuConfig, {
@@ -2211,6 +2869,42 @@ function validateCatalogLocal() {
         if (priceRequired && (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0)) {
           showFeedback(
             `O preço do item "${item.name || `Item ${itemIndex + 1}`}" precisa ser maior que R$ 0,00.`,
+            'error'
+          );
+          hasValidationErrors = true;
+        }
+
+        const itemLabel = item.name || `Item ${itemIndex + 1}`;
+        if (itemPriceMode === 'quota') {
+          if (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0) {
+            showFeedback(`Informe o valor de cada cota do item "${itemLabel}".`, 'error');
+            hasValidationErrors = true;
+          }
+          if (
+            !Number.isSafeInteger(item.quotaTotal) ||
+            item.quotaTotal < QUOTA_MIN_TOTAL ||
+            item.quotaTotal > QUOTA_MAX_TOTAL
+          ) {
+            showFeedback(
+              `O total de cotas do item "${itemLabel}" deve ficar entre ${QUOTA_MIN_TOTAL} e ${QUOTA_MAX_TOTAL}.`,
+              'error'
+            );
+            hasValidationErrors = true;
+          } else if ((item.quotaFilled ?? 0) > item.quotaTotal) {
+            showFeedback(
+              `As cotas confirmadas do item "${itemLabel}" não podem passar do total.`,
+              'error'
+            );
+            hasValidationErrors = true;
+          }
+        }
+        const prohibitedTerm = findProhibitedQuotaTerm(
+          [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+          { quota: itemPriceMode === 'quota' }
+        );
+        if (prohibitedTerm) {
+          showFeedback(
+            `Remova "${prohibitedTerm}" do item "${itemLabel}": a vitrine não aceita rifa, sorteio, prêmio ou promessa de retorno financeiro.`,
             'error'
           );
           hasValidationErrors = true;

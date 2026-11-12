@@ -2,6 +2,7 @@ import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './pla
 import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
+import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 
 // State variables
 let isOnline = false;
@@ -32,6 +33,7 @@ const authSection = globalThis.document?.getElementById('auth-section');
 const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
 const vitrinesSection = globalThis.document?.getElementById('vitrines-section');
 const insightsSection = globalThis.document?.getElementById('insights-section');
+const leiloesSection = globalThis.document?.getElementById('leiloes-section');
 const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
@@ -106,6 +108,9 @@ const insightsDayChartContainer = globalThis.document?.getElementById('insights-
 const insightsHourChartContainer = globalThis.document?.getElementById('insights-hour-chart-container');
 const insightsTopItemsList = globalThis.document?.getElementById('insights-top-items-list');
 const insightsTopCategoriesList = globalThis.document?.getElementById('insights-top-categories-list');
+const insightsLikesTotal = globalThis.document?.getElementById('insights-likes-total');
+const insightsLikesPeriod = globalThis.document?.getElementById('insights-likes-period');
+const insightsLikesList = globalThis.document?.getElementById('insights-likes-list');
 
 const googleLoginButton = globalThis.document?.getElementById('google-login-button');
 const localDemoButton = globalThis.document?.getElementById('local-demo-button');
@@ -121,6 +126,7 @@ export function getSectionFromHash(hash) {
     '#vitrines': 'vitrines',
     '#dashboard': 'vitrines',
     '#insights': 'insights',
+    '#leiloes': 'leiloes',
     '#perfil': 'perfil',
     '#pedidos': 'pedidos',
     '#wizard': 'wizard',
@@ -194,6 +200,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupProfileChips();
   setupWizardFlow();
   setupInsightsControls();
+  initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
   setupHashRouting();
   await checkSession();
   if (currentUser) {
@@ -867,6 +874,7 @@ export function showSection(section) {
     if (inicioSection) inicioSection.hidden = section !== 'inicio';
     if (vitrinesSection) vitrinesSection.hidden = section !== 'vitrines';
     if (insightsSection) insightsSection.hidden = section !== 'insights';
+    if (leiloesSection) leiloesSection.hidden = section !== 'leiloes';
     if (perfilSection) perfilSection.hidden = section !== 'perfil';
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
     if (wizardSection) wizardSection.hidden = section !== 'wizard';
@@ -882,6 +890,9 @@ export function showSection(section) {
     if (section === 'insights') {
       syncInsightsSiteSelector();
       loadInsightsForActiveSite();
+    }
+    if (section === 'leiloes') {
+      void loadAuctionsPanel();
     }
   }
 }
@@ -1577,8 +1588,23 @@ function renderSites() {
       openEditor(site);
     });
 
+    const actions = document.createElement('div');
+    actions.className = 'site-item-actions';
+    actions.appendChild(actionBtn);
+    if (site.role === 'owner' || site.role === 'admin') {
+      const auctionsBtn = document.createElement('button');
+      auctionsBtn.className = 'button button-small button-secondary button-pill';
+      auctionsBtn.type = 'button';
+      auctionsBtn.textContent = 'Leilões';
+      auctionsBtn.addEventListener('click', () => {
+        selectAuctionSite(site.id);
+        if (globalThis.window) globalThis.window.location.hash = '#leiloes';
+      });
+      actions.appendChild(auctionsBtn);
+    }
+
     item.appendChild(info);
-    item.appendChild(actionBtn);
+    item.appendChild(actions);
 
     sitesListContainer.appendChild(item);
   });
@@ -1922,7 +1948,8 @@ export function getEmptyInsightsDataset() {
     byDay: [],
     byHour: [],
     topItems: [],
-    topCategories: []
+    topCategories: [],
+    likes: { total: 0, periodNew: 0, items: [] }
   };
 }
 
@@ -2394,6 +2421,79 @@ export function renderInsightsPanel(insights) {
       });
     }
   }
+
+  renderInsightsLikes(insights.likes);
+}
+
+function formatLikesCount(count) {
+  return count === 1 ? '1 curtida' : `${count} curtidas`;
+}
+
+function renderInsightsLikes(likes) {
+  const data = likes && typeof likes === 'object' ? likes : { total: 0, periodNew: 0, items: [] };
+  if (insightsLikesTotal) {
+    insightsLikesTotal.textContent = String(data.total ?? 0);
+  }
+  if (insightsLikesPeriod) {
+    insightsLikesPeriod.textContent = `+${data.periodNew ?? 0}`;
+  }
+  if (!insightsLikesList) return;
+
+  insightsLikesList.replaceChildren();
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent =
+      'Nenhuma curtida ainda. Quando visitantes tocarem no coração de um item da vitrine publicada, o ranking aparece aqui.';
+    insightsLikesList.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'insights-rank-row';
+
+    const main = document.createElement('div');
+    main.className = 'insights-rank-main';
+
+    const pos = document.createElement('span');
+    pos.className = 'insights-rank-pos';
+    pos.textContent = `${idx + 1}º`;
+
+    const info = document.createElement('div');
+    info.className = 'insights-rank-info';
+
+    const nameStrong = document.createElement('strong');
+    nameStrong.textContent = item.name || item.itemId;
+
+    const catSpan = document.createElement('span');
+    catSpan.textContent = item.categoryName || 'Vitrine';
+
+    info.appendChild(nameStrong);
+    info.appendChild(catSpan);
+    main.appendChild(pos);
+    main.appendChild(info);
+
+    const metrics = document.createElement('div');
+    metrics.className = 'insights-rank-metrics';
+
+    const likesPill = document.createElement('span');
+    likesPill.className = 'insights-metric-pill';
+    likesPill.textContent = formatLikesCount(item.likes ?? 0);
+    metrics.appendChild(likesPill);
+
+    if ((item.periodLikes ?? 0) > 0) {
+      const periodPill = document.createElement('span');
+      periodPill.className = 'insights-delta-pill';
+      periodPill.textContent = `+${item.periodLikes} no período`;
+      metrics.appendChild(periodPill);
+    }
+
+    row.appendChild(main);
+    row.appendChild(metrics);
+    insightsLikesList.appendChild(row);
+  });
 }
 
 

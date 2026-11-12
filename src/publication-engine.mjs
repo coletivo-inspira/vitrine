@@ -1,10 +1,20 @@
 import { projectShowcaseManifest } from './showcase-structure.mjs';
 import { publicMenu, whatsappLink } from './public-menu.mjs';
+import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
+import {
+  MILA_WHATSAPP,
+  ORDER_RELAY_MILA,
+  buildMilaRelayCode,
+  buildPublicOrderRelay,
+  resolveOrderRelayMode
+} from '../web/assets/mila-relay.mjs';
 import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
   migrateLegacyDraftContent,
+  projectPublicLocality,
+  slugifyCity,
   toPublicMenuDraft,
   validateComponentsConfig,
   validateDraftContent,
@@ -46,14 +56,17 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'slug',
   'name',
   'whatsapp',
+  'orderRelay',
   'currency',
   'components',
   'orderFields',
   'messages',
   'items',
   'categories',
-  'structure'
+  'structure',
+  'locality'
 ]);
+const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
 const ALLOWED_ITEM_KEYS = new Set([
   'id',
@@ -62,11 +75,16 @@ const ALLOWED_ITEM_KEYS = new Set([
   'priceMode',
   'conditions',
   'tradeFor',
+  'quotaTotal',
+  'quotaFilled',
+  'quotaReward',
   'description',
   'imageUrl',
   'minQuantity',
   'durationMinutes',
-  'section'
+  'section',
+  'auctionEndsAt',
+  'bidIncrementCents'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -176,11 +194,44 @@ export function assertNoPrivateLeakage(menuArtifact) {
     }
   }
 
+  if (menuArtifact.orderRelay !== undefined) {
+    const relay = menuArtifact.orderRelay;
+    const relayKeys = relay && typeof relay === 'object' && !Array.isArray(relay) ? Object.keys(relay) : null;
+    if (
+      !relayKeys ||
+      relayKeys.length !== 2 ||
+      relay.via !== ORDER_RELAY_MILA ||
+      relay.code !== buildMilaRelayCode(menuArtifact.slug)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco orderRelay inválido.');
+    }
+    if (menuArtifact.whatsapp !== MILA_WHATSAPP) {
+      throw new PortalValidationError(
+        422,
+        'PRIVATE_FIELD_LEAKAGE',
+        'Com pedidos pela Mila, o artefato público só pode conter o WhatsApp da Mila.'
+      );
+    }
+  }
+
   if (menuArtifact.structure !== undefined) {
     const { theme, navigation, pages } = menuArtifact.structure ?? {};
     const projected = projectShowcaseManifest({ themeOverrides: theme, navigationMenus: navigation, pages });
     if (JSON.stringify(projected) !== JSON.stringify(menuArtifact.structure)) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'A estrutura pública contém campos não permitidos.');
+    }
+  }
+
+  if (menuArtifact.locality !== undefined) {
+    const locality = menuArtifact.locality;
+    if (
+      !locality ||
+      typeof locality !== 'object' ||
+      Array.isArray(locality) ||
+      Object.keys(locality).some((key) => !ALLOWED_LOCALITY_KEYS.has(key)) ||
+      locality.citySlug !== slugifyCity(locality.city, locality.uf)
+    ) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco locality inválido.');
     }
   }
 
@@ -320,6 +371,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
   );
 
   validateDraftContent(migrated);
+  const relayViaMila = resolveOrderRelayMode(migrated) === ORDER_RELAY_MILA;
 
   let baseMenu;
   try {
@@ -327,6 +379,9 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       ? { ...migrated, categories: migrated.categories.filter(category => category?.active !== false) }
       : migrated;
     const publicMenuDraft = toPublicMenuDraft(visibleContent, site);
+    if (relayViaMila) {
+      publicMenuDraft.whatsapp = MILA_WHATSAPP;
+    }
     baseMenu = publicMenu(publicMenuDraft);
   } catch (err) {
     if (err instanceof PortalValidationError) {
@@ -363,9 +418,34 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
         const extras = {};
         if (
           typeof rawItem.priceMode === 'string' &&
-          ['offer', 'donation', 'trade'].includes(rawItem.priceMode.trim())
+          ['offer', 'donation', 'trade', 'quota'].includes(rawItem.priceMode.trim())
         ) {
           extras.priceMode = rawItem.priceMode.trim();
+        }
+        if (extras.priceMode === 'quota') {
+          extras.quotaTotal = rawItem.quotaTotal;
+          extras.quotaFilled = Number.isSafeInteger(rawItem.quotaFilled) ? rawItem.quotaFilled : 0;
+          const quotaReward = sanitizeOptionalItemShortText(
+            rawItem.quotaReward,
+            'INVALID_QUOTA_REWARD',
+            'O campo "O que cada cota garante"'
+          );
+          if (quotaReward !== undefined) {
+            extras.quotaReward = quotaReward;
+          }
+        }
+        if (extras.priceMode === 'offer') {
+          const auctionEndsAt = parseAuctionEndsAt(rawItem.auctionEndsAt);
+          if (auctionEndsAt) {
+            extras.auctionEndsAt = auctionEndsAt.toISOString();
+            if (
+              Number.isSafeInteger(rawItem.bidIncrementCents) &&
+              rawItem.bidIncrementCents >= AUCTION_RULES.minIncrementCents &&
+              rawItem.bidIncrementCents <= AUCTION_RULES.maxIncrementCents
+            ) {
+              extras.bidIncrementCents = rawItem.bidIncrementCents;
+            }
+          }
         }
         const conditions = sanitizeOptionalItemShortText(
           rawItem.conditions,
@@ -429,10 +509,15 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       ...(extras.priceMode !== undefined ? { priceMode: extras.priceMode } : {}),
       ...(extras.conditions !== undefined ? { conditions: extras.conditions } : {}),
       ...(extras.tradeFor !== undefined ? { tradeFor: extras.tradeFor } : {}),
+      ...(extras.quotaTotal !== undefined ? { quotaTotal: extras.quotaTotal } : {}),
+      ...(extras.quotaFilled !== undefined ? { quotaFilled: extras.quotaFilled } : {}),
+      ...(extras.quotaReward !== undefined ? { quotaReward: extras.quotaReward } : {}),
       ...(extras.description !== undefined ? { description: extras.description } : {}),
       ...(extras.section !== undefined ? { section: extras.section } : {}),
       ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),
       priceCents: item.priceCents,
+      ...(extras.auctionEndsAt !== undefined ? { auctionEndsAt: extras.auctionEndsAt } : {}),
+      ...(extras.bidIncrementCents !== undefined ? { bidIncrementCents: extras.bidIncrementCents } : {}),
       ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
       ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {})
     };
@@ -557,6 +642,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     baseMenu.name,
     baseMenu.template
   );
+  const locality = projectPublicLocality(migrated.locality);
 
   const menu = {
     schemaVersion: baseMenu.schemaVersion,
@@ -566,13 +652,15 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     slug: baseMenu.slug,
     name: baseMenu.name,
     whatsapp: baseMenu.whatsapp,
+    ...(relayViaMila ? { orderRelay: buildPublicOrderRelay(baseMenu.slug) } : {}),
     currency: baseMenu.currency,
     components: sanitizedComponents,
     orderFields: sanitizedOrderFields,
     messages: sanitizedMessages,
     items: projectedItems,
     categories: projectedCategories,
-    ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {})
+    ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
+    ...(locality ? { locality } : {})
   };
 
   for (const item of menu.items) {
@@ -610,6 +698,11 @@ export async function compilePublicStorefront(draftContent, site = {}, options =
     publication
   };
 }
+
+const DIRECT_ORDER_FOOTER_NOTE =
+  'Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.';
+const MILA_RELAY_FOOTER_NOTE =
+  'Preços em Reais (BRL). Os pedidos desta vitrine chegam à Mila, da equipe Vitrine Inspira, que repassa cada um ao negócio pelo WhatsApp.';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -791,6 +884,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const hero = home?.sections.find(section => section.moduleCode === 'hero')?.config;
   const topNav = renderNavigation(structure?.navigation.header, 'Navegação da vitrine');
   const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
+  const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
+    ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
+    : '';
   const modularHtml = structure
     ? renderPublicSections(structure.pages, menu, catalog)
     : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) +
@@ -799,6 +895,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
   const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
   const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
+  const orderNote = menu.orderRelay?.via === ORDER_RELAY_MILA
+    ? MILA_RELAY_FOOTER_NOTE
+    : DIRECT_ORDER_FOOTER_NOTE;
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
     const welcome = menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.';
     const ogImg = getOgImage(menu);
@@ -839,6 +938,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         '<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine"></nav>',
         `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`
       )
+      .replace(DIRECT_ORDER_FOOTER_NOTE, orderNote)
       .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
   }
 
@@ -890,15 +990,16 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <footer class="storefront-footer">
     <div class="wrap storefront-footer-inner">
       ${footerNav}
+      ${cityLink}
       <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
         <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
         <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
       </a>
       <p class="storefront-footer-note">
-        Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
+        ${orderNote}
       </p>
       <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">
-        Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais.
+        Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais. Ao curtir um item, um cookie funcional e anônimo guarda sua curtida para que ela não seja contada duas vezes. Ao dar um lance em leilão, seu nome e WhatsApp vão só para a vitrine, com sua autorização, e são apagados 90 dias após o encerramento.
       </p>
     </div>
   </footer>

@@ -1,4 +1,12 @@
 import { publicMenu } from './public-menu.mjs';
+import { ORDER_RELAY_MODES } from '../web/assets/mila-relay.mjs';
+import {
+  QUOTA_MAX_TOTAL,
+  QUOTA_MIN_TOTAL,
+  QUOTA_TEXT_MAX_LENGTH,
+  findProhibitedQuotaTerm
+} from '../web/assets/quota-rules.mjs';
+import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -15,6 +23,7 @@ export const RESERVED_SLUGS = Object.freeze([
   'possibilidades',
   'planos',
   'orcamento',
+  'por-cidade',
   'privacidade',
   'termos'
 ]);
@@ -48,8 +57,67 @@ export const ALLOWED_ITEM_PRICE_MODES = Object.freeze([
   'fixed',
   'offer',
   'donation',
-  'trade'
+  'trade',
+  'quota'
 ]);
+
+export const BRAZIL_UFS = Object.freeze([
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
+  'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+]);
+const LOCALITY_CITY_PATTERN = /^[\p{L}][\p{L}\s.'’-]{0,58}[\p{L}.]$/u;
+
+export function slugifyCity(city, uf) {
+  const base = String(city ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const state = String(uf ?? '').trim().toLowerCase();
+  return base && state ? `${base}-${state}` : '';
+}
+
+export function validateLocality(raw, errorStatus = 422) {
+  if (raw === undefined || raw === null) {
+    return { listed: false, city: '', uf: '' };
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new PortalValidationError(errorStatus, 'INVALID_LOCALITY', 'Configuração de cidade inválida.');
+  }
+  const listed = raw.listed === true;
+  const city = typeof raw.city === 'string' ? raw.city.trim().replace(/\s+/g, ' ') : '';
+  const uf = typeof raw.uf === 'string' ? raw.uf.trim().toUpperCase() : '';
+  if (city && !LOCALITY_CITY_PATTERN.test(city)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_LOCALITY_CITY',
+      'Informe o nome da cidade com 2 a 60 letras (sem números ou símbolos).'
+    );
+  }
+  if (uf && !BRAZIL_UFS.includes(uf)) {
+    throw new PortalValidationError(errorStatus, 'INVALID_LOCALITY_UF', 'Escolha um estado (UF) válido.');
+  }
+  if (listed && (!city || !uf)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INCOMPLETE_LOCALITY',
+      'Para aparecer na página da cidade, informe a cidade e o estado (UF).'
+    );
+  }
+  return { listed, city, uf };
+}
+
+export function projectPublicLocality(raw) {
+  let locality;
+  try {
+    locality = validateLocality(raw);
+  } catch {
+    return undefined;
+  }
+  if (!locality.listed) return undefined;
+  return { city: locality.city, uf: locality.uf, citySlug: slugifyCity(locality.city, locality.uf) };
+}
 
 export const ALLOWED_PROFILE_INTERESTS = Object.freeze([
   'cardapio-digital',
@@ -91,6 +159,9 @@ export const ALLOWED_INSIGHTS_PERIODS = Object.freeze(['7d', '30d', '90d']);
 export const MAX_EVENTS_BATCH_SIZE = 25;
 export const MAX_EVENTS_BATCH_BYTES = 16384;
 export const METRICS_RETENTION_MONTHS = 13;
+export const ITEM_LIKE_LIMITS = Object.freeze({ perItemPerHour: 30, perSitePerHour: 150 });
+export const MAX_LIKE_REQUEST_BYTES = 1024;
+export const MAX_RANKED_LIKED_ITEMS = 10;
 
 const BOT_USER_AGENT_PATTERN =
   /bot|crawler|spider|headless|slurp|facebookexternalhit|whatsapp|preview|curl|wget|python/i;
@@ -709,6 +780,43 @@ export function isValidPriceCents(priceCents) {
   return Number.isSafeInteger(priceCents) && priceCents > 0;
 }
 
+export function validateQuotaFields(item) {
+  if (
+    !Number.isSafeInteger(item?.quotaTotal) ||
+    item.quotaTotal < QUOTA_MIN_TOTAL ||
+    item.quotaTotal > QUOTA_MAX_TOTAL
+  ) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_QUOTA_TOTAL',
+      `O total de cotas deve ser um número inteiro entre ${QUOTA_MIN_TOTAL} e ${QUOTA_MAX_TOTAL}.`
+    );
+  }
+  if (item.quotaFilled !== undefined && item.quotaFilled !== null) {
+    if (
+      !Number.isSafeInteger(item.quotaFilled) ||
+      item.quotaFilled < 0 ||
+      item.quotaFilled > item.quotaTotal
+    ) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_QUOTA_FILLED',
+        'As cotas confirmadas devem ser um número inteiro entre 0 e o total de cotas.'
+      );
+    }
+  }
+  if (item.quotaReward !== undefined && item.quotaReward !== null) {
+    if (typeof item.quotaReward !== 'string' || item.quotaReward.trim().length > QUOTA_TEXT_MAX_LENGTH) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_QUOTA_REWARD',
+        `O campo "O que cada cota garante" deve ter no máximo ${QUOTA_TEXT_MAX_LENGTH} caracteres.`
+      );
+    }
+    assertNoDangerousTextPayload(item.quotaReward, 422, 'INVALID_ITEM');
+  }
+}
+
 export function validatePriceCents(priceCents, { allowZero = false } = {}) {
   if (allowZero && (priceCents === 0 || priceCents === null || priceCents === undefined)) {
     return 0;
@@ -1312,6 +1420,10 @@ export function validateDraftContent(content, options = {}) {
     );
   }
 
+  if (content.locality !== undefined) {
+    validateLocality(content.locality, 422);
+  }
+
   const allowZeroPrice =
     effectiveCatalogType === 'quote' || validatedComponents?.price === false;
 
@@ -1382,9 +1494,35 @@ export function validateDraftContent(content, options = {}) {
     }
 
     validateOptionalUrlFields(item, 422);
-    validatePriceCents(item.priceCents, {
-      allowZero: allowZeroPrice || itemPriceMode !== 'fixed'
-    });
+    if (itemPriceMode === 'quota') {
+      if (!isValidPriceCents(item.priceCents)) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_QUOTA_PRICE',
+          'Informe o valor de cada cota (maior que R$ 0,00).'
+        );
+      }
+    } else {
+      validatePriceCents(item.priceCents, {
+        allowZero: allowZeroPrice || itemPriceMode !== 'fixed'
+      });
+    }
+
+    if (itemPriceMode === 'quota') {
+      validateQuotaFields(item);
+    }
+
+    const prohibitedTerm = findProhibitedQuotaTerm(
+      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+      { quota: itemPriceMode === 'quota' }
+    );
+    if (prohibitedTerm) {
+      throw new PortalValidationError(
+        422,
+        itemPriceMode === 'quota' ? 'QUOTA_PROHIBITED_TERMS' : 'RAFFLE_NOT_ALLOWED',
+        `O termo "${prohibitedTerm}" não é permitido: a vitrine não oferece rifa, sorteio, prêmio ou retorno financeiro, que dependem de autorização federal.`
+      );
+    }
 
     if (item.conditions !== undefined && item.conditions !== null) {
       if (typeof item.conditions !== 'string' || item.conditions.trim().length > 240) {
@@ -1465,6 +1603,38 @@ export function validateDraftContent(content, options = {}) {
       }
     }
 
+    if (item.auctionEndsAt !== undefined && item.auctionEndsAt !== null && item.auctionEndsAt !== '') {
+      const endsAt = parseAuctionEndsAt(item.auctionEndsAt);
+      if (!endsAt) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_AUCTION_ENDS_AT',
+          'Informe a data e a hora de encerramento do leilão em formato válido.'
+        );
+      }
+      if (endsAt.getTime() > Date.now() + AUCTION_RULES.maxScheduleDays * 86_400_000) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_AUCTION_ENDS_AT',
+          `O encerramento do leilão deve ser em até ${AUCTION_RULES.maxScheduleDays} dias.`
+        );
+      }
+    }
+
+    if (item.bidIncrementCents !== undefined && item.bidIncrementCents !== null) {
+      if (
+        !Number.isSafeInteger(item.bidIncrementCents) ||
+        item.bidIncrementCents < AUCTION_RULES.minIncrementCents ||
+        item.bidIncrementCents > AUCTION_RULES.maxIncrementCents
+      ) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_BID_INCREMENT',
+          'O incremento mínimo do leilão deve ficar entre R$ 1,00 e R$ 10.000,00.'
+        );
+      }
+    }
+
     if (item.id !== undefined) {
       if (typeof item.id !== 'string' || !item.id.trim() || item.id.trim().length > 64) {
         throw new PortalValidationError(
@@ -1505,6 +1675,18 @@ export function validateDraftContent(content, options = {}) {
 
   const whatsappValue = content.whatsapp ?? options.defaultWhatsapp;
   validateWhatsapp(whatsappValue);
+
+  if (
+    content.orderRelay !== undefined &&
+    content.orderRelay !== null &&
+    !ORDER_RELAY_MODES.includes(content.orderRelay)
+  ) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ORDER_RELAY',
+      'Forma de receber pedidos inválida. Use "direct" (seu WhatsApp) ou "mila" (pela Mila).'
+    );
+  }
 
   return {
     content,
@@ -1734,6 +1916,40 @@ export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = n
   };
 }
 
+export function validateItemLikePayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'O corpo da curtida deve ser um objeto JSON válido.'
+    );
+  }
+  if (typeof payload.slug !== 'string') {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'Informe o identificador (slug) da vitrine publicada.'
+    );
+  }
+  const slug = validateSlug(payload.slug.trim().toLowerCase());
+
+  const itemId = typeof payload.itemId === 'string' ? payload.itemId.trim() : '';
+  if (!itemId || itemId.length > 64) {
+    throw new PortalValidationError(422, 'INVALID_LIKE_ITEM', 'Informe um item válido da vitrine.');
+  }
+  assertNoDangerousTextPayload(itemId, 422, 'INVALID_LIKE_ITEM');
+
+  if (typeof payload.liked !== 'boolean') {
+    throw new PortalValidationError(
+      400,
+      'INVALID_LIKE_REQUEST',
+      'O campo liked deve ser verdadeiro (curtir) ou falso (remover curtida).'
+    );
+  }
+
+  return { slug, itemId, liked: payload.liked };
+}
+
 function addUtcDays(isoDateStr, deltaDays) {
   const [y, m, d] = isoDateStr.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
@@ -1807,10 +2023,72 @@ function buildCatalogLookup(catalogSource = {}) {
   return { itemMetaById, categoryNameById };
 }
 
+function insightsPeriodDays(validPeriod) {
+  return validPeriod === '90d' ? 90 : validPeriod === '30d' ? 30 : 7;
+}
+
+function toIsoDateOnly(referenceDate) {
+  return typeof referenceDate === 'string' && ISO_DATE_ONLY_PATTERN.test(referenceDate)
+    ? referenceDate
+    : (referenceDate instanceof Date ? referenceDate : new Date(referenceDate))
+        .toISOString()
+        .slice(0, 10);
+}
+
+export function resolveInsightsPeriodStart(period = '7d', referenceDate = new Date()) {
+  const validPeriod = validateInsightsPeriod(period);
+  return addUtcDays(toIsoDateOnly(referenceDate), -(insightsPeriodDays(validPeriod) - 1));
+}
+
+function summarizeItemLikes(likeRows, itemMetaById) {
+  const restrictToCatalog = itemMetaById.size > 0;
+  const byItem = new Map();
+  for (const row of Array.isArray(likeRows) ? likeRows : []) {
+    if (!row || typeof row !== 'object') continue;
+    const itemKey = String(row.item_key ?? row.itemKey ?? '').trim();
+    if (!itemKey || (restrictToCatalog && !itemMetaById.has(itemKey))) continue;
+    const likesVal = Math.max(0, Number(row.total_likes ?? row.totalLikes ?? 0) || 0);
+    const periodVal = Math.min(
+      likesVal,
+      Math.max(0, Number(row.period_likes ?? row.periodLikes ?? 0) || 0)
+    );
+    const existing = byItem.get(itemKey) ?? { likes: 0, periodLikes: 0 };
+    existing.likes += likesVal;
+    existing.periodLikes += periodVal;
+    byItem.set(itemKey, existing);
+  }
+
+  let total = 0;
+  let periodNew = 0;
+  const items = [];
+  for (const [itemKey, stat] of byItem.entries()) {
+    if (stat.likes <= 0) continue;
+    total += stat.likes;
+    periodNew += stat.periodLikes;
+    const meta = itemMetaById.get(itemKey);
+    items.push({
+      itemId: itemKey,
+      name: meta?.name ?? itemKey,
+      categoryName: meta?.categoryName ?? '',
+      likes: stat.likes,
+      periodLikes: stat.periodLikes
+    });
+  }
+
+  items.sort((a, b) => {
+    if (b.likes !== a.likes) return b.likes - a.likes;
+    if (b.periodLikes !== a.periodLikes) return b.periodLikes - a.periodLikes;
+    return a.name.localeCompare(b.name, 'pt-BR');
+  });
+
+  return { total, periodNew, items: items.slice(0, MAX_RANKED_LIKED_ITEMS) };
+}
+
 export function computeStorefrontInsights({
   siteId,
   period = '7d',
   rows = [],
+  likeRows = [],
   catalogSource = {},
   referenceDate = new Date()
 } = {}) {
@@ -2063,6 +2341,14 @@ export function computeStorefrontInsights({
     }
   }
 
+  const likes = summarizeItemLikes(likeRows, itemMetaById);
+  if (likes.items.length > 0) {
+    const favorite = likes.items[0];
+    highlights.push(
+      `${favorite.name} é o item mais curtido da vitrine, com ${favorite.likes} ${favorite.likes === 1 ? 'curtida' : 'curtidas'}.`
+    );
+  }
+
   if (highlights.length === 0) {
     highlights.push(
       'Ainda não há eventos registrados neste período. Divulgue o link da sua vitrine para acompanhar visitas e pedidos aqui.'
@@ -2084,6 +2370,7 @@ export function computeStorefrontInsights({
     },
     topItems,
     topCategories,
+    likes,
     byDay,
     byHour,
     highlights

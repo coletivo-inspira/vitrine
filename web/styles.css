@@ -74,6 +74,25 @@
 .area-panel+.area-panel{margin-top:40px}.area-panel[hidden]+.area-panel{margin-top:0}
 .area-heading{display:flex;justify-content:space-between;align-items:baseline;gap:32px;margin-bottom:24px}.area-heading h3{font-size:27px}.area-heading p{max-width:55ch;font-size:15px;color:var(--ink-soft)}
 .area-examples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}.area-example{min-width:0;align-self:start}.area-empty{padding-block:32px;border-block:1px solid var(--line);color:var(--ink-soft)}
+.model-demos{margin-bottom:64px}
+.model-demos-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 24px}
+.model-demo{min-width:0;margin:0}
+.model-demo-media{overflow:hidden;aspect-ratio:1200/900;border-radius:12px;background:#f7f7f4;box-shadow:var(--shadow-preview)}
+.model-demo-media img,.model-demo-media>svg{display:block;width:100%;height:auto}
+.model-demo figcaption{display:flex;align-items:center;gap:12px;min-height:56px;margin-top:10px;text-align:left;font-size:13px;color:var(--ink-soft)}
+.model-demo-name{font-size:15px;font-weight:700;color:var(--ink)}
+.model-demo-note{min-width:0}
+.model-demo-toggle{display:inline-flex;align-items:center;gap:8px;flex:none;min-height:44px;margin-left:auto;padding:0 16px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.model-demo-toggle[hidden]{display:none}
+.model-demo-toggle:hover{background:var(--apricot);border-color:var(--orange)}
+.model-demo-toggle[aria-pressed="true"]{background:var(--apricot);color:var(--orange)}
+@media(max-width:800px){
+  .model-demos-grid{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+  .model-demo figcaption{flex-wrap:wrap;gap:4px 12px}
+  .model-demo-note{flex:1 1 60%}
+}
 .compact-footer{margin-top:64px;padding:0;background:var(--paper)}.compact-footer>.wrap{padding:28px 0 28px 72px;display:flex;justify-content:center}.compact-footer p{font-size:13px;text-align:center;color:var(--ink-soft)}.compact-footer a{font-weight:600;text-decoration:none}.compact-footer a:hover{text-decoration:underline}.footer-logo-link{vertical-align:middle;margin-left:8px;display:inline-flex;align-items:center}.footer-logo{vertical-align:middle}
 [data-theme="dark"] .compact-footer{background:var(--paper)}
 @media(max-width:800px){.area-choices{gap:16px}.area-choice{font-size:13px}.area-examples{grid-template-columns:repeat(2,minmax(0,1fr))}.area-heading{display:block}.area-heading p{margin-top:12px}.site-header{column-gap:16px}.site-header>nav{gap:16px}}

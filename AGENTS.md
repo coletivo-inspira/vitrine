@@ -5,7 +5,7 @@ at specs/010-ux-audit-meta-readiness/plan.md
 <!-- SPECKIT END -->
 
 Read `.specify/memory/constitution.md`, `docs/architecture.md` and
-`docs/roadmap.md` before planning. Active specifications: `specs/008-portal-redesign/spec.md`, `specs/009-modular-admin-platform/spec.md` and `specs/010-ux-audit-meta-readiness/spec.md`; current plan: `specs/010-ux-audit-meta-readiness/plan.md`. Use Spec Kit for
+`docs/roadmap.md` before planning. Active specifications: `specs/008-portal-redesign/spec.md`, `specs/009-modular-admin-platform/spec.md`, `specs/010-ux-audit-meta-readiness/spec.md` and `specs/015-campanha-movimento/spec.md` (campanha Instagram e demonstrações de Possibilidades); current plan: `specs/010-ux-audit-meta-readiness/plan.md`. Use Spec Kit for
 new feature specs and plans. Keep research in `docs/` and domain vocabulary in
 `CONTEXT.md`. Cloudflare hosting is approved (ADR 0001); Supabase Auth/Postgres is approved; Google sign-in via Supabase Auth is approved; Workers Free with Static Assets selected; remote configuration remains open. No paid plans or automatic upgrades. Run `npm test` for this foundation.
 

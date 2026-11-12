@@ -32,7 +32,7 @@ O piloto inaugural opera sob restrição estrita de **custo zero de infraestrutu
 | **Modelo (Template) homologado** | Exclusivamente `pizzeria-v1` | Validado em `src/portal-validation.mjs`, `src/public-menu.mjs` e constraint SQL em `public.sites`. |
 | **Limite comercial de itens ativos** | **Até 20 itens ativos** (`active: true`) por **Vitrine** | Aplicado no editor do **Painel**, na API (`validateDraftContent`) e no validador do piloto (`ACTIVE_ITEMS_LIMIT_EXCEEDED`). |
 | **Teto técnico total por Rascunho** | **Até 100 itens totais** (somando itens ativos e itens ocultos em elaboração) e máximo de **256 KiB** (`262.144 bytes`) em JSONB | Aplicado em `src/portal-validation.mjs` (`TOTAL_ITEMS_LIMIT_EXCEEDED` / `DRAFT_TOO_LARGE`) e constraint SQL em `public.drafts`. |
-| **Canal de pedidos dos visitantes** | Link direto `https://wa.me/<whatsapp>?text=...` | Gerado de forma determinística por `whatsappLink()` (`src/public-menu.mjs`). Abrir o link não envia mensagem automaticamente nem confirma pedido sem ação do visitante. |
+| **Canal de pedidos dos visitantes** | Link direto `https://wa.me/<whatsapp>?text=...` | Gerado de forma determinística por `whatsappLink()` (`src/public-menu.mjs`). Abrir o link não envia mensagem automaticamente nem confirma pedido sem ação do visitante. Com pedidos pela Mila, o link aponta para o WhatsApp da Mila com o código da vitrine (ADR 0012). |
 | **Armazenamento de mídia** | Zero upload de imagens ou vídeos de clientes no banco | Uso exclusivo de texto estruturado e ativos estáticos do próprio **Modelo** centralizado. |
 
 ### 2.2 Passo a Passo de Onboarding Assistido pelo Operador Inspira
@@ -46,6 +46,18 @@ O piloto inaugural opera sob restrição estrita de **custo zero de infraestrutu
 3. **Cadastro do Rascunho e Primeira Publicação**:
    - O **Proprietário** cadastra categorias e itens com preços inteiros em centavos de Real (`priceCents` em BRL), mantendo no máximo **20 itens ativos** (podendo manter itens sazonais como `active: false` até o teto técnico de **100 itens totais**).
    - Ao acionar **Publicar**, o motor (`src/publication-engine.mjs`) projeta apenas os campos públicos autorizados e os itens ativos, calcula o hash SHA-256 determinístico e disponibiliza a **Publicação** em `https://vitrine.inspira.dev.br/<slug>`.
+
+### 2.3 Repasse de pedidos pela Mila (ADR 0012)
+
+Vale para vitrines com "Receber pedidos pela Mila" ligado em Configurações. A Mila é uma pessoa da equipe e atende no WhatsApp Business do número da equipe.
+
+1. O pedido chega ao WhatsApp da Mila começando por `#VI-XXXXXX-XXXX · Pedido para <Nome do negócio>`.
+2. No painel, em **Administração da plataforma › Pedidos pela Mila**, cole a mensagem inteira e, se quiser, o WhatsApp do cliente. Clique em **Localizar vitrine**.
+3. Confira se o nome do negócio bate com o da mensagem e clique em **Repassar ao dono no WhatsApp**. A conversa abre com a mensagem pronta, e o envio depende de você.
+4. Responda ao cliente que o pedido foi repassado. A Mila não confirma pedido, preço nem disponibilidade em nome do dono.
+5. Sem código, ou com um código que não é encontrado, peça ao cliente para enviar pelo botão da vitrine.
+
+Cada consulta fica registrada na auditoria da vitrine (`mila_relay_lookup`). Nada do que é colado no painel é salvo.
 
 ---
 
@@ -200,6 +212,7 @@ node scripts/validate-pilot-pack.mjs
    - `SUPABASE_ANON_KEY` (**obrigatória**): aceita a nova **publishable key (`sb_publishable_...`)** ou a chave `anon` legada; é lida por `workers/api.mjs` (`createSupabaseRestStore`) para autenticar chamadas REST ao Supabase sob o token JWT do usuário (aplicando integralmente as políticas RLS).
    - `SUPABASE_JWT_SECRET` (**opcional — legado**): lida por `workers/api.mjs` (`verifyJwtHs256`) apenas se configurada, como fallback para projetos ou tokens legados `HS256`. Para o projeto `qawlpsrfewosxsfgmmpm` (`ES256` via JWKS), sua configuração é opcional.
    - **Importante (Princípios I e III)**: `SUPABASE_SERVICE_ROLE_KEY` **não** é lida por `workers/api.mjs` e **jamais** deve ser injetada no Worker público.
+   - `AUCTION_BID_SECRET` (**obrigatória para leilões**, Spec 013): segredo aleatório de 32 bytes que autentica o canal Worker → `public.place_auction_bid` (cabeçalho `x-vitrine-bid-key`) e deriva o identificador irreversível do visitante. Registre com `npx wrangler secret put AUCTION_BID_SECRET` e grave **só o SHA-256** em `private.auction_settings` pelo SQL Editor do Supabase (passo a passo em `specs/013-leilao/quickstart.md`). Sem ele, os lances respondem `503 AUCTIONS_UNAVAILABLE` e o restante da vitrine segue no ar. Para revogar, troque o segredo e o hash.
 
 ### 5.4 Portões Obrigatórios de Pré-Lançamento (Dry-Run)
 

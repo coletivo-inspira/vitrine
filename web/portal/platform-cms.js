@@ -1,4 +1,6 @@
 import { renderStructureFields } from './showcase-structure.js';
+import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
+import { buildMilaForwardMessage, normalizeMilaRelayCode } from '../assets/mila-relay.mjs';
 const section = globalThis.document?.getElementById('platform-cms-section');
 const open = globalThis.document?.getElementById('platform-cms-open');
 const fields = globalThis.document?.getElementById('platform-cms-fields');
@@ -174,6 +176,7 @@ export async function detectPlatformCms(authenticated) {
     templateSelect.replaceChildren();
     templateFields.replaceChildren();
   }
+  resetMilaConsole();
   if (!authenticated) return;
   try {
     const { sections } = await request();
@@ -335,5 +338,74 @@ templatePanel?.addEventListener('toggle', async () => {
     showSelectedTemplate();
   } catch (error) {
     if (currentGeneration === generation) templateStatus.textContent = error.message;
+  }
+});
+
+const milaPanel = globalThis.document?.getElementById('platform-mila');
+const milaForm = globalThis.document?.getElementById('platform-mila-form');
+const milaMessage = globalThis.document?.getElementById('platform-mila-message');
+const milaCustomer = globalThis.document?.getElementById('platform-mila-customer');
+const milaStatus = globalThis.document?.getElementById('platform-mila-status');
+const milaResults = globalThis.document?.getElementById('platform-mila-results');
+
+function resetMilaConsole() {
+  if (!milaPanel) return;
+  milaPanel.open = false;
+  milaForm.reset();
+  milaStatus.textContent = '';
+  milaResults.replaceChildren();
+}
+
+function renderMilaMatch(match, code, order, customerPhone) {
+  const entry = document.createElement('li');
+  entry.className = 'mila-console-match';
+  const title = document.createElement('strong');
+  title.textContent = match.name;
+  const meta = document.createElement('span');
+  meta.className = 'form-help';
+  meta.textContent = `/${match.slug} · dono: ${formatWhatsappBR(match.whatsapp)}`;
+  const forward = document.createElement('a');
+  forward.className = 'button button-small button-pill';
+  forward.target = '_blank';
+  forward.rel = 'noopener noreferrer';
+  forward.textContent = 'Repassar ao dono no WhatsApp';
+  forward.href = `https://wa.me/${match.whatsapp}?text=${encodeURIComponent(
+    buildMilaForwardMessage({ businessName: match.name, code, order, customerPhone })
+  )}`;
+  entry.append(title, meta, forward);
+  return entry;
+}
+
+attachWhatsappMask(milaCustomer);
+milaForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const order = milaMessage.value.trim();
+  const code = normalizeMilaRelayCode(order);
+  milaResults.replaceChildren();
+  if (!code) {
+    milaStatus.textContent = 'Não encontrei um código #VI-XXXXXX-XXXX na mensagem. Peça ao cliente para enviar o pedido pelo botão da vitrine.';
+    milaMessage.focus();
+    return;
+  }
+  const submit = milaForm.querySelector('button[type="submit"]');
+  const currentGeneration = generation;
+  submit.disabled = true;
+  milaStatus.textContent = `Procurando a vitrine do código #${code}…`;
+  try {
+    const response = await fetch('/api/admin/mila-relay?code=' + encodeURIComponent(code));
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message ?? 'Não foi possível localizar a vitrine.');
+    if (currentGeneration !== generation) return;
+    const customerPhone = extractPhoneDigits(milaCustomer.value);
+    milaResults.replaceChildren(...data.matches.map(match => renderMilaMatch(match, code, order, customerPhone)));
+    milaStatus.textContent = !data.matches.length
+      ? `Nenhuma vitrine publicada usa o código #${code} com pedidos pela Mila.`
+      : data.matches.length > 1
+        ? `${data.matches.length} vitrines usam o código #${code}. Confira o nome do negócio na mensagem antes de repassar.`
+        : `Vitrine encontrada para #${code}.`;
+  } catch (error) {
+    if (currentGeneration === generation) milaStatus.textContent = error.message;
+  } finally {
+    submit.disabled = false;
   }
 });

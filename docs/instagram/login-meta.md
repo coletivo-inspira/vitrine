@@ -17,8 +17,8 @@ Na arquitetura da Vitrine Inspira, a identidade da pessoa que administra o paine
 | **Objetivo** | Identificar a pessoa (`auth.users`) que acessa o painel para administrar suas vitrines. | Autorizar a plataforma a ler perfil e mídias de uma conta profissional do Instagram para exibi-las em uma vitrine específica. |
 | **Escopo no domínio** | Por pessoa (`user_id` estável no Supabase Auth). Uma pessoa pode ser proprietária ou membro de várias vitrines (ADR 0002). | Estritamente por vitrine (`site_id`). Uma conta do Instagram por vitrine; o acesso a uma vitrine não autoriza outra. |
 | **Momento do fluxo** | Antes de acessar qualquer área autenticada do portal (`/portal/`). | Dentro do painel, após a pessoa já estar autenticada e selecionar uma vitrine na qual possui permissão. |
-| **Credenciais e tokens** | Sessão do painel validada pelo Worker (`__Host-vitrine_session`) a partir do JWT emitido pelo Supabase Auth (`aud = authenticated`). | Token OAuth da API do Instagram guardado apenas no servidor, vinculado ao `site_id`, renovado em segundo plano (detalhes em #49 e #50, a confirmar). |
-| **Permissões solicitadas** | Identidade básica do usuário (id, nome, email quando disponível). | Permissão de leitura de conta profissional (`instagram_business_basic`, a confirmar em #48). |
+| **Credenciais e tokens** | Sessão do painel validada pelo Worker (`__Host-vitrine_session`) a partir do JWT emitido pelo Supabase Auth (`aud = authenticated`). | Token de usuário do sistema do portfólio empresarial do dono (login unificado), guardado apenas no servidor e vinculado ao `site_id`, sem renovação periódica quando configurado para não expirar (detalhes em #49 e #50). |
+| **Permissões solicitadas** | Identidade básica do usuário (id, nome, email quando disponível). | Permissão única de leitura de conta profissional `instagram_basic`, pelo login unificado da Meta ([`configuracao-meta.md`](configuracao-meta.md), #48). |
 
 Consequências diretas dessa separação:
 
@@ -45,7 +45,15 @@ O Supabase Auth (GoTrue) **possui provedor nativo para Facebook (`provider=faceb
 - A Meta descontinuou a antiga API de exibição básica para contas pessoais (*Instagram Basic Display API*) e concentrou a integração oficial na **API do Instagram com Instagram Login** voltada a contas profissionais (Empresa ou Criador), cujos escopos (`instagram_business_basic`) e endpoints de troca de token diferem do provedor OAuth padrão do Facebook no GoTrue.
 - Além disso, a API de Instagram Login não fornece endereço de email da pessoa na resposta padrão de identidade, o que impede o GoTrue de unificar ou criar identidades por email da mesma forma que faz com Google ou Facebook.
 
-Diante dessa restrição técnica e da regra de manter a infraestrutura em custo zero (Cloudflare Workers Free e Supabase Free, sem planos pagos), existem três saídas possíveis.
+### O login unificado da Meta não é um login de pessoa
+
+Em 12/11/2026 a Vitrine adotou a **Configuração da API com login unificado** para conectar o Instagram às vitrines ([`configuracao-meta.md`](configuracao-meta.md)). Embora a tela da Meta deixe a pessoa "entrar com Instagram ou Facebook", ela não serve como login do painel:
+
+- O resultado é um **token de usuário do sistema do portfólio empresarial** escolhido, não um token da pessoa. Nesse token, `/me` representa o usuário do sistema, e o token continua válido mesmo se a pessoa sair do negócio.
+- Não há email nem identidade estável da pessoa para criar ou localizar um registro em `auth.users`.
+- O app Meta da Vitrine usa **Facebook Login for Business**, em que a tela é definida por `config_id` e o parâmetro `scope` não deve ser usado. O provedor `facebook` do Supabase Auth monta a autorização com `scope` (`email`, `public_profile`) para o Facebook Login clássico, então não deve reaproveitar o app da integração do Instagram.
+
+Diante dessas restrições técnicas e da regra de manter a infraestrutura em custo zero (Cloudflare Workers Free e Supabase Free, sem planos pagos), existem três saídas possíveis.
 
 ## Avaliação das alternativas
 
@@ -61,7 +69,7 @@ Consiste em habilitar o provedor `facebook` já suportado pelo Supabase Auth, pe
 - **Limitações e riscos**:
   - **Expectativa do usuário**: donos de negócios que usam apenas o aplicativo do Instagram no celular podem não lembrar a senha do Facebook ou não ter conta Facebook vinculada.
   - **Não substitui o #49**: entrar com Facebook no painel apenas autentica o usuário (`auth.users`); para ler o feed da vitrine sem exigir página do Facebook atrelada, o fluxo de "Conectar Instagram" (#49, a confirmar) continua sendo um passo separado.
-  - **Dependências no console Meta**: exige configurar o produto *Facebook Login* no app Meta da Vitrine, URL de callback do Supabase (`/auth/v1/callback`), política de privacidade, exclusão de dados e revisão/verificação empresarial na Meta (a confirmar no escopo do #48).
+  - **Dependências no console Meta**: exige um **app Meta separado**, do tipo Consumidor, com o *Facebook Login* clássico, URL de callback do Supabase (`/auth/v1/callback`), política de privacidade, exclusão de dados e revisão própria do escopo `email`. O app da integração do Instagram (tipo Empresa, Facebook Login for Business com `config_id`) não deve ser reaproveitado para isso, para não misturar a revisão de *Tech Provider* com login de pessoas.
 
 ### Opção B — Implementar OAuth próprio de Instagram Login no Cloudflare Worker
 
@@ -71,7 +79,7 @@ Consiste em implementar um fluxo OAuth 2.0 customizado diretamente no Cloudflare
 - **Vantagens**:
   - Permite que o usuário autentique diretamente com o usuário/senha do Instagram (conta profissional).
 - **Limitações e riscos**:
-  - **Ausência de email no Instagram Login**: a API do Instagram retorna `user_id` (escopado por app) e `username`, mas não retorna email. Criar usuários sintéticos no Supabase Auth sem email verificado quebra premissas do painel (como exibição de conta no `#profile-gate` e recuperação de acesso).
+  - **Ausência de identidade de pessoa**: a configuração antiga de login do Instagram retorna `user_id` (escopado por app) e `username`, sem email; o login unificado, adotado pela Vitrine, retorna um token do portfólio empresarial, sem identidade da pessoa. Criar usuários sintéticos no Supabase Auth sem email verificado quebra premissas do painel (como exibição de conta no `#profile-gate` e recuperação de acesso).
   - **Exposição e uso de `service_role` no fluxo de login**: para criar usuários ou emitir sessões fora do GoTrue nativo, o Worker precisaria operar com privilégio administrativo (`SUPABASE_SERVICE_ROLE_KEY`) em rotas públicas de autenticação, aumentando a superfície de risco que a arquitetura atual evita (hoje o Worker só repassa o JWT do próprio usuário ao PostgREST).
   - **Restrição a contas profissionais**: a API atual com Instagram Login exige conta profissional (Empresa ou Criador); membros da equipe ou proprietários com conta pessoal no Instagram falhariam ao tentar entrar no painel.
   - **Confusão entre login e conexão de vitrine**: usar a mesma tela de consentimento da Meta tanto para entrar no painel quanto para conectar o feed de uma vitrine (#49) mistura escopos pessoais de sessão com autorizações de leitura de uma vitrine específica.
@@ -124,11 +132,11 @@ Caso uma segunda opção de login (Opção A ou Opção B) seja ativada no futur
 
 ## Recomendação e próximos passos
 
-1. **Recomendação imediata (Opção C)**: manter **Entrar com Google** como login único do painel nesta fase e tratar a integração com a Meta exclusivamente como **"Conectar Instagram" por vitrine** ([issue #49](https://github.com/coletivo-inspira/vitrine/issues/49), detalhes a confirmar), depois que a pessoa já estiver autenticada no painel.
-2. **Evolução futura se houver demanda de login social adicional (Opção A)**: caso surja necessidade comprovada de login alternativo para usuários sem conta Google, priorizar o provedor nativo **Facebook/Meta do Supabase Auth** com fluxo explícito de vinculação de conta no perfil (`#perfil`), evitando a construção de um emissor OAuth customizado no Worker (Opção B).
-3. **Dependências a confirmar em outros documentos**:
-   - Configuração do app Meta único da Vitrine, permissões aprovadas e URLs de retorno no console Meta (`docs/instagram/configuracao-meta.md`, ref. #48 — a confirmar).
-   - Fluxo detalhado de autorização OAuth por vitrine, estados de conexão e revogação (`docs/instagram/conectar-por-vitrine.md`, ref. #49 — a confirmar).
+1. **Recomendação imediata (Opção C)**: manter **Entrar com Google** como login único do painel nesta fase e tratar a integração com a Meta exclusivamente como **"Conectar Instagram" por vitrine** ([issue #49](https://github.com/coletivo-inspira/vitrine/issues/49)), depois que a pessoa já estiver autenticada no painel. O login unificado da Meta confirma essa separação: a pessoa até pode escolher entrar com Instagram ou Facebook na tela da Meta, mas isso só autoriza a leitura do feed de uma vitrine e não cria sessão no painel.
+2. **Evolução futura se houver demanda de login social adicional (Opção A)**: caso surja necessidade comprovada de login alternativo para usuários sem conta Google, priorizar o provedor nativo **Facebook/Meta do Supabase Auth**, num app Meta separado do tipo Consumidor, com fluxo explícito de vinculação de conta no perfil (`#perfil`), evitando a construção de um emissor OAuth customizado no Worker (Opção B).
+3. **Dependências em outros documentos**:
+   - Configuração do app Meta único da Vitrine, permissão `instagram_basic` e URLs de retorno no console Meta ([`configuracao-meta.md`](configuracao-meta.md), ref. #48 — decidido; ações no console pendentes).
+   - Fluxo detalhado de autorização OAuth por vitrine, estados de conexão e revogação ([`conectar-por-vitrine.md`](conectar-por-vitrine.md), ref. #49).
    - Armazenamento seguro, renovação de tokens e sincronização periódica (`docs/instagram/sincronizacao.md`, ref. #50 — a confirmar).
    - Contrato público de leitura e webhook para sites conectados (`docs/instagram/interface-publica-feed.md`, ref. #51 — a confirmar).
 

@@ -1,8 +1,27 @@
+import { ORDER_RELAY_MILA, isMilaRelayCode, withMilaRelayPrefix } from './mila-relay.mjs';
+
 /**
  * Shared Storefront Renderer for Vitrine Inspira.
  * Used by both the Public Storefront (/vitrine/ & /<slug>) and the Portal Editor Live Preview (/portal/).
  * Strictly CSP-safe: zero inline scripts, zero inline styles, zero innerHTML with untrusted data, zero emojis.
  */
+
+import {
+  QUOTA_MAX_PER_SELECTION,
+  QUOTA_NO_DRAW_NOTICE,
+  QUOTA_PAYMENT_NOTICE,
+  getQuotaRemaining
+} from './quota-rules.mjs';
+import {
+  auctionErrorMessage,
+  buildWhatsappHref,
+  formatAuctionDeadline,
+  formatRemaining,
+  getAuctionTerms,
+  isAuctionItem,
+  normalizeBidderName,
+  normalizeBidderWhatsapp
+} from './auction-rules.mjs';
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -67,8 +86,20 @@ export class StorefrontRenderer {
     this.offers = new Map(); // itemId -> offerCents
     this.tradeProposals = new Map(); // itemId -> text
     this.itemErrors = new Map(); // itemId -> error message
+    this.likeButtons = [];
+    this.auctionBoard = new Map(); // itemId -> lote público
+    this.auctionClockOffsetMs = 0;
+    this.auctionInputs = new Map(); // itemId -> valor digitado
+    this.myAuctionBids = new Map(); // itemId -> { refs: Set, lastAmountCents }
+    this.auctionNotices = new Map(); // itemId -> mensagem de sucesso
+    this.auctionRenderPending = false;
+    this.bidderProfile = { name: '', whatsapp: '' };
+    this.bidDialog = null;
     this.validationMessage = '';
     this.idPrefix = this.options.isPreview ? 'preview-sf' : 'public-sf';
+    if (this.options.isPublicPage && typeof this.options.likes?.subscribe === 'function') {
+      this.options.likes.subscribe((itemId, message) => this.syncLikeButtons(itemId, message));
+    }
 
     const orderFields = this.getResolvedOrderFields();
     this.customerDetails = {
@@ -87,7 +118,76 @@ export class StorefrontRenderer {
     if (raw === 'offer' || raw === 'donation' || raw === 'trade') {
       return raw;
     }
+    if (raw === 'quota' && Number.isSafeInteger(item?.quotaTotal) && item.quotaTotal > 0) {
+      return 'quota';
+    }
     return 'fixed';
+  }
+
+  getQuotaSelectionLimit(item) {
+    return Math.min(getQuotaRemaining(item), QUOTA_MAX_PER_SELECTION);
+  }
+
+  setQuotaQuantity(item, delta) {
+    if (!item || item.active === false || this.getItemPriceMode(item) !== 'quota') return false;
+    const limit = this.getQuotaSelectionLimit(item);
+    const current = this.cart.get(item.id) || 0;
+    const next = Math.max(0, Math.min(current + delta, limit));
+    if (next === current) {
+      if (delta > 0 && limit > 0 && current >= limit) {
+        this.itemErrors.set(
+          item.id,
+          limit === 1 ? 'Resta apenas 1 cota disponível.' : `Restam apenas ${limit} cotas disponíveis.`
+        );
+        this.render();
+      }
+      return false;
+    }
+    this.itemErrors.delete(item.id);
+    if (next === 0) {
+      this.cart.delete(item.id);
+    } else {
+      this.cart.set(item.id, next);
+    }
+    if (
+      next > current &&
+      this.options.isPublicPage &&
+      typeof globalThis.recordStorefrontEvent === 'function'
+    ) {
+      globalThis.recordStorefrontEvent('item_select', {
+        itemId: item.id,
+        count: next - current
+      });
+    }
+    if (typeof this.options.onUpdate === 'function') {
+      this.options.onUpdate(this);
+    }
+    this.render();
+    return true;
+  }
+
+  getQuotaTotal() {
+    let total = 0;
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'quota') {
+        total += (item.priceCents || 0) * this.cart.get(item.id);
+      }
+    }
+    return total;
+  }
+
+  getQuotaCount() {
+    let count = 0;
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'quota') {
+        count += this.cart.get(item.id);
+      }
+    }
+    return count;
+  }
+
+  formatQuotaCount(count) {
+    return count === 1 ? '1 cota' : `${count} cotas`;
   }
 
   hasSelectedOffers() {
@@ -418,6 +518,7 @@ export class StorefrontRenderer {
 
   render() {
     if (!this.container) return;
+    this.likeButtons = [];
     if (typeof this.container.replaceChildren === 'function') {
       this.container.replaceChildren();
     } else {
@@ -585,18 +686,28 @@ export class StorefrontRenderer {
       const info = document.createElement('div');
       info.className = 'cart-bar-info';
 
+      const quotaCount = this.getQuotaCount();
+      const otherCount = cartCount - quotaCount;
       const countStrong = document.createElement('strong');
       countStrong.textContent =
         catalogType === 'booking'
           ? cartCount === 1
             ? '1 serviço selecionado'
             : `${cartCount} serviços selecionados`
-          : cartCount === 1
-            ? '1 item selecionado'
-            : `${cartCount} itens selecionados`;
+          : quotaCount > 0
+            ? [
+                otherCount > 0 ? (otherCount === 1 ? '1 item' : `${otherCount} itens`) : '',
+                `${this.formatQuotaCount(quotaCount)} reservada${quotaCount === 1 ? '' : 's'}`
+              ]
+                .filter(Boolean)
+                .join(' e ')
+            : cartCount === 1
+              ? '1 item selecionado'
+              : `${cartCount} itens selecionados`;
       info.appendChild(countStrong);
 
       const cartTotal = this.getCartTotal();
+      const quotaTotal = this.getQuotaTotal();
       if (
         resolvedComponents.price &&
         (cartTotal > 0 || (catalogType !== 'quote' && this.hasSelectedFixedPriceItems()))
@@ -607,6 +718,17 @@ export class StorefrontRenderer {
           ? `${this.formatPrice(cartTotal)} (sem os lances)`
           : this.formatPrice(cartTotal);
         info.appendChild(totalVal);
+        if (quotaTotal > 0) {
+          const quotaVal = document.createElement('span');
+          quotaVal.className = 'cart-bar-total sf-cart-quota-total';
+          quotaVal.textContent = `+ ${this.formatPrice(quotaTotal)} em cotas`;
+          info.appendChild(quotaVal);
+        }
+      } else if (quotaTotal > 0) {
+        const quotaVal = document.createElement('span');
+        quotaVal.className = 'cart-bar-total sf-cart-quota-total';
+        quotaVal.textContent = `${this.formatPrice(quotaTotal)} em cotas`;
+        info.appendChild(quotaVal);
       } else if (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0) {
         const durVal = document.createElement('span');
         durVal.className = 'cart-bar-total';
@@ -630,6 +752,411 @@ export class StorefrontRenderer {
       cartBar.appendChild(advBtn);
       parent.appendChild(cartBar);
     }
+  }
+
+  getAuctionNowMs() {
+    return Date.now() + this.auctionClockOffsetMs;
+  }
+
+  setAuctionBoard(board) {
+    if (!board || !Array.isArray(board.lots)) return;
+    const serverNowMs = Date.parse(board.serverNow);
+    if (Number.isFinite(serverNowMs)) {
+      this.auctionClockOffsetMs = serverNowMs - Date.now();
+    }
+    for (const lot of board.lots) {
+      if (lot && typeof lot.itemId === 'string') this.auctionBoard.set(lot.itemId, lot);
+    }
+    this.requestAuctionRender();
+  }
+
+  isAuctionInteractionActive() {
+    if (this.bidDialog?.open) return true;
+    const active = globalThis.document?.activeElement;
+    return Boolean(active && typeof active.closest === 'function' && active.closest('.sf-auction'));
+  }
+
+  requestAuctionRender() {
+    if (this.stage !== 1) return;
+    if (this.isAuctionInteractionActive()) {
+      this.auctionRenderPending = true;
+      return;
+    }
+    this.auctionRenderPending = false;
+    this.render();
+  }
+
+  getAuctionLot(item) {
+    const fromBoard = this.auctionBoard.get(item.id);
+    if (fromBoard) return fromBoard;
+    const terms = getAuctionTerms(item);
+    return {
+      itemId: item.id,
+      status: Date.parse(terms.scheduledEndsAt) > this.getAuctionNowMs() ? 'open' : 'closed',
+      endsAt: terms.scheduledEndsAt,
+      scheduledEndsAt: terms.scheduledEndsAt,
+      startCents: terms.startCents,
+      incrementCents: terms.incrementCents,
+      currentCents: null,
+      nextMinCents: terms.startCents,
+      bidCount: 0,
+      leadingRef: null,
+      recentBids: []
+    };
+  }
+
+  renderAuctionFooter(item, footer, isInactive) {
+    footer.classList.add('sf-footer-stacked', 'sf-auction');
+    const lot = this.getAuctionLot(item);
+    const remainingMs = Date.parse(lot.endsAt) - this.getAuctionNowMs();
+    const isOpen = lot.status === 'open' && remainingMs > 0;
+    const hasBids = Number.isSafeInteger(lot.currentCents) && lot.currentCents > 0;
+    const bidCountText = lot.bidCount === 1 ? '1 lance' : `${lot.bidCount || 0} lances`;
+
+    const header = document.createElement('div');
+    header.className = 'sf-offer-header';
+    const headline = document.createElement('span');
+    headline.className = 'menu-item-price sf-offer-headline';
+    headline.textContent = isOpen
+      ? hasBids
+        ? `Lance atual ${this.formatPrice(lot.currentCents)}`
+        : `Lance inicial ${this.formatPrice(lot.startCents)}`
+      : hasBids
+        ? `Arrematado por ${this.formatPrice(lot.currentCents)}`
+        : 'Encerrado sem lances';
+    header.appendChild(headline);
+    const statusPill = document.createElement('span');
+    statusPill.className = isOpen ? 'sf-auction-status is-open' : 'sf-auction-status is-closed';
+    statusPill.textContent = isOpen ? 'Aberto' : 'Encerrado';
+    header.appendChild(statusPill);
+    footer.appendChild(header);
+
+    const meta = document.createElement('p');
+    meta.className = 'sf-auction-meta';
+    meta.textContent = isOpen
+      ? `${bidCountText} · encerra ${formatAuctionDeadline(lot.endsAt)} · faltam ${formatRemaining(remainingMs)}`
+      : `${bidCountText} · encerrado ${formatAuctionDeadline(lot.endsAt)}`;
+    footer.appendChild(meta);
+
+    const mine = this.myAuctionBids.get(item.id);
+    if (mine?.refs.size) {
+      const standing = document.createElement('p');
+      standing.setAttribute('role', 'status');
+      const leading = lot.leadingRef && mine.refs.has(lot.leadingRef);
+      standing.className = leading ? 'sf-auction-standing is-leading' : 'sf-auction-standing';
+      standing.textContent = leading
+        ? isOpen
+          ? 'Você está na frente.'
+          : 'Seu lance venceu. A vitrine vai combinar com você pelo WhatsApp.'
+        : isOpen
+          ? `Seu lance foi superado. Próximo mínimo: ${this.formatPrice(lot.nextMinCents)}.`
+          : 'O leilão encerrou com outro lance vencedor.';
+      footer.appendChild(standing);
+    }
+
+    if (Array.isArray(lot.recentBids) && lot.recentBids.length > 0) {
+      const history = document.createElement('ul');
+      history.className = 'sf-auction-history';
+      history.setAttribute('aria-label', `Últimos lances em ${item.name || 'item'}`);
+      for (const entry of lot.recentBids.slice(0, 3)) {
+        const li = document.createElement('li');
+        const placed = new Date(entry.placedAt);
+        const time = Number.isNaN(placed.getTime())
+          ? ''
+          : ` · ${String(placed.getHours()).padStart(2, '0')}:${String(placed.getMinutes()).padStart(2, '0')}`;
+        li.textContent = `${this.formatPrice(entry.amountCents)}${time}`;
+        history.appendChild(li);
+      }
+      footer.appendChild(history);
+    }
+
+    if (!isOpen) return;
+
+    const minNote = document.createElement('span');
+    minNote.className = 'sf-offer-min';
+    minNote.textContent = `Próximo lance: a partir de ${this.formatPrice(lot.nextMinCents)} · incremento ${this.formatPrice(lot.incrementCents)}`;
+    footer.appendChild(minNote);
+
+    const canBid = Boolean(this.options.auctionClient) && !isInactive;
+    const row = document.createElement('div');
+    row.className = 'sf-inline-interaction';
+    const inputId = `${this.idPrefix}-bid-${item.id}`;
+    const label = document.createElement('label');
+    label.className = 'sf-field-label';
+    label.setAttribute('for', inputId);
+    label.textContent = 'Seu lance';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = inputId;
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    input.className = 'sf-input sf-offer-input';
+    input.placeholder = `Mínimo ${this.formatPrice(lot.nextMinCents)}`;
+    input.disabled = !canBid;
+    input.value = this.auctionInputs.get(item.id) || '';
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D/g, '').slice(0, 11);
+      input.value = digits
+        ? `R$ ${parseInt(digits.slice(0, -2) || '0', 10).toLocaleString('pt-BR')},${digits.slice(-2).padStart(2, '0')}`
+        : '';
+      this.auctionInputs.set(item.id, input.value);
+    });
+    input.addEventListener('blur', () => {
+      if (this.auctionRenderPending && !this.bidDialog?.open) {
+        setTimeout(() => this.requestAuctionRender(), 0);
+      }
+    });
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'whatsapp-order-button';
+    button.disabled = !canBid;
+    button.textContent = 'Dar lance';
+    button.addEventListener('click', () => this.startBid(item, input.value));
+    row.appendChild(label);
+    row.appendChild(input);
+    row.appendChild(button);
+    footer.appendChild(row);
+
+    if (!this.options.auctionClient) {
+      const previewNote = document.createElement('p');
+      previewNote.className = 'sf-auction-meta';
+      previewNote.textContent = 'Os lances ficam disponíveis na vitrine publicada.';
+      footer.appendChild(previewNote);
+    }
+
+    const errText = this.itemErrors.get(item.id);
+    if (errText) {
+      const errEl = document.createElement('p');
+      errEl.className = 'sf-item-error';
+      errEl.setAttribute('role', 'alert');
+      errEl.textContent = errText;
+      footer.appendChild(errEl);
+    }
+
+    const notice = this.auctionNotices.get(item.id);
+    if (notice) {
+      const ok = document.createElement('p');
+      ok.className = 'sf-auction-success';
+      ok.setAttribute('role', 'status');
+      ok.textContent = notice;
+      footer.appendChild(ok);
+      const href = buildWhatsappHref(
+        this.options.targetWhatsapp || this.menu?.whatsapp,
+        withMilaRelayPrefix(
+          `Olá! Dei um lance de ${this.formatPrice(mine?.lastAmountCents || 0)} no item "${item.name || 'Item'}" da vitrine. Meu nome é ${this.bidderProfile.name}.`,
+          this.getOrderRelay(),
+          this.menu?.name || this.menu?.businessName || ''
+        )
+      );
+      if (href) {
+        const link = document.createElement('a');
+        link.className = 'sf-secondary-button sf-auction-whatsapp';
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Avisar pelo WhatsApp';
+        footer.appendChild(link);
+      }
+    }
+  }
+
+  startBid(item, rawValue) {
+    const lot = this.getAuctionLot(item);
+    const digits = String(rawValue ?? '').replace(/\D/g, '');
+    const cents = parseInt(digits, 10) || 0;
+    this.auctionNotices.delete(item.id);
+    if (cents < lot.nextMinCents) {
+      this.itemErrors.set(item.id, auctionErrorMessage('BID_TOO_LOW', { requiredCents: lot.nextMinCents }));
+      this.render();
+      return false;
+    }
+    this.itemErrors.delete(item.id);
+    this.openBidDialog(item, cents);
+    return true;
+  }
+
+  ensureBidDialog() {
+    if (this.bidDialog) return this.bidDialog;
+    const doc = globalThis.document;
+    const dialog = doc.createElement('dialog');
+    dialog.className = 'sf-bid-dialog';
+    dialog.setAttribute('aria-labelledby', `${this.idPrefix}-bid-title`);
+
+    const form = doc.createElement('form');
+    form.className = 'sf-bid-form';
+    form.noValidate = true;
+
+    const title = doc.createElement('h2');
+    title.id = `${this.idPrefix}-bid-title`;
+    title.className = 'sf-bid-title';
+    title.textContent = 'Confirmar lance';
+    form.appendChild(title);
+
+    const summary = doc.createElement('p');
+    summary.className = 'sf-bid-summary';
+    form.appendChild(summary);
+
+    const field = (id, labelText, attrs) => {
+      const group = doc.createElement('div');
+      group.className = 'sf-field-group';
+      const label = doc.createElement('label');
+      label.className = 'sf-field-label';
+      label.setAttribute('for', id);
+      label.textContent = labelText;
+      const input = doc.createElement('input');
+      input.id = id;
+      input.className = 'sf-input';
+      Object.assign(input, attrs);
+      group.appendChild(label);
+      group.appendChild(input);
+      form.appendChild(group);
+      return input;
+    };
+    const nameInput = field(`${this.idPrefix}-bid-name`, 'Seu nome', {
+      type: 'text',
+      autocomplete: 'name',
+      maxLength: 60,
+      required: true
+    });
+    const phoneInput = field(`${this.idPrefix}-bid-whatsapp`, 'Seu WhatsApp', {
+      type: 'tel',
+      inputMode: 'tel',
+      autocomplete: 'tel',
+      maxLength: 20,
+      placeholder: '(51) 99999-9999',
+      required: true
+    });
+
+    const consentLabel = doc.createElement('label');
+    consentLabel.className = 'sf-bid-consent';
+    const consent = doc.createElement('input');
+    consent.type = 'checkbox';
+    consent.id = `${this.idPrefix}-bid-consent`;
+    const consentText = doc.createElement('span');
+    consentText.textContent =
+      'Autorizo enviar meu nome e WhatsApp à vitrine para combinar este leilão. Eles não aparecem para outros visitantes.';
+    consentLabel.appendChild(consent);
+    consentLabel.appendChild(consentText);
+    form.appendChild(consentLabel);
+
+    const trap = doc.createElement('div');
+    trap.className = 'sf-bid-trap';
+    trap.setAttribute('aria-hidden', 'true');
+    const trapInput = doc.createElement('input');
+    trapInput.type = 'text';
+    trapInput.name = 'website';
+    trapInput.tabIndex = -1;
+    trapInput.autocomplete = 'off';
+    trap.appendChild(trapInput);
+    form.appendChild(trap);
+
+    const error = doc.createElement('p');
+    error.className = 'sf-item-error';
+    error.setAttribute('role', 'alert');
+    form.appendChild(error);
+
+    const actions = doc.createElement('div');
+    actions.className = 'sf-bid-actions';
+    const cancel = doc.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'sf-secondary-button';
+    cancel.textContent = 'Cancelar';
+    const confirm = doc.createElement('button');
+    confirm.type = 'submit';
+    confirm.className = 'whatsapp-order-button';
+    confirm.textContent = 'Confirmar lance';
+    actions.appendChild(cancel);
+    actions.appendChild(confirm);
+    form.appendChild(actions);
+    dialog.appendChild(form);
+
+    cancel.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+      if (this.auctionRenderPending) this.requestAuctionRender();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void this.submitBidDialog();
+    });
+
+    doc.body.appendChild(dialog);
+    this.bidDialog = dialog;
+    this.bidDialogParts = { summary, nameInput, phoneInput, consent, trapInput, error, confirm };
+    return dialog;
+  }
+
+  openBidDialog(item, amountCents) {
+    const dialog = this.ensureBidDialog();
+    const parts = this.bidDialogParts;
+    this.pendingBid = { item, amountCents };
+    parts.summary.textContent = `Lance de ${this.formatPrice(amountCents)} em ${item.name || 'item'}.`;
+    parts.nameInput.value = this.bidderProfile.name;
+    parts.phoneInput.value = this.bidderProfile.whatsapp;
+    parts.error.textContent = '';
+    parts.confirm.disabled = false;
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+    parts.nameInput.focus?.();
+  }
+
+  async submitBidDialog() {
+    const parts = this.bidDialogParts;
+    const pending = this.pendingBid;
+    if (!parts || !pending || !this.options.auctionClient) return false;
+    const name = normalizeBidderName(parts.nameInput.value);
+    const whatsapp = normalizeBidderWhatsapp(parts.phoneInput.value);
+    if (!name) {
+      parts.error.textContent = 'Informe seu nome (2 a 60 caracteres).';
+      return false;
+    }
+    if (!whatsapp) {
+      parts.error.textContent = 'Informe um WhatsApp válido com DDD.';
+      return false;
+    }
+    if (!parts.consent.checked) {
+      parts.error.textContent = 'Marque a autorização para enviar seu contato à vitrine.';
+      return false;
+    }
+    parts.confirm.disabled = true;
+    parts.error.textContent = '';
+    this.bidderProfile = { name, whatsapp: parts.phoneInput.value };
+    const result = await this.options.auctionClient.placeBid({
+      itemId: pending.item.id,
+      amountCents: pending.amountCents,
+      name,
+      whatsapp,
+      consent: true,
+      website: parts.trapInput.value
+    });
+    parts.confirm.disabled = false;
+    if (!result?.ok) {
+      const code = result?.error?.code;
+      parts.error.textContent = auctionErrorMessage(code, result?.error ?? {});
+      if (code === 'BID_TOO_LOW' || code === 'AUCTION_CLOSED') {
+        this.options.auctionClient.refresh?.();
+      }
+      return false;
+    }
+    const itemId = pending.item.id;
+    if (result.lot) this.auctionBoard.set(itemId, result.lot);
+    const mine = this.myAuctionBids.get(itemId) ?? { refs: new Set(), lastAmountCents: 0 };
+    if (result.bid?.ref) mine.refs.add(result.bid.ref);
+    mine.lastAmountCents = pending.amountCents;
+    this.myAuctionBids.set(itemId, mine);
+    this.auctionInputs.delete(itemId);
+    this.itemErrors.delete(itemId);
+    this.auctionNotices.set(itemId, `Lance de ${this.formatPrice(pending.amountCents)} registrado.`);
+    this.pendingBid = null;
+    if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+      globalThis.recordStorefrontEvent('item_select', { itemId, count: 1 });
+    }
+    this.bidDialog.close?.();
+    this.auctionRenderPending = false;
+    this.render();
+    return true;
   }
 
   submitOffer(item, rawText) {
@@ -696,6 +1223,99 @@ export class StorefrontRenderer {
     return true;
   }
 
+  renderLikeButton(item, parent, cardBody) {
+    const likes = this.options.likes;
+    if (!this.options.isPublicPage || !likes || !item?.id || item.active === false) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sf-like-button';
+    button.setAttribute('data-like-item-id', String(item.id));
+
+    if (typeof document.createElementNS === 'function') {
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const icon = document.createElementNS(svgNs, 'svg');
+      icon.setAttribute('class', 'sf-like-icon');
+      icon.setAttribute('width', '20');
+      icon.setAttribute('height', '20');
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.setAttribute('aria-hidden', 'true');
+      icon.setAttribute('focusable', 'false');
+      const path = document.createElementNS(svgNs, 'path');
+      path.setAttribute(
+        'd',
+        'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z'
+      );
+      icon.appendChild(path);
+      button.appendChild(icon);
+    }
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'sf-like-count';
+    countSpan.setAttribute('aria-hidden', 'true');
+    button.appendChild(countSpan);
+
+    const entry = {
+      itemId: String(item.id),
+      name: item.name || 'este item',
+      button,
+      countSpan,
+      cardBody,
+      notice: null
+    };
+    button.addEventListener('click', () => {
+      likes.toggle(entry.itemId);
+    });
+
+    this.likeButtons.push(entry);
+    this.updateLikeButton(entry);
+    parent.appendChild(button);
+  }
+
+  updateLikeButton(entry) {
+    const state = this.options.likes.getState(entry.itemId);
+    const { button } = entry;
+    const countLabel = state.count === 1 ? '1 curtida' : `${state.count} curtidas`;
+
+    button.hidden = !state.available;
+    if (state.liked) button.classList.add('is-liked');
+    else button.classList.remove('is-liked');
+    button.setAttribute('aria-pressed', state.liked ? 'true' : 'false');
+    button.setAttribute('aria-busy', state.pending ? 'true' : 'false');
+    button.setAttribute('aria-label', `Curtir ${entry.name} (${countLabel})`);
+    button.title = state.liked ? 'Remover curtida' : 'Curtir';
+    entry.countSpan.textContent = state.count > 0 ? String(state.count) : '';
+    return state;
+  }
+
+  syncLikeButtons(itemId = null, message = '') {
+    for (const entry of this.likeButtons) {
+      if (itemId !== null && entry.itemId !== itemId) continue;
+      const state = this.updateLikeButton(entry);
+      if (itemId === null) continue;
+
+      if (state.pending && state.liked) {
+        entry.button.classList.add('is-popping');
+        entry.button.addEventListener(
+          'animationend',
+          () => entry.button.classList.remove('is-popping'),
+          { once: true }
+        );
+      }
+
+      if (message && entry.cardBody && !entry.notice) {
+        entry.notice = document.createElement('p');
+        entry.notice.className = 'sf-item-error sf-like-error';
+        entry.notice.setAttribute('role', 'status');
+        entry.cardBody.appendChild(entry.notice);
+      }
+      if (entry.notice) {
+        entry.notice.textContent = message;
+        entry.notice.hidden = !message;
+      }
+    }
+  }
+
   renderItemCard(item, grid, resolvedComponents, catalogType) {
     if (!item) return;
     const isInactive = item.active === false;
@@ -739,10 +1359,12 @@ export class StorefrontRenderer {
         modeBadge.className = `sf-mode-badge sf-mode-${priceMode}`;
         modeBadge.textContent =
           priceMode === 'offer'
-            ? 'Lance'
+            ? isAuctionItem(item) ? 'Leilão' : 'Lance'
             : priceMode === 'donation'
               ? 'Doação'
-              : 'Troca';
+              : priceMode === 'quota'
+                ? 'Cotas'
+                : 'Troca';
         titleRow.appendChild(modeBadge);
       }
 
@@ -753,7 +1375,10 @@ export class StorefrontRenderer {
         titleRow.appendChild(hiddenBadge);
       }
 
+      this.renderLikeButton(item, titleRow, body);
       body.appendChild(titleRow);
+    } else {
+      this.renderLikeButton(item, body, body);
     }
 
     if (resolvedComponents.description && typeof item.description === 'string' && item.description.trim()) {
@@ -775,6 +1400,10 @@ export class StorefrontRenderer {
       tradeP.className = 'sf-item-condition-note';
       tradeP.textContent = `Aceito em troca: ${item.tradeFor.trim()}`;
       body.appendChild(tradeP);
+    }
+
+    if (priceMode === 'quota') {
+      this.renderQuotaDetails(item, body);
     }
 
     const showDuration = Boolean(resolvedComponents.durationMinutes && item.durationMinutes > 0);
@@ -804,7 +1433,9 @@ export class StorefrontRenderer {
 
     const hasPositivePrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
 
-    if (priceMode === 'offer') {
+    if (priceMode === 'offer' && isAuctionItem(item)) {
+      this.renderAuctionFooter(item, footer, isInactive);
+    } else if (priceMode === 'offer') {
       footer.classList.add('sf-footer-stacked');
       const offerHeader = document.createElement('div');
       offerHeader.className = 'sf-offer-header';
@@ -906,6 +1537,8 @@ export class StorefrontRenderer {
       donateBtn.textContent = qty > 0 ? 'Selecionado' : 'Quero receber';
       donateBtn.addEventListener('click', () => this.toggleSingleSelect(item));
       footer.appendChild(donateBtn);
+    } else if (priceMode === 'quota') {
+      this.renderQuotaFooter(item, footer, qty, isInactive);
     } else if (priceMode === 'trade') {
       footer.classList.add('sf-footer-stacked');
       const tradeHeader = document.createElement('div');
@@ -1043,6 +1676,118 @@ export class StorefrontRenderer {
     card.appendChild(body);
     card.appendChild(footer);
     grid.appendChild(card);
+  }
+
+  renderQuotaDetails(item, body) {
+    const total = item.quotaTotal;
+    const remaining = getQuotaRemaining(item);
+    const filled = total - remaining;
+
+    if (typeof item.quotaReward === 'string' && item.quotaReward.trim()) {
+      const rewardP = document.createElement('p');
+      rewardP.className = 'sf-item-condition-note';
+      rewardP.textContent = `Cada cota garante: ${item.quotaReward.trim()}`;
+      body.appendChild(rewardP);
+    }
+
+    if (typeof item.conditions === 'string' && item.conditions.trim()) {
+      const condP = document.createElement('p');
+      condP.className = 'sf-item-condition-note';
+      condP.textContent = `Condições: ${item.conditions.trim()}`;
+      body.appendChild(condP);
+    }
+
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'sf-quota-progress';
+
+    const progressId = `${this.idPrefix}-quota-progress-${item.id}`;
+    const progressLabel = document.createElement('label');
+    progressLabel.className = 'sf-quota-progress-label';
+    progressLabel.setAttribute('for', progressId);
+    progressLabel.textContent = `${filled} de ${total} cotas confirmadas`;
+
+    const progressBar = document.createElement('progress');
+    progressBar.id = progressId;
+    progressBar.className = 'sf-quota-bar';
+    progressBar.max = total;
+    progressBar.value = filled;
+    progressBar.setAttribute('max', String(total));
+    progressBar.setAttribute('value', String(filled));
+
+    const goalP = document.createElement('p');
+    goalP.className = 'sf-quota-goal';
+    goalP.textContent = `Meta: ${this.formatPrice((item.priceCents || 0) * total)} · ${
+      remaining === 0 ? 'meta atingida' : `${this.formatQuotaCount(remaining)} disponíve${remaining === 1 ? 'l' : 'is'}`
+    }`;
+
+    progressWrap.appendChild(progressLabel);
+    progressWrap.appendChild(progressBar);
+    progressWrap.appendChild(goalP);
+    body.appendChild(progressWrap);
+
+    const legal = document.createElement('p');
+    legal.className = 'sf-quota-legal';
+    legal.textContent = `${QUOTA_NO_DRAW_NOTICE} ${QUOTA_PAYMENT_NOTICE}`;
+    body.appendChild(legal);
+  }
+
+  renderQuotaFooter(item, footer, qty, isInactive) {
+    const remaining = getQuotaRemaining(item);
+
+    const price = document.createElement('span');
+    price.className = 'menu-item-price sf-quota-price';
+    price.textContent = `${this.formatPrice(item.priceCents || 0)} por cota`;
+    footer.appendChild(price);
+
+    if (remaining === 0) {
+      const soldOut = document.createElement('span');
+      soldOut.className = 'sf-quote-tag sf-quota-soldout';
+      soldOut.textContent = 'Cotas esgotadas';
+      footer.appendChild(soldOut);
+      return;
+    }
+
+    const name = item.name || 'item';
+    const qtyDiv = document.createElement('div');
+    qtyDiv.className = 'qty-selector';
+    qtyDiv.setAttribute('role', 'group');
+    qtyDiv.setAttribute('aria-label', `Cotas de ${name}`);
+
+    const decBtn = document.createElement('button');
+    decBtn.type = 'button';
+    decBtn.className = 'btn-qty';
+    decBtn.textContent = '−';
+    decBtn.disabled = qty === 0 || isInactive;
+    decBtn.setAttribute('aria-label', `Remover uma cota de ${name}`);
+    decBtn.addEventListener('click', () => this.setQuotaQuantity(item, -1));
+
+    const qtyVal = document.createElement('span');
+    qtyVal.className = 'qty-val';
+    qtyVal.textContent = String(qty);
+    qtyVal.setAttribute('aria-live', 'polite');
+
+    const incBtn = document.createElement('button');
+    incBtn.type = 'button';
+    incBtn.className = 'btn-qty';
+    incBtn.textContent = '+';
+    incBtn.disabled = isInactive || qty >= this.getQuotaSelectionLimit(item);
+    incBtn.setAttribute('aria-label', `Reservar mais uma cota de ${name}`);
+    incBtn.addEventListener('click', () => this.setQuotaQuantity(item, 1));
+
+    qtyDiv.appendChild(decBtn);
+    qtyDiv.appendChild(qtyVal);
+    qtyDiv.appendChild(incBtn);
+    footer.appendChild(qtyDiv);
+
+    const errText = this.itemErrors.get(item.id);
+    if (errText) {
+      footer.classList.add('sf-footer-stacked');
+      const errEl = document.createElement('p');
+      errEl.className = 'sf-item-error';
+      errEl.setAttribute('role', 'alert');
+      errEl.textContent = errText;
+      footer.appendChild(errEl);
+    }
   }
 
   renderStage2(parent) {
@@ -1327,7 +2072,20 @@ export class StorefrontRenderer {
     parent.appendChild(card);
   }
 
+  getOrderRelay() {
+    const relay = this.menu?.orderRelay;
+    return relay?.via === ORDER_RELAY_MILA && isMilaRelayCode(relay.code) ? relay : null;
+  }
+
   buildOrderMessage() {
+    return withMilaRelayPrefix(
+      this.buildOrderBody(),
+      this.getOrderRelay(),
+      this.menu?.name || this.menu?.businessName || ''
+    );
+  }
+
+  buildOrderBody() {
     const catalogType = this.getCatalogType();
     const resolvedComponents = this.getResolvedComponents();
     const resolvedFields = this.getResolvedOrderFields();
@@ -1344,6 +2102,10 @@ export class StorefrontRenderer {
         itemLines.push(`- ${item.name || 'Item'} — Lance: ${this.formatPrice(offerCents)}`);
       } else if (priceMode === 'donation') {
         itemLines.push(`- Doação: ${item.name || 'Item'}`);
+      } else if (priceMode === 'quota') {
+        itemLines.push(
+          `- ${this.formatQuotaCount(qty)} de apoio: ${item.name || 'Item'} (${qty} × ${this.formatPrice(item.priceCents || 0)} = ${this.formatPrice((item.priceCents || 0) * qty)})`
+        );
       } else if (priceMode === 'trade') {
         const proposal = (this.tradeProposals.get(item.id) || '').trim();
         itemLines.push(
@@ -1366,8 +2128,17 @@ export class StorefrontRenderer {
 
     const cartTotal = this.getCartTotal();
     const hasOffers = this.hasSelectedOffers();
-    const totalStr =
-      resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
+    const quotaTotal = this.getQuotaTotal();
+    const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
+    if (quotaTotal > 0) {
+      if (!quotaOnly) {
+        itemLines.push(`Cotas reservadas (à parte do total): ${this.formatPrice(quotaTotal)}`);
+      }
+      itemLines.push('Cotas: reserva sem sorteio; o pagamento é combinado diretamente com o negócio.');
+    }
+    const totalStr = quotaOnly
+      ? `${this.formatPrice(quotaTotal)} em cotas`
+      : resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
         ? hasOffers
           ? `${this.formatPrice(cartTotal)} (sem os lances)`
           : this.formatPrice(cartTotal)
@@ -1459,6 +2230,13 @@ export class StorefrontRenderer {
       } else if (priceMode === 'donation') {
         titleSpan.textContent = `Doação: ${item.name || 'Item'}`;
         itemRow.appendChild(titleSpan);
+      } else if (priceMode === 'quota') {
+        titleSpan.textContent = `${this.formatQuotaCount(qty)} de apoio: ${item.name || 'Item'}`;
+        itemRow.appendChild(titleSpan);
+        const priceSpan = document.createElement('span');
+        priceSpan.className = 'review-item-price';
+        priceSpan.textContent = this.formatPrice((item.priceCents || 0) * qty);
+        itemRow.appendChild(priceSpan);
       } else if (priceMode === 'trade') {
         const proposal = (this.tradeProposals.get(item.id) || '').trim();
         titleSpan.textContent = proposal
@@ -1488,9 +2266,12 @@ export class StorefrontRenderer {
 
     const cartTotal = this.getCartTotal();
     const hasOffers = this.hasSelectedOffers();
+    const quotaTotal = this.getQuotaTotal();
+    const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
     if (
-      (resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)) ||
-      (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0)
+      !quotaOnly &&
+      ((resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)) ||
+        (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0))
     ) {
       const totalDiv = document.createElement('div');
       totalDiv.className = 'review-total-divider';
@@ -1512,6 +2293,24 @@ export class StorefrontRenderer {
           : `${this.getCartTotalDuration()} min`;
       totalDiv.appendChild(totalVal);
       card.appendChild(totalDiv);
+    }
+
+    if (quotaTotal > 0) {
+      const quotaDiv = document.createElement('div');
+      quotaDiv.className = 'review-total-divider';
+      const quotaLabel = document.createElement('strong');
+      quotaLabel.textContent = 'Total em cotas (reserva)';
+      const quotaVal = document.createElement('span');
+      quotaVal.className = 'review-total-val';
+      quotaVal.textContent = this.formatPrice(quotaTotal);
+      quotaDiv.appendChild(quotaLabel);
+      quotaDiv.appendChild(quotaVal);
+      card.appendChild(quotaDiv);
+
+      const quotaNote = document.createElement('p');
+      quotaNote.className = 'sf-quota-legal';
+      quotaNote.textContent = `${QUOTA_NO_DRAW_NOTICE} ${QUOTA_PAYMENT_NOTICE}`;
+      card.appendChild(quotaNote);
     }
 
     const detailPairs = [];
@@ -1578,6 +2377,14 @@ export class StorefrontRenderer {
     previewMsgPre.textContent = compiledMessage;
     previewMsgBox.appendChild(previewMsgPre);
     card.appendChild(previewMsgBox);
+
+    if (this.getOrderRelay()) {
+      const relayNote = document.createElement('p');
+      relayNote.className = 'sf-relay-note';
+      relayNote.textContent =
+        'Seu pedido vai para a Mila, da equipe Vitrine Inspira, que repassa ao negócio pelo WhatsApp. Mantenha o código no começo da mensagem.';
+      card.appendChild(relayNote);
+    }
 
     const rawPhone = String(
       this.options.targetWhatsapp || this.menu?.whatsapp || '5511999999999'
