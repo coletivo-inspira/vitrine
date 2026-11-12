@@ -37,6 +37,7 @@ import {
   computeSha256Hex,
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
+import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1251,6 +1252,18 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return result;
     },
 
+    async lookupMilaRelay(code) {
+      const matches = [];
+      for (const publication of publicationsBySlug.values()) {
+        if (publication.menu?.orderRelay?.code !== code) continue;
+        const site = [...sites.values()].find((entry) => entry.slug === publication.slug);
+        const whatsapp = site ? drafts.get(site.id)?.content?.whatsapp : null;
+        if (!isValidWhatsapp(whatsapp)) continue;
+        matches.push({ slug: publication.slug, name: publication.menu.name, whatsapp: whatsapp.trim() });
+      }
+      return matches;
+    },
+
     async createSite({
       userId,
       name,
@@ -1493,6 +1506,7 @@ async function hydratePublicationRecord(row) {
     slug: row.slug ?? rawMenu.slug,
     businessName: rawMenu.name ?? rawMenu.businessName,
     whatsapp: rawMenu.whatsapp,
+    ...(rawMenu.orderRelay?.via === ORDER_RELAY_MILA ? { orderRelay: ORDER_RELAY_MILA } : {}),
     ...(rawMenu.components ? { components: rawMenu.components } : {}),
     ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
     ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
@@ -1822,6 +1836,19 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       );
       if (!response.ok) throw new Error('Falha ao consultar a autorização da plataforma.');
       return (await response.json()).length > 0;
+    },
+
+    async lookupMilaRelay(code, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/lookup_mila_relay`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ target_code: code })
+      });
+      if (!response.ok) throw new Error('Falha ao localizar a vitrine pelo código da Mila.');
+      const rows = await response.json();
+      return (Array.isArray(rows) ? rows : [])
+        .filter((row) => isValidWhatsapp(row?.whatsapp))
+        .map((row) => ({ slug: row.slug, name: row.name, whatsapp: row.whatsapp.trim() }));
     },
 
     async listCms({ token }) {
@@ -3392,6 +3419,24 @@ export function createApiHandler(deps = {}) {
           return jsonResponse(200, { request: updated });
         }
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para administração.');
+      }
+
+      if (pathname === '/api/admin/mila-relay') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para a Mila.');
+        const code = normalizeMilaRelayCode(url.searchParams.get('code') ?? '');
+        if (!code) {
+          return errorResponse(422, 'INVALID_MILA_CODE', 'Informe um código no formato #VI-XXXXXX-XXXX.');
+        }
+        const matches = typeof store.lookupMilaRelay === 'function'
+          ? await store.lookupMilaRelay(code, options)
+          : [];
+        return jsonResponse(200, { code, matches }, { 'cache-control': 'no-store' });
       }
 
       if (pathname === '/api/admin/templates') {

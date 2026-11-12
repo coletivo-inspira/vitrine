@@ -1,3 +1,5 @@
+import { withMilaRelayPrefix } from '../web/assets/mila-relay.mjs';
+
 // Explicit projection: never serialize the private draft or its owner/session.
 function text(value, name, max = 160) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) {
@@ -56,5 +58,10 @@ export function whatsappLink(menu, itemId) {
   const checked = publicMenu({ ...menu, items: menu.items.map(item => ({ ...item, active: true })) });
   const item = checked.items.find(entry => entry.id === itemId);
   if (!item) throw new TypeError('Unknown item');
-  return `https://wa.me/${checked.whatsapp}?text=${encodeURIComponent(`Olá! Tenho interesse em ${item.name}. Pode confirmar preço e disponibilidade?`)}`;
+  const message = withMilaRelayPrefix(
+    `Olá! Tenho interesse em ${item.name}. Pode confirmar preço e disponibilidade?`,
+    menu.orderRelay,
+    checked.name
+  );
+  return `https://wa.me/${checked.whatsapp}?text=${encodeURIComponent(message)}`;
 }

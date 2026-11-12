@@ -1,3 +1,5 @@
+import { ORDER_RELAY_MILA, isMilaRelayCode, withMilaRelayPrefix } from './mila-relay.mjs';
+
 /**
  * Shared Storefront Renderer for Vitrine Inspira.
  * Used by both the Public Storefront (/vitrine/ & /<slug>) and the Portal Editor Live Preview (/portal/).
@@ -1327,7 +1329,20 @@ export class StorefrontRenderer {
     parent.appendChild(card);
   }
 
+  getOrderRelay() {
+    const relay = this.menu?.orderRelay;
+    return relay?.via === ORDER_RELAY_MILA && isMilaRelayCode(relay.code) ? relay : null;
+  }
+
   buildOrderMessage() {
+    return withMilaRelayPrefix(
+      this.buildOrderBody(),
+      this.getOrderRelay(),
+      this.menu?.name || this.menu?.businessName || ''
+    );
+  }
+
+  buildOrderBody() {
     const catalogType = this.getCatalogType();
     const resolvedComponents = this.getResolvedComponents();
     const resolvedFields = this.getResolvedOrderFields();
@@ -1578,6 +1593,14 @@ export class StorefrontRenderer {
     previewMsgPre.textContent = compiledMessage;
     previewMsgBox.appendChild(previewMsgPre);
     card.appendChild(previewMsgBox);
+
+    if (this.getOrderRelay()) {
+      const relayNote = document.createElement('p');
+      relayNote.className = 'sf-relay-note';
+      relayNote.textContent =
+        'Seu pedido vai para a Mila, da equipe Vitrine Inspira, que repassa ao negócio pelo WhatsApp. Mantenha o código no começo da mensagem.';
+      card.appendChild(relayNote);
+    }
 
     const rawPhone = String(
       this.options.targetWhatsapp || this.menu?.whatsapp || '5511999999999'

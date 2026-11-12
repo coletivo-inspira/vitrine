@@ -851,6 +851,13 @@ html[data-theme="dark"] .brand .brand-logo-dark {
   color: var(--ink);
 }
 
+.sf-relay-note {
+  margin: -4px 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
