@@ -691,65 +691,6 @@ from public.sites s
 where s.id = pr.site_id
   and not (pr.menu ? 'catalogType');
 
--- 8. Supabase Storage bucket catalog-images (Free 1 GB) with member-only write RLS
-create schema if not exists storage;
-grant usage on schema storage to anon, authenticated;
-
-create table if not exists storage.buckets (
-  id text primary key,
-  name text not null,
-  owner uuid null,
-  public boolean not null default false,
-  file_size_limit bigint null,
-  allowed_mime_types text[] null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists storage.objects (
-  id uuid primary key default gen_random_uuid(),
-  bucket_id text null references storage.buckets(id),
-  name text null,
-  owner uuid null default auth.uid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  last_accessed_at timestamptz not null default now(),
-  metadata jsonb null,
-  unique (bucket_id, name)
-);
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'storage' and p.proname = 'foldername'
-  ) then
-    execute $fn$
-      create function storage.foldername(name text)
-      returns text[]
-      language sql
-      immutable
-      set search_path = ''
-      as $body$
-        select string_to_array(coalesce(name, ''), '/');
-      $body$;
-    $fn$;
-  end if;
-end
-$$;
-
-grant execute on function storage.foldername(text) to anon, authenticated;
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('catalog-images', 'catalog-images', true, 262144, array['image/webp'])
-on conflict (id) do update
-  set public = excluded.public,
-      file_size_limit = excluded.file_size_limit,
-      allowed_mime_types = excluded.allowed_mime_types,
-      updated_at = now();
-
 create or replace function private.can_access_catalog_image_object(object_name text)
 returns boolean
 language plpgsql
@@ -775,52 +716,128 @@ $$;
 revoke all on function private.can_access_catalog_image_object(text) from public, anon;
 grant execute on function private.can_access_catalog_image_object(text) to authenticated;
 
-alter table storage.objects enable row level security;
+-- 8. Supabase Storage bucket catalog-images (Free 1 GB) with member-only write RLS
+do $$
+begin
+  -- Local/PGlite test-harness shim: hosted Supabase pre-provisions schema storage
+  -- owned by supabase_storage_admin and forbids DDL on it from the migration role.
+  if not exists (
+    select 1 from pg_namespace where nspname = 'storage'
+  ) then
+    execute 'create schema storage';
+    execute 'grant usage on schema storage to anon, authenticated';
 
-grant select on storage.buckets, storage.objects to anon, authenticated;
-grant insert (bucket_id, name, owner, metadata), update (name, metadata), delete on storage.objects to authenticated;
+    execute $ddl$
+      create table storage.buckets (
+        id text primary key,
+        name text not null,
+        owner uuid null,
+        public boolean not null default false,
+        file_size_limit bigint null,
+        allowed_mime_types text[] null,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    $ddl$;
 
-drop policy if exists catalog_images_public_select on storage.objects;
-create policy catalog_images_public_select
-  on storage.objects
-  for select
-  to anon, authenticated
-  using (bucket_id = 'catalog-images');
+    execute $ddl$
+      create table storage.objects (
+        id uuid primary key default gen_random_uuid(),
+        bucket_id text null references storage.buckets(id),
+        name text null,
+        owner uuid null default auth.uid(),
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        last_accessed_at timestamptz not null default now(),
+        metadata jsonb null,
+        unique (bucket_id, name)
+      )
+    $ddl$;
 
-drop policy if exists catalog_images_member_insert on storage.objects;
-create policy catalog_images_member_insert
-  on storage.objects
-  for insert
-  to authenticated
-  with check (
-    bucket_id = 'catalog-images'
-    and name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[a-z0-9][a-z0-9._-]*\.webp$'
-    and private.can_access_catalog_image_object(name)
-  );
+    execute $fn$
+      create function storage.foldername(name text)
+      returns text[]
+      language sql
+      immutable
+      set search_path = ''
+      as $body$
+        select string_to_array(coalesce(name, ''), '/');
+      $body$
+    $fn$;
 
-drop policy if exists catalog_images_member_update on storage.objects;
-create policy catalog_images_member_update
-  on storage.objects
-  for update
-  to authenticated
-  using (
-    bucket_id = 'catalog-images'
-    and private.can_access_catalog_image_object(name)
-  )
-  with check (
-    bucket_id = 'catalog-images'
-    and name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[a-z0-9][a-z0-9._-]*\.webp$'
-    and private.can_access_catalog_image_object(name)
-  );
+    execute 'grant execute on function storage.foldername(text) to anon, authenticated';
+    execute 'alter table storage.objects enable row level security';
+    execute 'grant select on storage.buckets, storage.objects to anon, authenticated';
+    execute 'grant insert (bucket_id, name, owner, metadata), update (name, metadata), delete on storage.objects to authenticated';
+  end if;
 
-drop policy if exists catalog_images_member_delete on storage.objects;
-create policy catalog_images_member_delete
-  on storage.objects
-  for delete
-  to authenticated
-  using (
-    bucket_id = 'catalog-images'
-    and private.can_access_catalog_image_object(name)
-  );
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('catalog-images', 'catalog-images', true, 262144, array['image/webp'])
+  on conflict (id) do update
+    set public = excluded.public,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types,
+        updated_at = now();
+
+  -- Only the owner of storage.objects (or a role with ownership membership) can create/drop policies on it.
+  if pg_has_role(current_user, (
+    select c.relowner
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+  ), 'USAGE') then
+    execute 'drop policy if exists catalog_images_public_select on storage.objects';
+    execute $pol$
+      create policy catalog_images_public_select
+        on storage.objects
+        for select
+        to anon, authenticated
+        using (bucket_id = 'catalog-images')
+    $pol$;
+
+    execute 'drop policy if exists catalog_images_member_insert on storage.objects';
+    execute $pol$
+      create policy catalog_images_member_insert
+        on storage.objects
+        for insert
+        to authenticated
+        with check (
+          bucket_id = 'catalog-images'
+          and name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[a-z0-9][a-z0-9._-]*\.webp$'
+          and private.can_access_catalog_image_object(name)
+        )
+    $pol$;
+
+    execute 'drop policy if exists catalog_images_member_update on storage.objects';
+    execute $pol$
+      create policy catalog_images_member_update
+        on storage.objects
+        for update
+        to authenticated
+        using (
+          bucket_id = 'catalog-images'
+          and private.can_access_catalog_image_object(name)
+        )
+        with check (
+          bucket_id = 'catalog-images'
+          and name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[a-z0-9][a-z0-9._-]*\.webp$'
+          and private.can_access_catalog_image_object(name)
+        )
+    $pol$;
+
+    execute 'drop policy if exists catalog_images_member_delete on storage.objects';
+    execute $pol$
+      create policy catalog_images_member_delete
+        on storage.objects
+        for delete
+        to authenticated
+        using (
+          bucket_id = 'catalog-images'
+          and private.can_access_catalog_image_object(name)
+        )
+    $pol$;
+  end if;
+end
+$$;
 
 commit;
