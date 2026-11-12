@@ -122,9 +122,14 @@ export function getSectionFromHash(hash) {
     '#perfil': 'perfil',
     '#pedidos': 'pedidos',
     '#wizard': 'wizard',
-    '#editor': 'editor'
+    '#editor': 'editor',
+    '#profile-gate': 'profile-gate'
   };
   return hashToSection[hash] || 'inicio';
+}
+
+export function isProfileComplete() {
+  return !!(profile && profile.displayName && profile.businessName && profile.city && profile.whatsapp && /^[1-9]\d{7,14}$/.test(profile.whatsapp));
 }
 
 export function handleRouting() {
@@ -132,9 +137,27 @@ export function handleRouting() {
     showSection('auth');
     return;
   }
+
+  const complete = isProfileComplete();
   const hash = globalThis.window?.location?.hash || '';
-  const section = getSectionFromHash(hash);
-  
+  let section = getSectionFromHash(hash);
+
+  if (!complete) {
+    section = 'profile-gate';
+    if (globalThis.window && globalThis.window.location.hash !== '#profile-gate') {
+      globalThis.window.location.hash = '#profile-gate';
+      return;
+    }
+  } else {
+    if (section === 'profile-gate') {
+      section = 'inicio';
+      if (globalThis.window) {
+        globalThis.window.location.hash = '#inicio';
+        return;
+      }
+    }
+  }
+
   if (section === 'editor' && !activeSite) {
     if (globalThis.window) {
       globalThis.window.location.hash = '#vitrines';
