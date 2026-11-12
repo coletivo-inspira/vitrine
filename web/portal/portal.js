@@ -2,6 +2,7 @@ import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './pla
 import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
+import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 
 // State variables
 let isOnline = false;
@@ -32,6 +33,7 @@ const authSection = globalThis.document?.getElementById('auth-section');
 const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
 const vitrinesSection = globalThis.document?.getElementById('vitrines-section');
 const insightsSection = globalThis.document?.getElementById('insights-section');
+const leiloesSection = globalThis.document?.getElementById('leiloes-section');
 const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
@@ -124,6 +126,7 @@ export function getSectionFromHash(hash) {
     '#vitrines': 'vitrines',
     '#dashboard': 'vitrines',
     '#insights': 'insights',
+    '#leiloes': 'leiloes',
     '#perfil': 'perfil',
     '#pedidos': 'pedidos',
     '#wizard': 'wizard',
@@ -197,6 +200,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupProfileChips();
   setupWizardFlow();
   setupInsightsControls();
+  initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
   setupHashRouting();
   await checkSession();
   if (currentUser) {
@@ -870,6 +874,7 @@ export function showSection(section) {
     if (inicioSection) inicioSection.hidden = section !== 'inicio';
     if (vitrinesSection) vitrinesSection.hidden = section !== 'vitrines';
     if (insightsSection) insightsSection.hidden = section !== 'insights';
+    if (leiloesSection) leiloesSection.hidden = section !== 'leiloes';
     if (perfilSection) perfilSection.hidden = section !== 'perfil';
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
     if (wizardSection) wizardSection.hidden = section !== 'wizard';
@@ -885,6 +890,9 @@ export function showSection(section) {
     if (section === 'insights') {
       syncInsightsSiteSelector();
       loadInsightsForActiveSite();
+    }
+    if (section === 'leiloes') {
+      void loadAuctionsPanel();
     }
   }
 }
@@ -1580,8 +1588,23 @@ function renderSites() {
       openEditor(site);
     });
 
+    const actions = document.createElement('div');
+    actions.className = 'site-item-actions';
+    actions.appendChild(actionBtn);
+    if (site.role === 'owner' || site.role === 'admin') {
+      const auctionsBtn = document.createElement('button');
+      auctionsBtn.className = 'button button-small button-secondary button-pill';
+      auctionsBtn.type = 'button';
+      auctionsBtn.textContent = 'Leilões';
+      auctionsBtn.addEventListener('click', () => {
+        selectAuctionSite(site.id);
+        if (globalThis.window) globalThis.window.location.hash = '#leiloes';
+      });
+      actions.appendChild(auctionsBtn);
+    }
+
     item.appendChild(info);
-    item.appendChild(actionBtn);
+    item.appendChild(actions);
 
     sitesListContainer.appendChild(item);
   });

@@ -149,6 +149,12 @@
             </a>
           </li>
           <li>
+            <a href="#leiloes" class="nav-link" data-section="leiloes">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><path d="m21 11-8-8"/></svg>
+              Leilões
+            </a>
+          </li>
+          <li>
             <a href="#perfil" class="nav-link" data-section="perfil">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               Perfil e Interesses
@@ -504,6 +510,24 @@
               Cada visitante curte um item uma única vez, lembrado por um cookie funcional e anônimo. Nenhum IP ou dado pessoal é armazenado.
             </p>
           </section>
+        </section>
+
+        <section id="leiloes-section" class="shell-section" hidden>
+          <div class="section-header insights-header-flex">
+            <div>
+              <h1 class="display-title">Leilões</h1>
+              <p class="section-desc">Acompanhe os lances, o encerramento e quem venceu cada item em leilão. Nome e WhatsApp de quem deu lance aparecem só para proprietário e administradores.</p>
+            </div>
+            <div class="auctions-toolbar">
+              <div class="form-group-inline">
+                <label for="auctions-site-select">Vitrine:</label>
+                <select id="auctions-site-select" class="select-styled compact-select"></select>
+              </div>
+              <button id="auctions-refresh" type="button" class="button button-small button-secondary button-pill">Atualizar</button>
+            </div>
+          </div>
+          <p id="auctions-status" class="auction-empty" role="status"></p>
+          <div id="auctions-list" class="auctions-list"></div>
         </section>
 
         <!-- Section 3: Perfil e Interesses -->

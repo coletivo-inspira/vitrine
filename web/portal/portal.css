@@ -5350,3 +5350,204 @@ textarea {
     grid-template-columns: minmax(0, 1fr) 96px;
   }
 }
+
+/* Leilão: cartão na prévia do editor e seção "Leilões" do painel (Spec 013) */
+.sf-auction-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.sf-auction-status.is-open {
+  border-color: var(--orange);
+  background: var(--apricot);
+  color: var(--orange);
+}
+
+.sf-auction-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.auctions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.auctions-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.auction-card {
+  display: grid;
+  gap: 14px;
+}
+
+.auction-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.auction-card-header h2 {
+  margin: 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.auction-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.auction-stats div {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.auction-stats dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.auction-stats dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.auction-winner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--apricot);
+  border-left: 4px solid var(--orange);
+}
+
+.auction-winner p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.auction-winner-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.auction-winner-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.auction-bids summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.auction-bid-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auction-bid-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.auction-bid-row.is-void {
+  opacity: 0.7;
+}
+
+.auction-bid-row.is-void .auction-bid-amount {
+  text-decoration: line-through;
+}
+
+.auction-bid-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.auction-bid-info span {
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.auction-bid-amount {
+  font-weight: 700;
+}
+
+.auction-empty {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.auction-void-form {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+}
+
+.auction-void-form textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+}
+
+.auction-void-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.auction-void-check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--orange);
+}
+
+.site-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

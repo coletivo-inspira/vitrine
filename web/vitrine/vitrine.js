@@ -1,4 +1,5 @@
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
+import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
@@ -293,6 +294,40 @@ export function createStorefrontLikesClient({ slug, fetchImpl = globalThis.fetch
   };
 }
 
+export function createAuctionClient({ slug, fetchImpl = globalThis.fetch, onBoard } = {}) {
+  const base = `/api/public/auctions/${encodeURIComponent(slug)}`;
+
+  async function loadBoard() {
+    try {
+      const response = await fetchImpl(base, { headers: { accept: 'application/json' }, cache: 'no-store' });
+      if (!response?.ok) return null;
+      const board = await response.json();
+      onBoard?.(board);
+      return board;
+    } catch {
+      return null;
+    }
+  }
+
+  async function placeBid(payload) {
+    try {
+      const response = await fetchImpl(`${base}/bids`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 201) return { ok: true, ...body };
+      if (response.status === 202) return { ok: false, error: { code: 'INVALID_BID' } };
+      return { ok: false, error: body?.error ?? { code: 'AUCTIONS_UNAVAILABLE' } };
+    } catch {
+      return { ok: false, error: { code: 'AUCTIONS_UNAVAILABLE' } };
+    }
+  }
+
+  return { loadBoard, placeBid, refresh: loadBoard };
+}
+
 export async function bootStorefront(deps = {}) {
   const doc = deps.document ?? globalThis.document;
   if (!doc) return null;
@@ -426,6 +461,30 @@ export async function bootStorefront(deps = {}) {
       }
     });
     renderer.metricsCollector = collector;
+
+    const hasAuctions = categories.some((category) => (category.items ?? []).some(isAuctionItem));
+    if (hasAuctions) {
+      const auctionClient = createAuctionClient({
+        slug,
+        fetchImpl,
+        onBoard: (board) => renderer.setAuctionBoard(board)
+      });
+      renderer.options.auctionClient = auctionClient;
+      const refreshWhenVisible = () => {
+        if (doc.visibilityState !== 'hidden' && renderer.stage === 1) auctionClient.loadBoard();
+      };
+      const setIntervalImpl = deps.setInterval ?? globalThis.setInterval;
+      if (typeof setIntervalImpl === 'function') {
+        renderer.auctionTimer = setIntervalImpl(refreshWhenVisible, AUCTION_RULES.boardPollMs);
+      }
+      if (typeof doc.addEventListener === 'function') {
+        doc.addEventListener('visibilitychange', refreshWhenVisible);
+      }
+      renderer.render();
+      await auctionClient.loadBoard();
+      return renderer;
+    }
+
     renderer.render();
     likesClient.load();
     return renderer;
