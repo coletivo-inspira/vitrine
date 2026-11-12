@@ -2,6 +2,7 @@ import {
   formatPriceBRL,
   interpolateWhatsappTemplate
 } from '../assets/storefront-renderer.mjs';
+import { ORDER_RELAY_MILA, buildPublicOrderRelay, withMilaRelayPrefix } from '../assets/mila-relay.mjs';
 
 export const MAX_TIME_SLOTS = 24;
 const TIME_SLOT_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -264,7 +265,7 @@ export function buildSimulatedWhatsappPreview(draftContent = {}) {
         : formatPriceBRL(totalCents)
       : 'Sob orçamento';
 
-  const message = interpolateWhatsappTemplate(template, {
+  const interpolated = interpolateWhatsappTemplate(template, {
     itens: itemLines.join('\n'),
     total: totalStr,
     data: '15/11/2026',
@@ -272,6 +273,15 @@ export function buildSimulatedWhatsappPreview(draftContent = {}) {
     endereco: 'Entrega: Rua das Flores, 120 - Centro',
     nome: 'Maria'
   });
+  let orderRelay = null;
+  if (draftContent?.orderRelay === ORDER_RELAY_MILA) {
+    try {
+      orderRelay = buildPublicOrderRelay(draftContent.slug);
+    } catch {
+      orderRelay = null;
+    }
+  }
+  const message = withMilaRelayPrefix(interpolated, orderRelay, draftContent?.businessName);
 
   const unsupported = findUnsupportedTemplateVariables(
     template,

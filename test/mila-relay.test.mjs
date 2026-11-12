@@ -12,6 +12,7 @@ import {
   withMilaRelayPrefix
 } from '../web/assets/mila-relay.mjs';
 import { StorefrontRenderer } from '../web/assets/storefront-renderer.mjs';
+import { buildSimulatedWhatsappPreview } from '../web/portal/order-message-tools.mjs';
 import { validateDraftContent } from '../src/portal-validation.mjs';
 import {
   assertNoPrivateLeakage,
@@ -134,6 +135,19 @@ test('Mensagem montada na vitrine começa com o código da Mila', async () => {
   const directRenderer = new StorefrontRenderer(null, { ...structuredClone(menu), orderRelay: undefined }, {});
   directRenderer.cart.set('calabresa', 1);
   assert.ok(!directRenderer.buildOrderMessage().startsWith('#VI-'));
+});
+
+test('Simular mensagem no editor mostra o código da Mila quando a chave está ligada', () => {
+  const content = {
+    slug: 'pizzaria-do-ze',
+    businessName: 'Pizzaria do Zé',
+    whatsapp: OWNER_PHONE,
+    categories: [{ name: 'Pizzas', items: [{ name: 'Calabresa', priceCents: 4500, active: true }] }]
+  };
+  const code = buildMilaRelayCode('pizzaria-do-ze');
+  const relayed = buildSimulatedWhatsappPreview({ ...content, orderRelay: 'mila' });
+  assert.ok(relayed.message.startsWith(`#${code} · Pedido para Pizzaria do Zé\n\n`));
+  assert.ok(!buildSimulatedWhatsappPreview(content).message.startsWith('#VI-'));
 });
 
 test('Worker: nenhuma resposta pública da vitrine com Mila contém o número do dono', async () => {
