@@ -627,13 +627,24 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
       '/planos',
       '/planos/',
       '/orcamento',
-      '/orcamento/'
+      '/orcamento/',
+      '/privacidade',
+      '/privacidade/',
+      '/termos',
+      '/termos/'
     ]) {
       const mktRes = await worker.fetch(new Request(`https://vitrine.inspira.dev.br${mktPath}`), env);
       assert.equal(mktRes.status, 200, `Esperado 200 em https://vitrine.inspira.dev.br${mktPath}`);
-      assert.equal(mktRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+      if (/^\/(?:privacidade|termos)\/?$/.test(mktPath)) {
+        assert.match(mktRes.headers.get('content-security-policy'), /style-src 'self';/);
+        assert.doesNotMatch(mktRes.headers.get('content-security-policy'), /unsafe-inline/);
+      } else {
+        assert.equal(mktRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+      }
       const mktHtml = await mktRes.text();
       assert.match(mktHtml, /Vitrine Inspira/);
+      if (mktPath.startsWith('/privacidade')) assert.match(mktHtml, /id="exclusao-dados"/);
+      if (mktPath.startsWith('/termos')) assert.match(mktHtml, /<h1>Termos de Uso<\/h1>/);
     }
 
     const portfolioRes = await worker.fetch(

@@ -23,7 +23,9 @@ export const RESERVED_SLUGS = Object.freeze([
   'possibilidades',
   'planos',
   'orcamento',
-  'por-cidade'
+  'por-cidade',
+  'privacidade',
+  'termos'
 ]);
 
 export const DEFAULT_TEMPLATE = 'pizzeria-v1';

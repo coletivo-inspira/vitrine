@@ -46,7 +46,9 @@ test('every nav link on marketing pages points to a page that exists in dist/', 
     'como-funciona/index.html',
     'possibilidades/index.html',
     'planos/index.html',
-    'orcamento/index.html'
+    'orcamento/index.html',
+    'privacidade/index.html',
+    'termos/index.html'
   ];
   
   for (const page of marketingPages) {
@@ -85,7 +87,9 @@ test('no user-visible catálogo or cardápio exists on marketing pages in dist/'
     'como-funciona/index.html',
     'possibilidades/index.html',
     'planos/index.html',
-    'orcamento/index.html'
+    'orcamento/index.html',
+    'privacidade/index.html',
+    'termos/index.html'
   ];
   
   for (const page of marketingPages) {

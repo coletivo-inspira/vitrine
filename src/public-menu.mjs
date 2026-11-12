@@ -30,7 +30,9 @@ const RESERVED_PUBLIC_SLUGS = Object.freeze([
   'possibilidades',
   'planos',
   'orcamento',
-  'por-cidade'
+  'por-cidade',
+  'privacidade',
+  'termos'
 ]);
 
 export function publicMenu(draft) {

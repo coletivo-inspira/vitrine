@@ -174,6 +174,8 @@ Todas as URLs usam HTTPS estrito nos domínios planejados no [ADR 0006](../adr/0
 
 ## Bloqueios antes da liberação a clientes
 
+O pacote público inclui as páginas `/privacidade/` (com `#exclusao-dados`) e `/termos/`, conforme a [Spec 010](../../specs/010-ux-audit-meta-readiness/spec.md). Antes de publicar, confirme o texto institucional e o canal de privacidade, verifique se alguma vitrine publicada usa os endereços reservados e valide as URLs por HTTPS. Cadastre os callbacks no console somente depois de implementar e testar os endpoints correspondentes.
+
 1. **Piloto fechado (Ganja)**: itens 5, 8, 9 e 10; depois, a implementação do fluxo do painel (#49) com o item 11.
 2. **Liberação geral**: itens 12 e 13.
 
