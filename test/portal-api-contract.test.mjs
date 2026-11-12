@@ -467,12 +467,71 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
       SUPABASE_JWKS: jwks
     };
 
-    // 1. POST /api/auth/session rejeita tokens inválidos/expirados sem definir Set-Cookie
+    // 1. POST /api/auth/session bloqueia Login CSRF exigindo Origin igual à própria origem da requisição (403 sem Set-Cookie)
+    for (const badOrigin of [
+      null,
+      '',
+      'null',
+      'https://attacker.example.com',
+      'http://vitrine-inspira.vitrineinspira.workers.dev',
+      'https://vitrine-inspira.vitrineinspira.workers.dev:8443'
+    ]) {
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      if (badOrigin !== null) {
+        headers.set('Origin', badOrigin);
+      }
+      const csrfRes = await api.fetch(
+        new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ accessToken: validAccessToken })
+        }),
+        envWithJwks
+      );
+      assert.equal(csrfRes.status, 403, `Origin ${String(badOrigin)} deve ser rejeitado com 403`);
+      assert.equal(csrfRes.headers.get('set-cookie'), null, 'Jamais deve definir cookie em tentativa de Login CSRF');
+      const csrfBody = await csrfRes.json();
+      assert.equal(csrfBody.error.code, 'FORBIDDEN_ORIGIN');
+    }
+
+    // 2. POST /api/auth/session exige Content-Type: application/json e rejeita text/plain ou form bodies com 415 sem Set-Cookie
+    for (const badContentType of [
+      null,
+      '',
+      'text/plain',
+      'text/plain; charset=utf-8',
+      'application/x-www-form-urlencoded',
+      'multipart/form-data; boundary=---123'
+    ]) {
+      const headers = new Headers({
+        Origin: 'https://vitrine-inspira.vitrineinspira.workers.dev'
+      });
+      if (badContentType !== null) {
+        headers.set('Content-Type', badContentType);
+      }
+      const mediaRes = await api.fetch(
+        new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ accessToken: validAccessToken })
+        }),
+        envWithJwks
+      );
+      assert.equal(mediaRes.status, 415, `Content-Type ${String(badContentType)} deve ser rejeitado com 415`);
+      assert.equal(mediaRes.headers.get('set-cookie'), null, 'Jamais deve definir cookie quando Content-Type é inválido');
+      const mediaBody = await mediaRes.json();
+      assert.equal(mediaBody.error.code, 'UNSUPPORTED_MEDIA_TYPE');
+    }
+
+    // 3. POST /api/auth/session rejeita tokens inválidos/expirados sem definir Set-Cookie
     for (const badBody of [{}, { accessToken: '' }, { accessToken: 'invalid.jwt.token' }, { accessToken: expiredAccessToken }]) {
       const badRes = await api.fetch(
         new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            Origin: 'https://vitrine-inspira.vitrineinspira.workers.dev',
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify(badBody)
         }),
         envWithJwks
@@ -481,11 +540,14 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
       assert.equal(badRes.headers.get('set-cookie'), null, 'Jamais deve definir cookie para token inválido');
     }
 
-    // 2. POST /api/auth/session aceita ES256 válido e define __Host-vitrine_session HttpOnly; Secure; SameSite=Lax; Path=/
+    // 4. POST /api/auth/session aceita ES256 válido com Origin correspondente e Content-Type application/json (incluindo charset) e define __Host-vitrine_session
     const establishRes = await api.fetch(
       new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Origin: 'https://vitrine-inspira.vitrineinspira.workers.dev',
+          'Content-Type': 'application/json; charset=utf-8'
+        },
         body: JSON.stringify({ accessToken: validAccessToken })
       }),
       envWithJwks
@@ -556,6 +618,9 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
       }
 
       const headers = new Headers(init.headers || {});
+      if ((init.method || 'GET').toUpperCase() === 'POST' && !headers.has('origin')) {
+        headers.set('origin', reqUrl.origin);
+      }
       if (activeCookie && !headers.has('cookie')) {
         headers.set('cookie', activeCookie);
       }

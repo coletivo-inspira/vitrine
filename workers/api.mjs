@@ -1596,6 +1596,24 @@ export function createApiHandler(deps = {}) {
         }
 
         if (method === 'POST') {
+          const requestOrigin = (request.headers.get('origin') || '').trim();
+          if (!requestOrigin || requestOrigin !== url.origin) {
+            return errorResponse(
+              403,
+              'FORBIDDEN_ORIGIN',
+              'Origem da requisição inválida para estabelecimento de sessão.'
+            );
+          }
+
+          const contentType = (request.headers.get('content-type') || '').trim();
+          if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+            return errorResponse(
+              415,
+              'UNSUPPORTED_MEDIA_TYPE',
+              'O cabeçalho Content-Type deve ser application/json.'
+            );
+          }
+
           let candidateToken = null;
           let rawBody = '';
           try {
