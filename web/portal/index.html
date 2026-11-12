@@ -744,15 +744,39 @@
                     <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
                   </div>
                   <p id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/pizzaria-bella</p>
+                  <div class="editor-status-line">
+                    <span id="autosave-indicator" class="autosave-indicator saved" role="status" aria-live="polite">Todas as alterações foram salvas</span>
+                  </div>
+                </div>
+                <div class="editor-type-inline-group">
+                  <label for="editor-catalog-type" class="editor-type-inline-label">Tipo de vitrine</label>
+                  <select id="editor-catalog-type" name="catalogType" class="select-styled editor-type-select-compact">
+                    <option value="products">Produtos (com carrinho)</option>
+                    <option value="booking">Agendamento de Serviços</option>
+                    <option value="quote">Lista de Interesse / Orçamento</option>
+                  </select>
                 </div>
               </div>
 
               <div class="editor-save-container">
-                <span id="autosave-indicator" class="autosave-indicator saved" role="status" aria-live="polite">Todas as alterações foram salvas</span>
-                <a id="editor-open-public-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine</a>
-                <button id="secure-preview-button" class="button button-small button-secondary button-pill" type="button" hidden>Abrir prévia salva</button>
-                <button id="save-draft-button" class="button button-small button-secondary button-pill" type="button">Salvar Rascunho</button>
-                <button id="publish-site-button" class="button button-small button-pill" type="button">Publicar Vitrine</button>
+                <div class="dropdown-wrapper editor-view-menu-wrapper">
+                  <button id="editor-view-menu-btn" class="button button-small button-secondary button-pill editor-action-btn-view" type="button" aria-haspopup="menu" aria-expanded="false">
+                    <svg width="16" height="16" aria-hidden="true"><use href="#icon-eye"/></svg>
+                    <span>Ver</span>
+                  </button>
+                  <div id="editor-view-menu" class="dropdown-menu editor-view-dropdown" hidden role="menu" aria-label="Visualizar vitrine">
+                    <a id="editor-open-public-link" role="menuitem" class="dropdown-item" href="/loja1" target="_blank" rel="noopener noreferrer">
+                      <strong>Abrir vitrine</strong>
+                      <span>Ver página publicada</span>
+                    </a>
+                    <button id="secure-preview-button" role="menuitem" class="dropdown-item" type="button" hidden>
+                      <strong>Abrir prévia salva</strong>
+                      <span>Link privado temporário</span>
+                    </button>
+                  </div>
+                </div>
+                <button id="save-draft-button" class="button button-small button-secondary button-pill editor-equal-action-btn" type="button">Salvar rascunho</button>
+                <button id="publish-site-button" class="button button-small button-pill editor-equal-action-btn" type="button">Publicar vitrine</button>
               </div>
             </div>
 
@@ -803,13 +827,40 @@
             </div>
           </div>
 
-          <!-- Editor Navigation Tabs (Fix AUD-005, 44px pill targets) -->
+          <!-- Confirmation Dialog for Switching Vitrine Type -->
+          <dialog id="catalog-type-confirm-dialog" class="portal-dialog" aria-labelledby="catalog-type-dialog-title">
+            <div class="portal-dialog-body">
+              <h3 id="catalog-type-dialog-title" class="portal-dialog-title">Trocar para Agendamento de Serviços?</h3>
+              <p id="catalog-type-dialog-desc" class="portal-dialog-desc">Seus itens e categorias continuam. Os campos exibidos, os horários e os textos de Pedido &amp; Mensagem voltam ao padrão do novo tipo.</p>
+              <div class="portal-dialog-actions">
+                <button type="button" id="catalog-type-cancel-btn" class="button button-small button-secondary button-pill">Cancelar</button>
+                <button type="button" id="catalog-type-confirm-btn" class="button button-small button-pill">Trocar tipo</button>
+              </div>
+            </div>
+          </dialog>
+
+          <!-- Editor Navigation Tabs (Fix AUD-005, 44px targets with icon on top, zero horizontal scroll) -->
           <div class="editor-tabs-selector" role="tablist" aria-label="Seções do editor">
-            <button type="button" role="tab" class="tab-btn active" data-tab="items" aria-selected="true">Itens &amp; Planilha</button>
-            <button type="button" role="tab" class="tab-btn" data-tab="categories" aria-selected="false">Categorias</button>
-            <button type="button" role="tab" class="tab-btn" data-tab="settings" aria-selected="false">Configurações</button>
-            <button type="button" role="tab" class="tab-btn" data-tab="order-msg" aria-selected="false">Pedido &amp; Mensagem</button>
-            <button type="button" role="tab" class="tab-btn mobile-only-tab" data-tab="preview" aria-selected="false">Prévia ao Vivo</button>
+            <button type="button" role="tab" class="tab-btn active" data-tab="items" aria-selected="true" aria-label="Itens e planilha">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+              <span>Itens</span>
+            </button>
+            <button type="button" role="tab" class="tab-btn" data-tab="categories" aria-selected="false" aria-label="Categorias da vitrine">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              <span>Categorias</span>
+            </button>
+            <button type="button" role="tab" class="tab-btn" data-tab="settings" aria-selected="false" aria-label="Configurações e estrutura">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>Ajustes</span>
+            </button>
+            <button type="button" role="tab" class="tab-btn" data-tab="order-msg" aria-selected="false" aria-label="Pedido e mensagem">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>Pedido</span>
+            </button>
+            <button type="button" role="tab" class="tab-btn mobile-only-tab" data-tab="preview" aria-selected="false" aria-label="Prévia ao vivo">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Prévia</span>
+            </button>
           </div>
 
           <div class="editor-workspace">
@@ -987,15 +1038,6 @@
                   </div>
 
                   <div class="form-group">
-                    <label for="editor-catalog-type">Tipo de Vitrine</label>
-                    <select id="editor-catalog-type" name="catalogType" class="select-styled">
-                      <option value="products">Produtos / Vitrine (com carrinho)</option>
-                      <option value="booking">Agendamento de Serviços (serviço, dia e horário)</option>
-                      <option value="quote">Lista de Interesse / Orçamento (preço opcional)</option>
-                    </select>
-                  </div>
-
-                  <div class="form-group">
                     <span class="label-spaced">Componentes Visíveis do Item</span>
                     <span class="form-help help-block-spaced">Ligue ou desligue cada componente exibido nos cartões de item:</span>
                     <div class="checkbox-group-grid">
@@ -1051,9 +1093,22 @@
                     <ul id="team-audit"></ul>
                   </details>
 
-                  <details id="showcase-structure" class="portal-card" hidden>
-                    <summary>Identidade, menus e páginas</summary>
-                    <p id="showcase-structure-status" role="status"></p>
+                  <details id="showcase-structure" class="portal-card structure-details-card" hidden>
+                    <summary class="structure-details-summary">
+                      <span class="structure-summary-main">
+                        <span class="structure-summary-icon" aria-hidden="true">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        </span>
+                        <span class="structure-summary-texts">
+                          <strong>Identidade, menus e páginas</strong>
+                          <small>Cores, fonte, menus e páginas da sua vitrine</small>
+                        </span>
+                      </span>
+                      <span class="structure-summary-chevron" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </span>
+                    </summary>
+                    <p id="showcase-structure-status" class="structure-status-msg" role="status"></p>
                     <div id="showcase-structure-fields"></div>
                   </details>
 

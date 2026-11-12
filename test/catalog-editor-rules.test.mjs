@@ -6,6 +6,12 @@ import {
   parseCurrencyToCents,
   validateDraftContent
 } from '../src/portal-validation.mjs';
+import {
+  applyCatalogTypeSwitch,
+  getCatalogTypeDisplayLabel,
+  normalizeDraftForEditor
+} from '../web/portal/editor.js';
+import { renderStructureFields } from '../web/portal/showcase-structure.js';
 
 export function parseBrlToCents(val) {
   if (typeof val !== 'string') {
@@ -153,5 +159,176 @@ test('Frente QA - Regras do Editor de Cardápio e Máscara de Centavos', async (
 
     // Itens ocultos/inválidos devem falhar ao tentar gerar link do WhatsApp
     assert.throws(() => whatsappLink(publicData, 'p3'), /Unknown item/);
+  });
+
+  await t.test('Troca de Tipo de Vitrine no editor: cancelar não altera o rascunho e confirmar mantém itens e categorias', () => {
+    const initialDraft = normalizeDraftForEditor(
+      {
+        schemaVersion: 1,
+        template: 'products-v1',
+        catalogType: 'products',
+        slug: 'estudio-ana',
+        businessName: 'Estúdio Ana',
+        whatsapp: '5511999999999',
+        categories: [
+          {
+            id: 'cat-1',
+            name: 'Serviços & Produtos',
+            items: [
+              { id: 'i-1', name: 'Consultoria Visual', priceCents: 18000, active: true },
+              { id: 'i-2', name: 'Kit Aquarela', priceCents: 9500, active: true }
+            ]
+          }
+        ]
+      },
+      { slug: 'estudio-ana', name: 'Estúdio Ana', template: 'products-v1' }
+    );
+
+    const snapshotBeforeCancel = JSON.stringify(initialDraft);
+    // Simula cancelamento: o rascunho não sofre mutação e os rótulos do diálogo batem com os tipos
+    assert.equal(getCatalogTypeDisplayLabel('booking'), 'Agendamento de Serviços');
+    assert.equal(getCatalogTypeDisplayLabel('quote'), 'Lista de Interesse / Orçamento');
+    assert.equal(JSON.stringify(initialDraft), snapshotBeforeCancel);
+    assert.equal(initialDraft.catalogType, 'products');
+
+    // Simula confirmação: aplica a troca para 'booking', preserva categorias e itens intactos e atualiza padrões
+    applyCatalogTypeSwitch(initialDraft, 'booking');
+    assert.equal(initialDraft.catalogType, 'booking');
+    assert.equal(initialDraft.template, 'booking-v1');
+    assert.equal(initialDraft.components.durationMinutes, true);
+    assert.equal(initialDraft.orderFields.date, true);
+    assert.ok(initialDraft.orderFields.timeSlots.length > 0);
+    assert.equal(initialDraft.categories.length, 1);
+    assert.equal(initialDraft.categories[0].name, 'Serviços & Produtos');
+    assert.equal(initialDraft.categories[0].items.length, 2);
+    assert.equal(initialDraft.categories[0].items[0].name, 'Consultoria Visual');
+    assert.equal(initialDraft.categories[0].items[1].name, 'Kit Aquarela');
+  });
+
+  await t.test('renderStructureFields redesenhado monta cartões, seletor de modelos, cor e seções mantendo o formato de onSave', async () => {
+    function makeNode(tag) {
+      let _text = '';
+      const classes = new Set();
+      const el = {
+        tagName: String(tag).toUpperCase(),
+        ownerDocument: doc,
+        id: '',
+        type: '',
+        value: '',
+        checked: false,
+        disabled: false,
+        hidden: false,
+        open: false,
+        innerHTML: '',
+        children: [],
+        attributes: {},
+        listeners: {},
+        get className() {
+          return [...classes].join(' ');
+        },
+        set className(v) {
+          classes.clear();
+          String(v || '')
+            .split(/\s+/)
+            .filter(Boolean)
+            .forEach((c) => classes.add(c));
+        },
+        classList: {
+          add: (...cs) => cs.forEach((c) => c && classes.add(c)),
+          remove: (...cs) => cs.forEach((c) => classes.delete(c)),
+          contains: (c) => classes.has(c)
+        },
+        get textContent() {
+          if (this.children.length === 0) return _text;
+          return this.children.map((c) => c.textContent ?? '').join('');
+        },
+        set textContent(v) {
+          this.children = [];
+          _text = String(v ?? '');
+        },
+        appendChild(child) {
+          this.children.push(child);
+          return child;
+        },
+        append(...nodes) {
+          nodes.forEach((n) => {
+            if (typeof n === 'string') {
+              this.children.push({ nodeType: 3, textContent: n });
+            } else if (n) {
+              this.children.push(n);
+            }
+          });
+        },
+        replaceChildren(...nodes) {
+          this.children = [...nodes];
+          _text = '';
+        },
+        setAttribute(k, v) {
+          this.attributes[k] = String(v);
+          if (k === 'id') this.id = String(v);
+        },
+        getAttribute(k) {
+          return this.attributes[k] ?? null;
+        },
+        addEventListener(type, fn) {
+          if (!this.listeners[type]) this.listeners[type] = [];
+          this.listeners[type].push(fn);
+        },
+        dispatchEvent(evt) {
+          (this.listeners[evt.type] || []).forEach((fn) => fn(evt));
+        }
+      };
+      return el;
+    }
+
+    const doc = {
+      createElement: (tag) => makeNode(tag)
+    };
+    const root = makeNode('div');
+
+    let savedPayload = null;
+    renderStructureFields(
+      root,
+      {
+        theme: { accentColor: '#C74414', fontPair: 'editorial-syne', buttonStyle: 'pill' },
+        navigation: {
+          header: [{ label: 'Início', href: '#sec-hero' }],
+          footer: [{ label: 'Contato', href: '#sec-hours' }]
+        },
+        pages: [
+          {
+            slug: 'home',
+            title: 'Início',
+            active: true,
+            sections: [
+              { id: 'sec-hero', moduleCode: 'hero', active: true, config: { headline: 'Olá', subtitle: 'Sub' } }
+            ]
+          }
+        ]
+      },
+      async (payload) => {
+        savedPayload = payload;
+      },
+      [],
+      null,
+      {
+        selected: '',
+        templates: [{ code: 'products-v1', name: 'Produtos Clássico' }]
+      }
+    );
+
+    const form = root.children[0];
+    assert.ok(form, 'Deve montar o formulário de estrutura');
+    await form.listeners.submit[0]({ preventDefault() {} });
+
+    assert.ok(savedPayload, 'onSave deve ser chamado ao submeter o formulário');
+    assert.deepEqual(savedPayload.themeOverrides, {
+      accentColor: '#C74414',
+      fontPair: 'editorial-syne',
+      buttonStyle: 'pill'
+    });
+    assert.deepEqual(savedPayload.navigationMenus.header, [{ label: 'Início', href: '#sec-hero' }]);
+    assert.equal(savedPayload.pages.length, 1);
+    assert.equal(savedPayload.pages[0].sections[0].id, 'sec-hero');
   });
 });
