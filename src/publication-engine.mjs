@@ -578,6 +578,26 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function getOgImage(menu) {
+  let ogImage = menu.logoUrl || menu.coverUrl || menu.imageUrl;
+  if (!ogImage && menu.structure?.theme?.logoUrl) {
+    ogImage = menu.structure.theme.logoUrl;
+  }
+  if (!ogImage) {
+    const firstItemWithImage = menu.items?.find(item => typeof item.imageUrl === 'string' && item.imageUrl.trim());
+    if (firstItemWithImage) {
+      ogImage = firstItemWithImage.imageUrl.trim();
+    }
+  }
+  if (!ogImage) {
+    ogImage = 'https://vitrine.inspira.dev.br/assets/brand/og-vitrine.png';
+  }
+  if (ogImage.startsWith('/')) {
+    ogImage = `https://vitrine.inspira.dev.br${ogImage}`;
+  }
+  return ogImage;
+}
+
 export function formatPublicPriceBRL(priceCents) {
   const reais = Math.floor(priceCents / 100);
   const centavos = String(priceCents % 100).padStart(2, '0');
@@ -661,7 +681,7 @@ function renderStorefrontHero(menu, config = {}, id = '', navigation = '') {
 }
 
 function renderCategoryNavigation(chipsHtml) {
-  return `<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>`;
+  return `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`;
 }
 
 function renderStorefrontCatalog({ chipsHtml, sectionsHtml }, id = '', columns) {
@@ -738,22 +758,44 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
   const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
+    const welcome = menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.';
+    const ogImg = getOgImage(menu);
     return baseTemplateHtml
       .replace(
         '<title id="storefront-page-title">Cardápio Digital — Vitrine Inspira</title>',
-        `<title id="storefront-page-title">${escapeHtml(menu.name)} — Cardápio Digital</title>`
+        `<title id="storefront-page-title">${escapeHtml(menu.name)} — Vitrine</title>`
+      )
+      .replace(
+        '<meta property="og:title" id="og-title" content="Vitrine Inspira">',
+        `<meta property="og:title" id="og-title" content="${escapeHtml(menu.name)} — Vitrine">`
+      )
+      .replace(
+        '<meta property="og:description" id="og-description" content="Vitrine oficial: faça seu pedido direto no WhatsApp.">',
+        `<meta property="og:description" id="og-description" content="${escapeHtml(welcome)}">`
+      )
+      .replace(
+        '<meta property="og:url" id="og-url" content="https://inspira.dev.br/">',
+        `<meta property="og:url" id="og-url" content="https://vitrine.inspira.dev.br/${escapeHtml(menu.slug)}">`
+      )
+      .replace(
+        '<meta property="og:image" id="og-image" content="https://inspira.dev.br/assets/brand/og-vitrine.png">',
+        `<meta property="og:image" id="og-image" content="${escapeHtml(ogImg)}">`
+      )
+      .replace(
+        '<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial">',
+        `<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial de ${escapeHtml(menu.name)}">`
       )
       .replace(
         '<span id="storefront-slug-pill" class="storefront-slug-pill">/loja1</span>',
         `<span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>`
       )
       .replace(
-        '<h1 id="storefront-name">Carregando cardápio...</h1>',
+        '<h1 id="storefront-name">Carregando vitrine...</h1>',
         `<h1 id="storefront-name">${escapeHtml(hero?.headline || menu.name)}</h1>`
       )
       .replace(
-        '<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio"></nav>',
-        `<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>`
+        '<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine"></nav>',
+        `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`
       )
       .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
   }
@@ -764,8 +806,19 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#F7F7F4">
-  <meta name="description" content="Cardápio digital oficial — faça seu pedido direto no WhatsApp.">
-  <title id="storefront-page-title">${escapeHtml(menu.name)} — Cardápio Digital</title>
+  <meta name="description" content="Vitrine oficial: faça seu pedido direto no WhatsApp.">
+  <title id="storefront-page-title">${escapeHtml(menu.name)} — Vitrine</title>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vitrine Inspira">
+  <meta property="og:title" content="${escapeHtml(menu.name)} — Vitrine">
+  <meta property="og:description" content="${escapeHtml(menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.')}">
+  <meta property="og:url" content="https://vitrine.inspira.dev.br/${escapeHtml(menu.slug)}">
+  <meta property="og:image" content="${escapeHtml(getOgImage(menu))}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Vitrine oficial de ${escapeHtml(menu.name)}">
+  <meta property="og:locale" content="pt_BR">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
   <link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
@@ -773,10 +826,10 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <link rel="stylesheet" href="/vitrine/vitrine.css">
 </head>
 <body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>
-  <a class="skip-link" href="#cardapio-principal">Pular para o conteúdo</a>
+  <a class="skip-link" href="#vitrine-principal">Pular para os itens</a>
   <header class="storefront-topbar wrap">
     <div class="storefront-brand-meta">
-      <span class="storefront-template-tag">Cardápio Digital</span>
+      <span class="storefront-template-tag">Vitrine</span>
       <span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>
     </div>
     ${topNav}
@@ -787,7 +840,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
       </button>
     </div>
   </header>
-  <main id="cardapio-principal" class="wrap storefront-main">
+  <main id="vitrine-principal" class="wrap storefront-main">
     <div id="storefront-status" class="storefront-status" role="status" aria-live="polite" hidden></div>
     ${structure && !hero ? `<h1 id="storefront-name" class="storefront-accessible-title">${escapeHtml(menu.name)}</h1>` : ''}
     ${modularHtml}
