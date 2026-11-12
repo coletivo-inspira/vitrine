@@ -758,58 +758,13 @@
               </div>
 
               <div class="editor-save-container">
+                <span id="autosave-indicator" class="autosave-indicator saved" role="status" aria-live="polite">Todas as alterações foram salvas</span>
                 <a id="editor-open-public-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine</a>
                 <button id="secure-preview-button" class="button button-small button-secondary button-pill" type="button" hidden>Abrir prévia salva</button>
                 <button id="save-draft-button" class="button button-small button-secondary button-pill" type="button">Salvar Rascunho</button>
                 <button id="publish-site-button" class="button button-small button-pill" type="button">Publicar Vitrine</button>
               </div>
             </div>
-
-            <details id="publication-history" class="portal-card" hidden>
-              <summary>Versões publicadas</summary>
-              <p id="publication-history-status" role="status"></p>
-              <ul id="publication-history-list"></ul>
-            </details>
-
-            <details id="team-management" class="portal-card" hidden>
-              <summary>Equipe e permissões</summary>
-              <p id="team-status" role="status"></p>
-              <ul id="team-members"></ul>
-              <form id="team-form">
-                <label>ID da conta <input name="userId" required autocomplete="off"></label>
-                <label>Papel
-                  <select name="role">
-                    <option value="viewer">Leitor</option>
-                    <option value="editor">Editor</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </label>
-                <button class="button button-small button-pill" type="submit">Salvar membro</button>
-              </form>
-              <h3>Histórico de alterações</h3>
-              <ul id="team-audit"></ul>
-            </details>
-
-            <details id="showcase-structure" class="portal-card" hidden>
-              <summary>Identidade, menus e páginas</summary>
-              <p id="showcase-structure-status" role="status"></p>
-              <div id="showcase-structure-fields"></div>
-            </details>
-
-            <details id="asset-library" class="portal-card" hidden>
-              <summary>Biblioteca de arquivos</summary>
-              <p id="asset-library-status" role="status"></p>
-              <label>Adicionar imagem <input id="asset-library-upload" type="file" accept="image/*"></label>
-              <ul id="asset-library-list"></ul>
-            </details>
-
-            <details id="custom-domains" class="portal-card" hidden>
-              <summary>Domínios e publicação</summary>
-              <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
-              <p id="custom-domains-status" role="status"></p>
-              <div id="custom-domains-fields"></div>
-              <ul id="custom-domains-list"></ul>
-            </details>
 
             <!-- Compact inline meters -->
             <div class="editor-compact-meters" aria-label="Limites do rascunho">
@@ -889,11 +844,20 @@
                 <div class="editor-items-toolbar">
                   <!-- Type Menu Dropdown -->
                   <div class="dropdown-wrapper">
-                    <button id="add-item-button" class="button button-small button-pill" type="button" aria-haspopup="menu" aria-expanded="false">+ Adicionar Item</button>
-                    <div id="add-item-menu" class="dropdown-menu" hidden role="menu">
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="text">Só texto</button>
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="price">Com preço</button>
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="photo">Com foto</button>
+                    <button id="add-item-button" class="button button-small button-pill" type="button" aria-haspopup="menu" aria-expanded="false">+ Adicionar item</button>
+                    <div id="add-item-menu" class="dropdown-menu" hidden role="menu" aria-label="Tipo de item">
+                      <button type="button" role="menuitem" class="dropdown-item" data-type="photo">
+                        <strong>Produto com foto</strong>
+                        <span>Nome, preço, descrição e foto</span>
+                      </button>
+                      <button type="button" role="menuitem" class="dropdown-item" data-type="price">
+                        <strong>Produto ou serviço com preço</strong>
+                        <span>Nome, preço e descrição</span>
+                      </button>
+                      <button type="button" role="menuitem" class="dropdown-item" data-type="text">
+                        <strong>Só texto (orçamento)</strong>
+                        <span>Nome e descrição</span>
+                      </button>
                     </div>
                   </div>
 
@@ -956,15 +920,15 @@
                   <!-- Floating Side/Bottom Toolbar (Google Forms style) -->
                   <div class="forms-floating-toolbar" role="toolbar" aria-label="Ações do formulário">
                     <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item">
-                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-plus"/></svg>
+                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-plus"/></svg>
                       <span class="tooltip">Adicionar item</span>
                     </button>
                     <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar seção" aria-label="Adicionar seção">
-                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-edit"/></svg>
+                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-edit"/></svg>
                       <span class="tooltip">Adicionar seção</span>
                     </button>
                     <button type="button" class="toolbar-btn" id="toolbar-add-image" title="Adicionar imagem" aria-label="Adicionar imagem">
-                      <svg width="20" height="20" class="google-svg-icon"><use href="#icon-image"/></svg>
+                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-image"/></svg>
                       <span class="tooltip">Adicionar imagem</span>
                     </button>
                   </div>
@@ -1037,6 +1001,55 @@
                     </div>
                   </div>
                 </form>
+
+                <div class="editor-advanced-sections">
+                  <h3>Administração e Estrutura da Vitrine</h3>
+                  <details id="publication-history" class="portal-card" hidden>
+                    <summary>Versões publicadas</summary>
+                    <p id="publication-history-status" role="status"></p>
+                    <ul id="publication-history-list"></ul>
+                  </details>
+
+                  <details id="team-management" class="portal-card" hidden>
+                    <summary>Equipe e permissões</summary>
+                    <p id="team-status" role="status"></p>
+                    <ul id="team-members"></ul>
+                    <form id="team-form">
+                      <label>ID da conta <input name="userId" required autocomplete="off"></label>
+                      <label>Papel
+                        <select name="role">
+                          <option value="viewer">Leitor</option>
+                          <option value="editor">Editor</option>
+                          <option value="admin">Administrador</option>
+                        </select>
+                      </label>
+                      <button class="button button-small button-pill" type="submit">Salvar membro</button>
+                    </form>
+                    <h3>Histórico de alterações</h3>
+                    <ul id="team-audit"></ul>
+                  </details>
+
+                  <details id="showcase-structure" class="portal-card" hidden>
+                    <summary>Identidade, menus e páginas</summary>
+                    <p id="showcase-structure-status" role="status"></p>
+                    <div id="showcase-structure-fields"></div>
+                  </details>
+
+                  <details id="asset-library" class="portal-card" hidden>
+                    <summary>Biblioteca de arquivos</summary>
+                    <p id="asset-library-status" role="status"></p>
+                    <label>Adicionar imagem <input id="asset-library-upload" type="file" accept="image/*"></label>
+                    <ul id="asset-library-list"></ul>
+                  </details>
+
+                  <details id="custom-domains" class="portal-card" hidden>
+                    <summary>Domínios e publicação</summary>
+                    <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
+                    <p id="custom-domains-status" role="status"></p>
+                    <div id="custom-domains-fields"></div>
+                    <ul id="custom-domains-list"></ul>
+                  </details>
+                </div>
               </div>
 
               <!-- PANE 4: Order & Message -->
