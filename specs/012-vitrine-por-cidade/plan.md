@@ -34,7 +34,7 @@ src/publication-engine.mjs    # menu.locality + validação de vazamento + link 
 src/city-listings.mjs         # linhas derivadas (gêmeo JS do trigger), cursor, filtros, describeListingPrice (encaixe 013)
 src/city-page.mjs             # HTML do índice, da cidade, 404 e indisponível
 workers/api.mjs               # rotas /por-cidade e /data/por-cidade, Cache API, métodos de store (memória e Supabase)
-supabase/migrations/20261112190432_city_listings.sql
+supabase/migrations/20261112193000_city_listings.sql
 web/portal/{index.html,editor.js,portal.css}   # bloco "Página por cidade" em Ajustes
 web/por-cidade/por-cidade.css
 web/vitrine/vitrine.css       # estilo do link no rodapé

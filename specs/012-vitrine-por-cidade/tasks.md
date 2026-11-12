@@ -10,7 +10,7 @@
 
 ## Fase 2 — Banco (US1, US2)
 
-- [x] T004 Migração `supabase/migrations/20261112190432_city_listings.sql`: tabela, índices, trigger `private.refresh_city_listings()`, view `city_listing_cities`, RLS e grants por coluna
+- [x] T004 Migração `supabase/migrations/20261112193000_city_listings.sql`: tabela, índices, trigger `private.refresh_city_listings()`, view `city_listing_cities`, RLS e grants por coluna
 - [x] T005 [P] Testes PGlite `test/database/city-listings.test.mjs`: derivação, remoção ao desmarcar, localidade inválida, `site_id` oculto, escrita negada, cascade, slug reservado
 
 ## Fase 3 — Página pública (US1, US3)
@@ -34,7 +34,7 @@
 
 ## Pendências humanas
 
-- [ ] H001 Aplicar a migração `20261112190432_city_listings.sql` no Supabase de produção (fluxo `db-migrate`)
+- [ ] H001 Aplicar a migração `20261112193000_city_listings.sql` no Supabase de produção (fluxo `db-migrate`)
 - [ ] H002 Após aplicar, publicar uma vitrine de teste com cidade autorizada e abrir `https://vitrine.inspira.dev.br/por-cidade`
 
 ## Fora do escopo (próximas fatias)
