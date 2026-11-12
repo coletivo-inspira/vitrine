@@ -387,7 +387,9 @@ test('Fase 6 - Pacote do Piloto de 10 Vitrines, Ciclo Comercial 002-US4 e Guia O
     assert.match(migrateWorkflow, /dry_run:[\s\S]*?type:\s*boolean[\s\S]*?default:\s*true/);
     assert.match(migrateWorkflow, /uses:\s*supabase\/setup-cli@[a-f0-9]{40}\s+#\s*v/);
     assert.match(migrateWorkflow, /supabase link --project-ref qawlpsrfewosxsfgmmpm/);
-    assert.match(migrateWorkflow, /supabase db push --dry-run/);
+    assert.match(migrateWorkflow, /supabase db push --remote --dry-run/);
+    assert.match(migrateWorkflow, /supabase db push --remote --yes/);
+    assert.match(opsGuide, /npx supabase db push --remote/);
     assert.match(migrateWorkflow, /SUPABASE_ACCESS_TOKEN:\s*\$\{\{\s*secrets\.SUPABASE_ACCESS_TOKEN\s*\}\}/);
     assert.match(migrateWorkflow, /SUPABASE_DB_PASSWORD:\s*\$\{\{\s*secrets\.SUPABASE_DB_PASSWORD\s*\}\}/);
     assert.doesNotMatch(migrateWorkflow, /--db-url|--password|-p\s+\$/);

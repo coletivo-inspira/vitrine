@@ -39,7 +39,7 @@ O repositório contém duas migrações SQL append-only que devem ser aplicadas 
 Em ambiente administrativo autenticado (`SUPABASE_ACCESS_TOKEN` e senha do banco em variáveis de ambiente):
 
 ```bash
-npx supabase link --project-ref qawlpsrfewosxsfgmmpm && npx supabase db push
+npx supabase link --project-ref qawlpsrfewosxsfgmmpm && npx supabase db push --remote
 ```
 
 ### Opção B — Via SQL Editor no Painel do Supabase

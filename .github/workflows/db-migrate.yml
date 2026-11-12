@@ -46,7 +46,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with:
-          version: latest
+          version: 3.1.0
 
       - name: Link Supabase project and push migrations
         env:
@@ -56,9 +56,9 @@ jobs:
         run: |
           supabase link --project-ref qawlpsrfewosxsfgmmpm
           if [ "${DRY_RUN}" = "false" ]; then
-            echo "Applying pending SQL migrations to project qawlpsrfewosxsfgmmpm..."
-            supabase db push
+            echo "Applying pending SQL migrations to remote project qawlpsrfewosxsfgmmpm..."
+            supabase db push --remote --yes
           else
-            echo "Running SQL migration dry-run against project qawlpsrfewosxsfgmmpm..."
-            supabase db push --dry-run
+            echo "Running SQL migration dry-run against remote project qawlpsrfewosxsfgmmpm..."
+            supabase db push --remote --dry-run
           fi

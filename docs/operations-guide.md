@@ -113,10 +113,10 @@ Projetos no plano **Supabase Free** sofrem pausa automática após **7 dias cons
 
 ### 4.1 Vínculo e Aplicação das Migrações no Projeto `qawlpsrfewosxsfgmmpm`
 
-Para vincular o repositório ao projeto oficial `qawlpsrfewosxsfgmmpm` e aplicar as migrações `202611070001_site_access.sql` e `202611110001_portal_schema.sql` em ordem cronológica:
+Para vincular o repositório ao projeto oficial `qawlpsrfewosxsfgmmpm` e aplicar as migrações `202611070001_site_access.sql`, `202611110001_portal_schema.sql` e `202611120001_public_publications.sql` em ordem cronológica no projeto remoto:
 
 ```bash
-npx supabase link --project-ref qawlpsrfewosxsfgmmpm && npx supabase db push
+npx supabase link --project-ref qawlpsrfewosxsfgmmpm && npx supabase db push --remote
 ```
 
 *(Alternativamente, execute `supabase/migrations/202611070001_site_access.sql` seguido de `supabase/migrations/202611110001_portal_schema.sql` diretamente no SQL Editor do projeto `qawlpsrfewosxsfgmmpm`.)*
@@ -305,9 +305,9 @@ O workflow `.github/workflows/db-migrate.yml` **nunca roda sozinho em push** (`w
    - Clique no botão verde **Run workflow**.
    - Aguarde alguns segundos, clique na execução que apareceu no topo da lista e abra o job **migrate** para conferir nos logs quais arquivos SQL em `supabase/migrations/*.sql` seriam aplicados no projeto `qawlpsrfewosxsfgmmpm`.
 2. **Passo 2 — Aplicar de fato as migrações no banco (`dry_run = false`)**:
-   - Somente após confirmar que o resultado da simulação (`dry_run`) no Passo 1 ficou verde e listou apenas as migrações esperadas, volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼.
+   - Somente após confirmar que o resultado da simulação (`dry_run`) no Passo 1 ficou verde e listou apenas as migrações esperadas (`supabase db push --remote --dry-run`), volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼.
    - **Desmarque** a caixa `dry_run` (deixando-a desativada / `false`).
-   - Clique no botão verde **Run workflow** para executar `supabase db push` contra o projeto `qawlpsrfewosxsfgmmpm`.
+   - Clique no botão verde **Run workflow** para executar `supabase db push --remote --yes` contra o projeto remoto `qawlpsrfewosxsfgmmpm` (ou, localmente no terminal com variáveis de ambiente configuradas, `npx supabase db push --remote --dry-run` seguido de `npx supabase db push --remote`).
 
 ### 6.7 Como funciona o Deploy Automático no Cloudflare Workers (`deploy.yml`)
 
