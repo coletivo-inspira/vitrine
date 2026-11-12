@@ -3,6 +3,8 @@ import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showca
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
+import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
+import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
   CATALOG_IMAGES_BUCKET,
@@ -1024,6 +1026,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const publicationsByHash = new Map();
   const metricsDaily = new Map();
   const itemLikes = new Map();
+  const auctionBook = createAuctionBook();
 
   if (initial.sites instanceof Map) {
     for (const [key, value] of initial.sites.entries()) {
@@ -1643,6 +1646,55 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return { accepted };
     },
 
+    async resolveAuctionPublication(slug) {
+      const pub =
+        (await this.getPublicationBySlug(slug)) ??
+        (await sharedPublicPublications.getPublicationBySlug(slug));
+      if (!pub || !pub.menu) throw new AuctionError('PUBLICATION_NOT_FOUND');
+      let siteId = pub.siteId ?? null;
+      if (!siteId) {
+        for (const site of sites.values()) {
+          if (site.slug === slug) {
+            siteId = site.id;
+            break;
+          }
+        }
+      }
+      return { siteId: siteId ?? `pub-${slug}`, menu: pub.menu };
+    },
+
+    async readAuctionBoard(slug, { now = Date.now() } = {}) {
+      const { siteId, menu } = await this.resolveAuctionPublication(slug);
+      return auctionBook.readBoard({ siteId, menu, now });
+    },
+
+    async placeAuctionBid(slug, bid, { visitorKey, now = Date.now() } = {}) {
+      const { siteId, menu } = await this.resolveAuctionPublication(slug);
+      return auctionBook.placeBid({ siteId, menu, ...bid, visitorKey, now });
+    },
+
+    async listSiteAuctions(siteId, userId, { now = Date.now() } = {}) {
+      if (!TEAM_ROLES.includes(getRoleForSite(sites.get(siteId), userId))) return null;
+      return auctionBook.listSiteAuctions({ siteId, now });
+    },
+
+    async voidAuctionBid(siteId, userId, bidId, { reason, block = false, now = Date.now() } = {}) {
+      if (!TEAM_ROLES.includes(getRoleForSite(sites.get(siteId), userId))) return { status: 'site_not_found' };
+      const result = auctionBook.voidBid({ siteId, bidId, reason, block, now });
+      if (result.status === 'ok') {
+        auditLogs.push({
+          siteId,
+          actorUserId: userId,
+          action: 'auction.bid_void',
+          entityType: 'auction_bid',
+          entityId: bidId,
+          summary: { itemId: result.auction.itemId, blocked: Boolean(block) },
+          createdAt: new Date(now).toISOString()
+        });
+      }
+      return result;
+    },
+
     async getSiteInsights(siteId, userId, period = '7d', { referenceDate = new Date() } = {}) {
       const site = sites.get(siteId);
       const role = getRoleForSite(site, userId);
@@ -1824,6 +1876,33 @@ async function mapItemLikeRpcError(operation, response) {
   }
   logUpstreamError(operation, errInfo);
   return likesUnavailableError();
+}
+
+const AUCTION_RPC_ERROR_CODES = new Set([
+  'INVALID_BID',
+  'BIDDER_BLOCKED',
+  'BIDDER_IS_OWNER',
+  'PUBLICATION_NOT_FOUND',
+  'AUCTION_NOT_FOUND',
+  'AUCTION_CLOSED',
+  'ALREADY_LEADING',
+  'AUCTION_BID_LIMIT',
+  'BID_TOO_LOW',
+  'BID_TOO_HIGH',
+  'BID_RATE_LIMITED',
+  'TOO_MANY_IDENTITIES'
+]);
+
+async function mapAuctionRpcError(operation, response) {
+  if (!response) return new AuctionError('AUCTIONS_UNAVAILABLE');
+  const errInfo = await readUpstreamErrorDetails(response);
+  const code = String(errInfo.message ?? '').trim();
+  if (AUCTION_RPC_ERROR_CODES.has(code)) {
+    const requiredCents = Number.parseInt(String(errInfo.details ?? ''), 10);
+    return new AuctionError(code, Number.isSafeInteger(requiredCents) ? { requiredCents } : {});
+  }
+  logUpstreamError(operation, errInfo);
+  return new AuctionError('AUCTIONS_UNAVAILABLE');
 }
 
 export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: customFetch } = {}) {
@@ -2963,6 +3042,94 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return [];
     },
 
+    async readAuctionBoard(slug) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.readAuctionBoard(slug);
+      }
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_auction_board`, {
+        method: 'POST',
+        headers: anonHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ target_slug: slug })
+      }).catch(() => null);
+      if (response?.ok) return response.json();
+      throw await mapAuctionRpcError('readAuctionBoard', response);
+    },
+
+    async placeAuctionBid(slug, bid, { visitorKey, env = {} } = {}) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        throw new AuctionError('AUCTIONS_UNAVAILABLE');
+      }
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/place_auction_bid`, {
+        method: 'POST',
+        headers: anonHeaders({
+          'content-type': 'application/json',
+          'x-vitrine-bid-key': String(env.AUCTION_BID_SECRET ?? '')
+        }),
+        body: JSON.stringify({
+          target_slug: slug,
+          target_item_id: bid.itemId,
+          bidder_name: bid.name,
+          bidder_whatsapp: bid.whatsapp,
+          amount_cents: bid.amountCents,
+          visitor_key: visitorKey
+        })
+      }).catch(() => null);
+      if (response?.ok) return response.json();
+      throw await mapAuctionRpcError('placeAuctionBid', response);
+    },
+
+    async listSiteAuctions(siteId, userId, { token, now = Date.now() } = {}) {
+      const site = await this.getSite(siteId, userId, { token });
+      if (!site || !TEAM_ROLES.includes(site.role)) return null;
+      const id = encodeURIComponent(siteId);
+      const [lotsRes, bidsRes] = await Promise.all([
+        fetchImpl(
+          `${baseUrl}/rest/v1/auction_lots?site_id=eq.${id}&select=id,item_id,item_name,start_cents,increment_cents,scheduled_ends_at,ends_at,highest_bid_id,highest_cents,bid_count,personal_data_purged_at&order=ends_at.desc&limit=200`,
+          { method: 'GET', headers: authHeaders(token) }
+        ),
+        fetchImpl(
+          `${baseUrl}/rest/v1/auction_bids?site_id=eq.${id}&select=id,lot_id,amount_cents,bidder_name,bidder_whatsapp,status,void_reason,voided_at,created_at&order=created_at.desc&limit=2000`,
+          { method: 'GET', headers: authHeaders(token) }
+        )
+      ]);
+      if (!lotsRes?.ok || !bidsRes?.ok) {
+        const errInfo = await readUpstreamErrorDetails(lotsRes?.ok ? bidsRes : lotsRes);
+        logUpstreamError('listSiteAuctions', errInfo);
+        throw createUpstreamStoreError('listSiteAuctions', errInfo);
+      }
+      return teamAuctionViewsFromRows(await lotsRes.json(), await bidsRes.json(), now);
+    },
+
+    async voidAuctionBid(siteId, userId, bidId, { token, reason, block = false, now = Date.now() } = {}) {
+      const site = await this.getSite(siteId, userId, { token });
+      if (!site || !TEAM_ROLES.includes(site.role)) return { status: 'site_not_found' };
+      const ownedRes = await fetchImpl(
+        `${baseUrl}/rest/v1/auction_bids?id=eq.${encodeURIComponent(bidId)}&site_id=eq.${encodeURIComponent(siteId)}&select=id,lot_id,status&limit=1`,
+        { method: 'GET', headers: authHeaders(token) }
+      );
+      const [owned] = ownedRes?.ok ? await ownedRes.json() : [];
+      if (!owned) return { status: 'not_found' };
+      if (owned.status === 'void') return { status: 'already_void' };
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/void_auction_bid`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ target_bid: bidId, void_reason: reason, block_bidder: Boolean(block) })
+      });
+      if (!response.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        const message = String(errInfo.message ?? '');
+        if (message.includes('BID_ALREADY_VOID')) return { status: 'already_void' };
+        if (message.includes('BID_NOT_FOUND')) return { status: 'not_found' };
+        if (message.includes('INVALID_VOID_REASON')) {
+          throw new PortalValidationError(422, 'INVALID_VOID_REASON', 'Informe o motivo com 3 a 200 caracteres.');
+        }
+        logUpstreamError('voidAuctionBid', errInfo);
+        throw createUpstreamStoreError('voidAuctionBid', errInfo);
+      }
+      const auctions = await this.listSiteAuctions(siteId, userId, { token, now });
+      return { status: 'ok', auction: auctions?.find((entry) => entry.lotId === owned.lot_id) ?? null };
+    },
+
     async getSiteInsights(
       siteId,
       userId,
@@ -3563,7 +3730,99 @@ function isExternalHostname(hostname) {
     hostname !== 'inspira.dev.br' && hostname !== '127.0.0.1';
 }
 
-async function handleCustomHostname(request, url, store, assets, context) {
+const PUBLIC_AUCTION_PATH = /^\/api\/public\/auctions\/([a-z0-9-]{1,63})(\/bids)?\/?$/;
+const MAX_AUCTION_BID_BYTES = 2048;
+const utf8AuctionEncoder = new TextEncoder();
+
+function resolveNowMs(deps = {}) {
+  const raw = typeof deps.nowMs === 'function' ? deps.nowMs() : deps.nowMs;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : Date.now();
+}
+
+export async function deriveAuctionVisitorKey(secret, clientAddress) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    utf8AuctionEncoder.encode(String(secret)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, utf8AuctionEncoder.encode(`visitor:${clientAddress}`));
+  return [...new Uint8Array(signature)]
+    .slice(0, 16)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function handlePublicAuctionRequest(request, url, env, store, deps, slug, isBidRoute) {
+  const method = (request.method || 'GET').toUpperCase();
+  if (!isValidSlug(slug)) {
+    return errorResponse(404, 'PUBLICATION_NOT_FOUND', 'Vitrine publicada não encontrada.');
+  }
+  if (typeof store.readAuctionBoard !== 'function' || typeof store.placeAuctionBid !== 'function') {
+    return errorResponse(503, 'AUCTIONS_UNAVAILABLE', 'Leilões indisponíveis no momento. Tente mais tarde.');
+  }
+  const now = resolveNowMs(deps);
+  try {
+    if (!isBidRoute) {
+      if (method !== 'GET') {
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para o quadro de leilões.');
+      }
+      return jsonResponse(200, await store.readAuctionBoard(slug, { now, env }));
+    }
+    if (method !== 'POST') {
+      return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para lances.');
+    }
+    const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+    if (guardError) return guardError;
+
+    const declaredLength = Number(request.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_AUCTION_BID_BYTES) {
+      throw new AuctionError('INVALID_BID');
+    }
+    const rawText = await request.text().catch(() => '');
+    if (!rawText || utf8AuctionEncoder.encode(rawText).byteLength > MAX_AUCTION_BID_BYTES) {
+      throw new AuctionError('INVALID_BID');
+    }
+    if (isBotUserAgent(request.headers.get('user-agent') || '')) {
+      return jsonResponse(202, { accepted: false });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new AuctionError('INVALID_BID');
+    }
+    if (typeof parsed?.website === 'string' && parsed.website.trim()) {
+      return jsonResponse(202, { accepted: false });
+    }
+
+    const secret = typeof env?.AUCTION_BID_SECRET === 'string' ? env.AUCTION_BID_SECRET.trim() : '';
+    if (secret.length < 16) throw new AuctionError('AUCTIONS_UNAVAILABLE');
+
+    const bid = validateBidPayload(parsed);
+    const clientAddress = (request.headers.get('cf-connecting-ip') || 'sem-endereco').trim();
+    const visitorKey = await deriveAuctionVisitorKey(secret, clientAddress);
+    const result = await store.placeAuctionBid(slug, bid, { visitorKey, now, env });
+    return jsonResponse(201, result);
+  } catch (error) {
+    if (error instanceof AuctionError) {
+      const extra = Number.isSafeInteger(error.details?.requiredCents)
+        ? { requiredCents: error.details.requiredCents }
+        : {};
+      return errorResponse(error.status, error.code, error.message, extra);
+    }
+    throw error;
+  }
+}
+
+async function handleCustomHostname(request, url, store, assets, context, env = {}, deps = {}) {
+  const auctionMatch = url.pathname.match(PUBLIC_AUCTION_PATH);
+  if (auctionMatch && typeof store.resolveDomain === 'function') {
+    const domainSlug = await store.resolveDomain(url.hostname);
+    if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
+    return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
+  }
   if (!['GET', 'HEAD'].includes(request.method) || typeof store.resolveDomain !== 'function') {
     return new Response(null, { status: 404 });
   }
@@ -3639,7 +3898,7 @@ export function createApiHandler(deps = {}) {
     const isItemLikesRoute = pathname === '/api/likes' || pathname === '/api/likes/';
     if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname) && !isItemLikesRoute) {
       try {
-        return await handleCustomHostname(request, url, store, assetsFetcher, _ctx);
+        return await handleCustomHostname(request, url, store, assetsFetcher, _ctx, env, deps);
       } catch {
         return new Response(null, { status: 503 });
       }
@@ -4319,6 +4578,60 @@ export function createApiHandler(deps = {}) {
           { itemId: result.itemId, liked: result.liked, count: result.count },
           !existingToken && liked ? { 'set-cookie': buildLikeVisitorCookieHeader(token) } : {}
         );
+      }
+
+      const publicAuctionMatch = pathname.match(PUBLIC_AUCTION_PATH);
+      if (publicAuctionMatch) {
+        return await handlePublicAuctionRequest(
+          request,
+          url,
+          env,
+          store,
+          deps,
+          publicAuctionMatch[1],
+          Boolean(publicAuctionMatch[2])
+        );
+      }
+
+      const siteAuctionsMatch = pathname.match(/^\/api\/sites\/([^/]+)\/auctions(?:\/bids\/([^/]+)\/void)?\/?$/);
+      if (siteAuctionsMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const siteId = decodeURIComponent(siteAuctionsMatch[1]);
+        const bidId = siteAuctionsMatch[2] ? decodeURIComponent(siteAuctionsMatch[2]) : null;
+        const options = { token: user.token, env, now: resolveNowMs(deps) };
+        if (typeof store.listSiteAuctions !== 'function') {
+          return errorResponse(503, 'AUCTIONS_UNAVAILABLE', 'Leilões indisponíveis neste ambiente.');
+        }
+        if (!bidId) {
+          if (method !== 'GET') {
+            return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para leilões.');
+          }
+          const auctions = await store.listSiteAuctions(siteId, user.id, options);
+          if (!auctions) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+          return jsonResponse(200, { auctions });
+        }
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para desconsiderar lances.');
+        }
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        const { parsed } = await parseJsonRequest(request);
+        const reason = typeof parsed?.reason === 'string' ? parsed.reason.replace(/\s+/g, ' ').trim() : '';
+        if (
+          reason.length < AUCTION_RULES.voidReasonMinLength ||
+          reason.length > AUCTION_RULES.voidReasonMaxLength
+        ) {
+          return errorResponse(422, 'INVALID_VOID_REASON', 'Informe o motivo com 3 a 200 caracteres.');
+        }
+        assertNoDangerousTextPayload(reason, 422, 'INVALID_VOID_REASON');
+        const result = UUID_PATTERN.test(bidId)
+          ? await store.voidAuctionBid(siteId, user.id, bidId, { ...options, reason, block: parsed?.block === true })
+          : { status: 'not_found' };
+        if (result?.status === 'site_not_found') return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (result?.status === 'already_void') return errorResponse(409, 'BID_ALREADY_VOID', 'Este lance já foi desconsiderado.');
+        if (result?.status !== 'ok') return errorResponse(404, 'BID_NOT_FOUND', 'Lance não encontrado.');
+        return jsonResponse(200, { auction: result.auction });
       }
 
       if (pathname === '/api/events' || pathname === '/api/events/') {

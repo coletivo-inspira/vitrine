@@ -14,6 +14,7 @@ import {
   removeTimeSlot,
   toggleVariableInTemplate
 } from './order-message-tools.mjs';
+import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -1632,9 +1633,10 @@ function renderItems() {
                 ? `Aceito: ${item.tradeFor}`
                 : 'Troca'
               : itemPriceMode === 'offer'
-                ? item.priceCents
-                  ? `Lance mín.: ${formatCentsToReais(item.priceCents)}`
-                  : 'Faça sua oferta'
+                ? [
+                    item.auctionEndsAt ? `Leilão até ${formatAuctionDeadline(item.auctionEndsAt)}` : '',
+                    item.priceCents ? `Lance mín.: ${formatCentsToReais(item.priceCents)}` : item.auctionEndsAt ? '' : 'Faça sua oferta'
+                  ].filter(Boolean).join(' · ')
                 : item.priceCents
                   ? formatCentsToReais(item.priceCents)
                   : '';
@@ -1807,6 +1809,10 @@ function renderItems() {
         if (nextMode === 'quota') {
           applyQuotaDefaults(item);
         }
+        if (nextMode !== 'offer') {
+          delete item.auctionEndsAt;
+          delete item.bidIncrementCents;
+        }
         renderItems();
         updateDraftAndPreview();
       });
@@ -1849,6 +1855,63 @@ function renderItems() {
       gPrice.appendChild(lPrice);
       gPrice.appendChild(priceInput);
       fields.appendChild(gPrice);
+
+      if (itemPriceMode === 'offer') {
+        const gEnds = document.createElement('div');
+        gEnds.className = 'form-group item-fields-full';
+        const lEnds = document.createElement('label');
+        lEnds.setAttribute('for', `item-auction-ends-${item.id}`);
+        lEnds.textContent = 'Encerramento do leilão';
+        const endsInput = document.createElement('input');
+        endsInput.type = 'datetime-local';
+        endsInput.id = `item-auction-ends-${item.id}`;
+        endsInput.className = 'item-input input-styled-height';
+        endsInput.value = isoToLocalDateTimeInput(item.auctionEndsAt);
+        const endsHelp = document.createElement('span');
+        endsHelp.className = 'form-help';
+        endsHelp.id = `item-auction-ends-help-${item.id}`;
+        endsHelp.textContent = 'Com data, os lances ficam registrados e você vê o vencedor em Leilões. Sem data, as ofertas chegam só pelo WhatsApp.';
+        endsInput.setAttribute('aria-describedby', endsHelp.id);
+        endsInput.addEventListener('change', () => {
+          const iso = localDateTimeInputToIso(endsInput.value);
+          if (iso) {
+            item.auctionEndsAt = iso;
+          } else {
+            delete item.auctionEndsAt;
+          }
+          updateDraftAndPreview();
+        });
+        gEnds.appendChild(lEnds);
+        gEnds.appendChild(endsInput);
+        gEnds.appendChild(endsHelp);
+        fields.appendChild(gEnds);
+
+        const gIncrement = document.createElement('div');
+        gIncrement.className = 'form-group item-fields-full';
+        const lIncrement = document.createElement('label');
+        lIncrement.setAttribute('for', `item-bid-increment-${item.id}`);
+        lIncrement.textContent = 'Incremento mínimo entre lances (opcional)';
+        const incrementInput = document.createElement('input');
+        incrementInput.type = 'text';
+        incrementInput.inputMode = 'numeric';
+        incrementInput.id = `item-bid-increment-${item.id}`;
+        incrementInput.className = 'item-input input-styled-height';
+        incrementInput.placeholder = 'Padrão: R$ 1,00';
+        incrementInput.value = item.bidIncrementCents ? formatCentsToReais(item.bidIncrementCents) : '';
+        incrementInput.addEventListener('input', () => {
+          maskMoneyInput(incrementInput);
+          const cents = parseReaisToCents(incrementInput.value);
+          if (cents > 0) {
+            item.bidIncrementCents = cents;
+          } else {
+            delete item.bidIncrementCents;
+          }
+          updateDraftAndPreview();
+        });
+        gIncrement.appendChild(lIncrement);
+        gIncrement.appendChild(incrementInput);
+        fields.appendChild(gIncrement);
+      }
     } else if (itemPriceMode === 'donation') {
       const gCond = document.createElement('div');
       gCond.className = 'form-group item-fields-full';
@@ -2289,6 +2352,19 @@ async function uploadImageToSupabaseStorage(blob, itemId) {
 
   const data = await res.json();
   return data.imageUrl;
+}
+
+function isoToLocalDateTimeInput(iso) {
+  const date = typeof iso === 'string' ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localDateTimeInputToIso(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function formatCentsToReais(cents) {

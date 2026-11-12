@@ -6,6 +6,7 @@ import {
   QUOTA_TEXT_MAX_LENGTH,
   findProhibitedQuotaTerm
 } from '../web/assets/quota-rules.mjs';
+import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -1596,6 +1597,38 @@ export function validateDraftContent(content, options = {}) {
           422,
           'INVALID_ITEM',
           'A duração em minutos (durationMinutes) deve ser um número inteiro entre 5 e 480.'
+        );
+      }
+    }
+
+    if (item.auctionEndsAt !== undefined && item.auctionEndsAt !== null && item.auctionEndsAt !== '') {
+      const endsAt = parseAuctionEndsAt(item.auctionEndsAt);
+      if (!endsAt) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_AUCTION_ENDS_AT',
+          'Informe a data e a hora de encerramento do leilão em formato válido.'
+        );
+      }
+      if (endsAt.getTime() > Date.now() + AUCTION_RULES.maxScheduleDays * 86_400_000) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_AUCTION_ENDS_AT',
+          `O encerramento do leilão deve ser em até ${AUCTION_RULES.maxScheduleDays} dias.`
+        );
+      }
+    }
+
+    if (item.bidIncrementCents !== undefined && item.bidIncrementCents !== null) {
+      if (
+        !Number.isSafeInteger(item.bidIncrementCents) ||
+        item.bidIncrementCents < AUCTION_RULES.minIncrementCents ||
+        item.bidIncrementCents > AUCTION_RULES.maxIncrementCents
+      ) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_BID_INCREMENT',
+          'O incremento mínimo do leilão deve ficar entre R$ 1,00 e R$ 10.000,00.'
         );
       }
     }

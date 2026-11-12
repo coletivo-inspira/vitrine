@@ -12,6 +12,16 @@ import {
   QUOTA_PAYMENT_NOTICE,
   getQuotaRemaining
 } from './quota-rules.mjs';
+import {
+  auctionErrorMessage,
+  buildWhatsappHref,
+  formatAuctionDeadline,
+  formatRemaining,
+  getAuctionTerms,
+  isAuctionItem,
+  normalizeBidderName,
+  normalizeBidderWhatsapp
+} from './auction-rules.mjs';
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -77,6 +87,14 @@ export class StorefrontRenderer {
     this.tradeProposals = new Map(); // itemId -> text
     this.itemErrors = new Map(); // itemId -> error message
     this.likeButtons = [];
+    this.auctionBoard = new Map(); // itemId -> lote público
+    this.auctionClockOffsetMs = 0;
+    this.auctionInputs = new Map(); // itemId -> valor digitado
+    this.myAuctionBids = new Map(); // itemId -> { refs: Set, lastAmountCents }
+    this.auctionNotices = new Map(); // itemId -> mensagem de sucesso
+    this.auctionRenderPending = false;
+    this.bidderProfile = { name: '', whatsapp: '' };
+    this.bidDialog = null;
     this.validationMessage = '';
     this.idPrefix = this.options.isPreview ? 'preview-sf' : 'public-sf';
     if (this.options.isPublicPage && typeof this.options.likes?.subscribe === 'function') {
@@ -736,6 +754,407 @@ export class StorefrontRenderer {
     }
   }
 
+  getAuctionNowMs() {
+    return Date.now() + this.auctionClockOffsetMs;
+  }
+
+  setAuctionBoard(board) {
+    if (!board || !Array.isArray(board.lots)) return;
+    const serverNowMs = Date.parse(board.serverNow);
+    if (Number.isFinite(serverNowMs)) {
+      this.auctionClockOffsetMs = serverNowMs - Date.now();
+    }
+    for (const lot of board.lots) {
+      if (lot && typeof lot.itemId === 'string') this.auctionBoard.set(lot.itemId, lot);
+    }
+    this.requestAuctionRender();
+  }
+
+  isAuctionInteractionActive() {
+    if (this.bidDialog?.open) return true;
+    const active = globalThis.document?.activeElement;
+    return Boolean(active && typeof active.closest === 'function' && active.closest('.sf-auction'));
+  }
+
+  requestAuctionRender() {
+    if (this.stage !== 1) return;
+    if (this.isAuctionInteractionActive()) {
+      this.auctionRenderPending = true;
+      return;
+    }
+    this.auctionRenderPending = false;
+    this.render();
+  }
+
+  getAuctionLot(item) {
+    const fromBoard = this.auctionBoard.get(item.id);
+    if (fromBoard) return fromBoard;
+    const terms = getAuctionTerms(item);
+    return {
+      itemId: item.id,
+      status: Date.parse(terms.scheduledEndsAt) > this.getAuctionNowMs() ? 'open' : 'closed',
+      endsAt: terms.scheduledEndsAt,
+      scheduledEndsAt: terms.scheduledEndsAt,
+      startCents: terms.startCents,
+      incrementCents: terms.incrementCents,
+      currentCents: null,
+      nextMinCents: terms.startCents,
+      bidCount: 0,
+      leadingRef: null,
+      recentBids: []
+    };
+  }
+
+  renderAuctionFooter(item, footer, isInactive) {
+    footer.classList.add('sf-footer-stacked', 'sf-auction');
+    const lot = this.getAuctionLot(item);
+    const remainingMs = Date.parse(lot.endsAt) - this.getAuctionNowMs();
+    const isOpen = lot.status === 'open' && remainingMs > 0;
+    const hasBids = Number.isSafeInteger(lot.currentCents) && lot.currentCents > 0;
+    const bidCountText = lot.bidCount === 1 ? '1 lance' : `${lot.bidCount || 0} lances`;
+
+    const header = document.createElement('div');
+    header.className = 'sf-offer-header';
+    const headline = document.createElement('span');
+    headline.className = 'menu-item-price sf-offer-headline';
+    headline.textContent = isOpen
+      ? hasBids
+        ? `Lance atual ${this.formatPrice(lot.currentCents)}`
+        : `Lance inicial ${this.formatPrice(lot.startCents)}`
+      : hasBids
+        ? `Arrematado por ${this.formatPrice(lot.currentCents)}`
+        : 'Encerrado sem lances';
+    header.appendChild(headline);
+    const statusPill = document.createElement('span');
+    statusPill.className = isOpen ? 'sf-auction-status is-open' : 'sf-auction-status is-closed';
+    statusPill.textContent = isOpen ? 'Aberto' : 'Encerrado';
+    header.appendChild(statusPill);
+    footer.appendChild(header);
+
+    const meta = document.createElement('p');
+    meta.className = 'sf-auction-meta';
+    meta.textContent = isOpen
+      ? `${bidCountText} · encerra ${formatAuctionDeadline(lot.endsAt)} · faltam ${formatRemaining(remainingMs)}`
+      : `${bidCountText} · encerrado ${formatAuctionDeadline(lot.endsAt)}`;
+    footer.appendChild(meta);
+
+    const mine = this.myAuctionBids.get(item.id);
+    if (mine?.refs.size) {
+      const standing = document.createElement('p');
+      standing.setAttribute('role', 'status');
+      const leading = lot.leadingRef && mine.refs.has(lot.leadingRef);
+      standing.className = leading ? 'sf-auction-standing is-leading' : 'sf-auction-standing';
+      standing.textContent = leading
+        ? isOpen
+          ? 'Você está na frente.'
+          : 'Seu lance venceu. A vitrine vai combinar com você pelo WhatsApp.'
+        : isOpen
+          ? `Seu lance foi superado. Próximo mínimo: ${this.formatPrice(lot.nextMinCents)}.`
+          : 'O leilão encerrou com outro lance vencedor.';
+      footer.appendChild(standing);
+    }
+
+    if (Array.isArray(lot.recentBids) && lot.recentBids.length > 0) {
+      const history = document.createElement('ul');
+      history.className = 'sf-auction-history';
+      history.setAttribute('aria-label', `Últimos lances em ${item.name || 'item'}`);
+      for (const entry of lot.recentBids.slice(0, 3)) {
+        const li = document.createElement('li');
+        const placed = new Date(entry.placedAt);
+        const time = Number.isNaN(placed.getTime())
+          ? ''
+          : ` · ${String(placed.getHours()).padStart(2, '0')}:${String(placed.getMinutes()).padStart(2, '0')}`;
+        li.textContent = `${this.formatPrice(entry.amountCents)}${time}`;
+        history.appendChild(li);
+      }
+      footer.appendChild(history);
+    }
+
+    if (!isOpen) return;
+
+    const minNote = document.createElement('span');
+    minNote.className = 'sf-offer-min';
+    minNote.textContent = `Próximo lance: a partir de ${this.formatPrice(lot.nextMinCents)} · incremento ${this.formatPrice(lot.incrementCents)}`;
+    footer.appendChild(minNote);
+
+    const canBid = Boolean(this.options.auctionClient) && !isInactive;
+    const row = document.createElement('div');
+    row.className = 'sf-inline-interaction';
+    const inputId = `${this.idPrefix}-bid-${item.id}`;
+    const label = document.createElement('label');
+    label.className = 'sf-field-label';
+    label.setAttribute('for', inputId);
+    label.textContent = 'Seu lance';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = inputId;
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    input.className = 'sf-input sf-offer-input';
+    input.placeholder = `Mínimo ${this.formatPrice(lot.nextMinCents)}`;
+    input.disabled = !canBid;
+    input.value = this.auctionInputs.get(item.id) || '';
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D/g, '').slice(0, 11);
+      input.value = digits
+        ? `R$ ${parseInt(digits.slice(0, -2) || '0', 10).toLocaleString('pt-BR')},${digits.slice(-2).padStart(2, '0')}`
+        : '';
+      this.auctionInputs.set(item.id, input.value);
+    });
+    input.addEventListener('blur', () => {
+      if (this.auctionRenderPending && !this.bidDialog?.open) {
+        setTimeout(() => this.requestAuctionRender(), 0);
+      }
+    });
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'whatsapp-order-button';
+    button.disabled = !canBid;
+    button.textContent = 'Dar lance';
+    button.addEventListener('click', () => this.startBid(item, input.value));
+    row.appendChild(label);
+    row.appendChild(input);
+    row.appendChild(button);
+    footer.appendChild(row);
+
+    if (!this.options.auctionClient) {
+      const previewNote = document.createElement('p');
+      previewNote.className = 'sf-auction-meta';
+      previewNote.textContent = 'Os lances ficam disponíveis na vitrine publicada.';
+      footer.appendChild(previewNote);
+    }
+
+    const errText = this.itemErrors.get(item.id);
+    if (errText) {
+      const errEl = document.createElement('p');
+      errEl.className = 'sf-item-error';
+      errEl.setAttribute('role', 'alert');
+      errEl.textContent = errText;
+      footer.appendChild(errEl);
+    }
+
+    const notice = this.auctionNotices.get(item.id);
+    if (notice) {
+      const ok = document.createElement('p');
+      ok.className = 'sf-auction-success';
+      ok.setAttribute('role', 'status');
+      ok.textContent = notice;
+      footer.appendChild(ok);
+      const href = buildWhatsappHref(
+        this.options.targetWhatsapp || this.menu?.whatsapp,
+        `Olá! Dei um lance de ${this.formatPrice(mine?.lastAmountCents || 0)} no item "${item.name || 'Item'}" da vitrine. Meu nome é ${this.bidderProfile.name}.`
+      );
+      if (href) {
+        const link = document.createElement('a');
+        link.className = 'sf-secondary-button sf-auction-whatsapp';
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Avisar pelo WhatsApp';
+        footer.appendChild(link);
+      }
+    }
+  }
+
+  startBid(item, rawValue) {
+    const lot = this.getAuctionLot(item);
+    const digits = String(rawValue ?? '').replace(/\D/g, '');
+    const cents = parseInt(digits, 10) || 0;
+    this.auctionNotices.delete(item.id);
+    if (cents < lot.nextMinCents) {
+      this.itemErrors.set(item.id, auctionErrorMessage('BID_TOO_LOW', { requiredCents: lot.nextMinCents }));
+      this.render();
+      return false;
+    }
+    this.itemErrors.delete(item.id);
+    this.openBidDialog(item, cents);
+    return true;
+  }
+
+  ensureBidDialog() {
+    if (this.bidDialog) return this.bidDialog;
+    const doc = globalThis.document;
+    const dialog = doc.createElement('dialog');
+    dialog.className = 'sf-bid-dialog';
+    dialog.setAttribute('aria-labelledby', `${this.idPrefix}-bid-title`);
+
+    const form = doc.createElement('form');
+    form.className = 'sf-bid-form';
+    form.noValidate = true;
+
+    const title = doc.createElement('h2');
+    title.id = `${this.idPrefix}-bid-title`;
+    title.className = 'sf-bid-title';
+    title.textContent = 'Confirmar lance';
+    form.appendChild(title);
+
+    const summary = doc.createElement('p');
+    summary.className = 'sf-bid-summary';
+    form.appendChild(summary);
+
+    const field = (id, labelText, attrs) => {
+      const group = doc.createElement('div');
+      group.className = 'sf-field-group';
+      const label = doc.createElement('label');
+      label.className = 'sf-field-label';
+      label.setAttribute('for', id);
+      label.textContent = labelText;
+      const input = doc.createElement('input');
+      input.id = id;
+      input.className = 'sf-input';
+      Object.assign(input, attrs);
+      group.appendChild(label);
+      group.appendChild(input);
+      form.appendChild(group);
+      return input;
+    };
+    const nameInput = field(`${this.idPrefix}-bid-name`, 'Seu nome', {
+      type: 'text',
+      autocomplete: 'name',
+      maxLength: 60,
+      required: true
+    });
+    const phoneInput = field(`${this.idPrefix}-bid-whatsapp`, 'Seu WhatsApp', {
+      type: 'tel',
+      inputMode: 'tel',
+      autocomplete: 'tel',
+      maxLength: 20,
+      placeholder: '(51) 99999-9999',
+      required: true
+    });
+
+    const consentLabel = doc.createElement('label');
+    consentLabel.className = 'sf-bid-consent';
+    const consent = doc.createElement('input');
+    consent.type = 'checkbox';
+    consent.id = `${this.idPrefix}-bid-consent`;
+    const consentText = doc.createElement('span');
+    consentText.textContent =
+      'Autorizo enviar meu nome e WhatsApp à vitrine para combinar este leilão. Eles não aparecem para outros visitantes.';
+    consentLabel.appendChild(consent);
+    consentLabel.appendChild(consentText);
+    form.appendChild(consentLabel);
+
+    const trap = doc.createElement('div');
+    trap.className = 'sf-bid-trap';
+    trap.setAttribute('aria-hidden', 'true');
+    const trapInput = doc.createElement('input');
+    trapInput.type = 'text';
+    trapInput.name = 'website';
+    trapInput.tabIndex = -1;
+    trapInput.autocomplete = 'off';
+    trap.appendChild(trapInput);
+    form.appendChild(trap);
+
+    const error = doc.createElement('p');
+    error.className = 'sf-item-error';
+    error.setAttribute('role', 'alert');
+    form.appendChild(error);
+
+    const actions = doc.createElement('div');
+    actions.className = 'sf-bid-actions';
+    const cancel = doc.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'sf-secondary-button';
+    cancel.textContent = 'Cancelar';
+    const confirm = doc.createElement('button');
+    confirm.type = 'submit';
+    confirm.className = 'whatsapp-order-button';
+    confirm.textContent = 'Confirmar lance';
+    actions.appendChild(cancel);
+    actions.appendChild(confirm);
+    form.appendChild(actions);
+    dialog.appendChild(form);
+
+    cancel.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+      if (this.auctionRenderPending) this.requestAuctionRender();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void this.submitBidDialog();
+    });
+
+    doc.body.appendChild(dialog);
+    this.bidDialog = dialog;
+    this.bidDialogParts = { summary, nameInput, phoneInput, consent, trapInput, error, confirm };
+    return dialog;
+  }
+
+  openBidDialog(item, amountCents) {
+    const dialog = this.ensureBidDialog();
+    const parts = this.bidDialogParts;
+    this.pendingBid = { item, amountCents };
+    parts.summary.textContent = `Lance de ${this.formatPrice(amountCents)} em ${item.name || 'item'}.`;
+    parts.nameInput.value = this.bidderProfile.name;
+    parts.phoneInput.value = this.bidderProfile.whatsapp;
+    parts.error.textContent = '';
+    parts.confirm.disabled = false;
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+    parts.nameInput.focus?.();
+  }
+
+  async submitBidDialog() {
+    const parts = this.bidDialogParts;
+    const pending = this.pendingBid;
+    if (!parts || !pending || !this.options.auctionClient) return false;
+    const name = normalizeBidderName(parts.nameInput.value);
+    const whatsapp = normalizeBidderWhatsapp(parts.phoneInput.value);
+    if (!name) {
+      parts.error.textContent = 'Informe seu nome (2 a 60 caracteres).';
+      return false;
+    }
+    if (!whatsapp) {
+      parts.error.textContent = 'Informe um WhatsApp válido com DDD.';
+      return false;
+    }
+    if (!parts.consent.checked) {
+      parts.error.textContent = 'Marque a autorização para enviar seu contato à vitrine.';
+      return false;
+    }
+    parts.confirm.disabled = true;
+    parts.error.textContent = '';
+    this.bidderProfile = { name, whatsapp: parts.phoneInput.value };
+    const result = await this.options.auctionClient.placeBid({
+      itemId: pending.item.id,
+      amountCents: pending.amountCents,
+      name,
+      whatsapp,
+      consent: true,
+      website: parts.trapInput.value
+    });
+    parts.confirm.disabled = false;
+    if (!result?.ok) {
+      const code = result?.error?.code;
+      parts.error.textContent = auctionErrorMessage(code, result?.error ?? {});
+      if (code === 'BID_TOO_LOW' || code === 'AUCTION_CLOSED') {
+        this.options.auctionClient.refresh?.();
+      }
+      return false;
+    }
+    const itemId = pending.item.id;
+    if (result.lot) this.auctionBoard.set(itemId, result.lot);
+    const mine = this.myAuctionBids.get(itemId) ?? { refs: new Set(), lastAmountCents: 0 };
+    if (result.bid?.ref) mine.refs.add(result.bid.ref);
+    mine.lastAmountCents = pending.amountCents;
+    this.myAuctionBids.set(itemId, mine);
+    this.auctionInputs.delete(itemId);
+    this.itemErrors.delete(itemId);
+    this.auctionNotices.set(itemId, `Lance de ${this.formatPrice(pending.amountCents)} registrado.`);
+    this.pendingBid = null;
+    if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+      globalThis.recordStorefrontEvent('item_select', { itemId, count: 1 });
+    }
+    this.bidDialog.close?.();
+    this.auctionRenderPending = false;
+    this.render();
+    return true;
+  }
+
   submitOffer(item, rawText) {
     if (!item || item.active === false) return false;
     const digits = String(rawText ?? '').replace(/\D/g, '');
@@ -936,7 +1355,7 @@ export class StorefrontRenderer {
         modeBadge.className = `sf-mode-badge sf-mode-${priceMode}`;
         modeBadge.textContent =
           priceMode === 'offer'
-            ? 'Lance'
+            ? isAuctionItem(item) ? 'Leilão' : 'Lance'
             : priceMode === 'donation'
               ? 'Doação'
               : priceMode === 'quota'
@@ -1010,7 +1429,9 @@ export class StorefrontRenderer {
 
     const hasPositivePrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
 
-    if (priceMode === 'offer') {
+    if (priceMode === 'offer' && isAuctionItem(item)) {
+      this.renderAuctionFooter(item, footer, isInactive);
+    } else if (priceMode === 'offer') {
       footer.classList.add('sf-footer-stacked');
       const offerHeader = document.createElement('div');
       offerHeader.className = 'sf-offer-header';

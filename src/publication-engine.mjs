@@ -1,5 +1,6 @@
 import { projectShowcaseManifest } from './showcase-structure.mjs';
 import { publicMenu, whatsappLink } from './public-menu.mjs';
+import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import {
   MILA_WHATSAPP,
   ORDER_RELAY_MILA,
@@ -81,7 +82,9 @@ const ALLOWED_ITEM_KEYS = new Set([
   'imageUrl',
   'minQuantity',
   'durationMinutes',
-  'section'
+  'section',
+  'auctionEndsAt',
+  'bidIncrementCents'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -431,6 +434,19 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
             extras.quotaReward = quotaReward;
           }
         }
+        if (extras.priceMode === 'offer') {
+          const auctionEndsAt = parseAuctionEndsAt(rawItem.auctionEndsAt);
+          if (auctionEndsAt) {
+            extras.auctionEndsAt = auctionEndsAt.toISOString();
+            if (
+              Number.isSafeInteger(rawItem.bidIncrementCents) &&
+              rawItem.bidIncrementCents >= AUCTION_RULES.minIncrementCents &&
+              rawItem.bidIncrementCents <= AUCTION_RULES.maxIncrementCents
+            ) {
+              extras.bidIncrementCents = rawItem.bidIncrementCents;
+            }
+          }
+        }
         const conditions = sanitizeOptionalItemShortText(
           rawItem.conditions,
           'INVALID_ITEM_CONDITIONS',
@@ -500,6 +516,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       ...(extras.section !== undefined ? { section: extras.section } : {}),
       ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),
       priceCents: item.priceCents,
+      ...(extras.auctionEndsAt !== undefined ? { auctionEndsAt: extras.auctionEndsAt } : {}),
+      ...(extras.bidIncrementCents !== undefined ? { bidIncrementCents: extras.bidIncrementCents } : {}),
       ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
       ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {})
     };
