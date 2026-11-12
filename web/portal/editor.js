@@ -199,6 +199,28 @@ function getCatalogDefaults(catalogType = 'products', businessName = 'Vitrine', 
   };
 }
 
+export function applyCatalogTypeSwitch(draftContent, nextType) {
+  if (!draftContent || typeof draftContent !== 'object') return draftContent;
+  draftContent.catalogType = nextType;
+  draftContent.template =
+    nextType === 'booking' ? 'booking-v1' : nextType === 'quote' ? 'quote-v1' : 'products-v1';
+  const defaults = getCatalogDefaults(
+    nextType,
+    draftContent.businessName,
+    draftContent.template
+  );
+  draftContent.components = defaults.components;
+  draftContent.orderFields = defaults.orderFields;
+  draftContent.messages = defaults.messages;
+  return draftContent;
+}
+
+export function getCatalogTypeDisplayLabel(catalogType) {
+  if (catalogType === 'booking') return 'Agendamento de Serviços';
+  if (catalogType === 'quote') return 'Lista de Interesse / Orçamento';
+  return 'Produtos (com carrinho)';
+}
+
 export function normalizeDraftForEditor(rawContent, site = {}) {
   const cloned = rawContent && typeof rawContent === 'object' ? structuredClone(rawContent) : {};
   const template = cloned.template || site?.template || 'products-v1';
@@ -327,7 +349,7 @@ export async function loadEditor(site, isOnline) {
         const initialTab =
           currentDraft.content.categories.length > 0 ? 'items' : 'settings';
         setActiveTab(initialTab);
-        initializeEditorWorkspace();
+        initializeEditorWorkspace({ skipAutosave: true });
         savedDraftContent = JSON.stringify(currentDraft.content);
       } else {
         if (generation === editorLoadGeneration) showFeedback('Erro ao carregar o rascunho remoto.', 'error');
@@ -352,7 +374,7 @@ export async function loadEditor(site, isOnline) {
     const initialTab =
       currentDraft.content.categories.length > 0 ? 'items' : 'settings';
     setActiveTab(initialTab);
-    initializeEditorWorkspace();
+    initializeEditorWorkspace({ skipAutosave: true });
     savedDraftContent = JSON.stringify(currentDraft.content);
   }
 }
@@ -550,6 +572,24 @@ function setupEditorEvents() {
 
   const csvBtn = document.getElementById('csv-menu-btn');
   const csvMenu = document.getElementById('csv-dropdown-menu');
+  const viewMenuBtn = document.getElementById('editor-view-menu-btn');
+  const viewMenu = document.getElementById('editor-view-menu');
+
+  const closeViewMenu = () => {
+    if (viewMenuBtn) viewMenuBtn.setAttribute('aria-expanded', 'false');
+    if (viewMenu) viewMenu.hidden = true;
+  };
+
+  viewMenuBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const expanded = viewMenuBtn.getAttribute('aria-expanded') === 'true';
+    viewMenuBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (viewMenu) viewMenu.hidden = expanded;
+  });
+
+  viewMenu?.addEventListener('click', () => {
+    closeViewMenu();
+  });
 
   csvBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -575,6 +615,7 @@ function setupEditorEvents() {
     if (addItemBtn) addItemBtn.setAttribute('aria-expanded', 'false');
     if (addItemMenu) addItemMenu.hidden = true;
     closeToolbarAddMenu();
+    closeViewMenu();
     if (csvBtn) csvBtn.setAttribute('aria-expanded', 'false');
     if (csvMenu) csvMenu.hidden = true;
   });
@@ -620,14 +661,65 @@ function setupEditorEvents() {
     });
   });
 
+  const typeConfirmDialog = document.getElementById('catalog-type-confirm-dialog');
+  const typeDialogTitle = document.getElementById('catalog-type-dialog-title');
+  const typeCancelBtn = document.getElementById('catalog-type-cancel-btn');
+  const typeConfirmBtn = document.getElementById('catalog-type-confirm-btn');
+  let pendingCatalogType = null;
+
+  const closeTypeDialog = (revert = true) => {
+    if (revert && editorCatalogType && currentDraft) {
+      editorCatalogType.value = currentDraft.content.catalogType || 'products';
+    }
+    pendingCatalogType = null;
+    if (typeConfirmDialog) {
+      if (typeof typeConfirmDialog.close === 'function' && typeConfirmDialog.open) {
+        typeConfirmDialog.close();
+      } else {
+        typeConfirmDialog.removeAttribute('open');
+      }
+    }
+  };
+
   editorCatalogType?.addEventListener('change', () => {
     if (!currentDraft) return;
+    const prevType = currentDraft.content.catalogType || 'products';
     const nextType = editorCatalogType.value;
-    currentDraft.content.catalogType = nextType;
-    currentDraft.content.template =
-      nextType === 'booking' ? 'booking-v1' : nextType === 'quote' ? 'quote-v1' : 'products-v1';
-    syncCatalogTypeDefaults();
-    updateDraftAndPreview();
+    if (nextType === prevType) return;
+
+    pendingCatalogType = nextType;
+    if (typeDialogTitle) {
+      typeDialogTitle.textContent = `Trocar para ${getCatalogTypeDisplayLabel(nextType)}?`;
+    }
+    if (typeConfirmDialog) {
+      if (typeof typeConfirmDialog.showModal === 'function') {
+        typeConfirmDialog.showModal();
+      } else {
+        typeConfirmDialog.setAttribute('open', '');
+      }
+    } else {
+      applyCatalogTypeSwitch(currentDraft.content, nextType);
+      initializeEditorWorkspace();
+    }
+  });
+
+  typeCancelBtn?.addEventListener('click', () => {
+    closeTypeDialog(true);
+  });
+
+  typeConfirmBtn?.addEventListener('click', () => {
+    if (currentDraft && pendingCatalogType) {
+      applyCatalogTypeSwitch(currentDraft.content, pendingCatalogType);
+      closeTypeDialog(false);
+      initializeEditorWorkspace();
+    } else {
+      closeTypeDialog(true);
+    }
+  });
+
+  typeConfirmDialog?.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeTypeDialog(true);
   });
 
   editorTimeslots?.addEventListener('input', () => {
@@ -761,7 +853,7 @@ function setupEditorEvents() {
   });
 }
 
-function initializeEditorWorkspace() {
+function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   setupEditorEvents();
 
   if (editorRevisionIndicator) {
@@ -819,19 +911,12 @@ function initializeEditorWorkspace() {
   populateCategorySelect();
   renderCategories();
   renderItems();
-  updateDraftAndPreview();
+  updateDraftAndPreview({ skipAutosave });
 }
 
 function syncCatalogTypeDefaults() {
-  const catType = currentDraft.content.catalogType;
-  const defaults = getCatalogDefaults(
-    catType,
-    currentDraft.content.businessName,
-    currentDraft.content.template
-  );
-  currentDraft.content.components = defaults.components;
-  currentDraft.content.orderFields = defaults.orderFields;
-  currentDraft.content.messages = defaults.messages;
+  if (!currentDraft) return;
+  applyCatalogTypeSwitch(currentDraft.content, currentDraft.content.catalogType);
   initializeEditorWorkspace();
 }
 
@@ -1264,7 +1349,7 @@ function renderItems() {
     // Selector: Tipo do item (Products & Quote)
     if (!isBooking) {
       const gMode = document.createElement('div');
-      gMode.className = 'form-group';
+      gMode.className = 'form-group item-fields-full';
       const lMode = document.createElement('label');
       lMode.setAttribute('for', `item-mode-${item.id}`);
       lMode.textContent = 'Tipo do item';
@@ -1307,7 +1392,8 @@ function renderItems() {
       itemPriceMode === 'offer';
     if (showPriceField) {
       const gPrice = document.createElement('div');
-      gPrice.className = 'form-group';
+      gPrice.className =
+        itemPriceMode === 'offer' ? 'form-group item-fields-full' : 'form-group';
       const lPrice = document.createElement('label');
       lPrice.setAttribute('for', `item-price-${item.id}`);
       lPrice.textContent =
@@ -1337,7 +1423,7 @@ function renderItems() {
       fields.appendChild(gPrice);
     } else if (itemPriceMode === 'donation') {
       const gCond = document.createElement('div');
-      gCond.className = 'form-group';
+      gCond.className = 'form-group item-fields-full';
       const lCond = document.createElement('label');
       lCond.setAttribute('for', `item-conditions-${item.id}`);
       lCond.textContent = 'Condições (opcional)';
@@ -1357,7 +1443,7 @@ function renderItems() {
       fields.appendChild(gCond);
     } else if (itemPriceMode === 'trade') {
       const gTrade = document.createElement('div');
-      gTrade.className = 'form-group';
+      gTrade.className = 'form-group item-fields-full';
       const lTrade = document.createElement('label');
       lTrade.setAttribute('for', `item-trade-for-${item.id}`);
       lTrade.textContent = 'Aceito em troca (opcional)';
@@ -1905,7 +1991,7 @@ function duplicateItem(catId, itemIdx) {
 
 let autosaveTimeout = null;
 
-function updateDraftAndPreview() {
+function updateDraftAndPreview({ skipAutosave = false } = {}) {
   if (!currentDraft) return;
 
   const textEncoder = new TextEncoder();
@@ -1948,6 +2034,39 @@ function updateDraftAndPreview() {
 
   // AUTOSAVE DEBOUNCED TRIGGER
   const indicator = globalThis.document?.getElementById('autosave-indicator');
+  if (activeCount > 20) {
+    if (indicator) {
+      indicator.textContent = '⚠️ Limite de 20 itens ativos';
+      indicator.className = 'autosave-indicator error';
+    }
+    if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    return;
+  }
+  if (totalCount > 100) {
+    if (indicator) {
+      indicator.textContent = '⚠️ Limite de 100 itens totais';
+      indicator.className = 'autosave-indicator error';
+    }
+    if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    return;
+  }
+  if (sizeInBytes > 262144) {
+    if (indicator) {
+      indicator.textContent = '⚠️ Limite de 256 KiB excedido';
+      indicator.className = 'autosave-indicator error';
+    }
+    if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    return;
+  }
+
+  if (skipAutosave) {
+    if (indicator) {
+      indicator.textContent = '✓ Todas as alterações foram salvas';
+      indicator.className = 'autosave-indicator saved';
+    }
+    return;
+  }
+
   if (indicator) {
     indicator.textContent = 'Alterando...';
     indicator.className = 'autosave-indicator saving';
@@ -1990,8 +2109,15 @@ function updateDraftAndPreview() {
             editorRevisionIndicator.textContent = `Revisão em conflito: ${currentDraft.revision} (servidor: ${data.error.currentRevision})`;
           }
         } else {
+          const errData = await res.json().catch(() => null);
+          const errCode = errData?.error?.code;
           if (indicator) {
-            indicator.textContent = '⚠️ Erro ao salvar';
+            indicator.textContent =
+              errCode === 'ACTIVE_ITEMS_LIMIT_EXCEEDED'
+                ? '⚠️ Limite de 20 itens ativos'
+                : errData?.error?.message
+                  ? `⚠️ ${errData.error.message}`
+                  : '⚠️ Erro ao salvar';
             indicator.className = 'autosave-indicator error';
           }
         }
