@@ -327,3 +327,16 @@ O workflow `.github/workflows/db-migrate.yml` permanece disponível exclusivamen
    - Na operação normal, **não é necessário clicar manualmente com `dry_run = false`**, pois o merge na `main` já aplica as migrações automaticamente no `deploy.yml` (Seção 6.6).
    - Caso seja necessário aplicar migrações manualmente fora de um merge em `main` (somente após validar o `dry_run = true`), volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼, **desmarque** a caixa `dry_run` (`false`) e clique em **Run workflow** para executar `supabase db push --remote --yes` contra o projeto remoto `qawlpsrfewosxsfgmmpm` (ou, localmente no terminal com variáveis de ambiente configuradas, `npx supabase db push --remote --dry-run` seguido de `npx supabase db push --remote`).
 
+
+## Painel modular (Spec 009)
+
+As migrações `202611120005`, `202611120006` e `202611120007` acrescentam papéis por vitrine, auditoria, CMS, versões, estrutura, ativos, componentes e domínios. Valide a cadeia em staging antes de liberar os recursos na conta de produção.
+
+- **Prévia**. Configure `PREVIEW_HMAC_SECRET` como segredo do Worker. O link expira em 30 minutos, exige a sessão que o emitiu e perde validade quando o rascunho muda.
+- **CMS**. Cadastre os operadores autorizados em `public.platform_operators` pelo ambiente administrativo do banco. O conteúdo estático continua visível até a primeira publicação do CMS.
+- **Mídia**. Supabase Storage é o provedor padrão. O adaptador R2 depende dos bindings `R2_BUCKET` e `R2_PUBLIC_BASE_URL` e exige validação do host público e das políticas de conteúdo antes de habilitar.
+- **Sandbox**. Associe `sandbox.inspira.dev.br` ao Worker. A aprovação usa um pacote HTML autocontido. Para pacotes trazidos de um release GitHub, envie também a origem e o SHA-256 do conteúdo importado.
+- **Domínios**. A integração depende de `CF_SAAS_CNAME_TARGET`, `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN` e `SUPABASE_SERVICE_ROLE_KEY`. Configure o alvo e a origem de fallback na zona Cloudflare for SaaS e mantenha as chaves no Worker. O limite interno é de 95 endereços. Se uma criação na Cloudflare perder a resposta, confirme o registro na zona antes de reconciliar o ID no banco.
+- **Aceite externo**. Ainda pendente com OAuth e PostgREST reais, upload no provedor, domínio de sandbox e fluxo de DNS/TLS para um domínio de teste.
+
+Documentação da Cloudflare sobre [planos e hostnames](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/) e [validação de propriedade](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/hostname-validation/).

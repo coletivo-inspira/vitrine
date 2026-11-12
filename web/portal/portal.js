@@ -1,3 +1,4 @@
+import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './platform-cms.js';
 import { loadEditor } from './editor.js';
 
 // State variables
@@ -577,6 +578,7 @@ export async function exchangePkceCode(code, deps = {}) {
     const initialSection = getSectionFromHash(initialHash);
     onSection(initialSection);
     await loadSitesFn();
+    void detectPlatformCms(true);
     return { ok: true, user: sessionData.user, sites };
   } catch {
     return handlePkceFailure(
@@ -605,6 +607,7 @@ export async function checkSession(deps = {}) {
       if (logoutButton) logoutButton.hidden = false;
       
       await loadSitesFn();
+      void detectPlatformCms(true);
       
       const initialHash = deps.locationHash ?? deps.location?.hash ?? globalThis.window?.location?.hash ?? '';
       const initialSection = getSectionFromHash(initialHash);
@@ -783,6 +786,7 @@ async function handleLogout() {
   globalThis.sessionStorage?.removeItem('pkce_verifier');
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
   currentUser = null;
+  void detectPlatformCms(false);
   sites = [];
   activeSite = null;
   profile = {
@@ -806,6 +810,7 @@ export function showSection(section) {
   // Toggle Auth section
   if (authSection) authSection.hidden = section !== 'auth';
   if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
+  showPlatformCms(section === 'platform-cms');
 
   if (section !== 'auth') {
     // Show/Hide authenticated content panes
@@ -2146,3 +2151,5 @@ export function renderInsightsPanel(insights) {
   }
 }
 
+
+initializePlatformCms(() => showSection('platform-cms'));

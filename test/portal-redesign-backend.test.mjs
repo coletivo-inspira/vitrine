@@ -236,14 +236,11 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       (err) => err.code === '42501'
     );
 
-    // Usuário autenticado não tem permissão para alterar status diretamente (42501 column privilege)
-    await assert.rejects(
-      () =>
-        asRole(db, USER_A, () =>
-          db.query("update public.customization_requests set status = 'respondido'")
-        ),
-      (err) => err.code === '42501'
+    // A política RLS reserva a alteração de status aos operadores da plataforma.
+    const update = await asRole(db, USER_A, () =>
+      db.query("update public.customization_requests set status = 'respondido' returning id")
     );
+    assert.equal(update.rows.length, 0);
   });
 
   await t.test('3. PGlite: sites.storefront_type, novos templates, catálogo por componentes, migração sem perda de pizzeria-v1 e bucket catalog-images RLS', async () => {
@@ -1473,4 +1470,101 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       console.error = origConsoleError;
     }
   });
+});
+
+
+test('RBAC por vitrine protege a equipe e registra alterações no banco', async (t) => {
+  const db = await setupPgliteWithMigrations();
+  t.after(() => db.close());
+  await db.query(
+    "insert into public.sites (id, owner_user_id, slug, name) values ($1, $2, 'equipe-a', 'Equipe A'), ($3, $2, 'equipe-b', 'Equipe B')",
+    [SITE_A, USER_A, SITE_B]
+  );
+  await asRole(db, USER_A, () => db.query(
+    "select public.set_showcase_member($1, $2, 'editor')", [SITE_A, USER_B]
+  ), 'authenticated', true);
+  const visible = await asRole(db, USER_B, () => db.query('select id from public.sites'));
+  assert.deepEqual(visible.rows, [{ id: SITE_A }]);
+  await assert.rejects(() => asRole(db, USER_B, () => db.query(
+    "select public.set_showcase_member($1, $2, 'admin')", [SITE_A, USER_B]
+  )), { code: '42501' });
+  await assert.rejects(() => asRole(db, USER_A, () => db.query(
+    "select public.set_showcase_member($1, $2, 'viewer')", [SITE_A, USER_A]
+  )), { code: '42501' });
+  const audit = await asRole(db, USER_A, () => db.query(
+    "select action, actor_user_id, entity_id, summary from public.audit_logs"
+  ));
+  assert.deepEqual(audit.rows, [{
+    action: 'insert', actor_user_id: USER_A, entity_id: USER_B, summary: { role: 'editor' }
+  }]);
+  await assert.rejects(() => asRole(db, USER_B, () => db.query(
+    "delete from public.audit_logs"
+  )), { code: '42501' });
+});
+
+
+test('CMS publica uma revisão consistente e mantém rascunhos privados', async (t) => {
+  const db = await setupPgliteWithMigrations();
+  t.after(() => db.close());
+  await db.query('insert into public.platform_operators (user_id) values ($1)', [USER_A]);
+  const snapshot = async () => Object.fromEntries((await db.query(
+    'select section_key, draft_content, draft_visible, draft_order from public.platform_cms'
+  )).rows.map(row => [row.section_key, {
+    content: row.draft_content, visible: row.draft_visible, displayOrder: row.draft_order
+  }]));
+
+  await assert.rejects(() => asRole(db, null, () => db.query('select draft_content from public.platform_cms'), 'anon'), {
+    code: '42501'
+  });
+  const privateRows = await asRole(db, USER_B, () => db.query('select draft_content from public.platform_cms'));
+  assert.deepEqual(privateRows.rows, []);
+  const oldSnapshot = await snapshot();
+  await asRole(db, USER_A, () => db.query(
+    "update public.platform_cms set draft_content = '{\"headline\":\"Título publicado\"}' where section_key = 'hero'"
+  ), 'authenticated', true);
+
+  const publish = expected => db.query('select public.publish_platform_cms($1) as ok', [JSON.stringify(expected)]);
+  const stale = await asRole(db, USER_A, () => publish(oldSnapshot));
+  assert.equal(stale.rows[0].ok, false);
+  const current = await snapshot();
+  await assert.rejects(() => asRole(db, USER_B, () => publish(current)), { code: '42501' });
+  const updated = await asRole(db, USER_A, () => publish(current), 'authenticated', true);
+  assert.equal(updated.rows[0].ok, true);
+  const publicRows = await asRole(db, null, () => db.query('select * from public.read_platform_cms()'), 'anon');
+  const hero = publicRows.rows.find(row => row.section_key === 'hero');
+  assert.deepEqual(hero.content, { headline: 'Título publicado' });
+  assert.deepEqual(publicRows.rows.find(row => row.section_key === 'announcements').content, {});
+  assert.equal(Object.hasOwn(hero, 'draft_content'), false);
+});
+
+
+test('Banco preserva as cinco versões recentes e restaura somente versões da própria vitrine', async (t) => {
+  const db = await setupPgliteWithMigrations();
+  t.after(() => db.close());
+  await db.query("insert into public.sites (id, owner_user_id, slug, name) values ($1, $2, 'versoes-a', 'Versões')", [
+    SITE_A, USER_A
+  ]);
+  let targetHash;
+  for (let revision = 1; revision <= 6; revision++) {
+    const { menu, hash } = await compilePublicStorefront({
+      businessName: `Versão ${revision}`, whatsapp: '5511999999999',
+      items: [{ id: 'produto', name: 'Produto', priceCents: 1000 }]
+    }, { slug: 'versoes-a' }, { revision });
+    if (revision === 2) targetHash = hash;
+    await db.query(
+      `insert into public.publications (site_id, slug, revision, artifact_hash, menu, published_at)
+       values ($1, 'versoes-a', $2, $3, $4, $5)
+       on conflict (site_id) do update set revision = excluded.revision,
+         artifact_hash = excluded.artifact_hash, menu = excluded.menu, published_at = excluded.published_at`,
+      [SITE_A, revision, hash, JSON.stringify(menu), `2026-11-0${revision}T00:00:00Z`]
+    );
+  }
+  const versions = await db.query('select revision from public.publication_releases order by revision');
+  assert.deepEqual(versions.rows.map(row => row.revision), [2, 3, 4, 5, 6]);
+  const rollback = () => db.query('select revision from public.rollback_showcase($1, 2, $2)', [SITE_A, targetHash]);
+  await assert.rejects(() => asRole(db, USER_STRANGER, rollback), { code: '42501' });
+  const restored = await asRole(db, USER_A, rollback, 'authenticated', true);
+  assert.equal(restored.rows[0].revision, 2);
+  const audit = await db.query("select action, actor_user_id from public.audit_logs where entity_type = 'publication'");
+  assert.deepEqual(audit.rows, [{ action: 'rollback', actor_user_id: USER_A }]);
 });

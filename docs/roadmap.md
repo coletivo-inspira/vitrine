@@ -39,3 +39,13 @@ Direção A implementada em web/; build para dist/ e preview local. Menu/FAQ, of
 em preparação, catálogo público e contato configurável. Revisão em
 docs/design/marketing-qa.md e publicação em docs/marketing-launch.md.
 Wrangler dry-run passou; autenticação Cloudflare não configurada, sem deploy remoto.
+
+## Planejamento da Plataforma Modular e Painel Configurável (`008` e `009`)
+
+1. **Especificação `008-portal-redesign`**: App Shell Liquid Glass no `/portal/`, painel inicial, perfil e interesses, assistente de nova vitrine em 3 passos, pedidos de customização, editor por componentes (`products`, `booking`, `quote`), planilha CSV no cliente, fluxo público em etapas e painel de Insights sem dados pessoais.
+2. **Especificação `009-modular-admin-platform` e `docs/modular-admin-architecture.md`**:
+   - **Fase 1 (S)**: Fundação Multi-Inquilino (`tenants`, `platform_operators`), RBAC por vitrine (`owner`, `admin`, `editor`, `viewer`) e trilha de auditoria (`audit_logs`).
+   - **Fase 2 (M)**: Edição sem deploy, alternância rápida de disponibilidade, pré-visualização assinada por HMAC, rollback das últimas 5 versões e CMS Institucional (`platform_cms`).
+   - **Fase 3 (L)**: Motor de templates (`templates`), módulos de seção (`modules`, `pages`, `sections`, `navigation_menus`) e herança em cascata por vertical de negócio.
+   - **Fase 4 (M)**: Gestão de ativos WebP (`<= 200 KB`) com cache imutável na borda (`SupabaseStorageProvider` padrão sem cartão + `R2StorageProvider` plugável) e sandboxing em origem opaca (`sandbox.inspira.dev.br`).
+   - **Fase 5 (L)**: Domínios personalizados (`custom_domains`), verificação DNS/SSL, roteamento por `Host` com SWR na borda e trava de 95 domínios gratuitos.

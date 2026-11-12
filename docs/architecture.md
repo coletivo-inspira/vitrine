@@ -54,3 +54,13 @@ comercial e fluxo de orçamento em docs/commercial-offer.md; preços não public
 
 A página de divulgação foi implementada em web/; não é o portal autenticado.
 Configuração estática Cloudflare validada sem deploy; ver docs/marketing-launch.md.
+
+## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
+
+Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
+
+- **ADR 0008 (Roteamento e cache na borda)**: vitrines públicas servidas a partir de manifestos imutáveis (`public.publications`) via Cloudflare Worker + `Cache API` (`stale-while-revalidate`, CPU `< 1,5 ms`), com resolução por caminho (`vitrine.inspira.dev.br/<slug>`) e por cabeçalho `Host` (`public.custom_domains`). Trava rígida em 95 domínios ativos no Cloudflare for SaaS para manter custo operacional zero.
+- **ADR 0009 (CMS institucional e publicação sem deploy)**: gestão em tempo de execução tanto da página principal (`public.platform_cms`, exclusiva para Operadores Inspira) quanto das vitrines dos clientes, com prévia assinada por HMAC (`X-Robots-Tag: noindex, nofollow`) e reversão (*rollback*) entre as últimas 5 versões publicadas.
+- **ADR 0010 (Sandboxing em origem opaca)**: componentes personalizados (HTML/CSS/JS ou de repositórios GitHub externos aprovados) executam exclusivamente em `<iframe sandbox="allow-scripts" referrerpolicy="no-referrer">` sem `allow-same-origin` (origem `null`) sob `sandbox.inspira.dev.br`.
+- **ADR 0011 (Armazenamento WebP client-side a custo zero)**: conversão de imagens no navegador para WebP (`<= 200 KB`) antes do upload, servidas com cache imutável na borda sobre o Supabase Storage Free (1 GB, padrão sem cartão) e adaptador plugável para Cloudflare R2 Free (10 GB, zero egress).
+- **Contenção visual (Liquid Glass vs. Brandbook)**: *Liquid Glass* restrito ao App Shell do painel (`/portal/`) com opacidade base de 85% (WCAG AAA) e fallback sólido automático; vitrines públicas e site institucional permanecem 100% sólidos.

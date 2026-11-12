@@ -37,4 +37,18 @@ _Evitar_: negócio para designar o modelo.
 
 **Case**: Exemplo autorizado de um trabalho realizado, publicado no portfólio da Inspira.
 
-**Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento e benefícios comerciais; não se confunde com proprietário de vitrine.
+**Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento, CMS institucional e benefícios comerciais; não se confunde com proprietário de vitrine.
+
+**Organização cliente (Inquilino / Tenant)**: Agrupador comercial de um cliente que pode possuir uma ou mais vitrines sob cotas controladas, mantendo o isolamento de acesso por vitrine.
+
+**Módulo**: Bloco funcional reutilizável de uma vitrine (ex.: topo/hero, grade de catálogo, agendamento, depoimentos, FAQ, horários/localização, componente em sandbox).
+
+**Seção**: Instância ordenada e configurada de um módulo dentro de uma página da vitrine.
+
+**Prévia autenticada**: Visualização temporária e assinada (`noindex`) de um rascunho antes da publicação pública.
+
+**Reversão (Rollback)**: Restauração imediata de uma das últimas versões publicadas da vitrine sem necessidade de novo deploy.
+
+**CMS Institucional**: Área exclusiva dos Operadores Inspira no portal para atualizar banners, textos, seções, modelos e cases da página principal da plataforma sem alterar código.
+
+**Sandbox de extensão**: Contêiner isolado em origem opaca (`<iframe sandbox="allow-scripts">` sem `allow-same-origin`) onde componentes personalizados em HTML/CSS/JS ou de repositórios externos executam sem acesso a cookies ou dados de outros clientes.

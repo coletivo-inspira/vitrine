@@ -864,3 +864,45 @@ html[data-theme="dark"] .brand .brand-logo-dark {
     transition-duration: 0.01ms !important;
   }
 }
+
+.storefront-module {
+  margin-block: 2rem;
+  padding-block: 1rem;
+  border-block-start: 1px solid var(--line);
+}
+
+.storefront-module-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+}
+
+.storefront-module-nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-underline-offset: .2em;
+}
+
+[data-font-pair="modern-inter"] .storefront-module h2,
+[data-font-pair="playful-poppins"] .storefront-module h2 {
+  font-family: "DM Sans", sans-serif;
+}
+
+[data-font-pair="classic-garamond"] .storefront-module h2 {
+  font-family: Georgia, serif;
+}
+
+body[data-button-style] .category-chip {
+  border-color: var(--storefront-custom-accent, currentColor);
+}
+
+body[data-button-style="rounded"] .category-chip {
+  border-radius: .5rem;
+}
+
+.storefront-widget {
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+}

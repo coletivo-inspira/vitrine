@@ -19,7 +19,7 @@ menuButton.addEventListener('click', () => {
 nav.addEventListener('click', event => {
   const link = event.target.closest('a');
   if (!link || menuButton.getAttribute('aria-expanded') !== 'true') return;
-  const destination = document.querySelector(link.getAttribute('href'));
+  const destination = document.getElementById(link.hash.slice(1));
   if (destination) {
     destination.setAttribute('tabindex', '-1');
     destination.focus({ preventScroll: true });
@@ -81,7 +81,6 @@ async function loadContent() {
   document.querySelector('#projetos').hidden = !list.childElementCount;
 }
 // Static marketing content remains useful even when optional data cannot be loaded.
-loadContent().catch(() => {});
 
 // A sheet leaves the front, then settles behind the other real sites.
 const showcase = document.querySelector('.showcase');
@@ -139,3 +138,103 @@ if (showcase) {
   stack.addEventListener('pointercancel', () => { startX = undefined; });
   syncPause();
 }
+
+const cmsSections = {
+  hero: '#inicio', value_props: '#cms-benefits', areas_showcase: '#possibilidades',
+  templates_catalog: '#cms-templates', featured_cases: '#projetos',
+  commercial_offer: '#planos', faq: '#duvidas', announcements: '#cms-announcements',
+  header_nav: '#site-nav', footer: '.site-footer'
+};
+
+function updateText(root, selector, value) {
+  const element = root.querySelector(selector);
+  if (element && typeof value === 'string') element.textContent = value;
+}
+
+function createTextElement(tag, text) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  return element;
+}
+
+function applyPlatformCms(sections) {
+  const main = document.getElementById('conteudo');
+  const contact = document.getElementById('contato');
+  for (const { sectionKey, content, visible } of sections) {
+    if (!Object.hasOwn(cmsSections, sectionKey)) continue;
+    const root = document.querySelector(cmsSections[sectionKey]);
+    if (!visible) {
+      root.hidden = true;
+      continue;
+    }
+    if (root.parentElement === main) main.insertBefore(root, contact);
+    switch (sectionKey) {
+      case 'hero':
+        updateText(root, 'h1', content.headline);
+        updateText(root, '.hero-description', content.subtitle);
+        break;
+      case 'value_props':
+        updateText(root, 'h2', content.title);
+        root.querySelector('ul').replaceChildren(...(content.items ?? []).map(item => createTextElement('li', item)));
+        break;
+      case 'areas_showcase':
+        updateText(root, 'h2', content.title);
+        if (Array.isArray(content.areas)) {
+          root.querySelectorAll('[data-area]').forEach(button => {
+            if (!content.areas.includes(button.dataset.area)) {
+              document.getElementById(button.getAttribute('aria-controls'))?.remove();
+              button.remove();
+            }
+          });
+          root.querySelector('[data-area]')?.click();
+        }
+        break;
+      case 'commercial_offer':
+        updateText(root, 'h2', content.title);
+        updateText(root, '.offer-emphasis', content.freePlanTitle);
+        break;
+      case 'faq':
+        updateText(root, 'h2', content.title);
+        if (Array.isArray(content.items)) {
+          root.querySelector('.faq-list').replaceChildren(...content.items.map(({ q, a }) => {
+            const detail = document.createElement('details');
+            detail.append(createTextElement('summary', q), createTextElement('p', a));
+            return detail;
+          }));
+        }
+        break;
+      case 'announcements':
+        updateText(root, 'p', content.bannerText);
+        break;
+      case 'header_nav':
+        if (Array.isArray(content.links)) {
+          root.replaceChildren(...content.links.filter(entry => /^#[a-z][a-z0-9-]*$/.test(entry.href))
+            .map(({ label, href }) => {
+              const link = createTextElement('a', label);
+              link.href = href;
+              return link;
+            }));
+        }
+        break;
+      case 'footer':
+        updateText(root, 'p', content.copyright);
+        break;
+      default:
+        updateText(root, 'h2', content.title);
+    }
+    if (sectionKey !== 'featured_cases' || root.querySelector('#project-list').children.length > 0) {
+      root.hidden = false;
+    }
+  }
+}
+
+async function loadPlatformCms() {
+  try {
+    const { sections } = await json('/api/public/platform-cms');
+    if (Array.isArray(sections)) applyPlatformCms(sections);
+  } catch {
+    // A página continua disponível com seu conteúdo estático.
+  }
+}
+
+void loadContent().catch(() => {}).then(loadPlatformCms);
