@@ -1,3 +1,4 @@
+// Run via: npx --yes playwright-chromium@1.49.0 scripts/capture-portal-qa.js
 import { chromium } from 'playwright-chromium';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';

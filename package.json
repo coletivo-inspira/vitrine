@@ -12,7 +12,6 @@
     "preview": "node scripts/serve.mjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.15",
-    "playwright-chromium": "^1.65.0"
+    "@electric-sql/pglite": "0.5.15"
   }
 }

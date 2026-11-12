@@ -27,6 +27,10 @@ test('QA Test Suite - Spec 008 CSS Contracts and Static Assets', async (t) => {
 
     // Confirm resolution of AUD-001 (Logo specificity / selectors for dark and light logos)
     assert.ok(portalCss.includes('.brand-logo-dark') || portalCss.includes('.brand-logo-light'), 'Portal CSS should have specific selectors for light and dark brand logos');
+
+    // Confirm that status badges (available, custom) preserve space between words for uppercase renderings
+    assert.match(portalCss, /\.badge-status-available\s*{[^}]*word-spacing:\s*3px/, 'badge-status-available must define word-spacing to keep uppercase space visible');
+    assert.match(portalCss, /\.badge-status-custom\s*{[^}]*word-spacing:\s*3px/, 'badge-status-custom must define word-spacing to keep uppercase space visible');
   });
 
   await t.test('2. Marketing UI stylesheet (web/styles.css) must NOT contain glass glass effects ("no glass" Direction A)', async () => {
