@@ -1087,6 +1087,51 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   };
 }
 
+export const PUBLICATION_CACHE_TTL_MS = 30 * 1000;
+const publicationFetchedAtBySlug = new Map();
+
+export function clearPublicationsCache() {
+  sharedPublicPublications.publicationsBySlug.clear();
+  sharedPublicPublications.publicationsByHash.clear();
+  publicationFetchedAtBySlug.clear();
+}
+
+async function hydratePublicationRecord(row) {
+  if (!row || typeof row !== 'object' || !row.menu || typeof row.menu !== 'object') {
+    return null;
+  }
+  const rawMenu = row.menu;
+  const hasCategories = Array.isArray(rawMenu.categories) && rawMenu.categories.length > 0;
+  const draftLike = {
+    schemaVersion: 1,
+    template: rawMenu.template ?? DEFAULT_TEMPLATE,
+    slug: row.slug ?? rawMenu.slug,
+    businessName: rawMenu.name ?? rawMenu.businessName,
+    whatsapp: rawMenu.whatsapp,
+    ...(hasCategories
+      ? { categories: rawMenu.categories }
+      : { items: Array.isArray(rawMenu.items) ? rawMenu.items : [] })
+  };
+  const compiled = await compilePublicStorefront(
+    draftLike,
+    {
+      id: row.site_id ?? undefined,
+      slug: row.slug ?? rawMenu.slug,
+      name: rawMenu.name ?? rawMenu.businessName,
+      template: rawMenu.template ?? DEFAULT_TEMPLATE
+    },
+    {
+      siteId: row.site_id ?? undefined,
+      revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
+      publishedAt:
+        typeof row.published_at === 'string' && row.published_at
+          ? row.published_at
+          : new Date().toISOString()
+    }
+  );
+  return compiled.publication;
+}
+
 export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: customFetch } = {}) {
   const fetchImpl = customFetch ?? globalThis.fetch;
   const baseUrl = String(supabaseUrl ?? '').replace(/\/+$/, '');
@@ -1096,6 +1141,15 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       apikey: String(supabaseAnonKey),
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',
+      ...extra
+    };
+  }
+
+  function anonHeaders(extra = {}) {
+    return {
+      apikey: String(supabaseAnonKey),
+      authorization: `Bearer ${supabaseAnonKey}`,
+      accept: 'application/json',
       ...extra
     };
   }
@@ -1294,21 +1348,178 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       };
     },
 
-    async savePublication(publication) {
+    async savePublication(publication, { token } = {}) {
+      if (token && publication?.siteId && baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
+        const pubRes = await fetchImpl(`${baseUrl}/rest/v1/publications?on_conflict=site_id`, {
+          method: 'POST',
+          headers: authHeaders(token, {
+            prefer: 'resolution=merge-duplicates,return=representation'
+          }),
+          body: JSON.stringify({
+            site_id: publication.siteId,
+            slug: publication.slug,
+            revision: publication.revision,
+            status: 'active',
+            artifact_hash: publication.hash,
+            menu: publication.menu,
+            published_at: publication.publishedAt
+          })
+        });
+        if (pubRes && !pubRes.ok && pubRes.status !== 404) {
+          throw new Error(`Supabase savePublication error: ${pubRes.status}`);
+        }
+      }
+      publicationFetchedAtBySlug.set(publication.slug, Date.now());
       return sharedPublicPublications.savePublication(publication);
     },
 
     async getPublicationBySlug(slug) {
+      const nowMs = Date.now();
+      const cachedAt = publicationFetchedAtBySlug.get(slug) ?? 0;
+      if (
+        sharedPublicPublications.publicationsBySlug.has(slug) &&
+        nowMs - cachedAt < PUBLICATION_CACHE_TTL_MS
+      ) {
+        return sharedPublicPublications.publicationsBySlug.get(slug);
+      }
+      if (slug === 'loja1') {
+        return getPilotLoja1Publication();
+      }
+
+      if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
+        try {
+          const response = await fetchImpl(
+            `${baseUrl}/rest/v1/publications?slug=eq.${encodeURIComponent(slug)}&status=eq.active&select=slug,revision,artifact_hash,menu,published_at&limit=1`,
+            {
+              method: 'GET',
+              headers: anonHeaders()
+            }
+          );
+          if (response && response.ok) {
+            const rows = await response.json();
+            if (Array.isArray(rows) && rows.length > 0) {
+              const hydrated = await hydratePublicationRecord(rows[0]);
+              if (hydrated) {
+                publicationFetchedAtBySlug.set(hydrated.slug, nowMs);
+                await sharedPublicPublications.savePublication(hydrated);
+                if (
+                  typeof rows[0].artifact_hash === 'string' &&
+                  rows[0].artifact_hash !== hydrated.hash
+                ) {
+                  sharedPublicPublications.publicationsByHash.set(
+                    `${hydrated.slug}:${rows[0].artifact_hash}`,
+                    hydrated
+                  );
+                }
+                return hydrated;
+              }
+            }
+          }
+        } catch {
+          // Fall back to in-memory or pilot publication on transient fetch errors
+        }
+      }
+
       return sharedPublicPublications.getPublicationBySlug(slug);
     },
 
     async getPublicationByHash(slug, hash) {
+      const key = `${slug}:${hash}`;
+      if (sharedPublicPublications.publicationsByHash.has(key)) {
+        return sharedPublicPublications.publicationsByHash.get(key);
+      }
+      if (slug === 'loja1') {
+        const pilot = await getPilotLoja1Publication();
+        if (pilot.hash === hash) {
+          return pilot;
+        }
+      }
+
+      if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
+        try {
+          let row = null;
+          const releaseRes = await fetchImpl(
+            `${baseUrl}/rest/v1/publication_releases?slug=eq.${encodeURIComponent(slug)}&artifact_hash=eq.${encodeURIComponent(hash)}&select=slug,revision,artifact_hash,menu,published_at&limit=1`,
+            {
+              method: 'GET',
+              headers: anonHeaders()
+            }
+          );
+          if (releaseRes && releaseRes.ok) {
+            const releaseRows = await releaseRes.json();
+            if (Array.isArray(releaseRows) && releaseRows.length > 0) {
+              row = releaseRows[0];
+            }
+          }
+
+          if (!row) {
+            const activeRes = await fetchImpl(
+              `${baseUrl}/rest/v1/publications?slug=eq.${encodeURIComponent(slug)}&artifact_hash=eq.${encodeURIComponent(hash)}&select=slug,revision,artifact_hash,menu,published_at&limit=1`,
+              {
+                method: 'GET',
+                headers: anonHeaders()
+              }
+            );
+            if (activeRes && activeRes.ok) {
+              const activeRows = await activeRes.json();
+              if (Array.isArray(activeRows) && activeRows.length > 0) {
+                row = activeRows[0];
+              }
+            }
+          }
+
+          if (row) {
+            const hydrated = await hydratePublicationRecord(row);
+            if (hydrated) {
+              sharedPublicPublications.publicationsByHash.set(key, hydrated);
+              sharedPublicPublications.publicationsByHash.set(
+                `${hydrated.slug}:${hydrated.hash}`,
+                hydrated
+              );
+              return hydrated;
+            }
+          }
+        } catch {
+          // Fall back to in-memory or pilot publication
+        }
+      }
+
       return sharedPublicPublications.getPublicationByHash(slug, hash);
     }
   };
 }
 
 const sharedPublicPublications = createMemoryStore({ sites: [], drafts: [], memberships: [] });
+
+const DEFAULT_NOT_FOUND_HTML = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Página não encontrada — Vitrine Inspira</title><link rel="stylesheet" href="/styles.css"><link rel="icon" href="/assets/brand/plus.svg"></head><body><main class="wrap section-space"><a class="brand" href="/"><img src="/assets/brand/plus.svg" width="36" height="36" alt="">Vitrine Inspira</a><h1 class="section-space">Essa página<br>não está aqui.</h1><p>O endereço pode ter mudado ou ainda não ter sido publicado.</p><p><a class="text-link" href="/">Voltar ao início →</a></p></main></body></html>
+`;
+
+async function renderNotFoundPageResponse(request, method, assetsFetcher) {
+  let html = DEFAULT_NOT_FOUND_HTML;
+  if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+    try {
+      const notFoundUrl = new URL('/404.html', request.url);
+      const assetRes = await assetsFetcher.fetch(new Request(notFoundUrl, { method: 'GET' }));
+      if (assetRes && (assetRes.ok || assetRes.status === 404)) {
+        const text = await assetRes.text();
+        if (text && text.includes('Essa página')) {
+          html = text;
+        }
+      }
+    } catch {
+      // Fallback to built-in 404 HTML
+    }
+  }
+  return new Response(method === 'HEAD' ? null : html, {
+    status: 404,
+    headers: {
+      ...PUBLIC_SECURITY_HEADERS,
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store'
+    }
+  });
+}
 
 const RESERVED_PUBLIC_PATHS = new Set([
   ...RESERVED_SLUGS,
@@ -1437,17 +1648,7 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
       }
     }
 
-    return new Response(
-      method === 'HEAD' ? null : 'Vitrine pública não encontrada.',
-      {
-        status: 404,
-        headers: {
-          ...PUBLIC_SECURITY_HEADERS,
-          'content-type': 'text/plain; charset=utf-8',
-          'cache-control': 'no-store'
-        }
-      }
-    );
+    return renderNotFoundPageResponse(request, method, assetsFetcher);
   }
 
   return null;
@@ -1524,6 +1725,12 @@ export function createApiHandler(deps = {}) {
       }
       if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
         const assetRes = await assetsFetcher.fetch(request);
+        if (
+          assetRes.status === 404 &&
+          !/text\/html/i.test(assetRes.headers.get('content-type') || '')
+        ) {
+          return renderNotFoundPageResponse(request, method, assetsFetcher);
+        }
         const headers = new Headers(assetRes.headers);
         const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
         if (!headers.has('content-security-policy')) {
@@ -1543,7 +1750,7 @@ export function createApiHandler(deps = {}) {
           headers
         });
       }
-      return errorResponse(404, 'NOT_FOUND', 'Recurso não encontrado.');
+      return renderNotFoundPageResponse(request, method, assetsFetcher);
     }
 
     try {
@@ -1867,8 +2074,9 @@ export function createApiHandler(deps = {}) {
         });
 
         if (typeof store.savePublication === 'function') {
-          await store.savePublication(compiled.publication);
+          await store.savePublication(compiled.publication, { token: user.token, env });
         }
+        publicationFetchedAtBySlug.set(compiled.publication.slug, Date.now());
         await sharedPublicPublications.savePublication(compiled.publication);
 
         return jsonResponse(200, { publication: compiled.publication });

@@ -12,6 +12,7 @@ import worker, {
   STOREFRONT_CACHE_CONTROL,
   STRICT_CSP_HEADER,
   clearJwksCache,
+  clearPublicationsCache,
   evaluateHeadersForPath,
   parseHeadersRules
 } from '../workers/api.mjs';
@@ -252,6 +253,85 @@ async function createPgliteSupabaseHarness() {
             const res = await db.query(
               'update public.drafts set content = $1::jsonb where site_id = $2 and revision = $3 returning site_id, revision, updated_at, content',
               [JSON.stringify(body.content), siteId, revision]
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/rest/v1/publications') {
+        if (method === 'GET') {
+          const slugFilter = url.searchParams.get('slug');
+          const hashFilter = url.searchParams.get('artifact_hash');
+          const slug = slugFilter?.startsWith('eq.') ? slugFilter.slice(3) : null;
+          const hash = hashFilter?.startsWith('eq.') ? hashFilter.slice(3) : null;
+          const rows = await runAsJwtRole(request, async () => {
+            if (slug && hash) {
+              const res = await db.query(
+                'select slug, revision, status, artifact_hash, menu, published_at from public.publications where slug = $1 and artifact_hash = $2 limit 1',
+                [slug, hash]
+              );
+              return res.rows;
+            }
+            const res = await db.query(
+              'select slug, revision, status, artifact_hash, menu, published_at from public.publications where slug = $1 and status = $2 limit 1',
+              [slug, 'active']
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+
+        if (method === 'POST') {
+          const body = await request.json();
+          const rows = await runAsJwtRole(request, async () => {
+            const res = await db.query(
+              `insert into public.publications (site_id, slug, revision, status, artifact_hash, menu, published_at)
+               values ($1, $2, $3, $4, $5, $6::jsonb, $7)
+               on conflict (site_id) do update
+                 set slug = excluded.slug,
+                     revision = excluded.revision,
+                     status = excluded.status,
+                     artifact_hash = excluded.artifact_hash,
+                     menu = excluded.menu,
+                     published_at = excluded.published_at
+               returning site_id, slug, revision, status, artifact_hash, menu, published_at`,
+              [
+                body.site_id,
+                body.slug,
+                body.revision,
+                body.status ?? 'active',
+                body.artifact_hash,
+                JSON.stringify(body.menu),
+                body.published_at ?? new Date().toISOString()
+              ]
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/rest/v1/publication_releases') {
+        if (method === 'GET') {
+          const slugFilter = url.searchParams.get('slug');
+          const hashFilter = url.searchParams.get('artifact_hash');
+          const slug = slugFilter?.startsWith('eq.') ? slugFilter.slice(3) : null;
+          const hash = hashFilter?.startsWith('eq.') ? hashFilter.slice(3) : null;
+          const rows = await runAsJwtRole(request, async () => {
+            const res = await db.query(
+              'select slug, revision, artifact_hash, menu, published_at from public.publication_releases where slug = $1 and artifact_hash = $2 limit 1',
+              [slug, hash]
             );
             return res.rows;
           });
@@ -894,6 +974,145 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
       0,
       'Nenhuma consulta ao banco PostgreSQL administrativo pode ocorrer no consumo público'
     );
+  });
+
+  await t.test('5.1. Persistência entre isolates (cold start) para slug publicado (ex.: pipira rev 6) em vitrine/painel/workers.dev e página 404 para slugs desconhecidos/não publicados', async () => {
+    // Cria a vitrine pipira e avança até a revisão 6 antes de publicar
+    const createPipiraRes = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/api/sites', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auroraJwt}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Pipira Forno & Brasa',
+          slug: 'pipira',
+          template: 'pizzeria-v1',
+          whatsapp: '5511966665555'
+        })
+      }),
+      env
+    );
+    assert.equal(createPipiraRes.status, 201);
+    const pipiraSiteId = (await createPipiraRes.json()).site.id;
+
+    // Antes de publicar, acessar /pipira deve retornar a página 404 HTML com status 404 e CSP estrita
+    clearPublicationsCache();
+    const unpubRes = await worker.fetch(
+      new Request('https://vitrine.inspira.dev.br/pipira'),
+      env
+    );
+    assert.equal(unpubRes.status, 404);
+    assert.match(unpubRes.headers.get('content-type') || '', /text\/html/i);
+    assert.equal(unpubRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+    const unpubHtml = await unpubRes.text();
+    assert.match(unpubHtml, /Essa página<br>não está aqui\./);
+
+    const pipiraCatalog = {
+      schemaVersion: 1,
+      template: 'pizzeria-v1',
+      slug: 'pipira',
+      businessName: 'Pipira Forno & Brasa',
+      whatsapp: '5511966665555',
+      categories: [
+        {
+          name: 'Pizzas Artesanais Pipira',
+          items: [
+            {
+              id: 'pipira-especial',
+              name: 'Pipira Especial da Casa',
+              description: 'Queijo coalho tostado, tomate confit e manjericão.',
+              priceCents: 5890,
+              active: true
+            }
+          ]
+        }
+      ]
+    };
+
+    for (let rev = 1; rev < 6; rev += 1) {
+      const saveRes = await worker.fetch(
+        new Request(`https://painel.inspira.dev.br/api/sites/${pipiraSiteId}/draft`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${auroraJwt}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            revision: rev,
+            content: pipiraCatalog
+          })
+        }),
+        env
+      );
+      assert.equal(saveRes.status, 200);
+    }
+
+    const publishPipiraRes = await worker.fetch(
+      new Request(`https://painel.inspira.dev.br/api/sites/${pipiraSiteId}/publish`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${auroraJwt}` }
+      }),
+      env
+    );
+    assert.equal(publishPipiraRes.status, 200);
+    const { publication: pipiraPub } = await publishPipiraRes.json();
+    assert.equal(pipiraPub.slug, 'pipira');
+    assert.equal(pipiraPub.revision, 6);
+    assert.equal(pipiraPub.url, '/pipira');
+
+    // Simula novo isolate (cold start) limpando a memória do Worker
+    clearPublicationsCache();
+
+    for (const host of [
+      'https://vitrine.inspira.dev.br',
+      'https://painel.inspira.dev.br',
+      'https://vitrine-inspira.inspira.workers.dev'
+    ]) {
+      clearPublicationsCache();
+      const pageRes = await worker.fetch(new Request(`${host}/pipira`), env);
+      assert.equal(pageRes.status, 200, `GET ${host}/pipira deve retornar 200`);
+      assert.match(pageRes.headers.get('content-type') || '', /text\/html/i);
+      assert.equal(pageRes.headers.get('cache-control'), STOREFRONT_CACHE_CONTROL);
+      assert.equal(pageRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+      assert.equal(pageRes.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(pageRes.headers.get('x-frame-options'), 'DENY');
+      const html = await pageRes.text();
+      assert.match(html, /Pipira Forno &amp; Brasa/);
+      assert.match(html, /\/pipira/);
+      assert.match(html, /Pipira Especial da Casa/);
+      assert.match(html, /R\$\s*58,90/);
+      assert.doesNotMatch(html, /Essa página<br>não está aqui\./);
+    }
+
+    // Verifica leitura cold-start de /data/vitrines/pipira/menu.json e release imutável por hash
+    clearPublicationsCache();
+    const pipiraMenuRes = await worker.fetch(
+      new Request('https://vitrine.inspira.dev.br/data/vitrines/pipira/menu.json'),
+      env
+    );
+    assert.equal(pipiraMenuRes.status, 200);
+    assert.deepEqual(await pipiraMenuRes.json(), pipiraPub.menu);
+
+    clearPublicationsCache();
+    const pipiraReleaseRes = await worker.fetch(
+      new Request(`https://vitrine.inspira.dev.br${pipiraPub.immutableMenuUrl}`),
+      env
+    );
+    assert.equal(pipiraReleaseRes.status, 200);
+    assert.equal(pipiraReleaseRes.headers.get('cache-control'), IMMUTABLE_CACHE_CONTROL);
+    assert.deepEqual(await pipiraReleaseRes.json(), pipiraPub.menu);
+
+    // Slug desconhecido continua retornando 404 com a página 404 HTML e cabeçalhos de segurança
+    const unknownRes = await worker.fetch(
+      new Request('https://vitrine.inspira.dev.br/slug-totalmente-inexistente'),
+      env
+    );
+    assert.equal(unknownRes.status, 404);
+    assert.match(unknownRes.headers.get('content-type') || '', /text\/html/i);
+    assert.equal(unknownRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+    assert.match(await unknownRes.text(), /Essa página<br>não está aqui\./);
   });
 
   await t.test('6. Logout (POST /api/auth/logout) revogando/expurgando o cookie __Host-vitrine_session', async () => {

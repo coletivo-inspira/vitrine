@@ -418,4 +418,124 @@ test('Fase 4 - Motor de Publicação Imutável e Vitrine Pública Mobile-First',
     assert.match(headersText, /\/loja1\s+Cache-Control: public, max-age=300, stale-while-revalidate=86400/);
     assert.match(headersText, /\/data\/vitrines\/\*\/releases\/\*\s+Cache-Control: public, max-age=31536000, immutable/);
   });
+
+  await t.test('6. Roteamento de qualquer slug publicado (/pipira rev 6), página 404 para slugs não publicados e wrangler.jsonc run_worker_first', async () => {
+    const api = createApiHandler();
+
+    // Slug desconhecido retorna 404 HTML ("Essa página não está aqui.") com status 404 e CSP estrita
+    const unknownRes = await api.fetch(new Request('https://vitrine.inspira.dev.br/pipira'));
+    assert.equal(unknownRes.status, 404);
+    assert.match(unknownRes.headers.get('content-type') || '', /text\/html/i);
+    assert.match(unknownRes.headers.get('content-security-policy') || '', /script-src 'self'/);
+    assert.equal(unknownRes.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(unknownRes.headers.get('x-frame-options'), 'DENY');
+    assert.match(await unknownRes.text(), /Essa página<br>não está aqui\./);
+
+    // Cria vitrine pipira no portal
+    const createRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/sites', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Pipira Pizzaria',
+          slug: 'pipira',
+          template: 'pizzeria-v1',
+          whatsapp: '5511988887777'
+        })
+      })
+    );
+    assert.equal(createRes.status, 201);
+    const { site: pipiraSite } = await createRes.json();
+
+    // Enquanto não publicada (apenas rascunho), /pipira continua retornando 404 HTML
+    const unpublishedRes = await api.fetch(new Request('https://vitrine.inspira.dev.br/pipira'));
+    assert.equal(unpublishedRes.status, 404);
+    assert.match(await unpublishedRes.text(), /Essa página<br>não está aqui\./);
+
+    // Avança rascunho até revisão 6 e publica
+    const pipiraDraft = {
+      schemaVersion: 1,
+      template: 'pizzeria-v1',
+      slug: 'pipira',
+      businessName: 'Pipira Pizzaria',
+      whatsapp: '5511988887777',
+      categories: [
+        {
+          name: 'Clássicas',
+          items: [
+            {
+              id: 'pipira-marg',
+              name: 'Margherita Pipira',
+              description: 'Molho artesanal, muçarela e manjericão.',
+              priceCents: 4900,
+              active: true
+            }
+          ]
+        }
+      ]
+    };
+
+    for (let rev = 1; rev < 6; rev += 1) {
+      const putRes = await api.fetch(
+        new Request(`https://painel.inspira.dev.br/api/sites/${pipiraSite.id}/draft`, {
+          method: 'PUT',
+          headers: {
+            Authorization: 'Bearer token-owner',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ revision: rev, content: pipiraDraft })
+        })
+      );
+      assert.equal(putRes.status, 200);
+    }
+
+    const pubRes = await api.fetch(
+      new Request(`https://painel.inspira.dev.br/api/sites/${pipiraSite.id}/publish`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer token-owner' }
+      })
+    );
+    assert.equal(pubRes.status, 200);
+    const { publication } = await pubRes.json();
+    assert.equal(publication.slug, 'pipira');
+    assert.equal(publication.revision, 6);
+    assert.equal(publication.url, '/pipira');
+
+    // Renderiza em vitrine.inspira.dev.br/pipira, painel.inspira.dev.br/pipira e workers.dev/pipira
+    for (const url of [
+      'https://vitrine.inspira.dev.br/pipira',
+      'https://vitrine.inspira.dev.br/pipira/',
+      'https://painel.inspira.dev.br/pipira',
+      'https://vitrine-inspira.inspira.workers.dev/pipira'
+    ]) {
+      const res = await api.fetch(new Request(url));
+      assert.equal(res.status, 200, `Esperado 200 em ${url}`);
+      assert.match(res.headers.get('content-type') || '', /text\/html/i);
+      assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);
+      assert.doesNotMatch(res.headers.get('content-security-policy') || '', /script-src[^;]*unsafe-inline/);
+      const html = await res.text();
+      assert.match(html, /Pipira Pizzaria/);
+      assert.match(html, /\/pipira/);
+      assert.match(html, /Margherita Pipira/);
+      assert.match(html, /R\$\s*49,00/);
+      assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i);
+    }
+
+    // Verifica wrangler.jsonc: run_worker_first deve rotear /* para o Worker preservando regras !/ para assets estáticos
+    const wranglerConfig = JSON.parse(await readFile(resolve(root, 'wrangler.jsonc'), 'utf8'));
+    assert.ok(Array.isArray(wranglerConfig.assets.run_worker_first));
+    assert.ok(
+      wranglerConfig.assets.run_worker_first.includes('/*'),
+      'wrangler.jsonc run_worker_first deve incluir /* para que slugs dinâmicos (/pipira) invoquem o Worker'
+    );
+    assert.ok(
+      wranglerConfig.assets.run_worker_first.includes('!/assets/*') &&
+        wranglerConfig.assets.run_worker_first.includes('!/portal/*') &&
+        wranglerConfig.assets.run_worker_first.includes('!/vitrine/*'),
+      'wrangler.jsonc run_worker_first deve manter exclusões !/ para assets estáticos'
+    );
+  });
 });

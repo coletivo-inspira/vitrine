@@ -320,6 +320,88 @@ async function setupAuditDatabase() {
         }
       }
 
+      if (url.pathname === '/rest/v1/publications') {
+        if (method === 'GET') {
+          const slugFilter = url.searchParams.get('slug');
+          const hashFilter = url.searchParams.get('artifact_hash');
+          const slug = slugFilter?.startsWith('eq.') ? slugFilter.slice(3) : null;
+          const hash = hashFilter?.startsWith('eq.') ? hashFilter.slice(3) : null;
+          const rows = await asRole(role, sub, async () => {
+            if (slug && hash) {
+              return (
+                await db.query(
+                  'select slug, revision, status, artifact_hash, menu, published_at from public.publications where slug = $1 and artifact_hash = $2 limit 1',
+                  [slug, hash]
+                )
+              ).rows;
+            }
+            return (
+              await db.query(
+                'select slug, revision, status, artifact_hash, menu, published_at from public.publications where slug = $1 and status = $2 limit 1',
+                [slug, 'active']
+              )
+            ).rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (method === 'POST') {
+          const body = await request.json();
+          const rows = await asRole(role, sub, async () => {
+            return (
+              await db.query(
+                `insert into public.publications (site_id, slug, revision, status, artifact_hash, menu, published_at)
+                 values ($1, $2, $3, $4, $5, $6::jsonb, $7)
+                 on conflict (site_id) do update
+                   set slug = excluded.slug,
+                       revision = excluded.revision,
+                       status = excluded.status,
+                       artifact_hash = excluded.artifact_hash,
+                       menu = excluded.menu,
+                       published_at = excluded.published_at
+                 returning site_id, slug, revision, status, artifact_hash, menu, published_at`,
+                [
+                  body.site_id,
+                  body.slug,
+                  body.revision,
+                  body.status ?? 'active',
+                  body.artifact_hash,
+                  JSON.stringify(body.menu),
+                  body.published_at ?? new Date().toISOString()
+                ]
+              )
+            ).rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/rest/v1/publication_releases') {
+        if (method === 'GET') {
+          const slugFilter = url.searchParams.get('slug');
+          const hashFilter = url.searchParams.get('artifact_hash');
+          const slug = slugFilter?.startsWith('eq.') ? slugFilter.slice(3) : null;
+          const hash = hashFilter?.startsWith('eq.') ? hashFilter.slice(3) : null;
+          const rows = await asRole(role, sub, async () => {
+            return (
+              await db.query(
+                'select slug, revision, artifact_hash, menu, published_at from public.publication_releases where slug = $1 and artifact_hash = $2 limit 1',
+                [slug, hash]
+              )
+            ).rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
+
       return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
     } catch (err) {
       const status = err?.code === '23505' ? 409 : err?.code === '42501' ? 403 : 400;
