@@ -31,5 +31,5 @@ curl -i -X POST http://127.0.0.1:8788/api/likes \
 
 ## Produção (ação humana)
 
-1. Rodar o workflow **Supabase Database Migrate** com `dry_run=true`, conferir a saída e depois com `dry_run=false` para aplicar `20261112190500_item_likes.sql`.
+1. Rodar o workflow **Supabase Database Migrate** com `dry_run=true`, conferir a saída e depois com `dry_run=false` para aplicar `20261112192000_item_likes.sql`.
 2. Até isso acontecer, a vitrine em produção não mostra botões de curtir (degradação silenciosa).

@@ -55,7 +55,7 @@ specs/011-curtidas-produto/
 ### Source Code (repository root)
 
 ```text
-supabase/migrations/20261112190500_item_likes.sql   # tabela, funções e grants
+supabase/migrations/20261112192000_item_likes.sql   # tabela, funções e grants
 src/portal-validation.mjs                           # validação do payload, limites e bloco "likes" dos insights
 workers/api.mjs                                     # rota /api/likes, cookie, stores memória/Supabase, insights
 web/assets/storefront-renderer.mjs                  # botão de curtir no card do item

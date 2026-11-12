@@ -1,6 +1,6 @@
 # Data Model: Curtidas por Item (`011-curtidas-produto`)
 
-Migração: `supabase/migrations/20261112190500_item_likes.sql` (append-only).
+Migração: `supabase/migrations/20261112192000_item_likes.sql` (append-only).
 
 ## Tabela `public.item_likes`
 

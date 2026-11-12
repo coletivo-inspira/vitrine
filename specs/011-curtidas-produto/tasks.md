@@ -4,7 +4,7 @@
 
 ## Phase 1: Foundational (bloqueia todas as histórias)
 
-- [x] T001 Criar migração append-only `supabase/migrations/20261112190500_item_likes.sql` com `public.item_likes`, índice, RLS sem grants e funções `get_item_likes`, `set_item_like` e `site_item_like_stats`.
+- [x] T001 Criar migração append-only `supabase/migrations/20261112192000_item_likes.sql` com `public.item_likes`, índice, RLS sem grants e funções `get_item_likes`, `set_item_like` e `site_item_like_stats`.
 - [x] T002 Adicionar `ITEM_LIKE_LIMITS`, `MAX_LIKE_REQUEST_BYTES` e `validateItemLikePayload` em `src/portal-validation.mjs`.
 
 ## Phase 2: User Story 1 + 2 — Curtir com proteção (P1)
