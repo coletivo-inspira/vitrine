@@ -461,18 +461,78 @@ function setupEditorEvents() {
 
   // Floating Side/Bottom Toolbar Event Listeners
   const toolbarAddItem = document.getElementById('toolbar-add-item');
+  const toolbarAddItemMenu = document.getElementById('toolbar-add-item-menu');
   const toolbarAddSection = document.getElementById('toolbar-add-section');
   const toolbarAddImage = document.getElementById('toolbar-add-image');
+
+  const closeToolbarAddMenu = () => {
+    if (toolbarAddItem) toolbarAddItem.setAttribute('aria-expanded', 'false');
+    if (toolbarAddItemMenu) toolbarAddItemMenu.hidden = true;
+  };
 
   toolbarAddItem?.addEventListener('click', (e) => {
     e.stopPropagation();
     if (!currentDraft) return;
-    if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
-      addCategory('Geral');
+    if (currentDraft.content.catalogType === 'booking') return;
+    const expanded = toolbarAddItem.getAttribute('aria-expanded') === 'true';
+    toolbarAddItem.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (toolbarAddItemMenu) {
+      toolbarAddItemMenu.hidden = expanded;
+      if (!expanded) {
+        const firstOpt = toolbarAddItemMenu.querySelector('.toolbar-mode-option');
+        firstOpt?.focus();
+      }
     }
-    const expanded = addItemBtn?.getAttribute('aria-expanded') === 'true';
-    addItemBtn?.setAttribute('aria-expanded', !expanded);
-    if (addItemMenu) addItemMenu.hidden = expanded;
+  });
+
+  toolbarAddItem?.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (toolbarAddItemMenu && toolbarAddItemMenu.hidden) {
+        toolbarAddItem.setAttribute('aria-expanded', 'true');
+        toolbarAddItemMenu.hidden = false;
+      }
+      const opts = Array.from(toolbarAddItemMenu?.querySelectorAll('.toolbar-mode-option') || []);
+      if (opts.length > 0) {
+        const target = e.key === 'ArrowUp' ? opts[opts.length - 1] : opts[0];
+        target?.focus();
+      }
+    } else if (e.key === 'Escape') {
+      closeToolbarAddMenu();
+    }
+  });
+
+  toolbarAddItemMenu?.addEventListener('keydown', (e) => {
+    const opts = Array.from(toolbarAddItemMenu.querySelectorAll('.toolbar-mode-option'));
+    const idx = opts.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (opts.length > 0) {
+        opts[(idx + 1) % opts.length]?.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (opts.length > 0) {
+        opts[(idx - 1 + opts.length) % opts.length]?.focus();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeToolbarAddMenu();
+      toolbarAddItem?.focus();
+    }
+  });
+
+  toolbarAddItemMenu?.querySelectorAll('.toolbar-mode-option').forEach((opt) => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!currentDraft) return;
+      if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
+        addCategory('Geral');
+      }
+      const mode = opt.getAttribute('data-price-mode') || 'fixed';
+      addItem('price', mode);
+      closeToolbarAddMenu();
+    });
   });
 
   toolbarAddSection?.addEventListener('click', () => {
@@ -514,6 +574,7 @@ function setupEditorEvents() {
   document.addEventListener('click', () => {
     if (addItemBtn) addItemBtn.setAttribute('aria-expanded', 'false');
     if (addItemMenu) addItemMenu.hidden = true;
+    closeToolbarAddMenu();
     if (csvBtn) csvBtn.setAttribute('aria-expanded', 'false');
     if (csvMenu) csvMenu.hidden = true;
   });
@@ -970,6 +1031,22 @@ function renderItems() {
 
   const comp = currentDraft.content.components || {};
   const isQuote = currentDraft.content.catalogType === 'quote';
+  const isBooking = currentDraft.content.catalogType === 'booking';
+
+  const toolbarAddMenuWrapper = document.querySelector('.toolbar-menu-wrapper');
+  const toolbarAddBtnEl = document.getElementById('toolbar-add-item');
+  if (toolbarAddMenuWrapper) {
+    toolbarAddMenuWrapper.hidden = isBooking;
+  } else if (toolbarAddBtnEl) {
+    toolbarAddBtnEl.hidden = isBooking;
+  }
+
+  const getPriceModeLabel = (mode) => {
+    if (mode === 'offer') return 'Item de lance';
+    if (mode === 'donation') return 'Doação';
+    if (mode === 'trade') return 'Troca';
+    return 'Item à venda';
+  };
 
   // Google Forms-style header card (storefront title and short description)
   const formHeaderCard = document.createElement('div');
@@ -1022,14 +1099,40 @@ function renderItems() {
       const previewInfo = document.createElement('div');
       previewInfo.className = 'item-preview-info';
 
+      const previewTitleRow = document.createElement('div');
+      previewTitleRow.className = 'item-title-badge-row';
+
       const previewTitle = document.createElement('h3');
       previewTitle.className = 'item-preview-title';
       previewTitle.textContent = item.name || 'Item sem nome';
-      previewInfo.appendChild(previewTitle);
+      previewTitleRow.appendChild(previewTitle);
+
+      const itemPriceMode = isBooking ? 'fixed' : (item.priceMode || 'fixed');
+      if (!isBooking) {
+        const modePill = document.createElement('span');
+        modePill.className = `item-mode-badge item-mode-${itemPriceMode}`;
+        modePill.textContent = getPriceModeLabel(itemPriceMode);
+        previewTitleRow.appendChild(modePill);
+      }
+
+      previewInfo.appendChild(previewTitleRow);
 
       const previewSub = document.createElement('p');
       previewSub.className = 'item-preview-subtitle soft-text';
-      const priceText = item.priceCents ? formatCentsToReais(item.priceCents) : '';
+      const priceText =
+        itemPriceMode === 'donation'
+          ? 'Doação'
+          : itemPriceMode === 'trade'
+            ? item.tradeFor
+              ? `Aceito: ${item.tradeFor}`
+              : 'Troca'
+            : itemPriceMode === 'offer'
+              ? item.priceCents
+                ? `Lance mín.: ${formatCentsToReais(item.priceCents)}`
+                : 'Faça sua oferta'
+              : item.priceCents
+                ? formatCentsToReais(item.priceCents)
+                : '';
       const sectionText = item.section ? `Seção: ${item.section}` : '';
       const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
       previewSub.textContent = details.join(' · ');
@@ -1071,13 +1174,21 @@ function renderItems() {
     }
     headerRow.appendChild(thumb);
 
-    // Title / bold name
+    // Title / bold name + mode badge
+    const itemPriceMode = isBooking ? 'fixed' : (item.priceMode || 'fixed');
     const titleGroup = document.createElement('div');
-    titleGroup.className = 'item-title-group';
+    titleGroup.className = 'item-title-group item-title-badge-row';
     const boldName = document.createElement('h3');
     boldName.className = 'item-bold-title';
     boldName.textContent = item.name || 'Novo Item';
     titleGroup.appendChild(boldName);
+
+    if (!isBooking) {
+      const modePill = document.createElement('span');
+      modePill.className = `item-mode-badge item-mode-${itemPriceMode}`;
+      modePill.textContent = getPriceModeLabel(itemPriceMode);
+      titleGroup.appendChild(modePill);
+    }
     headerRow.appendChild(titleGroup);
 
     // Header actions
@@ -1150,19 +1261,71 @@ function renderItems() {
     gName.appendChild(nameInput);
     fields.appendChild(gName);
 
-    // Column 2: Preço (if visible)
-    const showPriceField = comp.price !== false && item._showPrice !== false;
+    // Selector: Tipo do item (Products & Quote)
+    if (!isBooking) {
+      const gMode = document.createElement('div');
+      gMode.className = 'form-group';
+      const lMode = document.createElement('label');
+      lMode.setAttribute('for', `item-mode-${item.id}`);
+      lMode.textContent = 'Tipo do item';
+      const modeSelect = document.createElement('select');
+      modeSelect.id = `item-mode-${item.id}`;
+      modeSelect.className = 'select-styled item-mode-select';
+      for (const [val, label] of [
+        ['fixed', 'Item à venda (preço fixo)'],
+        ['offer', 'Item de lance'],
+        ['donation', 'Doação'],
+        ['trade', 'Troca']
+      ]) {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        modeSelect.appendChild(opt);
+      }
+      modeSelect.value = itemPriceMode;
+      modeSelect.addEventListener('change', () => {
+        const nextMode = modeSelect.value;
+        if (nextMode === 'fixed') {
+          delete item.priceMode;
+        } else {
+          item.priceMode = nextMode;
+        }
+        if (nextMode === 'donation' || nextMode === 'trade') {
+          item.priceCents = 0;
+        }
+        renderItems();
+        updateDraftAndPreview();
+      });
+      gMode.appendChild(lMode);
+      gMode.appendChild(modeSelect);
+      fields.appendChild(gMode);
+    }
+
+    // Column 2: Preço / Lance mínimo / Condições / Aceito em troca
+    const showPriceField =
+      (itemPriceMode === 'fixed' && comp.price !== false && item._showPrice !== false) ||
+      itemPriceMode === 'offer';
     if (showPriceField) {
       const gPrice = document.createElement('div');
       gPrice.className = 'form-group';
       const lPrice = document.createElement('label');
       lPrice.setAttribute('for', `item-price-${item.id}`);
-      lPrice.textContent = isQuote ? 'Preço (opcional)' : 'Preço (BRL)';
+      lPrice.textContent =
+        itemPriceMode === 'offer'
+          ? 'Lance mínimo (opcional)'
+          : isQuote
+            ? 'Preço (opcional)'
+            : 'Preço (BRL)';
       const priceInput = document.createElement('input');
       priceInput.type = 'text';
       priceInput.id = `item-price-${item.id}`;
       priceInput.className = 'item-input input-styled-height';
-      priceInput.placeholder = isQuote ? 'Opcional (ex: R$ 48,00)' : 'Ex: R$ 48,00';
+      priceInput.placeholder =
+        itemPriceMode === 'offer'
+          ? 'Opcional (ex: R$ 50,00)'
+          : isQuote
+            ? 'Opcional (ex: R$ 48,00)'
+            : 'Ex: R$ 48,00';
       priceInput.value = item.priceCents ? formatCentsToReais(item.priceCents) : '';
       priceInput.addEventListener('input', () => {
         maskMoneyInput(priceInput);
@@ -1172,6 +1335,46 @@ function renderItems() {
       gPrice.appendChild(lPrice);
       gPrice.appendChild(priceInput);
       fields.appendChild(gPrice);
+    } else if (itemPriceMode === 'donation') {
+      const gCond = document.createElement('div');
+      gCond.className = 'form-group';
+      const lCond = document.createElement('label');
+      lCond.setAttribute('for', `item-conditions-${item.id}`);
+      lCond.textContent = 'Condições (opcional)';
+      const condInput = document.createElement('input');
+      condInput.type = 'text';
+      condInput.id = `item-conditions-${item.id}`;
+      condInput.maxLength = 240;
+      condInput.className = 'item-input input-styled-height';
+      condInput.placeholder = 'Ex: retirar no local até sexta';
+      condInput.value = item.conditions || '';
+      condInput.addEventListener('input', () => {
+        item.conditions = condInput.value;
+        updateDraftAndPreview();
+      });
+      gCond.appendChild(lCond);
+      gCond.appendChild(condInput);
+      fields.appendChild(gCond);
+    } else if (itemPriceMode === 'trade') {
+      const gTrade = document.createElement('div');
+      gTrade.className = 'form-group';
+      const lTrade = document.createElement('label');
+      lTrade.setAttribute('for', `item-trade-for-${item.id}`);
+      lTrade.textContent = 'Aceito em troca (opcional)';
+      const tradeInput = document.createElement('input');
+      tradeInput.type = 'text';
+      tradeInput.id = `item-trade-for-${item.id}`;
+      tradeInput.maxLength = 240;
+      tradeInput.className = 'item-input input-styled-height';
+      tradeInput.placeholder = 'Ex: livros ou plantas';
+      tradeInput.value = item.tradeFor || '';
+      tradeInput.addEventListener('input', () => {
+        item.tradeFor = tradeInput.value;
+        updateDraftAndPreview();
+      });
+      gTrade.appendChild(lTrade);
+      gTrade.appendChild(tradeInput);
+      fields.appendChild(gTrade);
     }
 
     // New Google Forms field: Section name (grupo de agrupamento opcional)
@@ -1616,7 +1819,7 @@ function moveCategory(catIndex, direction) {
   }
 }
 
-function addItem(type = 'price') {
+function addItem(type = 'price', priceMode = 'fixed') {
   const category = (currentDraft.content.categories || []).find(
     (c) => c.id === selectedCategoryForItems
   );
@@ -1631,15 +1834,19 @@ function addItem(type = 'price') {
     active: true
   };
 
+  if (priceMode && priceMode !== 'fixed') {
+    item.priceMode = priceMode;
+  }
+
   if (type === 'price' || type === 'photo') {
     item.priceCents = 0;
   }
   if (type === 'photo') {
     item._showPhoto = true;
   }
-  if (type === 'text') {
+  if (type === 'text' || priceMode === 'donation' || priceMode === 'trade') {
     item._showPrice = false;
-    item._showPhoto = false;
+    item._showPhoto = type === 'photo';
   } else if (type === 'price') {
     item._showPrice = true;
     item._showPhoto = false;
@@ -1648,7 +1855,7 @@ function addItem(type = 'price') {
     item._showPhoto = true;
   }
 
-  if (currentDraft.content.components?.minQuantity) item.minQuantity = 1;
+  if (currentDraft.content.components?.minQuantity && priceMode === 'fixed') item.minQuantity = 1;
   if (currentDraft.content.components?.durationMinutes) item.durationMinutes = 30;
 
   category.items.push(item);
@@ -1868,7 +2075,12 @@ function validateCatalogLocal() {
           hasValidationErrors = true;
         }
 
+        const itemPriceMode =
+          currentDraft.content.catalogType === 'booking'
+            ? 'fixed'
+            : (item.priceMode || 'fixed');
         const priceRequired =
+          itemPriceMode === 'fixed' &&
           currentDraft.content.components?.price !== false &&
           currentDraft.content.catalogType !== 'quote';
         if (priceRequired && (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0)) {

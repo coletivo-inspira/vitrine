@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { migrateLegacyDraftContent } from '../src/portal-validation.mjs';
+import {
+  migrateLegacyDraftContent,
+  validateDraftContent
+} from '../src/portal-validation.mjs';
 import { compilePublicStorefront } from '../src/publication-engine.mjs';
 import {
   StorefrontRenderer,
@@ -31,6 +34,21 @@ function createDomMock() {
       attributes: {},
       dataset: {},
       listeners: {},
+      classList: {
+        add(...tokens) {
+          const existing = new Set(String(el.className || '').split(/\s+/).filter(Boolean));
+          tokens.forEach((t) => existing.add(t));
+          el.className = [...existing].join(' ');
+        },
+        remove(...tokens) {
+          const existing = new Set(String(el.className || '').split(/\s+/).filter(Boolean));
+          tokens.forEach((t) => existing.delete(t));
+          el.className = [...existing].join(' ');
+        },
+        contains(token) {
+          return String(el.className || '').split(/\s+/).includes(token);
+        }
+      },
       appendChild(child) {
         this.children.push(child);
         return child;
@@ -190,6 +208,160 @@ test('storefront-staged-flow - a página pública renderiza os itens do menu com
 
   const rendererDirect = new StorefrontRenderer(catalog, menu, { isPublicPage: true });
   assert.equal(rendererDirect.getCartCount(), 0);
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  }
+});
+
+test('storefront-staged-flow - itens de lance, doação e troca: validação, carrinho e mensagem WhatsApp', async () => {
+  // 1. Itens de lance, doação e troca salvam sem preço (priceCents 0 ou omitido)
+  const draftWithModes = {
+    schemaVersion: 1,
+    template: 'products-v1',
+    catalogType: 'products',
+    storefrontType: 'art',
+    slug: 'bazar-arte',
+    businessName: 'Bazar & Arte',
+    whatsapp: '5511999999999',
+    categories: [
+      {
+        id: 'geral',
+        name: 'Geral',
+        items: [
+          {
+            id: 'item-fixed',
+            name: 'Quadro Aquarela',
+            priceMode: 'fixed',
+            priceCents: 12000,
+            active: true
+          },
+          {
+            id: 'item-offer-min',
+            name: 'Vaso Cerâmica Raro',
+            priceMode: 'offer',
+            priceCents: 5000,
+            active: true
+          },
+          {
+            id: 'item-offer-free',
+            name: 'Escultura em Madeira',
+            priceMode: 'offer',
+            priceCents: 0,
+            active: true
+          },
+          {
+            id: 'item-donation',
+            name: 'Mudas de Suculenta',
+            priceMode: 'donation',
+            priceCents: 0,
+            conditions: 'retirar no local até sexta',
+            active: true
+          },
+          {
+            id: 'item-trade',
+            name: 'Coleção de Vinis',
+            priceMode: 'trade',
+            priceCents: 0,
+            tradeFor: 'livros ou plantas',
+            active: true
+          }
+        ]
+      }
+    ]
+  };
+
+  const validated = validateDraftContent(draftWithModes);
+  assert.equal(validated.activeItems, 5);
+
+  const compiled = await compilePublicStorefront(draftWithModes, {
+    slug: 'bazar-arte',
+    name: 'Bazar & Arte',
+    template: 'products-v1'
+  });
+  assert.equal(compiled.menu.items.length, 5);
+  assert.equal(compiled.menu.items[1].priceMode, 'offer');
+  assert.equal(compiled.menu.items[3].priceMode, 'donation');
+  assert.equal(compiled.menu.items[3].conditions, 'retirar no local até sexta');
+  assert.equal(compiled.menu.items[4].priceMode, 'trade');
+  assert.equal(compiled.menu.items[4].tradeFor, 'livros ou plantas');
+
+  // 2. priceMode inválido é rejeitado e mensagem de item inválido usa "Item da vitrine inválido."
+  assert.throws(
+    () =>
+      validateDraftContent({
+        ...draftWithModes,
+        categories: [
+          {
+            id: 'geral',
+            name: 'Geral',
+            items: [{ id: 'bad-mode', name: 'Item', priceMode: 'auction', priceCents: 1000 }]
+          }
+        ]
+      }),
+    (err) => err?.code === 'INVALID_PRICE_MODE' && err?.status === 422
+  );
+
+  assert.throws(
+    () =>
+      validateDraftContent({
+        ...draftWithModes,
+        categories: [{ id: 'geral', name: 'Geral', items: [null] }]
+      }),
+    (err) => err?.code === 'INVALID_ITEM' && err?.message === 'Item da vitrine inválido.'
+  );
+
+  // 3. Vitrine pública: lance abaixo do mínimo é barrado; lance, doação e troca não somam no total e formatam a mensagem do WhatsApp
+  const { documentMock, byId } = createDomMock();
+  const previousDocument = globalThis.document;
+  globalThis.document = documentMock;
+  try {
+    const catalog = byId.get('storefront-catalog');
+    const renderer = new StorefrontRenderer(catalog, compiled.menu, { isPublicPage: true });
+    renderer.render();
+
+    const fixedItem = compiled.menu.items[0];
+    const offerMinItem = compiled.menu.items[1];
+    const donationItem = compiled.menu.items[3];
+    const tradeItem = compiled.menu.items[4];
+
+    // Adiciona item de preço fixo (R$ 120,00)
+    renderer.setQuantity(fixedItem, 1);
+    assert.equal(renderer.getCartTotal(), 12000);
+
+    // Lance abaixo do mínimo (R$ 30,00 < R$ 50,00) é barrado e mostra aviso
+    const rejectedLowOffer = renderer.submitOffer(offerMinItem, 'R$ 30,00');
+    assert.equal(rejectedLowOffer, false);
+    assert.equal(renderer.cart.has(offerMinItem.id), false);
+    assert.match(renderer.itemErrors.get(offerMinItem.id), /lance mínimo/i);
+
+    // Lance válido (R$ 85,00) entra, mas não soma no total do carrinho
+    const acceptedOffer = renderer.submitOffer(offerMinItem, 'R$ 85,00');
+    assert.equal(acceptedOffer, true);
+    assert.equal(renderer.cart.has(offerMinItem.id), true);
+    assert.equal(renderer.getCartTotal(), 12000);
+
+    // Doação selecionada não soma no total
+    renderer.toggleSingleSelect(donationItem);
+    assert.equal(renderer.cart.has(donationItem.id), true);
+    assert.equal(renderer.getCartTotal(), 12000);
+
+    // Troca selecionada com proposta não soma no total
+    const acceptedTrade = renderer.submitTrade(tradeItem, '2 livros de arte e 1 samambaia');
+    assert.equal(acceptedTrade, true);
+    assert.equal(renderer.cart.has(tradeItem.id), true);
+    assert.equal(renderer.getCartTotal(), 12000);
+
+    renderer.customerDetails.customerName = 'Mariana';
+    const message = renderer.buildOrderMessage();
+    assert.match(message, /- 1x Quadro Aquarela — R\$ 120,00/);
+    assert.match(message, /- Vaso Cerâmica Raro — Lance: R\$ 85,00/);
+    assert.match(message, /- Doação: Mudas de Suculenta/);
+    assert.match(message, /- Troca: Coleção de Vinis, ofereço: 2 livros de arte e 1 samambaia/);
+    assert.match(message, /Total \(sem os lances\): R\$ 120,00/);
   } finally {
     if (previousDocument === undefined) {
       delete globalThis.document;

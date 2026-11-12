@@ -4035,3 +4035,110 @@ svg {
     gap: 4px;
   }
 }
+
+/* Item Price Modes (Lance, Doação, Troca) in Editor & Preview */
+.toolbar-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.toolbar-dropdown-menu {
+  right: calc(100% + 10px);
+  left: auto;
+  top: 0;
+  min-width: 240px;
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background: #202A23;
+  border-color: var(--line);
+}
+
+.toolbar-mode-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-mode-icon {
+  color: var(--orange);
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .toolbar-dropdown-menu {
+    right: auto;
+    left: 0;
+    top: calc(100% + 8px);
+  }
+}
+
+.item-title-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.item-mode-badge,
+.sf-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--apricot);
+  color: var(--orange);
+  border: 1px solid var(--orange);
+  white-space: nowrap;
+}
+
+.sf-item-condition-note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--apricot);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.sf-footer-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sf-offer-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sf-offer-headline {
+  font-size: 17px;
+}
+
+.sf-offer-min {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.sf-inline-interaction {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.sf-item-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--orange);
+}
+

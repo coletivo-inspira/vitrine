@@ -60,6 +60,27 @@
       <circle cx="8.5" cy="8.5" r="1.5"/>
       <polyline points="21 15 16 10 5 21"/>
     </symbol>
+    <symbol id="icon-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
+    </symbol>
+    <symbol id="icon-gavel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"/>
+      <path d="m16 16 6-6"/>
+      <path d="m8 8 6-6"/>
+      <path d="m9 7 8 8"/>
+      <path d="m21 11-8-8"/>
+    </symbol>
+    <symbol id="icon-heart-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+      <path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/>
+    </symbol>
+    <symbol id="icon-arrows-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="17 1 21 5 17 9"/>
+      <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+      <polyline points="7 23 3 19 7 15"/>
+      <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+    </symbol>
   </svg>
   
   <!-- Auth / Login Section (Unauthenticated screen) -->
@@ -888,10 +909,42 @@
 
                   <!-- Floating Side/Bottom Toolbar (Google Forms style) -->
                   <div class="forms-floating-toolbar" role="toolbar" aria-label="Ações do formulário">
-                    <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item">
-                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-plus"/></svg>
-                      <span class="tooltip">Adicionar item</span>
-                    </button>
+                    <div class="toolbar-menu-wrapper">
+                      <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item" aria-haspopup="menu" aria-expanded="false">
+                        <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-plus"/></svg>
+                        <span class="tooltip">Adicionar item</span>
+                      </button>
+                      <div id="toolbar-add-item-menu" class="dropdown-menu toolbar-dropdown-menu" hidden role="menu" aria-label="Tipo de item">
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="fixed">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-tag"/></svg>
+                            <strong>Item à venda</strong>
+                          </span>
+                          <span>Preço fixo na vitrine</span>
+                        </button>
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="offer">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-gavel"/></svg>
+                            <strong>Item de lance</strong>
+                          </span>
+                          <span>Visitante propõe o valor</span>
+                        </button>
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="donation">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-heart-hand"/></svg>
+                            <strong>Doação</strong>
+                          </span>
+                          <span>Sem custo, com condições opcionais</span>
+                        </button>
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="trade">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-arrows-swap"/></svg>
+                            <strong>Troca</strong>
+                          </span>
+                          <span>Combinar troca pelo WhatsApp</span>
+                        </button>
+                      </div>
+                    </div>
                     <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar seção" aria-label="Adicionar seção">
                       <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-edit"/></svg>
                       <span class="tooltip">Adicionar seção</span>
