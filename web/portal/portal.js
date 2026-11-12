@@ -949,6 +949,17 @@ function prefillProfileWithGoogleCredentials() {
       if (avatarImg) {
         avatarImg.src = googleAvatar;
         avatarImg.hidden = false;
+        
+        if (!avatarImg._hasOnError) {
+          avatarImg._hasOnError = true;
+          avatarImg.addEventListener('error', () => {
+            avatarImg.hidden = true;
+            if (placeholderDiv) {
+              placeholderDiv.hidden = false;
+              placeholderDiv.textContent = (googleName || googleEmail || 'U')[0].toUpperCase();
+            }
+          });
+        }
       }
       if (placeholderDiv) placeholderDiv.hidden = true;
     } else {
