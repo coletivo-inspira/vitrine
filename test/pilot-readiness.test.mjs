@@ -380,7 +380,12 @@ test('Fase 6 - Pacote do Piloto de 10 Vitrines, Ciclo Comercial 002-US4 e Guia O
     assert.match(deployWorkflow, /npx --yes wrangler@4\.158\.0 deploy/);
     assert.match(deployWorkflow, /CLOUDFLARE_API_TOKEN:\s*\$\{\{\s*secrets\.CLOUDFLARE_API_TOKEN\s*\}\}/);
     assert.match(deployWorkflow, /CLOUDFLARE_ACCOUNT_ID:\s*\$\{\{\s*secrets\.CLOUDFLARE_ACCOUNT_ID\s*\}\}/);
+    assert.match(deployWorkflow, /set -euo pipefail/);
+    assert.match(deployWorkflow, /\^\[0-9a-f\]\{32\}\$/);
+    assert.match(deployWorkflow, /CLOUDFLARE_ACCOUNT_ID="\$\{CLOUDFLARE_ACCOUNT_ID\/\/\[\[:space:\]\]\/}"/);
+    assert.doesNotMatch(deployWorkflow, /if:\s*steps\.wrangler_deploy\.outputs\.workers_dev_url\s*!=\s*''/);
     assert.match(deployWorkflow, /\/api\/auth\/config/);
+    assert.match(migrateWorkflow, /set -euo pipefail/);
 
     assert.match(migrateWorkflow, /on:\s*\n\s*workflow_dispatch:/);
     assert.doesNotMatch(migrateWorkflow, /\bpush:\b|\bpull_request:\b/);
