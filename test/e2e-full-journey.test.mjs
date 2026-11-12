@@ -287,9 +287,24 @@ async function createPgliteSupabaseHarness() {
 }
 
 function createDistAssetsBinding() {
+  const lockPath = resolve(root, '.build.lock');
   let cachedRules = null;
+
+  async function waitForBuildLock() {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      try {
+        await stat(lockPath);
+        await new Promise((r) => setTimeout(r, 20));
+      } catch {
+        return;
+      }
+    }
+  }
+
   async function getRules() {
     if (!cachedRules) {
+      await waitForBuildLock();
       const raw = await readFile(resolve(distDir, '_headers'), 'utf8');
       cachedRules = parseHeadersRules(raw);
     }
@@ -311,25 +326,32 @@ function createDistAssetsBinding() {
       if (!target.startsWith(distDir.endsWith(sep) ? distDir : `${distDir}${sep}`)) {
         return new Response('Not Found', { status: 404 });
       }
-      try {
-        const info = await stat(target);
-        if (!info.isFile()) return new Response('Not Found', { status: 404 });
-        const body = await readFile(target);
-        const ext = extname(target);
-        const rules = await getRules();
-        const evaluated = evaluateHeadersForPath(rules, requestPathname);
-        const headers = new Headers(evaluated.headers);
-        headers.set('content-type', MIME_TYPES[ext] || 'application/octet-stream');
-        if (!headers.has('cache-control')) {
-          headers.set('cache-control', 'public, max-age=0, must-revalidate');
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await waitForBuildLock();
+        try {
+          const info = await stat(target);
+          if (!info.isFile()) return new Response('Not Found', { status: 404 });
+          const body = await readFile(target);
+          const ext = extname(target);
+          const rules = await getRules();
+          const evaluated = evaluateHeadersForPath(rules, requestPathname);
+          const headers = new Headers(evaluated.headers);
+          headers.set('content-type', MIME_TYPES[ext] || 'application/octet-stream');
+          if (!headers.has('cache-control')) {
+            headers.set('cache-control', 'public, max-age=0, must-revalidate');
+          }
+          return new Response(body, {
+            status: 200,
+            headers
+          });
+        } catch {
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 25));
+            continue;
+          }
         }
-        return new Response(body, {
-          status: 200,
-          headers
-        });
-      } catch {
-        return new Response('Not Found', { status: 404 });
       }
+      return new Response('Not Found', { status: 404 });
     }
   };
 }
