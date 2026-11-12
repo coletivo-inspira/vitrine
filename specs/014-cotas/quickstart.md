@@ -17,7 +17,7 @@ npm run preview                   # http://127.0.0.1:4173
 5. Publique e abra a vitrine pública. Reserve 3 cotas, avance até "Revisar e enviar" e confira:
    - linha "3 cotas de apoio: …" com R$ 60,00;
    - bloco "Total em cotas (reserva)" separado do "Total estimado";
-   - mensagem com "Cotas: reserva sem sorteio; o pagamento é combinado nesta conversa."
+   - mensagem com "Cotas: reserva sem sorteio; o pagamento é combinado diretamente com o negócio."
 6. Marque confirmadas = total e publique de novo: o cartão mostra "Cotas esgotadas".
 
 ## Capturas

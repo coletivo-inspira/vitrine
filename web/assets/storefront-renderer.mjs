@@ -1709,7 +1709,7 @@ export class StorefrontRenderer {
       if (!quotaOnly) {
         itemLines.push(`Cotas reservadas (à parte do total): ${this.formatPrice(quotaTotal)}`);
       }
-      itemLines.push('Cotas: reserva sem sorteio; o pagamento é combinado nesta conversa.');
+      itemLines.push('Cotas: reserva sem sorteio; o pagamento é combinado diretamente com o negócio.');
     }
     const totalStr = quotaOnly
       ? `${this.formatPrice(quotaTotal)} em cotas`

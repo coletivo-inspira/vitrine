@@ -46,7 +46,7 @@ Linhas adicionais quando há cotas na reserva:
 
 ```text
 Cotas reservadas (à parte do total): R$ 60,00     ← só quando há produtos de preço fixo ou lances
-Cotas: reserva sem sorteio; o pagamento é combinado nesta conversa.
+Cotas: reserva sem sorteio; o pagamento é combinado diretamente com o negócio.
 ```
 
 Quando a reserva só tem cotas (e eventualmente doações ou trocas), `{total}` do modelo de mensagem vira `R$ 60,00 em cotas`.

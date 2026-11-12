@@ -234,7 +234,7 @@ test('cotas - vitrine pública limita a seleção ao saldo e separa o total das 
       quotaOnlyMessage,
       /- 3 cotas de apoio: Forno novo da padaria \(3 × R\$ 20,00 = R\$ 60,00\)/
     );
-    assert.match(quotaOnlyMessage, /reserva sem sorteio; o pagamento é combinado nesta conversa/);
+    assert.match(quotaOnlyMessage, /reserva sem sorteio; o pagamento é combinado diretamente com o negócio/);
     assert.match(quotaOnlyMessage, /Total: R\$ 60,00 em cotas/);
     assert.doesNotMatch(quotaOnlyMessage, /à parte do total/);
 
@@ -248,6 +248,24 @@ test('cotas - vitrine pública limita a seleção ao saldo e separa o total das 
     renderer.setQuotaQuantity(forno, -3);
     assert.equal(renderer.cart.has(forno.id), false);
     assert.doesNotMatch(renderer.buildOrderMessage(), /cotas/i);
+  });
+});
+
+test('cotas - com pedidos pela Mila, a reserva mantém o código e as linhas de cota', async () => {
+  await withDom(async ({ makeEl }) => {
+    const { menu } = await compilePublicStorefront(
+      { ...baseDraft([quotaItem]), orderRelay: 'mila' },
+      { slug: 'padaria-coletiva', name: 'Padaria Coletiva', template: 'products-v1' }
+    );
+    assert.equal(menu.orderRelay.via, 'mila');
+    assert.equal(menu.items[0].quotaTotal, 50);
+    const renderer = new StorefrontRenderer(makeEl('div'), menu, { isPublicPage: true });
+    renderer.setQuotaQuantity(menu.items[0], 2);
+    renderer.setQuotaQuantity(menu.items[0], 1);
+    const message = renderer.buildOrderMessage();
+    assert.match(message, new RegExp(`^#${menu.orderRelay.code} · Pedido para Padaria Coletiva`));
+    assert.match(message, /- 3 cotas de apoio: Forno novo da padaria/);
+    assert.match(message, /o pagamento é combinado diretamente com o negócio/);
   });
 });
 

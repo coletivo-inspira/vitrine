@@ -13,7 +13,7 @@ export const QUOTA_TEXT_MAX_LENGTH = 240;
 
 export const QUOTA_NO_DRAW_NOTICE = 'Sem sorteio: toda cota garante o mesmo benefício.';
 export const QUOTA_PAYMENT_NOTICE =
-  'A reserva não é pagamento. O valor é combinado direto com a vitrine pelo WhatsApp.';
+  'A reserva não é pagamento. O valor é combinado diretamente com o negócio pelo WhatsApp.';
 
 const RAFFLE_TERMS_PATTERN =
   /\b(rifas?|rifar|sorteios?|sortear|sorteamos|sorteiam?|sorteados?|sorteadas?|numeros? da sorte|acao entre amigos|acoes entre amigos)\b/;

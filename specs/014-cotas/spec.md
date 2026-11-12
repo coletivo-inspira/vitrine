@@ -60,7 +60,7 @@ Como visitante, quero ver quanto falta para a meta, o valor de cada cota e o que
 1. **Given** um item com 50 cotas e 32 confirmadas, **When** a vitrine pública carrega, **Then** o cartão mostra "32 de 50 cotas confirmadas", barra de progresso, "Meta: R$ 1.000,00 · 18 cotas disponíveis", "R$ 20,00 por cota" e o aviso "Sem sorteio: toda cota garante o mesmo benefício. A reserva não é pagamento…".
 2. **Given** 3 cotas disponíveis, **When** o visitante tenta reservar a 4ª, **Then** o botão "+" fica desabilitado e a quantidade não passa do saldo.
 3. **Given** um item com todas as cotas confirmadas, **When** a vitrine carrega, **Then** aparece "Cotas esgotadas" e não é possível reservar.
-4. **Given** 3 cotas de R$ 20,00 reservadas, **When** o visitante revisa o pedido, **Then** o resumo mostra "3 cotas de apoio: …" com R$ 60,00, um bloco "Total em cotas (reserva)" separado do total de produtos e a mensagem do WhatsApp inclui "reserva sem sorteio; o pagamento é combinado nesta conversa".
+4. **Given** 3 cotas de R$ 20,00 reservadas, **When** o visitante revisa o pedido, **Then** o resumo mostra "3 cotas de apoio: …" com R$ 60,00, um bloco "Total em cotas (reserva)" separado do total de produtos e a mensagem do WhatsApp inclui "reserva sem sorteio; o pagamento é combinado diretamente com o negócio".
 5. **Given** cotas e produtos de preço fixo no mesmo pedido, **When** a mensagem é montada, **Then** o total dos produtos não soma as cotas e as cotas aparecem como "Cotas reservadas (à parte do total)".
 
 ---
@@ -98,7 +98,7 @@ Como Operador Inspira, quero que a vitrine não aceite itens com mecânica ou li
 - **FR-004**: O editor DEVE exibir no cartão de cota um aviso fixo explicando que não há sorteio, que rifa, sorteio, prêmio e retorno financeiro exigem autorização federal e que o pagamento é combinado direto com cada apoiador.
 - **FR-005**: O servidor DEVE rejeitar com 422 qualquer item que use termos de rifa ou sorteio e qualquer item de cota que use termos de prêmio ou retorno financeiro (lista em `research.md`, seção 4), com normalização de acentos e maiúsculas.
 - **FR-006**: A publicação DEVE projetar apenas `priceMode`, `priceCents`, `quotaTotal`, `quotaFilled`, `quotaReward` e `conditions` dos itens de cota; itens de outros tipos não publicam campos de cota.
-- **FR-007**: A vitrine pública DEVE mostrar progresso (confirmadas/total), meta em reais, saldo, valor por cota, benefício, condições e o aviso fixo "Sem sorteio: toda cota garante o mesmo benefício. A reserva não é pagamento. O valor é combinado direto com a vitrine pelo WhatsApp."
+- **FR-007**: A vitrine pública DEVE mostrar progresso (confirmadas/total), meta em reais, saldo, valor por cota, benefício, condições e o aviso fixo "Sem sorteio: toda cota garante o mesmo benefício. A reserva não é pagamento. O valor é combinado diretamente com o negócio pelo WhatsApp."
 - **FR-008**: O visitante DEVE escolher apenas a quantidade de cotas (1 até o menor entre saldo e 99); a vitrine NÃO DEVE oferecer escolha ou atribuição de números.
 - **FR-009**: O total em cotas DEVE aparecer separado do total de produtos na barra de seleção, na revisão e na mensagem do WhatsApp.
 - **FR-010**: Item com saldo zero DEVE exibir "Cotas esgotadas" e não aceitar reserva.
