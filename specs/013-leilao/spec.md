@@ -155,7 +155,8 @@ Como proprietário, quero definir no item de lance a data e a hora de encerramen
 16. Contato pelo WhatsApp por links `wa.me` com texto pronto, nos dois sentidos; nenhuma mensagem automática.
 17. Painel ganha a seção "Leilões" na barra lateral e um botão "Leilões" em cada vitrine da lista (acesso no celular); a barra inferior móvel continua com 5 atalhos.
 18. Rotas de lance também funcionam em domínios personalizados da vitrine.
-19. `.specify/feature.json` e a seção SPECKIT do `AGENTS.md` não foram alterados (workers paralelos); o gancho opcional `agent-context` foi pulado.
+19. Com a vitrine no modo Mila (#92), o aviso do visitante sai com o código da Mila no início da mensagem, e o WhatsApp real do dono (do rascunho) também fica impedido de dar lance; o botão "Chamar no WhatsApp" do painel usa o WhatsApp do próprio dono, por escolha dele.
+20. `.specify/feature.json` e a seção SPECKIT do `AGENTS.md` não foram alterados (workers paralelos); o gancho opcional `agent-context` foi pulado.
 
 ## Assumptions
 

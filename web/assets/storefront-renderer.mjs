@@ -942,7 +942,11 @@ export class StorefrontRenderer {
       footer.appendChild(ok);
       const href = buildWhatsappHref(
         this.options.targetWhatsapp || this.menu?.whatsapp,
-        `Olá! Dei um lance de ${this.formatPrice(mine?.lastAmountCents || 0)} no item "${item.name || 'Item'}" da vitrine. Meu nome é ${this.bidderProfile.name}.`
+        withMilaRelayPrefix(
+          `Olá! Dei um lance de ${this.formatPrice(mine?.lastAmountCents || 0)} no item "${item.name || 'Item'}" da vitrine. Meu nome é ${this.bidderProfile.name}.`,
+          this.getOrderRelay(),
+          this.menu?.name || this.menu?.businessName || ''
+        )
       );
       if (href) {
         const link = document.createElement('a');

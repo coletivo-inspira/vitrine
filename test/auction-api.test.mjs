@@ -311,3 +311,28 @@ test('Store Supabase envia a chave do canal só ao banco e traduz erros da funç
   const boardCall = calls.find((call) => call.url.endsWith('/rpc/read_auction_board'));
   assert.equal('x-vitrine-bid-key' in boardCall.init.headers, false);
 });
+
+test('Modo Mila: WhatsApp real do dono continua impedido de dar lance', async () => {
+  const content = { ...draftContent(), orderRelay: 'mila' };
+  const store = createMemoryStore({
+    sites: [{ id: SITE, owner_user_id: OWNER, slug: 'brecho-aurora', name: 'Brechó Aurora', template: 'products-v1' }],
+    drafts: [{ siteId: SITE, revision: 1, content }]
+  });
+  const compiled = await compilePublicStorefront(
+    content,
+    { id: SITE, slug: 'brecho-aurora', name: 'Brechó Aurora', template: 'products-v1' },
+    { revision: 1, siteId: SITE }
+  );
+  assert.notEqual(compiled.menu.whatsapp, '5551988887777');
+  await store.savePublication(compiled.publication);
+  const handler = createApiHandler({ store, nowMs: () => START_MS });
+  const res = await handler(
+    new Request(`${ORIGIN}/api/public/auctions/brecho-aurora/bids`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' },
+      body: JSON.stringify(bid({ whatsapp: '5551988887777' }))
+    }),
+    ENV
+  );
+  assert.equal((await res.json()).error.code, 'BIDDER_IS_OWNER');
+});

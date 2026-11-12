@@ -161,6 +161,14 @@ test('Leilão no banco - canal secreto, regras de lance e quadro público', asyn
       rejectsWith('BIDDER_IS_OWNER')
     );
     await assert.rejects(() => placeBid(db, { amount: 9000, item: 'cadeira', visitor: VISITOR_C }), rejectsWith('AUCTION_NOT_FOUND'));
+    await db.query('insert into public.drafts (site_id, content) values ($1, $2::jsonb)', [
+      SITE,
+      JSON.stringify({ schemaVersion: 1, template: 'products-v1', whatsapp: '5551900009999', items: [] })
+    ]);
+    await assert.rejects(
+      () => placeBid(db, { amount: 9000, whatsapp: '5551900009999', visitor: VISITOR_C }),
+      rejectsWith('BIDDER_IS_OWNER')
+    );
     await assert.rejects(() => placeBid(db, { amount: 9000, name: '<b>x</b>', visitor: VISITOR_C }), rejectsWith('INVALID_BID'));
 
     const board = await asRole(db, {}, async () => (await db.query("select public.read_auction_board('brecho-aurora') as b")).rows[0].b);

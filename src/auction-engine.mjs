@@ -192,13 +192,13 @@ export function createAuctionBook() {
       return { serverNow: iso(now), lots: views };
     },
 
-    placeBid({ siteId, menu, itemId, name, whatsapp, amountCents, visitorKey, now = Date.now() }) {
+    placeBid({ siteId, menu, itemId, name, whatsapp, amountCents, visitorKey, ownerWhatsapps = [], now = Date.now() }) {
       const item = findAuctionItem(menu, itemId);
       if (!item) throw new AuctionError('AUCTION_NOT_FOUND');
       const terms = getAuctionTerms(item);
       const scheduledMs = Date.parse(terms.scheduledEndsAt);
 
-      if (whatsapp === menu?.whatsapp) throw new AuctionError('BIDDER_IS_OWNER');
+      if ([menu?.whatsapp, ...ownerWhatsapps].includes(whatsapp)) throw new AuctionError('BIDDER_IS_OWNER');
       if (
         blocks.some(
           (block) =>

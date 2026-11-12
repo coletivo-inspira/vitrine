@@ -400,7 +400,8 @@ begin
     raise exception 'AUCTION_NOT_FOUND' using errcode = 'P0002';
   end if;
 
-  if p_whatsapp = coalesce(v_menu->>'whatsapp', '') then
+  if p_whatsapp = coalesce(v_menu->>'whatsapp', '')
+     or p_whatsapp = coalesce((select d.content->>'whatsapp' from public.drafts d where d.site_id = v_site), '') then
     raise exception 'BIDDER_IS_OWNER' using errcode = '42501';
   end if;
 

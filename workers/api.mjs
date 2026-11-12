@@ -1660,7 +1660,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
           }
         }
       }
-      return { siteId: siteId ?? `pub-${slug}`, menu: pub.menu };
+      const ownerWhatsapp = siteId ? drafts.get(siteId)?.content?.whatsapp : null;
+      return { siteId: siteId ?? `pub-${slug}`, menu: pub.menu, ownerWhatsapps: ownerWhatsapp ? [ownerWhatsapp] : [] };
     },
 
     async readAuctionBoard(slug, { now = Date.now() } = {}) {
@@ -1669,8 +1670,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     },
 
     async placeAuctionBid(slug, bid, { visitorKey, now = Date.now() } = {}) {
-      const { siteId, menu } = await this.resolveAuctionPublication(slug);
-      return auctionBook.placeBid({ siteId, menu, ...bid, visitorKey, now });
+      const { siteId, menu, ownerWhatsapps } = await this.resolveAuctionPublication(slug);
+      return auctionBook.placeBid({ siteId, menu, ...bid, visitorKey, ownerWhatsapps, now });
     },
 
     async listSiteAuctions(siteId, userId, { now = Date.now() } = {}) {
