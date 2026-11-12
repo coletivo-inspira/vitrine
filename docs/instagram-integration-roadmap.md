@@ -8,26 +8,26 @@ Dono entra no painel → seleciona sua vitrine → conecta e autoriza o Instagra
 
 ## Receita de configuração e implementação futura
 
-1. Confirmar que @ganjastudio.br usa conta profissional (Empresa ou Criador), identificar responsável pelo app Meta e uma conta de teste.
-2. No console Meta, criar/configurar o app com Instagram Login; mapear a permissão mínima de leitura instagram_business_basic. Registrar IDs públicos e responsáveis, nunca tokens ou segredos.
-3. Cadastrar retorno HTTPS do OAuth e páginas de privacidade/exclusão; mapear revogação e desconexão. Confirmar revisão, acesso para contas externas e verificações exigidas no console antes de liberar clientes.
-4. Integrar “Conectar Instagram” à vitrine selecionada no painel. A sessão do painel identifica o dono; o consentimento Instagram autoriza a leitura. Validar acesso no servidor e proteger o retorno OAuth contra troca de conta/vitrine.
-5. Definir executor/agendamento sobre a arquitetura Cloudflare/Supabase já escolhida. Confirmar infraestrutura operacional, cotas, frequência e proteção/renovação dos tokens. Não contratar planos nem fazer upgrade automático.
-6. Importar perfil e mídias com paginação; sincronizar novidades e alterações sem duplicar; tratar posts removidos, URLs de mídia expiradas, falhas, limites e necessidade de reconexão.
-7. Entregar somente projeção pública para os sites, compatível com publicação/cache existentes. Separar dados privados; o navegador nunca consulta o Instagram com credenciais do cliente.
+1. Confirmar que @ganjastudio.br usa conta profissional (Empresa ou Criador), identificar responsável pelo app Meta e uma conta de teste. (Ver [Configuração Meta](instagram/configuracao-meta.md))
+2. No console Meta, criar/configurar o app com Instagram Login; mapear a permissão mínima de leitura instagram_business_basic. Registrar IDs públicos e responsáveis, nunca tokens ou segredos. (Ver [Configuração Meta](instagram/configuracao-meta.md))
+3. Cadastrar retorno HTTPS do OAuth e páginas de privacidade/exclusão; mapear revogação e desconexão. Confirmar revisão, acesso para contas externas e verificações exigidas no console antes de liberar clientes. (Ver [Configuração Meta](instagram/configuracao-meta.md))
+4. Integrar “Conectar Instagram” à vitrine selecionada no painel. A sessão do painel identifica o dono; o consentimento Instagram autoriza a leitura. Validar acesso no servidor e proteger o retorno OAuth contra troca de conta/vitrine. (Ver [Conectar por Vitrine](instagram/conectar-por-vitrine.md))
+5. Definir executor/agendamento sobre a arquitetura Cloudflare/Supabase já escolhida. Confirmar infraestrutura operacional, cotas, frequência e proteção/renovação dos tokens. Não contratar planos nem fazer upgrade automático. (Ver [Sincronização periódica](instagram/sincronizacao.md))
+6. Importar perfil e mídias com paginação; sincronizar novidades e alterações sem duplicar; tratar posts removidos, URLs de mídia expiradas, falhas, limites e necessidade de reconexão. (Ver [Sincronização periódica](instagram/sincronizacao.md))
+7. Entregar somente projeção pública para os sites, compatível com publicação/cache existentes. Separar dados privados; o navegador nunca consulta o Instagram com credenciais do cliente. (Ver [Interface pública e Webhook](instagram/interface-publica-feed.md))
 8. Adaptar Ganja e executar o roteiro do piloto antes da liberação.
 
 ## Premissas e limites
 
-Uma conta Instagram por vitrine; leitura de perfil/feed; autorização oficial pelo dono; sincronização periódica sem promessa de tempo real. Informar o link do perfil não substitui a autorização. “Todas as fotos” significa todo conteúdo acessível pela API, consultado com paginação. Mensagens ficam fora da primeira entrega. Nenhum segredo deve entrar em documentos, frontend ou logs.
+Uma conta Instagram por vitrine; leitura de perfil/feed; autorização oficial pelo dono; sincronização periódica sem promessa de tempo real. Informar o link do perfil não substitui a autorização. “Todas as fotos” significa todo conteúdo acessível pela API, consultado com paginação. Mensagens ficam fora da primeira entrega (Ver [Mensagens futuro](instagram/mensagens-futuro.md)). O login no painel continua sendo exclusivamente via Google (Ver análise de opções para [Login Meta](instagram/login-meta.md)). Nenhum segredo deve entrar em documentos, frontend ou logs.
 
 ## Tarefas e dependências
 
-- [vitrine #48 — Mapear configuração Meta para integração Instagram](https://github.com/coletivo-inspira/vitrine/issues/48)
-- [vitrine #49 — Planejar Conectar Instagram no painel por vitrine](https://github.com/coletivo-inspira/vitrine/issues/49)
-- [vitrine #50 — Planejar sincronização periódica do perfil e feed Instagram](https://github.com/coletivo-inspira/vitrine/issues/50)
-- [vitrine #51 — Definir interface pública do feed para sites conectados](https://github.com/coletivo-inspira/vitrine/issues/51)
-- [vitrine #52 — Mapear mensagens no Instagram como evolução futura](https://github.com/coletivo-inspira/vitrine/issues/52)
+- [vitrine #48 — Mapear configuração Meta para integração Instagram](https://github.com/coletivo-inspira/vitrine/issues/48) — *Ver plano: [Configuração Meta](instagram/configuracao-meta.md)*
+- [vitrine #49 — Planejar Conectar Instagram no painel por vitrine](https://github.com/coletivo-inspira/vitrine/issues/49) — *Ver plano: [Conectar por Vitrine](instagram/conectar-por-vitrine.md)*
+- [vitrine #50 — Planejar sincronização periódica do perfil e feed Instagram](https://github.com/coletivo-inspira/vitrine/issues/50) — *Ver plano: [Sincronização periódica](instagram/sincronizacao.md)*
+- [vitrine #51 — Definir interface pública do feed para sites conectados](https://github.com/coletivo-inspira/vitrine/issues/51) — *Ver plano: [Interface pública e Webhook](instagram/interface-publica-feed.md)*
+- [vitrine #52 — Mapear mensagens no Instagram como evolução futura](https://github.com/coletivo-inspira/vitrine/issues/52) — *Ver plano: [Mensagens futuro](instagram/mensagens-futuro.md)*
 - [ganja #4 — Planejar substituição das imagens fixas pelo feed Instagram](https://github.com/coletivo-inspira/ganja/issues/4)
 - [ganja #5 — Planejar página do feed e acesso à gestão no Vitrine](https://github.com/coletivo-inspira/ganja/issues/5)
 - [ganja #6 — Definir validação do piloto Instagram com Ganja](https://github.com/coletivo-inspira/ganja/issues/6)
@@ -51,6 +51,17 @@ A estrutura Cloudflare/Supabase é uma base aprovada no repositório, não evid�
 Contrato de leitura: identidade pública do perfil, identificador/tipo da mídia, URL de exibição/capa, legenda, permalink, data e paginação. Rotas, formato final, frequência e política de cache serão definidos nas issues; não há API nova nesta entrega.
 
 Aceite futuro: consentimento/cancelamento; duas vitrines isoladas; importação com múltiplas páginas; nova publicação no ciclo previsto; repetição sem duplicatas; fotos/carrosséis/vídeos; conta vazia; falha/limite de API; expiração/revogação; reconexão; desconexão/exclusão; ausência de segredos nas respostas públicas.
+
+## Planos detalhados
+
+O planejamento completo desta integração está distribuído em documentos dedicados a cada aspecto técnico da solução:
+
+- **Configuração Meta**: [Mapeamento e configuração do aplicativo Meta](instagram/configuracao-meta.md) (associado à issue #48, aberta aguardando confirmações humanas).
+- **Conexão no Painel**: [Fluxo de conexão e gerenciamento do ciclo de vida da conta Instagram](instagram/conectar-por-vitrine.md) (associado à issue #49).
+- **Sincronização periódica**: [Mecanismo de sincronização do feed e perfil na infraestrutura gratuita](instagram/sincronizacao.md) (associado à issue #50).
+- **Interface Pública e Webhook**: [Contrato da API de leitura e notificação por webhook para sites conectados](instagram/interface-publica-feed.md) (associado à issue #51).
+- **Mensagens (Evolução Futura)**: [Backlog de perguntas e regras para integração futura de mensagens](instagram/mensagens-futuro.md) (associado à issue #52).
+- **Login Alternativo**: [Estudo e análise de viabilidade do login com Instagram/Meta no painel](instagram/login-meta.md).
 
 ## Referências
 
