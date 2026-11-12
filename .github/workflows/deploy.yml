@@ -1,0 +1,86 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-worker-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.node-version'
+          check-latest: true
+          package-manager-cache: false
+
+      - name: Verify Cloudflare deployment secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=()
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            missing+=("CLOUDFLARE_API_TOKEN")
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            missing+=("CLOUDFLARE_ACCOUNT_ID")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required GitHub Actions secret(s): ${missing[*]}. Configure them in Settings > Secrets and variables > Actions (see docs/operations-guide.md)." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Build static assets
+        run: npm run build
+
+      - name: Deploy Worker with Static Assets
+        id: wrangler_deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          deploy_log="$(mktemp)"
+          npx --yes wrangler@4.158.0 deploy 2>&1 | tee "${deploy_log}"
+          workers_dev_url="$(grep -Eo 'https://vitrine-inspira\.[a-z0-9-]+\.workers\.dev' "${deploy_log}" | tail -n 1 || true)"
+          rm -f "${deploy_log}"
+          if [ -n "${workers_dev_url}" ]; then
+            echo "workers_dev_url=${workers_dev_url}" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Post-deploy smoke check on workers.dev (/api/auth/config)
+        if: steps.wrangler_deploy.outputs.workers_dev_url != ''
+        env:
+          WORKERS_DEV_URL: ${{ steps.wrangler_deploy.outputs.workers_dev_url }}
+        run: |
+          smoke_url="${WORKERS_DEV_URL}/api/auth/config"
+          echo "Smoking ${smoke_url} (workers.dev host only; custom domains use bot challenge)..."
+          status="$(curl -sS -o /tmp/auth-config-smoke.json -w '%{http_code}' "${smoke_url}" || echo '000')"
+          if [ "${status}" = "200" ] || [ "${status}" = "503" ]; then
+            echo "Smoke check responded with HTTP ${status}."
+          else
+            echo "::warning::workers.dev smoke check returned unexpected HTTP ${status}."
+          fi
+          rm -f /tmp/auth-config-smoke.json
