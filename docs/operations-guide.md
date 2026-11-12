@@ -212,6 +212,7 @@ node scripts/validate-pilot-pack.mjs
    - `SUPABASE_ANON_KEY` (**obrigatória**): aceita a nova **publishable key (`sb_publishable_...`)** ou a chave `anon` legada; é lida por `workers/api.mjs` (`createSupabaseRestStore`) para autenticar chamadas REST ao Supabase sob o token JWT do usuário (aplicando integralmente as políticas RLS).
    - `SUPABASE_JWT_SECRET` (**opcional — legado**): lida por `workers/api.mjs` (`verifyJwtHs256`) apenas se configurada, como fallback para projetos ou tokens legados `HS256`. Para o projeto `qawlpsrfewosxsfgmmpm` (`ES256` via JWKS), sua configuração é opcional.
    - **Importante (Princípios I e III)**: `SUPABASE_SERVICE_ROLE_KEY` **não** é lida por `workers/api.mjs` e **jamais** deve ser injetada no Worker público.
+   - `AUCTION_BID_SECRET` (**obrigatória para leilões**, Spec 013): segredo aleatório de 32 bytes que autentica o canal Worker → `public.place_auction_bid` (cabeçalho `x-vitrine-bid-key`) e deriva o identificador irreversível do visitante. Registre com `npx wrangler secret put AUCTION_BID_SECRET` e grave **só o SHA-256** em `private.auction_settings` pelo SQL Editor do Supabase (passo a passo em `specs/013-leilao/quickstart.md`). Sem ele, os lances respondem `503 AUCTIONS_UNAVAILABLE` e o restante da vitrine segue no ar. Para revogar, troque o segredo e o hash.
 
 ### 5.4 Portões Obrigatórios de Pré-Lançamento (Dry-Run)
 

@@ -66,4 +66,10 @@ _Evitar_: rifa, sorteio, bilhete, número da sorte.
 
 **Localidade da vitrine**: Cidade e UF informadas pelo proprietário em Ajustes, com autorização explícita para a página por cidade; não se confunde com a cidade do perfil pessoal.
 
+**Leilão**: Item de lance com data de encerramento; os lances ficam registrados e o maior lance válido no encerramento vence. Item de lance sem data continua como oferta enviada pelo WhatsApp.
+
+**Lance**: Valor oferecido por um visitante em um leilão, com nome e WhatsApp visíveis só para proprietário e administradores da vitrine.
+
+**Lance desconsiderado**: Lance anulado pela equipe da vitrine com motivo registrado; o próximo maior lance válido passa a valer.
+
 **Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.

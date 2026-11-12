@@ -14,7 +14,7 @@ Itens `priceMode: "offer"` com `auctionEndsAt` viram leilões. A vitrine públic
 
 **Primary Dependencies**: nenhuma nova. Web Crypto (`crypto.subtle`) para HMAC no Worker; `pg_catalog.sha256` no banco.
 
-**Storage**: Supabase Postgres — novas tabelas `public.auction_lots`, `public.auction_bids`, `public.auction_blocks` e `private.auction_settings` (migração append-only `supabase/migrations/20261112191347_auction_bids.sql`).
+**Storage**: Supabase Postgres — novas tabelas `public.auction_lots`, `public.auction_bids`, `public.auction_blocks` e `private.auction_settings` (migração append-only `supabase/migrations/20261112194217_auction_bids.sql`).
 
 **Testing**: `node --test` — PGlite para RLS/função SQL (`test/database/auction-bids.test.mjs`), contrato da API com o store em memória (`test/auction-api.test.mjs`), regras puras e renderização (`test/auction-rules.test.mjs`).
 
@@ -55,7 +55,7 @@ specs/013-leilao/
 ### Source Code (repository root)
 
 ```text
-supabase/migrations/20261112191347_auction_bids.sql   # tabelas, RLS, funções place/read/void
+supabase/migrations/20261112194217_auction_bids.sql   # tabelas, RLS, funções place/read/void
 web/assets/auction-rules.mjs                           # regras puras compartilhadas (browser + Worker)
 web/assets/storefront-renderer.mjs                     # cartão de leilão e diálogo de lance
 web/vitrine/vitrine.js                                 # cliente do quadro, polling e envio

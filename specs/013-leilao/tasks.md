@@ -10,7 +10,7 @@
 
 ## Phase 2: Foundational (bloqueia todas as histórias)
 
-- [x] T002 Migração append-only `supabase/migrations/20261112191347_auction_bids.sql`: tabelas `auction_lots`, `auction_bids`, `auction_blocks`, `private.auction_settings`, RLS, grants de coluna
+- [x] T002 Migração append-only `supabase/migrations/20261112194217_auction_bids.sql`: tabelas `auction_lots`, `auction_bids`, `auction_blocks`, `private.auction_settings`, RLS, grants de coluna
 - [x] T003 [P] Regras puras compartilhadas em `web/assets/auction-rules.mjs` (termos, mínimo, prorrogação, validação de entrada, mensagens, formatação)
 - [x] T004 [P] Validar `auctionEndsAt` e `bidIncrementCents` em `src/portal-validation.mjs`
 - [x] T005 [P] Projetar `auctionEndsAt` (UTC) e `bidIncrementCents` só para itens `offer` em `src/publication-engine.mjs`

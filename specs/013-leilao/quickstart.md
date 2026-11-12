@@ -14,7 +14,7 @@ Testes relevantes: `test/auction-rules.test.mjs`, `test/auction-api.test.mjs`, `
 
 1. Gerar um segredo aleatório de 32 bytes num terminal confiável (ex.: `openssl rand -hex 32`) e guardá-lo no cofre.
 2. Registrar no Worker sem passar o valor na linha de comando: `npx wrangler secret put AUCTION_BID_SECRET` (cole quando solicitado).
-3. Calcular o SHA-256 do segredo no mesmo terminal (`printf '%s' "$SEGREDO" | sha256sum`) e, depois que a migração `20261112191347_auction_bids.sql` for aplicada, registrar **só o hash** no Supabase (SQL Editor do painel do Supabase, como administrador), para o segredo não ficar no histórico do editor:
+3. Calcular o SHA-256 do segredo no mesmo terminal (`printf '%s' "$SEGREDO" | sha256sum`) e, depois que a migração `20261112194217_auction_bids.sql` for aplicada, registrar **só o hash** no Supabase (SQL Editor do painel do Supabase, como administrador), para o segredo não ficar no histórico do editor:
 
 ```sql
 insert into private.auction_settings (id, bid_key_sha256)

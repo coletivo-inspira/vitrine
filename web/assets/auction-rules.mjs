@@ -2,7 +2,7 @@
  * Regras do leilão compartilhadas entre a vitrine pública, o painel, o Worker e o
  * motor em memória dos testes. A autoridade final é a função SQL
  * `private.place_auction_bid`; manter os valores abaixo iguais aos da migração
- * `20261112191347_auction_bids.sql`.
+ * `20261112194217_auction_bids.sql`.
  */
 
 export const AUCTION_RULES = Object.freeze({
@@ -110,8 +110,10 @@ export function applySoftClose({ endsAtMs, scheduledEndsAtMs, nowMs }) {
 }
 
 export function normalizeBidderWhatsapp(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  const withCountry = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  const text = String(raw ?? '').trim();
+  const digits = text.replace(/\D/g, '');
+  const hasCountryCode = text.startsWith('+');
+  const withCountry = !hasCountryCode && (digits.length === 10 || digits.length === 11) ? `55${digits}` : digits;
   return WHATSAPP_PATTERN.test(withCountry) ? withCountry : null;
 }
 
