@@ -72,4 +72,6 @@ _Evitar_: rifa, sorteio, bilhete, número da sorte.
 
 **Lance desconsiderado**: Lance anulado pela equipe da vitrine com motivo registrado; o próximo maior lance válido passa a valer.
 
-**Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.
+**Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing. Peças do Instagram podem nomear o modelo "Cardápio"; no site a mesma demonstração se chama "Pratos".
+
+**Demonstração de modelo**: Animação ilustrativa de 4 s de um modelo (Pratos/Cardápio, Lanches, Serviços, Portfólio), com negócio e valores fictícios, usada na página Possibilidades e na campanha do Instagram.
