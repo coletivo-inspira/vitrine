@@ -1399,6 +1399,57 @@ async function hydratePublicationRecord(row) {
   return compiled.publication;
 }
 
+function sanitizeDiagnosticText(value) {
+  if (typeof value !== 'string' || !value) return '';
+  return value
+    .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED_JWT]')
+    .replace(/\bsb_(?:secret|publishable)_[A-Za-z0-9_-]+/g, '[REDACTED_KEY]')
+    .replace(/\bsbp_[A-Za-z0-9_-]+/g, '[REDACTED_TOKEN]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[REDACTED]')
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[REDACTED_EMAIL]')
+    .slice(0, 300);
+}
+
+async function readUpstreamErrorDetails(response) {
+  if (!response) {
+    return { status: 0, code: null, message: null, details: null, hint: null };
+  }
+  let body = null;
+  try {
+    const target = typeof response.clone === 'function' ? response.clone() : response;
+    body = await target.json();
+  } catch {
+    body = null;
+  }
+  return {
+    status: Number(response.status) || 0,
+    code: body?.code ? sanitizeDiagnosticText(String(body.code)) : null,
+    message: body?.message ? sanitizeDiagnosticText(String(body.message)) : null,
+    details: body?.details ? sanitizeDiagnosticText(String(body.details)) : null,
+    hint: body?.hint ? sanitizeDiagnosticText(String(body.hint)) : null
+  };
+}
+
+function logUpstreamError(operation, errInfo) {
+  console.error(
+    JSON.stringify({
+      event: 'supabase_upstream_error',
+      operation,
+      status: errInfo.status,
+      code: errInfo.code,
+      message: errInfo.message,
+      details: errInfo.details,
+      hint: errInfo.hint
+    })
+  );
+}
+
+function createUpstreamStoreError(operation, errInfo) {
+  const err = new Error(`Supabase ${operation} error: ${errInfo.status}`);
+  err.upstream = errInfo;
+  return err;
+}
+
 export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: customFetch } = {}) {
   const fetchImpl = customFetch ?? globalThis.fetch;
   const baseUrl = String(supabaseUrl ?? '').replace(/\/+$/, '');
@@ -1450,26 +1501,58 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
     },
 
     async upsertProfile(userId, input, { token } = {}) {
-      const profileRes = await fetchImpl(`${baseUrl}/rest/v1/profiles?on_conflict=user_id`, {
+      const mutableFields = {
+        display_name: input.displayName ?? '',
+        business_name: input.businessName ?? '',
+        city: input.city ?? '',
+        whatsapp: input.whatsapp ?? ''
+      };
+      let profileRes = await fetchImpl(`${baseUrl}/rest/v1/profiles?on_conflict=user_id`, {
         method: 'POST',
         headers: authHeaders(token, {
           prefer: 'resolution=merge-duplicates,return=representation'
         }),
         body: JSON.stringify({
           user_id: userId,
-          display_name: input.displayName ?? '',
-          business_name: input.businessName ?? '',
-          city: input.city ?? '',
-          whatsapp: input.whatsapp ?? ''
+          ...mutableFields
         })
       });
 
+      if (profileRes && profileRes.status === 403) {
+        const patchRes = await fetchImpl(
+          `${baseUrl}/rest/v1/profiles?user_id=eq.${encodeURIComponent(userId)}`,
+          {
+            method: 'PATCH',
+            headers: authHeaders(token, { prefer: 'return=representation' }),
+            body: JSON.stringify(mutableFields)
+          }
+        );
+        if (patchRes && patchRes.ok) {
+          const patchedRows = await patchRes.clone().json().catch(() => []);
+          if (Array.isArray(patchedRows) && patchedRows.length > 0) {
+            profileRes = patchRes;
+          } else {
+            profileRes = await fetchImpl(`${baseUrl}/rest/v1/profiles`, {
+              method: 'POST',
+              headers: authHeaders(token, { prefer: 'return=representation' }),
+              body: JSON.stringify({
+                user_id: userId,
+                ...mutableFields
+              })
+            });
+          }
+        } else if (patchRes) {
+          profileRes = patchRes;
+        }
+      }
+
       if (!profileRes.ok) {
-        const errBody = await profileRes.json().catch(() => ({}));
-        if (errBody?.code === '23514') {
+        const errInfo = await readUpstreamErrorDetails(profileRes);
+        logUpstreamError('upsertProfile', errInfo);
+        if (errInfo.code === '23514') {
           throw new PortalValidationError(422, 'INVALID_PROFILE', 'Dados de perfil inválidos.');
         }
-        throw new Error(`Supabase upsertProfile error: ${profileRes.status}`);
+        throw createUpstreamStoreError('upsertProfile', errInfo);
       }
 
       const [savedRow] = await profileRes.json();
@@ -1719,6 +1802,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         }
       );
       if (!response.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        logUpstreamError('getDraft', errInfo);
         return null;
       }
       const rows = await response.json();
@@ -1755,6 +1840,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         }
       );
       if (!updateRes.ok) {
+        const errInfo = await readUpstreamErrorDetails(updateRes);
+        logUpstreamError('updateDraft', errInfo);
         return { status: 'not_found' };
       }
       const updatedRows = await updateRes.json();
@@ -1782,23 +1869,55 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async savePublication(publication, { token } = {}) {
       if (token && publication?.siteId && baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
-        const pubRes = await fetchImpl(`${baseUrl}/rest/v1/publications?on_conflict=site_id`, {
+        const mutablePublicationFields = {
+          slug: publication.slug,
+          revision: publication.revision,
+          status: 'active',
+          artifact_hash: publication.hash,
+          menu: publication.menu,
+          published_at: publication.publishedAt
+        };
+        let pubRes = await fetchImpl(`${baseUrl}/rest/v1/publications?on_conflict=site_id`, {
           method: 'POST',
           headers: authHeaders(token, {
             prefer: 'resolution=merge-duplicates,return=representation'
           }),
           body: JSON.stringify({
             site_id: publication.siteId,
-            slug: publication.slug,
-            revision: publication.revision,
-            status: 'active',
-            artifact_hash: publication.hash,
-            menu: publication.menu,
-            published_at: publication.publishedAt
+            ...mutablePublicationFields
           })
         });
+        if (pubRes && pubRes.status === 403) {
+          const patchRes = await fetchImpl(
+            `${baseUrl}/rest/v1/publications?site_id=eq.${encodeURIComponent(publication.siteId)}`,
+            {
+              method: 'PATCH',
+              headers: authHeaders(token, { prefer: 'return=representation' }),
+              body: JSON.stringify(mutablePublicationFields)
+            }
+          );
+          if (patchRes && patchRes.ok) {
+            const patchedRows = await patchRes.clone().json().catch(() => []);
+            if (Array.isArray(patchedRows) && patchedRows.length > 0) {
+              pubRes = patchRes;
+            } else {
+              pubRes = await fetchImpl(`${baseUrl}/rest/v1/publications`, {
+                method: 'POST',
+                headers: authHeaders(token, { prefer: 'return=representation' }),
+                body: JSON.stringify({
+                  site_id: publication.siteId,
+                  ...mutablePublicationFields
+                })
+              });
+            }
+          } else if (patchRes && patchRes.status !== 404) {
+            pubRes = patchRes;
+          }
+        }
         if (pubRes && !pubRes.ok && pubRes.status !== 404) {
-          throw new Error(`Supabase savePublication error: ${pubRes.status}`);
+          const errInfo = await readUpstreamErrorDetails(pubRes);
+          logUpstreamError('savePublication', errInfo);
+          throw createUpstreamStoreError('savePublication', errInfo);
         }
       }
       publicationFetchedAtBySlug.set(publication.slug, Date.now());
@@ -3039,8 +3158,36 @@ export function createApiHandler(deps = {}) {
       return errorResponse(404, 'NOT_FOUND', 'Endpoint da API não encontrado.');
     } catch (err) {
       if (err instanceof PortalValidationError) {
+        if (
+          pathname.endsWith('/publish') ||
+          pathname.endsWith('/publish/') ||
+          pathname.endsWith('/draft') ||
+          pathname.endsWith('/draft/')
+        ) {
+          console.error(
+            JSON.stringify({
+              event: 'api_validation_error',
+              method,
+              route: sanitizeDiagnosticText(pathname),
+              status: err.status,
+              code: sanitizeDiagnosticText(err.code),
+              message: sanitizeDiagnosticText(err.message)
+            })
+          );
+        }
         return jsonResponse(err.status, err.toJSON());
       }
+      console.error(
+        JSON.stringify({
+          event: 'api_internal_error',
+          method,
+          route: sanitizeDiagnosticText(pathname),
+          status: 500,
+          errorName: sanitizeDiagnosticText(err?.name || 'Error'),
+          errorMessage: sanitizeDiagnosticText(err?.message || 'Unknown error'),
+          ...(err?.upstream ? { upstream: err.upstream } : {})
+        })
+      );
       return errorResponse(500, 'INTERNAL_ERROR', 'Erro interno ao processar a requisição.');
     }
   };

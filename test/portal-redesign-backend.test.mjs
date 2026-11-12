@@ -1169,4 +1169,308 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       (err) => err.code === 'INVALID_STOREFRONT_TYPE'
     );
   });
+
+  await t.test('6. Regressão de produção: PostgREST upsert (resolution=merge-duplicates) em publications/profiles, fallback sem grant de PK e logs seguros em wrangler tail', async () => {
+    clearPublicationsCache();
+    const origin = 'https://painel.inspira.dev.br';
+
+    // 6.1 Com todas as migrações (incluindo 202611120004), o SQL exato do PostgREST (incluindo site_id/user_id no DO UPDATE SET) passa sem 42501
+    const fullDb = await setupPgliteWithMigrations();
+    t.after(() => fullDb.close());
+
+    await fullDb.query(
+      "insert into public.sites (id, owner_user_id, slug, name, storefront_type, template) values ($1, $2, 'vitrine-19-itens', 'Vitrine 19 Itens', 'food', 'products-v1')",
+      [SITE_A, USER_A]
+    );
+
+    const items19 = Array.from({ length: 19 }, (_, idx) => ({
+      id: `item-${idx + 1}`,
+      name: `Produto Artesanal ${idx + 1}`,
+      description: `Descrição do produto ${idx + 1}`,
+      priceCents: 2500 + idx * 100,
+      active: true
+    }));
+
+    const draft19 = createInitialDraftContent({
+      slug: 'vitrine-19-itens',
+      name: 'Vitrine 19 Itens',
+      storefrontType: 'food',
+      template: 'products-v1',
+      catalogType: 'products',
+      whatsapp: '5511999999999'
+    });
+    draft19.categories = [{ id: 'cat-principal', name: 'Destaques', items: items19 }];
+
+    await fullDb.query(
+      'insert into public.drafts (site_id, revision, content) values ($1, 1, $2::jsonb)',
+      [SITE_A, JSON.stringify(draft19)]
+    );
+
+    function createPostgrestSimulator(db) {
+      return async (urlStr, init = {}) => {
+        const u = new URL(urlStr);
+        const method = (init.method || 'GET').toUpperCase();
+        const prefer = String(init.headers?.prefer || init.headers?.Prefer || '');
+        const body = init.body ? JSON.parse(init.body) : null;
+
+        try {
+          if (u.pathname === '/rest/v1/drafts' && method === 'GET') {
+            const siteId = (u.searchParams.get('site_id') || '').replace(/^eq\./, '');
+            const rows = await asRole(db, USER_A, async () => {
+              const res = await db.query(
+                'select site_id, revision, updated_at, content from public.drafts where site_id = $1',
+                [siteId]
+              );
+              return res.rows;
+            });
+            return new Response(JSON.stringify(rows), { status: 200 });
+          }
+
+          if (u.pathname === '/rest/v1/sites' && method === 'GET') {
+            const siteId = (u.searchParams.get('id') || '').replace(/^eq\./, '');
+            const rows = await asRole(db, USER_A, async () => {
+              const res = await db.query(
+                'select id, owner_user_id, slug, name, storefront_type, template, created_at, updated_at from public.sites where id = $1',
+                [siteId]
+              );
+              return res.rows;
+            });
+            return new Response(JSON.stringify(rows), { status: 200 });
+          }
+
+          if (u.pathname === '/rest/v1/publications' && method === 'POST') {
+            const isMergeDuplicates = prefer.includes('resolution=merge-duplicates');
+            const rows = await asRole(
+              db,
+              USER_A,
+              async () => {
+                if (isMergeDuplicates) {
+                  // SQL exato emitido pelo PostgREST quando Prefer: resolution=merge-duplicates inclui todas as colunas do JSON no DO UPDATE SET
+                  const res = await db.query(
+                    `insert into public.publications (site_id, slug, revision, status, artifact_hash, menu, published_at)
+                     values ($1, $2, $3, $4, $5, $6::jsonb, $7)
+                     on conflict (site_id) do update set
+                       site_id = excluded.site_id,
+                       slug = excluded.slug,
+                       revision = excluded.revision,
+                       status = excluded.status,
+                       artifact_hash = excluded.artifact_hash,
+                       menu = excluded.menu,
+                       published_at = excluded.published_at
+                     returning site_id, slug, revision, status, artifact_hash, menu, published_at`,
+                    [
+                      body.site_id,
+                      body.slug,
+                      body.revision,
+                      body.status,
+                      body.artifact_hash,
+                      JSON.stringify(body.menu),
+                      body.published_at
+                    ]
+                  );
+                  return res.rows;
+                }
+                const res = await db.query(
+                  `insert into public.publications (site_id, slug, revision, status, artifact_hash, menu, published_at)
+                   values ($1, $2, $3, $4, $5, $6::jsonb, $7)
+                   returning site_id, slug, revision, status, artifact_hash, menu, published_at`,
+                  [
+                    body.site_id,
+                    body.slug,
+                    body.revision,
+                    body.status,
+                    body.artifact_hash,
+                    JSON.stringify(body.menu),
+                    body.published_at
+                  ]
+                );
+                return res.rows;
+              },
+              'authenticated',
+              true
+            );
+            return new Response(JSON.stringify(rows), { status: 201 });
+          }
+
+          if (u.pathname === '/rest/v1/publications' && method === 'PATCH') {
+            const siteId = (u.searchParams.get('site_id') || '').replace(/^eq\./, '');
+            if ('site_id' in body) {
+              throw Object.assign(new Error('permission denied for table publications'), {
+                code: '42501'
+              });
+            }
+            const rows = await asRole(
+              db,
+              USER_A,
+              async () => {
+                const res = await db.query(
+                  `update public.publications
+                      set slug = $1,
+                          revision = $2,
+                          status = $3,
+                          artifact_hash = $4,
+                          menu = $5::jsonb,
+                          published_at = $6
+                    where site_id = $7
+                    returning site_id, slug, revision, status, artifact_hash, menu, published_at`,
+                  [
+                    body.slug,
+                    body.revision,
+                    body.status,
+                    body.artifact_hash,
+                    JSON.stringify(body.menu),
+                    body.published_at,
+                    siteId
+                  ]
+                );
+                return res.rows;
+              },
+              'authenticated',
+              true
+            );
+            return new Response(JSON.stringify(rows), { status: 200 });
+          }
+
+          return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+        } catch (err) {
+          const status = err?.code === '42501' ? 403 : err?.code === '23505' ? 409 : 400;
+          return new Response(
+            JSON.stringify({
+              code: err?.code || 'DB_ERROR',
+              message: err?.message || 'Database error',
+              details: null,
+              hint: null
+            }),
+            { status, headers: { 'content-type': 'application/json' } }
+          );
+        }
+      };
+    }
+
+    const apiFull = createApiHandler({
+      authVerifier: async () => ({ id: USER_A }),
+      fetch: createPostgrestSimulator(fullDb)
+    });
+
+    const pubFullRes = await apiFull.fetch(
+      new Request(`${origin}/api/sites/${SITE_A}/publish`, {
+        method: 'POST',
+        headers: {
+          Cookie: '__Host-vitrine_session=token-owner',
+          Origin: origin
+        }
+      }),
+      {
+        SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+        SUPABASE_ANON_KEY: 'sb_publishable_test_key_1234567890'
+      }
+    );
+    assert.equal(pubFullRes.status, 200);
+    const pubFullBody = await pubFullRes.json();
+    assert.equal(pubFullBody.publication.slug, 'vitrine-19-itens');
+    assert.equal(pubFullBody.publication.menu.items.length, 19);
+
+    // 6.2 Mesmo em banco sem a migração 202611120004 (onde UPDATE(site_id) dá 42501 no ON CONFLICT DO UPDATE), o fallback PATCH + POST publica e republica com 200 OK
+    const preFixDb = new PGlite();
+    t.after(() => preFixDb.close());
+    await preFixDb.exec(`
+      create role anon nologin;
+      create role authenticated nologin;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema auth to authenticated, anon;
+      grant execute on function auth.uid() to authenticated, anon;
+    `);
+    const preFixFiles = (await readdir(migrationsDir))
+      .filter((f) => f.endsWith('.sql') && f <= '202611120003_site_metrics_daily.sql')
+      .sort();
+    for (const file of preFixFiles) {
+      await preFixDb.exec(await readFile(resolve(migrationsDir, file), 'utf8'));
+    }
+    await preFixDb.query('insert into auth.users (id) values ($1)', [USER_A]);
+    await preFixDb.query(
+      "insert into public.sites (id, owner_user_id, slug, name, storefront_type, template) values ($1, $2, 'vitrine-19-itens', 'Vitrine 19 Itens', 'food', 'products-v1')",
+      [SITE_A, USER_A]
+    );
+    await preFixDb.query(
+      'insert into public.drafts (site_id, revision, content) values ($1, 1, $2::jsonb)',
+      [SITE_A, JSON.stringify(draft19)]
+    );
+
+    const apiPreFix = createApiHandler({
+      authVerifier: async () => ({ id: USER_A }),
+      fetch: createPostgrestSimulator(preFixDb)
+    });
+
+    // Primeira publicação (INSERT via fallback) e segunda publicação (UPDATE via fallback PATCH)
+    for (const attempt of [1, 2]) {
+      const res = await apiPreFix.fetch(
+        new Request(`${origin}/api/sites/${SITE_A}/publish`, {
+          method: 'POST',
+          headers: {
+            Cookie: '__Host-vitrine_session=token-owner',
+            Origin: origin
+          }
+        }),
+        {
+          SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+          SUPABASE_ANON_KEY: 'sb_publishable_test_key_1234567890'
+        }
+      );
+      assert.equal(res.status, 200, `Tentativa ${attempt} de publicação deveria retornar 200`);
+    }
+
+    // 6.3 Quando o upstream PostgREST falha de forma irrecuperável, console.error registra código/mensagem/rota sem vazar tokens
+    const loggedErrors = [];
+    const origConsoleError = console.error;
+    console.error = (...args) => {
+      loggedErrors.push(args.join(' '));
+    };
+    try {
+      const apiBrokenUpstream = createApiHandler({
+        authVerifier: async () => ({ id: USER_A }),
+        fetch: async (urlStr, init = {}) => {
+          const u = new URL(urlStr);
+          if (u.pathname === '/rest/v1/publications') {
+            return new Response(
+              JSON.stringify({
+                code: '42501',
+                message: 'permission denied for table publications (Bearer eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiIxIn0.sig)',
+                details: 'contato@exemplo.com',
+                hint: 'Check column grants'
+              }),
+              { status: 500, headers: { 'content-type': 'application/json' } }
+            );
+          }
+          return createPostgrestSimulator(fullDb)(urlStr, init);
+        }
+      });
+
+      const failRes = await apiBrokenUpstream.fetch(
+        new Request(`${origin}/api/sites/${SITE_A}/publish`, {
+          method: 'POST',
+          headers: {
+            Cookie: '__Host-vitrine_session=eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiIxIn0.secret',
+            Origin: origin
+          }
+        }),
+        {
+          SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+          SUPABASE_ANON_KEY: 'sb_publishable_test_key_1234567890'
+        }
+      );
+      assert.equal(failRes.status, 500);
+      assert.ok(loggedErrors.length >= 2);
+      const joinedLogs = loggedErrors.join('\n');
+      assert.match(joinedLogs, /"code":"42501"/);
+      assert.match(joinedLogs, /"operation":"savePublication"/);
+      assert.match(joinedLogs, /\/api\/sites\/20000000-0000-0000-0000-000000000001\/publish/);
+      assert.doesNotMatch(joinedLogs, /eyJhbGciOiJFUzI1NiJ9/);
+      assert.doesNotMatch(joinedLogs, /contato@exemplo\.com/);
+    } finally {
+      console.error = origConsoleError;
+    }
+  });
 });

@@ -296,7 +296,8 @@ async function createPgliteSupabaseHarness() {
               `insert into public.publications (site_id, slug, revision, status, artifact_hash, menu, published_at)
                values ($1, $2, $3, $4, $5, $6::jsonb, $7)
                on conflict (site_id) do update
-                 set slug = excluded.slug,
+                 set site_id = excluded.site_id,
+                     slug = excluded.slug,
                      revision = excluded.revision,
                      status = excluded.status,
                      artifact_hash = excluded.artifact_hash,
