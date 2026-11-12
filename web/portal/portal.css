@@ -1544,6 +1544,12 @@ svg {
 }
 
 @media (max-width: 520px) {
+  .shell-demo-badge .badge-text {
+    display: none;
+  }
+  .shell-demo-badge {
+    padding: 8px;
+  }
   .brand .brand-logo-light, .brand .brand-logo-dark {
     width: 120px;
     height: 37px;

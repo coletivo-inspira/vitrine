@@ -1089,7 +1089,13 @@ function updateHubSummary() {
 
   // 2. Vitrines list summary
   if (vitrinesSummaryText) {
-    vitrinesSummaryText.textContent = `Você possui ${sites.length} vitrine(s) cadastrada(s).`;
+    if (sites.length === 0) {
+      vitrinesSummaryText.textContent = 'Você não possui nenhuma vitrine cadastrada.';
+    } else if (sites.length === 1) {
+      vitrinesSummaryText.textContent = 'Você possui 1 vitrine cadastrada.';
+    } else {
+      vitrinesSummaryText.textContent = `Você possui ${sites.length} vitrines cadastradas.`;
+    }
   }
   if (hubVitrinesList) {
     if (sites.length === 0) {
@@ -1115,7 +1121,13 @@ function updateHubSummary() {
 
   // 3. Customization Requests summary
   if (customRequestsSummaryText) {
-    customRequestsSummaryText.textContent = `${customizationRequests.length} pedido(s) enviado(s) ao coletivo.`;
+    if (customizationRequests.length === 0) {
+      customRequestsSummaryText.textContent = 'Nenhum pedido enviado ao coletivo.';
+    } else if (customizationRequests.length === 1) {
+      customRequestsSummaryText.textContent = '1 pedido enviado ao coletivo.';
+    } else {
+      customRequestsSummaryText.textContent = `${customizationRequests.length} pedidos enviados ao coletivo.`;
+    }
   }
   if (hubRequestsList) {
     if (customizationRequests.length === 0) {
