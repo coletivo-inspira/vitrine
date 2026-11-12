@@ -15,193 +15,582 @@
 <body>
   <a class="skip-link" href="#conteudo-portal">Pular para o conteúdo</a>
   
-  <header class="site-header wrap">
-    <a class="brand" href="./" aria-label="Vitrine Inspira — início do painel">
-      <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
-      <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
-    </a>
+  <!-- Auth / Login Section (Unauthenticated screen) -->
+  <section id="auth-section" class="portal-card select-none">
+    <div class="auth-header">
+      <img class="brand-logo brand-logo-light auth-logo" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+      <img class="brand-logo brand-logo-dark auth-logo" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+    </div>
+    <h2>Entrar no Panel</h2>
+    <p>Gerencie suas vitrines, edite cardápios e acompanhe as novidades da plataforma.</p>
     
-    <div class="header-controls">
-      <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
-        <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
-        <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+    <div class="auth-actions">
+      <button id="google-login-button" class="button button-google" type="button">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="google-svg-icon">
+          <path d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.71 0 3.27.61 4.5 1.615l2.435-2.435C17.31 1.485 14.91 1 12.24 1c-5.52 0-10 4.48-10 10s4.48 10 10 10c5.77 0 10-4.06 10-10 0-.68-.08-1.33-.2-1.715H12.24Z"/>
+        </svg>
+        Entrar com Google
       </button>
-      <button id="logout-button" class="button button-small" type="button" hidden>Sair</button>
-    </div>
-  </header>
-
-  <main id="conteudo-portal" class="wrap">
-    <!-- Feedback Banner / Message Container -->
-    <div id="global-feedback" class="feedback-banner" aria-live="polite" hidden></div>
-
-    <!-- Mode indicator for local evaluation -->
-    <div id="demo-mode-badge" class="demo-badge" hidden>
-      <span class="badge-dot"></span>
-      Modo Local de Demonstração (Offline)
     </div>
 
-    <!-- Auth Section -->
-    <section id="auth-section" class="portal-card select-none">
-      <h2>Entrar no Painel</h2>
-      <p>Gerencie suas vitrines, edite cardápios e acompanhe as novidades da plataforma.</p>
-      
-      <div class="auth-actions">
-        <button id="google-login-button" class="button button-google" type="button">
-          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.71 0 3.27.61 4.5 1.615l2.435-2.435C17.31 1.485 14.91 1 12.24 1c-5.52 0-10 4.48-10 10s4.48 10 10 10c5.77 0 10-4.06 10-10 0-.68-.08-1.33-.2-1.715H12.24Z"/>
-          </svg>
-          Entrar com Google
-        </button>
+    <div class="demo-offline-box">
+      <h3>Acesso offline</h3>
+      <p>Sem conexão ou backend configurado? Você pode testar e criar rascunhos salvos no seu navegador.</p>
+      <button id="local-demo-button" class="button button-small button-local button-pill" type="button">Acessar Modo Local (Offline)</button>
+    </div>
+  </section>
+
+  <!-- Authenticated Application Shell -->
+  <div id="authenticated-app" class="app-shell-container" hidden>
+    <!-- Glass Sidebar on Desktop -->
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
+        <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+          <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+          <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
+        </a>
       </div>
+      <nav class="sidebar-nav" aria-label="Menu principal">
+        <ul>
+          <li>
+            <a href="#inicio" class="nav-link active" data-section="inicio">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              Início
+            </a>
+          </li>
+          <li>
+            <a href="#vitrines" class="nav-link" data-section="dashboard">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+              Minhas Vitrines
+            </a>
+          </li>
+          <li>
+            <a href="#insights" class="nav-link nav-link-future" data-section="insights" aria-disabled="true" tabindex="-1">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Insights <span class="badge-future">Em breve</span>
+            </a>
+          </li>
+          <li>
+            <a href="#perfil" class="nav-link" data-section="perfil">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Perfil e Interesses
+            </a>
+          </li>
+          <li>
+            <a href="#pedidos" class="nav-link" data-section="pedidos">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Customizações
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
 
-      <div class="demo-offline-box">
-        <h3>Acesso offline</h3>
-        <p>Sem conexão ou backend configurado? Você pode testar e criar rascunhos salvos no seu navegador.</p>
-        <button id="local-demo-button" class="button button-small button-local" type="button">Acessar Modo Local (Offline)</button>
-      </div>
-    </section>
-
-    <!-- Dashboard Section -->
-    <section id="dashboard-section" hidden>
-      <div class="dashboard-header">
-        <h1>Minhas Vitrines</h1>
-        <p class="section-desc">Selecione uma vitrine para gerenciar o cardápio ou crie uma nova abaixo.</p>
-      </div>
-
-      <div class="dashboard-grid">
-        <!-- New site Form -->
-        <div class="portal-card">
-          <h2>Nova Vitrine</h2>
-          <form id="create-site-form" novalidate>
-            <div class="form-group">
-              <label for="new-site-name">Nome do Negócio</label>
-              <input type="text" id="new-site-name" name="name" required placeholder="Ex: Pizzaria Bella Itália">
-            </div>
-
-            <div class="form-group">
-              <label for="new-site-slug">Endereço da Vitrine (slug)</label>
-              <input type="text" id="new-site-slug" name="slug" required placeholder="pizzaria-bella">
-              <span id="slug-preview" class="form-help">Endereço: vitrine.inspira.dev.br/loja</span>
-              <span id="slug-validation-error" class="form-error-msg" hidden>O endereço deve conter apenas letras minúsculas, números e hífens.</span>
-            </div>
-
-            <button type="submit" class="button">Criar Vitrine</button>
-          </form>
+    <div class="app-main-layout">
+      <!-- Top bar for brand, theme toggle, accounts -->
+      <header class="app-top-bar">
+        <!-- Compact brand for mobile only -->
+        <div class="mobile-brand">
+          <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+            <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="120" height="37" alt="vitrine">
+            <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="120" height="37" alt="vitrine">
+          </a>
         </div>
-
-        <!-- Sites List -->
-        <div class="portal-card">
-          <h2>Suas Vitrines Ativas</h2>
-          <div id="sites-list-container" class="sites-list">
-            <p class="loading-msg">Carregando vitrines...</p>
+        
+        <div class="top-bar-middle">
+          <!-- Mode indicator for local evaluation in top bar -->
+          <div id="demo-mode-badge" class="demo-badge shell-demo-badge" hidden>
+            <span class="badge-dot"></span>
+            Modo Local
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Editor Section -->
-    <section id="editor-section" hidden>
-      <div class="editor-header-bar">
-        <button id="back-to-dashboard" class="button button-small button-secondary" type="button">← Voltar</button>
-        <div>
-          <h1 id="editor-site-title">Pizzaria Bella</h1>
-          <p id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/pizzaria-bella</p>
+        <div class="top-bar-controls">
+          <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+            <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+            <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+          </button>
+          <button id="logout-button" class="button button-small button-secondary button-pill" type="button">Sair</button>
         </div>
-        <div class="editor-save-container">
-          <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
-          <button id="save-draft-button" class="button button-secondary" type="button">Salvar Rascunho</button>
-          <button id="publish-site-button" class="button" type="button">Publicar Vitrine</button>
-        </div>
-      </div>
+      </header>
 
-      <!-- Publication Status Banner -->
-      <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
-        <div class="publication-status-info">
-          <span class="publication-badge">Publicada</span>
-          <span id="publication-status-text">Vitrine publicada com sucesso.</span>
-        </div>
-        <a id="publication-view-link" class="button button-small button-secondary" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine Pública</a>
-      </div>
+      <!-- Main app content pane -->
+      <main id="conteudo-portal" class="app-content-pane">
+        <!-- Global Feedback banner inside shell -->
+        <div id="global-feedback" class="feedback-banner" aria-live="polite" hidden></div>
 
-      <!-- Optimistic Concurrency Alert Banner -->
-      <div id="conflict-banner" class="conflict-banner" hidden>
-        <div class="conflict-content">
-          <h3>⚠️ Alerta de Concorrência</h3>
-          <p>Este rascunho foi atualizado em outra aba ou dispositivo. Recarregue antes de salvar.</p>
-          <div class="conflict-actions">
-            <button id="reload-conflict-button" class="button button-small" type="button">Recarregar rascunho remoto</button>
-            <button id="copy-conflict-button" class="button button-small button-secondary" type="button">Copiar alterações locais</button>
+        <!-- Section 1: Início (Home Dashboard) -->
+        <section id="inicio-section" class="shell-section">
+          <div class="section-header">
+            <h1 class="display-title">Painel Inicial</h1>
+            <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe a completude do seu perfil, suas vitrines e solicitações.</p>
           </div>
-        </div>
-      </div>
-
-      <!-- Editor Stats & Meters -->
-      <div class="editor-stats-container">
-        <div class="stat-card">
-          <span class="stat-label">Itens Ativos</span>
-          <div class="stat-meter-wrapper">
-            <span id="active-items-count" class="stat-value">0 / 20</span>
-            <progress id="active-items-progress" max="20" value="0"></progress>
-          </div>
-          <span id="active-items-warning" class="stat-warning" hidden>Limite de 20 itens ativos atingido para o plano gratuito.</span>
-        </div>
-
-        <div class="stat-card">
-          <span class="stat-label">Total de Itens</span>
-          <div class="stat-meter-wrapper">
-            <span id="total-items-count" class="stat-value">0 / 100</span>
-            <progress id="total-items-progress" max="100" value="0"></progress>
-          </div>
-          <span id="total-items-warning" class="stat-warning" hidden>Limite de 100 itens totais atingido.</span>
-        </div>
-
-        <div class="stat-card">
-          <span class="stat-label">Tamanho do Rascunho</span>
-          <div class="stat-meter-wrapper">
-            <span id="draft-size-count" class="stat-value">0 KiB / 256 KiB</span>
-            <progress id="draft-size-progress" max="262144" value="0"></progress>
-          </div>
-          <span id="draft-size-warning" class="stat-warning" hidden>O rascunho excede o limite técnico de 256 KiB.</span>
-        </div>
-      </div>
-
-      <div class="editor-workspace">
-        <!-- Editor Controls (Left Pane) -->
-        <div class="editor-controls-pane portal-card">
-          <h2>Configurações do Cardápio</h2>
           
-          <form id="editor-settings-form" novalidate>
-            <div class="form-group">
-              <label for="editor-whatsapp">WhatsApp para Pedidos (com código de país, ex: 5511999999999)</label>
-              <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999">
-              <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+          <div class="dashboard-hub-grid">
+            <!-- Profile Completeness Card -->
+            <div class="portal-card hub-card completeness-card">
+              <div class="card-eyebrow">Configuração</div>
+              <h3>Completude do Perfil</h3>
+              <div class="progress-bar-container">
+                <span class="progress-text" id="profile-progress-text">0% completo</span>
+                <progress id="profile-completeness-bar" max="100" value="0"></progress>
+              </div>
+              <p id="profile-missing-fields" class="missing-fields-text">Cidade, WhatsApp e interesses pendentes.</p>
+              <button id="hub-complete-profile-btn" class="button button-small button-secondary button-pill" type="button">Completar Perfil</button>
             </div>
-          </form>
 
-          <div class="editor-categories-header">
-            <h3>Categorias de Produtos</h3>
-            <button id="add-category-button" class="button button-small" type="button">+ Categoria</button>
+            <!-- Vitrines Summary Card -->
+            <div class="portal-card hub-card vitrines-summary-card">
+              <div class="card-eyebrow">Meus Projetos</div>
+              <h3>Suas Vitrines</h3>
+              <p id="vitrines-summary-text" class="summary-text-spaced">Carregando vitrines...</p>
+              <div id="hub-vitrines-list" class="hub-list">
+                <!-- Short list of sites -->
+              </div>
+              <button id="hub-create-site-btn" class="button button-small button-pill hub-btn-spaced" type="button">Criar Nova Vitrine</button>
+            </div>
+
+            <!-- Customization Summary Card -->
+            <div class="portal-card hub-card custom-summary-card">
+              <div class="card-eyebrow">Sob Medida</div>
+              <h3>Pedidos de Customização</h3>
+              <p id="custom-requests-summary-text" class="summary-text-spaced">Nenhuma solicitação em andamento.</p>
+              <div id="hub-requests-list" class="hub-list">
+                <!-- Short list of requests -->
+              </div>
+              <button id="hub-new-request-btn" class="button button-small button-secondary button-pill hub-btn-spaced" type="button">Fazer Solicitação</button>
+            </div>
+
+            <!-- Insights Summary Card (Room for future) -->
+            <div class="portal-card hub-card insights-future-card">
+              <div class="card-eyebrow">Inteligência</div>
+              <h3>Destaques da Semana</h3>
+              <div class="insights-placeholder">
+                <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true" class="insights-placeholder-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <p><strong>Métricas em breve</strong></p>
+                <p class="insights-placeholder-text">Acompanhe visualizações, cliques e conversões de pedidos no WhatsApp direto no painel assim que publicar.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2: Minhas Vitrines -->
+        <section id="dashboard-section" class="shell-section" hidden>
+          <div class="section-header vitrines-list-header-flex">
+            <div>
+              <h1 class="display-title">Minhas Vitrines</h1>
+              <p class="section-desc">Selecione uma vitrine para gerenciar o cardápio ou crie uma nova.</p>
+            </div>
+            <button id="wizard-open-btn" class="button button-small button-pill wizard-open-flex-btn" type="button">+ Nova Vitrine</button>
+          </div>
+          
+          <div class="portal-card portal-card-padded">
+            <h2>Suas Vitrines Ativas</h2>
+            <div id="sites-list-container" class="sites-list">
+              <p class="loading-msg">Carregando vitrines...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Perfil e Interesses -->
+        <section id="perfil-section" class="shell-section" hidden>
+          <div class="section-header">
+            <h1 class="display-title">Perfil e Interesses</h1>
+            <p class="section-desc">Personalize as informações da sua conta e selecione seus interesses de negócio.</p>
           </div>
 
-          <!-- Categories List Container -->
-          <div id="categories-container" class="categories-list-builder">
-            <!-- Rendered via JS -->
-          </div>
-        </div>
+          <div class="portal-card portal-card-narrow">
+            <h2>Editar Perfil</h2>
+            <form id="profile-form" novalidate class="form-flex-col">
+              <div class="form-group">
+                <label for="profile-display-name">Seu Nome / Nome de Exibição</label>
+                <input type="text" id="profile-display-name" name="displayName" placeholder="Ex: Maria Silva" maxlength="120">
+              </div>
 
-        <!-- Editor Live Preview (Right Pane) -->
-        <div class="editor-preview-pane">
-          <div class="preview-header">
-            <h2>Pré-visualização Instantânea</h2>
-            <span class="preview-badge">Ao Vivo</span>
+              <div class="form-group">
+                <label for="profile-business-name">Nome do seu Negócio</label>
+                <input type="text" id="profile-business-name" name="businessName" placeholder="Ex: Ateliê Maria" maxlength="160">
+              </div>
+
+              <div class="form-group">
+                <label for="profile-city">Cidade / Estado</label>
+                <input type="text" id="profile-city" name="city" placeholder="Ex: Porto Alegre, RS" maxlength="120">
+              </div>
+
+              <div class="form-group">
+                <label for="profile-whatsapp">WhatsApp do Negócio (somente dígitos, ex: 5551999999999)</label>
+                <input type="text" id="profile-whatsapp" name="whatsapp" placeholder="5551999999999">
+                <span id="profile-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: 5551999999999).</span>
+              </div>
+
+              <div class="form-group">
+                <label class="label-spaced">Áreas e Recursos de Interesse</label>
+                <span class="form-help help-block-spaced">Selecione as opções clicando nelas:</span>
+                <div id="interests-chips-container" class="chips-container">
+                  <button type="button" class="chip-btn" data-interest="cardapio-digital">Cardápio Digital</button>
+                  <button type="button" class="chip-btn" data-interest="agendamento">Agendamento de Serviços</button>
+                  <button type="button" class="chip-btn" data-interest="orcamento">Lista de Interesse/Orçamento</button>
+                  <button type="button" class="chip-btn" data-interest="identidade-visual">Identidade Visual</button>
+                  <button type="button" class="chip-btn" data-interest="dominio-proprio">Domínio Próprio</button>
+                  <button type="button" class="chip-btn" data-interest="fotografia">Fotografia de Produtos</button>
+                  <button type="button" class="chip-btn" data-interest="tecnologia">Integrações e Tecnologia</button>
+                </div>
+              </div>
+
+              <button type="submit" class="button button-pill btn-align-left">Salvar Perfil</button>
+            </form>
           </div>
-          <div id="live-storefront-preview" class="pizza-demo live-preview-box">
-            <!-- Rendered dynamically matching pizzeria-v1 style -->
+        </section>
+
+        <!-- Section 4: Pedidos de Customização -->
+        <section id="pedidos-section" class="shell-section" hidden>
+          <div class="section-header">
+            <h1 class="display-title">Customizações</h1>
+            <p class="section-desc">Solicite modificações personalizadas ou novos recursos sob medida desenvolvidos pelo Coletivo Inspira.</p>
           </div>
-        </div>
-      </div>
-    </section>
-  </main>
+
+          <div class="dashboard-grid">
+            <!-- Request Form -->
+            <div class="portal-card portal-card-left">
+              <h2>Fazer Solicitação</h2>
+              <p>Envie referências e detalhes do que você precisa para o seu negócio.</p>
+              
+              <form id="customization-request-form" novalidate class="form-flex-col">
+                <div class="form-group">
+                  <label for="request-storefront-type">Área de Atuação</label>
+                  <select id="request-storefront-type" name="storefrontType" required class="select-styled">
+                    <option value="food">Alimentação</option>
+                    <option value="art">Arte & design</option>
+                    <option value="photo">Fotografia & mídia</option>
+                    <option value="health">Saúde</option>
+                    <option value="tech">Tecnologia</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="request-template-interest">Modelo / Recurso Desejado</label>
+                  <input type="text" id="request-template-interest" name="templateInterest" required placeholder="Ex: Clínica Integrada, Portfolio Criativo, Galeria de Fotos" maxlength="120" class="item-input input-styled-height">
+                </div>
+
+                <div class="form-group">
+                  <label for="request-goal">Objetivo do Projeto (mínimo 10 caracteres)</label>
+                  <textarea id="request-goal" name="goal" required placeholder="Descreva brevemente o seu negócio e o que precisa na sua vitrine personalizada..." minlength="10" maxlength="2000" class="textarea-goal"></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="request-reference-urls">Links de Referência (um por linha, ex: https://exemplo.com)</label>
+                  <textarea id="request-reference-urls" name="referenceUrls" placeholder="Insira URLs HTTPS seguras de sites que você gosta para referência..." class="textarea-refs"></textarea>
+                  <span id="request-reference-error" class="form-error-msg" hidden>Insira URLs HTTPS válidas (ex: https://exemplo.com).</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="request-desired-deadline">Prazo Desejado</label>
+                  <input type="text" id="request-desired-deadline" name="desiredDeadline" placeholder="Ex: Dezembro/2026, 15 dias" maxlength="120" class="item-input input-styled-height">
+                </div>
+
+                <button type="submit" class="button button-pill btn-align-left">Enviar Pedido</button>
+              </form>
+            </div>
+
+            <!-- Requests List -->
+            <div class="portal-card portal-card-left">
+              <h2>Acompanhar Pedidos</h2>
+              <p>Histórico e status dos seus pedidos de customização.</p>
+              <div id="requests-list-container" class="sites-list">
+                <p class="empty-msg">Nenhuma solicitação enviada ainda.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 5: Assistente 3 Passos (Wizard Nova Vitrine) -->
+        <section id="wizard-section" class="shell-section" hidden>
+          <div class="section-header">
+            <h1 class="display-title">Nova Vitrine</h1>
+            <p class="section-desc">Crie sua vitrine em minutos seguindo os 3 passos simples abaixo.</p>
+          </div>
+
+          <div class="portal-card wizard-card-styled">
+            <!-- Progress indicator steps -->
+            <div class="wizard-steps-indicator">
+              <div class="step-ind active" id="step-ind-1"><span class="step-num">1</span> <span class="step-label">Área</span></div>
+              <div class="step-line"></div>
+              <div class="step-ind" id="step-ind-2"><span class="step-num">2</span> <span class="step-label">Modelo</span></div>
+              <div class="step-line"></div>
+              <div class="step-ind" id="step-ind-3"><span class="step-num">3</span> <span class="step-label">Endereço</span></div>
+            </div>
+
+            <form id="wizard-form" novalidate class="form-wizard-spaced">
+              <!-- Step 1: Área de atuação -->
+              <div id="wizard-step-1" class="wizard-step-pane">
+                <h2>Selecione a Área de Atuação do seu Negócio</h2>
+                <p class="p-spaced">Abaixo estão as áreas oficiais da Vitrine Inspira. Escolha a que melhor se adapta:</p>
+                
+                <div class="wizard-grid-cards">
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-area" value="food" checked>
+                    <div class="card-content">
+                      <div class="v-bicolor food-color"></div>
+                      <h3>Alimentação</h3>
+                      <p>Cardápios para restaurantes, lanchonetes, padarias e docerias com pedidos diretos.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-area" value="art">
+                    <div class="card-content">
+                      <div class="v-bicolor art-color"></div>
+                      <h3>Arte & design</h3>
+                      <p>Portfólios para designers, artesãos, estilistas e estúdios criativos.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-area" value="photo">
+                    <div class="card-content">
+                      <div class="v-bicolor photo-color"></div>
+                      <h3>Fotografia & mídia</h3>
+                      <p>Vitrines para fotógrafos, produtores de conteúdo e estúdios de gravação.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-area" value="health">
+                    <div class="card-content">
+                      <div class="v-bicolor health-color"></div>
+                      <h3>Saúde</h3>
+                      <p>Apresentação e serviços para profissionais, clínicas, terapeutas e bem-estar.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-area" value="tech">
+                    <div class="card-content">
+                      <div class="v-bicolor tech-color"></div>
+                      <h3>Tecnologia</h3>
+                      <p>Vitrinas para consultorias de software, integradores e startups de serviços.</p>
+                    </div>
+                  </label>
+                </div>
+                
+                <div class="wizard-actions-spaced">
+                  <button type="button" class="button button-secondary button-pill wizard-cancel-btn">Cancelar</button>
+                  <button type="button" class="button button-pill wizard-next-btn">Continuar →</button>
+                </div>
+              </div>
+
+              <!-- Step 2: Modelo/Catálogo -->
+              <div id="wizard-step-2" class="wizard-step-pane" hidden>
+                <h2>Selecione o Modelo de Catálogo</h2>
+                <p class="p-spaced">Os modelos ativos criam sua vitrine instantaneamente. Modelos sob customização abrem um pedido estruturado:</p>
+                
+                <div class="wizard-grid-cards">
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-model" value="products" checked>
+                    <div class="card-content">
+                      <span class="badge-status-available">Disponível</span>
+                      <h3>Cardápio / Produtos</h3>
+                      <p>Lista clássica com categorias, preços, imagens e carrinho para WhatsApp.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-model" value="booking">
+                    <div class="card-content">
+                      <span class="badge-status-available">Disponível</span>
+                      <h3>Agendamento de Serviços</h3>
+                      <p>Exibição de serviços com duração, preços e formulário de data e horário.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card">
+                    <input type="radio" name="wizard-model" value="quote">
+                    <div class="card-content">
+                      <span class="badge-status-available">Disponível</span>
+                      <h3>Lista de Interesse / Orçamento</h3>
+                      <p>Clientes selecionam itens para solicitar um orçamento customizado.</p>
+                    </div>
+                  </label>
+
+                  <label class="wizard-select-card wizard-select-card-custom">
+                    <input type="radio" name="wizard-model" value="custom">
+                    <div class="card-content">
+                      <span class="badge-status-custom">Sob Customização</span>
+                      <h3>Modelo Sob Medida</h3>
+                      <p>Design exclusivo e recursos avançados. Encaminha para o formulário de Pedido.</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="wizard-actions-spaced">
+                  <button type="button" class="button button-secondary button-pill wizard-prev-btn">← Voltar</button>
+                  <button type="button" class="button button-pill wizard-next-btn">Continuar →</button>
+                </div>
+              </div>
+
+              <!-- Step 3: Nome do negócio e Endereço/slug -->
+              <div id="wizard-step-3" class="wizard-step-pane" hidden>
+                <h2>Dê Nome e Endereço à sua Vitrine</h2>
+                <p class="p-spaced">Configure os detalhes finais de identificação na plataforma:</p>
+                
+                <div class="wizard-step3-container">
+                  <div class="form-group">
+                    <label for="wizard-site-name">Nome do seu Negócio</label>
+                    <input type="text" id="wizard-site-name" name="name" required placeholder="Ex: Pizzaria Bella Itália" class="item-input input-styled-height">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="wizard-site-slug">Endereço Público (slug na url)</label>
+                    <input type="text" id="wizard-site-slug" name="slug" required placeholder="pizzaria-bella" class="item-input input-styled-height">
+                    <span id="wizard-slug-preview" class="form-help">Endereço: vitrine.inspira.dev.br/sua-loja</span>
+                    <span id="wizard-slug-validation-error" class="form-error-msg" hidden>Endereço inválido. Use letras minúsculas, números e hífens.</span>
+                  </div>
+                </div>
+
+                <div class="wizard-actions-spaced">
+                  <button type="button" class="button button-secondary button-pill wizard-prev-btn">← Voltar</button>
+                  <button type="submit" class="button button-pill">Criar Vitrine 🎉</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- Section 6: Editor (Keep inside shell content container) -->
+        <section id="editor-section" class="shell-section" hidden>
+          <div class="editor-header-bar">
+            <button id="back-to-dashboard" class="button button-small button-secondary button-pill" type="button">← Voltar</button>
+            <div>
+              <h1 id="editor-site-title">Pizzaria Bella</h1>
+              <p id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/pizzaria-bella</p>
+            </div>
+            <div class="editor-save-container">
+              <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
+              <button id="save-draft-button" class="button button-secondary button-pill" type="button">Salvar Rascunho</button>
+              <button id="publish-site-button" class="button button-pill" type="button">Publicar Vitrine</button>
+            </div>
+          </div>
+
+          <!-- Publication Status Banner -->
+          <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
+            <div class="publication-status-info">
+              <span class="publication-badge">Publicada</span>
+              <span id="publication-status-text">Vitrine publicada com sucesso.</span>
+            </div>
+            <a id="publication-view-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine Pública</a>
+          </div>
+
+          <!-- Optimistic Concurrency Alert Banner -->
+          <div id="conflict-banner" class="conflict-banner" hidden>
+            <div class="conflict-content">
+              <h3>⚠️ Alerta de Concorrência</h3>
+              <p>Este rascunho foi atualizado em outra aba ou dispositivo. Recarregue antes de salvar.</p>
+              <div class="conflict-actions">
+                <button id="reload-conflict-button" class="button button-small button-pill" type="button">Recarregar rascunho remoto</button>
+                <button id="copy-conflict-button" class="button button-small button-secondary button-pill" type="button">Copiar alterações locais</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor Stats & Meters -->
+          <div class="editor-stats-container">
+            <div class="stat-card">
+              <span class="stat-label">Itens Ativos</span>
+              <div class="stat-meter-wrapper">
+                <span id="active-items-count" class="stat-value">0 / 20</span>
+                <progress id="active-items-progress" max="20" value="0"></progress>
+              </div>
+              <span id="active-items-warning" class="stat-warning" hidden>Limite de 20 itens ativos atingido para o plano gratuito.</span>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-label">Total de Itens</span>
+              <div class="stat-meter-wrapper">
+                <span id="total-items-count" class="stat-value">0 / 100</span>
+                <progress id="total-items-progress" max="100" value="0"></progress>
+              </div>
+              <span id="total-items-warning" class="stat-warning" hidden>Limite de 100 itens totais atingido.</span>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-label">Tamanho do Rascunho</span>
+              <div class="stat-meter-wrapper">
+                <span id="draft-size-count" class="stat-value">0 KiB / 256 KiB</span>
+                <progress id="draft-size-progress" max="262144" value="0"></progress>
+              </div>
+              <span id="draft-size-warning" class="stat-warning" hidden>O rascunho excede o limite técnico de 256 KiB.</span>
+            </div>
+          </div>
+
+          <div class="editor-workspace">
+            <!-- Editor Controls (Left Pane) -->
+            <div class="editor-controls-pane portal-card portal-card-left">
+              <h2>Configurações do Cardápio</h2>
+              
+              <form id="editor-settings-form" novalidate>
+                <div class="form-group">
+                  <label for="editor-whatsapp">WhatsApp para Pedidos (com código de país, ex: 5511999999999)</label>
+                  <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999">
+                  <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+                </div>
+              </form>
+
+              <div class="editor-categories-header">
+                <h3>Categorias de Produtos</h3>
+                <button id="add-category-button" class="button button-small button-pill" type="button">+ Categoria</button>
+              </div>
+
+              <!-- Categories List Container -->
+              <div id="categories-container" class="categories-list-builder">
+                <!-- Rendered via JS -->
+              </div>
+            </div>
+
+            <!-- Editor Live Preview (Right Pane) -->
+            <div class="editor-preview-pane">
+              <div class="preview-header">
+                <h2>Pré-visualização Instantânea</h2>
+                <span class="preview-badge">Ao Vivo</span>
+              </div>
+              <div id="live-storefront-preview" class="pizza-demo live-preview-box">
+                <!-- Rendered dynamically matching pizzeria-v1 style -->
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="app-bottom-nav" aria-label="Navegação móvel">
+      <ul>
+        <li>
+          <a href="#inicio" class="nav-link active" data-section="inicio">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span>Início</span>
+          </a>
+        </li>
+        <li>
+          <a href="#vitrines" class="nav-link" data-section="dashboard">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            <span>Vitrines</span>
+          </a>
+        </li>
+        <li>
+          <a href="#perfil" class="nav-link" data-section="perfil">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Perfil</span>
+          </a>
+        </li>
+        <li>
+          <a href="#pedidos" class="nav-link" data-section="pedidos">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Pedidos</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
 
   <footer class="site-footer compact-footer">
     <div class="wrap">
