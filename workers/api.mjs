@@ -1,4 +1,5 @@
 import {
+  CATALOG_IMAGES_BUCKET,
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
   MAX_DRAFT_BYTES,
@@ -9,6 +10,7 @@ import {
   isValidSlug,
   measureDraftBytes,
   migrateLegacyDraftContent,
+  validateCatalogImagePath,
   validateCustomizationRequestInput,
   validateDraftContent,
   validateProfileInput,
@@ -2113,8 +2115,7 @@ export function createApiHandler(deps = {}) {
             authenticated: true,
             user: {
               id: user.id
-            },
-            token: user.token
+            }
           });
         }
 
@@ -2512,6 +2513,145 @@ export function createApiHandler(deps = {}) {
         await sharedPublicPublications.savePublication(compiled.publication);
 
         return jsonResponse(200, { publication: compiled.publication });
+      }
+
+      const uploadMatch = pathname.match(/^\/api\/sites\/([^/]+)\/upload\/?$/);
+      if (uploadMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) {
+          return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        }
+
+        if (method !== 'POST') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para upload.');
+        }
+
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true,
+          requireJson: false
+        });
+        if (guardError) return guardError;
+
+        const siteId = decodeURIComponent(uploadMatch[1]);
+        let site = null;
+        if (typeof store.getSite === 'function') {
+          site = await store.getSite(siteId, user.id, { token: user.token, env });
+        }
+        if (!site) {
+          const allSites = await store.listSites(user.id, { token: user.token, env });
+          site = allSites.find((entry) => entry.id === siteId) ?? null;
+        }
+        if (!site) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+
+        const contentType = (request.headers.get('content-type') || '').trim();
+        if (!/^image\/webp(?:\s*;|$)/i.test(contentType)) {
+          return errorResponse(
+            415,
+            'UNSUPPORTED_MEDIA_TYPE',
+            'O cabeçalho Content-Type deve ser image/webp.'
+          );
+        }
+
+        const maxSizeBytes = 204800; // 200 KiB
+        const declaredLength = Number(request.headers.get('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > maxSizeBytes) {
+          return errorResponse(
+            413,
+            'FILE_TOO_LARGE',
+            'O arquivo excede o limite máximo permitido de 200 KB.'
+          );
+        }
+
+        let bodyBlob;
+        try {
+          bodyBlob = await request.arrayBuffer();
+        } catch {
+          return errorResponse(400, 'INVALID_BODY', 'Não foi possível ler o corpo do arquivo.');
+        }
+
+        if (bodyBlob.byteLength === 0) {
+          return errorResponse(400, 'EMPTY_FILE', 'O arquivo de imagem enviado está vazio.');
+        }
+
+        if (bodyBlob.byteLength > maxSizeBytes) {
+          return errorResponse(
+            413,
+            'FILE_TOO_LARGE',
+            'O arquivo excede o limite máximo permitido de 200 KB.'
+          );
+        }
+
+        const headerBytes = new Uint8Array(bodyBlob, 0, Math.min(bodyBlob.byteLength, 12));
+        const isWebpHeader =
+          headerBytes.length >= 12 &&
+          headerBytes[0] === 0x52 && // R
+          headerBytes[1] === 0x49 && // I
+          headerBytes[2] === 0x46 && // F
+          headerBytes[3] === 0x46 && // F
+          headerBytes[8] === 0x57 && // W
+          headerBytes[9] === 0x45 && // E
+          headerBytes[10] === 0x42 && // B
+          headerBytes[11] === 0x50; // P
+        if (!isWebpHeader) {
+          return errorResponse(
+            422,
+            'INVALID_IMAGE',
+            'O arquivo enviado não corresponde a uma imagem WebP válida.'
+          );
+        }
+
+        const rawItemId = url.searchParams.get('itemId');
+        const safeItemId = rawItemId === null || rawItemId === '' ? 'item' : rawItemId.trim();
+        if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(safeItemId) || safeItemId.includes('..')) {
+          return errorResponse(
+            422,
+            'INVALID_IMAGE_PATH',
+            'Identificador de item inválido para upload de imagem.'
+          );
+        }
+
+        const randBytes = new Uint8Array(4);
+        crypto.getRandomValues(randBytes);
+        const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        const validatedPath = validateCatalogImagePath(
+          `${site.id}/${safeItemId}-${randHex}.webp`,
+          site.id
+        );
+
+        const baseUrl = String(
+          env?.SUPABASE_URL ?? deps?.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL
+        ).replace(/\/+$/, '');
+        const anonKey = env?.SUPABASE_ANON_KEY ?? deps?.supabaseAnonKey ?? '';
+        const uploadUrl = `${baseUrl}/storage/v1/object/${CATALOG_IMAGES_BUCKET}/${validatedPath}`;
+
+        const fetchImpl = deps?.fetch ?? globalThis.fetch;
+        const storageRes = await fetchImpl(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+            apikey: anonKey,
+            'Content-Type': 'image/webp',
+            'x-upsert': 'true'
+          },
+          body: bodyBlob
+        });
+
+        if (!storageRes || !storageRes.ok) {
+          return errorResponse(
+            502,
+            'STORAGE_UPLOAD_ERROR',
+            'Falha ao enviar a imagem para o armazenamento da vitrine.'
+          );
+        }
+
+        const publicUrl = `${baseUrl}/storage/v1/object/public/${CATALOG_IMAGES_BUCKET}/${validatedPath}`;
+        return jsonResponse(200, {
+          imageUrl: publicUrl,
+          path: validatedPath,
+          bytes: bodyBlob.byteLength
+        });
       }
 
       return errorResponse(404, 'NOT_FOUND', 'Endpoint da API não encontrado.');

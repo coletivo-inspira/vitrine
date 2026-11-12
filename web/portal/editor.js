@@ -1,21 +1,23 @@
 import { showFeedback } from './portal.js';
-import { StorefrontRenderer } from './storefront-renderer.js';
+import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import {
   parseImportCatalogCSV,
   applyCSVToCatalog,
-  exportCatalogToCSV
+  exportCatalogToCSV,
+  validateCatalogLimits
 } from './csv-catalog.js';
 
-// Active editor state
 let currentSite = null;
 let currentIsOnline = false;
-let currentDraft = null; // { siteId, revision, updatedAt, content }
+let currentDraft = null;
 let selectedCategoryForItems = null;
+let activePreviewRenderer = null;
 
 // DOM Elements
 const editorSiteTitle = globalThis.document?.getElementById('editor-site-title');
 const editorSiteSlug = globalThis.document?.getElementById('editor-site-slug');
 const editorRevisionIndicator = globalThis.document?.getElementById('editor-revision-indicator');
+const editorOpenPublicLink = globalThis.document?.getElementById('editor-open-public-link');
 const saveDraftButton = globalThis.document?.getElementById('save-draft-button');
 const publishSiteButton = globalThis.document?.getElementById('publish-site-button');
 const publicationStatusBar = globalThis.document?.getElementById('publication-status-bar');
@@ -38,9 +40,10 @@ const draftSizeCount = globalThis.document?.getElementById('draft-size-count');
 const draftSizeProgress = globalThis.document?.getElementById('draft-size-progress');
 const draftSizeWarning = globalThis.document?.getElementById('draft-size-warning');
 
-// Form, Tabs & Container
+// Forms, Tabs & Containers
 const editorSettingsForm = globalThis.document?.getElementById('editor-settings-form');
 const editorOrderMsgForm = globalThis.document?.getElementById('editor-order-msg-form');
+const editorBusinessName = globalThis.document?.getElementById('editor-business-name');
 const editorWhatsapp = globalThis.document?.getElementById('editor-whatsapp');
 const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp-error');
 const editorCatalogType = globalThis.document?.getElementById('editor-catalog-type');
@@ -62,6 +65,7 @@ const addItemButton = globalThis.document?.getElementById('add-item-button');
 const itemsContainer = globalThis.document?.getElementById('items-container');
 
 // Order Fields and messages
+const fieldCustName = globalThis.document?.getElementById('field-cust-name');
 const fieldDate = globalThis.document?.getElementById('field-date');
 const fieldDeliveryPickup = globalThis.document?.getElementById('field-delivery-pickup');
 const fieldNotes = globalThis.document?.getElementById('field-notes');
@@ -74,8 +78,7 @@ const editorCtaLabel = globalThis.document?.getElementById('editor-cta-label');
 const editorWhatsappTemplate = globalThis.document?.getElementById('editor-whatsapp-template');
 
 // CSV Tool Elements
-const csvDownloadModelsBtn = globalThis.document?.getElementById('csv-download-models-btn');
-const csvModelsDropdownMenu = globalThis.document?.getElementById('csv-models-dropdown-menu');
+const csvDownloadPrimaryLink = globalThis.document?.getElementById('csv-download-primary-link');
 const csvExportBtn = globalThis.document?.getElementById('csv-export-btn');
 const csvUploadBtn = globalThis.document?.getElementById('csv-upload-btn');
 const csvFileInput = globalThis.document?.getElementById('csv-file-input');
@@ -84,23 +87,182 @@ const csvPreviewContainer = globalThis.document?.getElementById('csv-preview-con
 const csvSummaryText = globalThis.document?.getElementById('csv-summary-text');
 const csvErrorsList = globalThis.document?.getElementById('csv-errors-list');
 const csvApplyBtn = globalThis.document?.getElementById('csv-apply-btn');
+const csvCancelBtn = globalThis.document?.getElementById('csv-cancel-btn');
 
-// Entrypoint exported to portal.js
+function getCatalogDefaults(catalogType = 'products', businessName = 'Vitrine', template = 'products-v1') {
+  const safeName = businessName && businessName.trim() ? businessName.trim() : 'Vitrine';
+  if (catalogType === 'booking') {
+    return {
+      components: {
+        name: true,
+        description: true,
+        photo: true,
+        price: true,
+        minQuantity: false,
+        quantitySelector: false,
+        durationMinutes: true
+      },
+      orderFields: {
+        date: true,
+        timeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
+        deliveryOrPickup: false,
+        customerName: true,
+        notes: true
+      },
+      messages: {
+        heroTitle: safeName,
+        welcomeText:
+          'Escolha o serviço desejado, selecione a data e o horário de preferência e confirme pelo WhatsApp.',
+        ctaLabel: 'Confirmar agendamento no WhatsApp',
+        whatsappTemplate:
+          'Olá! Meu nome é {nome}. Gostaria de agendar:\n{itens}\nData: {data} às {horario}\nTotal estimado: {total}'
+      }
+    };
+  }
+
+  if (catalogType === 'quote') {
+    return {
+      components: {
+        name: true,
+        description: true,
+        photo: true,
+        price: false,
+        minQuantity: false,
+        quantitySelector: true,
+        durationMinutes: false
+      },
+      orderFields: {
+        date: false,
+        timeSlots: [],
+        deliveryOrPickup: false,
+        customerName: true,
+        notes: true
+      },
+      messages: {
+        heroTitle: safeName,
+        welcomeText:
+          'Selecione os itens de seu interesse e envie sua solicitação de orçamento pelo WhatsApp.',
+        ctaLabel: 'Solicitar orçamento no WhatsApp',
+        whatsappTemplate:
+          'Olá! Meu nome é {nome}. Tenho interesse em solicitar orçamento para:\n{itens}'
+      }
+    };
+  }
+
+  return {
+    components: {
+      name: true,
+      description: true,
+      photo: template !== 'pizzeria-v1',
+      price: true,
+      minQuantity: false,
+      quantitySelector: true,
+      durationMinutes: false
+    },
+    orderFields: {
+      date: false,
+      timeSlots: [],
+      deliveryOrPickup: true,
+      customerName: true,
+      notes: true
+    },
+    messages: {
+      heroTitle: safeName,
+      welcomeText: 'Escolha seus itens abaixo, revise os dados do pedido e envie pelo WhatsApp.',
+      ctaLabel: 'Enviar pedido no WhatsApp',
+      whatsappTemplate:
+        template === 'pizzeria-v1'
+          ? 'Olá! Tenho interesse nestes produtos:\n{itens}\nTotal estimado: {total}'
+          : 'Olá! Meu nome é {nome}. Gostaria de pedir:\n{itens}\nTotal estimado: {total}\nRecebimento: {endereco}'
+    }
+  };
+}
+
+export function normalizeDraftForEditor(rawContent, site = {}) {
+  const cloned = rawContent && typeof rawContent === 'object' ? structuredClone(rawContent) : {};
+  const template = cloned.template || site?.template || 'products-v1';
+  const catalogType =
+    cloned.catalogType ||
+    (template === 'booking-v1' ? 'booking' : template === 'quote-v1' ? 'quote' : 'products');
+  const storefrontType = cloned.storefrontType || site?.storefrontType || 'food';
+  const businessName =
+    (typeof cloned.businessName === 'string' && cloned.businessName.trim()) ||
+    (typeof site?.name === 'string' && site.name.trim()) ||
+    'Vitrine';
+
+  const defaults = getCatalogDefaults(catalogType, businessName, template);
+  const categories = Array.isArray(cloned.categories) ? cloned.categories : [];
+
+  categories.forEach((cat, catIdx) => {
+    if (!cat.id) {
+      cat.id = `${slugifyCategoryId(cat.name, catIdx)}-${catIdx + 1}`;
+    }
+    if (!Array.isArray(cat.items)) {
+      cat.items = [];
+    }
+    cat.items.forEach((item, itemIdx) => {
+      if (!item.id) {
+        item.id = `item-${catIdx + 1}-${itemIdx + 1}`;
+      }
+      if (item.active === undefined) {
+        item.active = item.available !== false;
+      }
+    });
+  });
+
+  return {
+    schemaVersion: cloned.schemaVersion ?? 1,
+    ...cloned,
+    template,
+    storefrontType,
+    catalogType,
+    slug: cloned.slug || site?.slug || 'vitrine',
+    businessName,
+    whatsapp: cloned.whatsapp || '5511999999999',
+    components: {
+      ...defaults.components,
+      ...(cloned.components && typeof cloned.components === 'object' ? cloned.components : {}),
+      name: true
+    },
+    orderFields: {
+      ...defaults.orderFields,
+      ...(cloned.orderFields && typeof cloned.orderFields === 'object' ? cloned.orderFields : {}),
+      timeSlots: Array.isArray(cloned.orderFields?.timeSlots)
+        ? [...cloned.orderFields.timeSlots]
+        : [...defaults.orderFields.timeSlots]
+    },
+    messages: {
+      ...defaults.messages,
+      ...(cloned.messages && typeof cloned.messages === 'object' ? cloned.messages : {})
+    },
+    categories
+  };
+}
+
 export async function loadEditor(site, isOnline) {
   currentSite = site;
   currentIsOnline = isOnline;
   currentDraft = null;
-  conflictBanner.hidden = true;
-  if (publicationStatusBar) {
-    publicationStatusBar.hidden = true;
+  selectedCategoryForItems = null;
+  activePreviewRenderer = null;
+
+  if (conflictBanner) conflictBanner.hidden = true;
+  if (publicationStatusBar) publicationStatusBar.hidden = true;
+  if (csvPreviewContainer) csvPreviewContainer.hidden = true;
+
+  if (editorSiteTitle) editorSiteTitle.textContent = site.name;
+  if (editorSiteSlug) editorSiteSlug.textContent = `vitrine.inspira.dev.br/${site.slug}`;
+  if (editorOpenPublicLink) {
+    editorOpenPublicLink.href = isOnline ? `/${site.slug}` : '/loja1';
   }
 
-  editorSiteTitle.textContent = site.name;
-  editorSiteSlug.textContent = `vitrine.inspira.dev.br/${site.slug}`;
-
-  // Clear workspace and tabs
-  categoriesContainer.innerHTML = '<p class="loading-msg">Carregando cardápio...</p>';
-  setActiveTab('settings');
+  if (categoriesContainer) {
+    categoriesContainer.replaceChildren();
+    const loadingP = document.createElement('p');
+    loadingP.className = 'loading-msg';
+    loadingP.textContent = 'Carregando catálogo...';
+    categoriesContainer.appendChild(loadingP);
+  }
 
   if (isOnline) {
     try {
@@ -108,80 +270,49 @@ export async function loadEditor(site, isOnline) {
       if (res.ok) {
         const data = await res.json();
         currentDraft = data.draft;
+        currentDraft.content = normalizeDraftForEditor(currentDraft.content, site);
+        const initialTab =
+          currentDraft.content.categories.length > 0 ? 'items' : 'settings';
+        setActiveTab(initialTab);
         initializeEditorWorkspace();
       } else {
         showFeedback('Erro ao carregar o rascunho remoto.', 'error');
       }
-    } catch (err) {
+    } catch {
       showFeedback('Falha de rede ao buscar o rascunho.', 'error');
     }
   } else {
-    // Offline local storage draft lookup
     const saved = localStorage.getItem(`vitrine_local_draft_${site.id}`);
     if (saved) {
       currentDraft = JSON.parse(saved);
+      currentDraft.content = normalizeDraftForEditor(currentDraft.content, site);
     } else {
-      // Create empty fallback
       currentDraft = {
         siteId: site.id,
         revision: 1,
         updatedAt: new Date().toISOString(),
-        content: {
-          schemaVersion: 1,
-          template: "products-v1",
-          catalogType: "products",
-          slug: site.slug,
-          businessName: site.name,
-          whatsapp: "5511999999999",
-          components: {
-            name: true,
-            description: true,
-            photo: true,
-            price: true,
-            minQuantity: false,
-            quantitySelector: true,
-            durationMinutes: false
-          },
-          orderFields: {
-            date: false,
-            timeSlots: [],
-            deliveryOrPickup: true,
-            customerName: true,
-            notes: true
-          },
-          messages: {
-            heroTitle: site.name,
-            welcomeText: "Escolha seus itens abaixo, revise os dados do pedido e envie pelo WhatsApp.",
-            ctaLabel: "Enviar pedido no WhatsApp",
-            whatsappTemplate: "Olá! Tenho interesse nestes produtos:\n{itens}\nTotal estimado: {total}"
-          },
-          categories: []
-        }
+        content: normalizeDraftForEditor({}, site)
       };
       localStorage.setItem(`vitrine_local_draft_${site.id}`, JSON.stringify(currentDraft));
     }
+    const initialTab =
+      currentDraft.content.categories.length > 0 ? 'items' : 'settings';
+    setActiveTab(initialTab);
     initializeEditorWorkspace();
   }
 }
 
-// Set active tab
 function setActiveTab(tabId) {
-  const tabs = globalThis.document?.querySelectorAll('.tab-btn');
-  tabs.forEach(tab => {
-    if (tab.dataset.tab === tabId) {
-      tab.classList.add('active');
-    } else {
-      tab.classList.remove('active');
-    }
+  const tabs = globalThis.document?.querySelectorAll('.tab-btn') || [];
+  tabs.forEach((tab) => {
+    const isMatch = tab.dataset.tab === tabId;
+    tab.classList.toggle('active', isMatch);
+    tab.setAttribute('aria-selected', isMatch ? 'true' : 'false');
   });
 
-  const panes = globalThis.document?.querySelectorAll('.editor-tab-pane');
-  panes.forEach(pane => {
-    if (pane.id === `pane-${tabId}`) {
-      pane.hidden = false;
-    } else {
-      pane.hidden = true;
-    }
+  const panes = globalThis.document?.querySelectorAll('.editor-tab-pane') || [];
+  panes.forEach((pane) => {
+    pane.hidden = pane.id !== `pane-${tabId}`;
   });
 
   const controlsPane = globalThis.document?.querySelector('.editor-controls-pane');
@@ -197,17 +328,26 @@ function setActiveTab(tabId) {
     if (controlsPane) controlsPane.hidden = false;
     if (previewPane) {
       previewPane.classList.remove('mobile-active');
-      // preview stays visible on desktop via CSS grid
+      previewPane.hidden = false;
     }
   }
 }
 
-// Bind event listeners specific to the editor
-function setupEditorEvents() {
-  if (window.editorEventsBound) return;
-  window.editorEventsBound = true;
+function updateCsvModelLink() {
+  if (!csvDownloadPrimaryLink || !currentDraft) return;
+  const isBooking = currentDraft.content?.catalogType === 'booking';
+  const fileName = isBooking ? 'modelo-servicos.csv' : 'modelo-produtos.csv';
+  csvDownloadPrimaryLink.href = `./${fileName}`;
+  csvDownloadPrimaryLink.setAttribute('download', fileName);
+  csvDownloadPrimaryLink.textContent = isBooking
+    ? 'Baixar modelo (serviços)'
+    : 'Baixar modelo (produtos)';
+}
 
-  // Tabs events
+function setupEditorEvents() {
+  if (globalThis.editorEventsBound) return;
+  globalThis.editorEventsBound = true;
+
   const tabSelector = globalThis.document?.querySelector('.editor-tabs-selector');
   tabSelector?.addEventListener('click', (e) => {
     const tabBtn = e.target.closest('.tab-btn');
@@ -216,15 +356,13 @@ function setupEditorEvents() {
     }
   });
 
-  saveDraftButton.addEventListener('click', async () => {
+  saveDraftButton?.addEventListener('click', async () => {
     await handleSaveDraft();
   });
 
-  if (publishSiteButton) {
-    publishSiteButton.addEventListener('click', async () => {
-      await handlePublishSite();
-    });
-  }
+  publishSiteButton?.addEventListener('click', async () => {
+    await handlePublishSite();
+  });
 
   if (editorSettingsForm) {
     editorSettingsForm.addEventListener('submit', (e) => {
@@ -238,101 +376,106 @@ function setupEditorEvents() {
     });
   }
 
-  addCategoryButton.addEventListener('click', () => {
+  addCategoryButton?.addEventListener('click', () => {
     addCategory();
   });
 
-  addItemButton.addEventListener('click', () => {
+  addItemButton?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
+      addCategory('Geral');
+    }
     addItem();
   });
 
-  editorCategorySelect.addEventListener('change', () => {
+  editorCategorySelect?.addEventListener('change', () => {
     selectedCategoryForItems = editorCategorySelect.value;
     renderItems();
   });
 
-  editorWhatsapp.addEventListener('input', () => {
-    const rawPhone = editorWhatsapp.value.replace(/\D/g, ''); // allow only digits
-    editorWhatsapp.value = rawPhone;
-    
-    if (rawPhone && !/^[1-9]\d{7,14}$/.test(rawPhone)) {
-      editorWhatsappError.hidden = false;
-    } else {
-      editorWhatsappError.hidden = true;
+  editorBusinessName?.addEventListener('input', () => {
+    if (!currentDraft) return;
+    currentDraft.content.businessName = editorBusinessName.value;
+    if (editorSiteTitle && editorBusinessName.value.trim()) {
+      editorSiteTitle.textContent = editorBusinessName.value.trim();
     }
     updateDraftAndPreview();
   });
 
-  // Handle components changes
-  [compDescription, compPhoto, compPrice, compMinQuantity, compQuantitySelector, compDuration].forEach(checkbox => {
-    checkbox.addEventListener('change', () => {
-      syncComponentsFromUI();
-      updateDraftAndPreview();
-    });
+  editorWhatsapp?.addEventListener('input', () => {
+    if (!currentDraft) return;
+    const rawPhone = editorWhatsapp.value.replace(/\D/g, '');
+    editorWhatsapp.value = rawPhone;
+    currentDraft.content.whatsapp = rawPhone;
+
+    if (editorWhatsappError) {
+      editorWhatsappError.hidden = !(rawPhone && !/^[1-9]\d{7,14}$/.test(rawPhone));
+    }
+    updateDraftAndPreview();
   });
 
-  // Handle order fields and custom messages
-  [fieldDate, fieldDeliveryPickup, fieldNotes].forEach(checkbox => {
-    checkbox.addEventListener('change', () => {
+  [compDescription, compPhoto, compPrice, compMinQuantity, compQuantitySelector, compDuration].forEach(
+    (checkbox) => {
+      checkbox?.addEventListener('change', () => {
+        syncComponentsFromUI();
+        renderItems();
+        updateDraftAndPreview();
+      });
+    }
+  );
+
+  [fieldCustName, fieldDate, fieldDeliveryPickup, fieldNotes].forEach((checkbox) => {
+    checkbox?.addEventListener('change', () => {
       syncOrderFieldsFromUI();
       updateDraftAndPreview();
     });
   });
 
-  editorCatalogType.addEventListener('change', () => {
-    currentDraft.content.catalogType = editorCatalogType.value;
-    // Set matching template
-    currentDraft.content.template = 
-      editorCatalogType.value === 'booking' ? 'booking-v1' :
-      editorCatalogType.value === 'quote' ? 'quote-v1' : 'products-v1';
-    
-    // Auto populate default components, orderFields and messages
+  editorCatalogType?.addEventListener('change', () => {
+    if (!currentDraft) return;
+    const nextType = editorCatalogType.value;
+    currentDraft.content.catalogType = nextType;
+    currentDraft.content.template =
+      nextType === 'booking' ? 'booking-v1' : nextType === 'quote' ? 'quote-v1' : 'products-v1';
     syncCatalogTypeDefaults();
     updateDraftAndPreview();
   });
 
-  editorTimeslots.addEventListener('input', () => {
-    const lines = editorTimeslots.value.split('\n')
-      .map(line => line.trim())
-      .filter(line => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(line)); // valid HH:MM
+  editorTimeslots?.addEventListener('input', () => {
+    if (!currentDraft) return;
+    const lines = editorTimeslots.value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^([01]\d|2[0-3]):[0-5]\d$/.test(line))
+      .slice(0, 24);
     currentDraft.content.orderFields.timeSlots = lines;
     updateDraftAndPreview();
   });
 
-  [editorHeroTitle, editorWelcomeText, editorCtaLabel, editorWhatsappTemplate].forEach(input => {
-    input.addEventListener('input', () => {
+  [editorHeroTitle, editorWelcomeText, editorCtaLabel, editorWhatsappTemplate].forEach((input) => {
+    input?.addEventListener('input', () => {
       syncMessagesFromUI();
       updateDraftAndPreview();
     });
   });
 
-  // Conflict actions
-  reloadConflictButton.addEventListener('click', async () => {
-    conflictBanner.hidden = true;
+  reloadConflictButton?.addEventListener('click', async () => {
+    if (conflictBanner) conflictBanner.hidden = true;
     await loadEditor(currentSite, currentIsOnline);
   });
 
-  copyConflictButton.addEventListener('click', async () => {
+  copyConflictButton?.addEventListener('click', async () => {
     try {
       const serialized = JSON.stringify(currentDraft.content, null, 2);
       await navigator.clipboard.writeText(serialized);
-      showFeedback('Conteúdo do rascunho copiado para a área de transferência!', 'success');
-    } catch (err) {
+      showFeedback('Conteúdo do rascunho copiado para a área de transferência.', 'success');
+    } catch {
       showFeedback('Erro ao copiar rascunho local.', 'error');
     }
   });
 
-  // CSV dropdown model trigger (Fix AUD-005)
-  csvDownloadModelsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    csvModelsDropdownMenu.hidden = !csvModelsDropdownMenu.hidden;
-  });
-
-  globalThis.document?.addEventListener('click', () => {
-    if (csvModelsDropdownMenu) csvModelsDropdownMenu.hidden = true;
-  });
-
-  csvExportBtn.addEventListener('click', () => {
+  csvExportBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
     const csvContent = exportCatalogToCSV(currentDraft.content);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -342,91 +485,148 @@ function setupEditorEvents() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   });
 
-  csvUploadBtn.addEventListener('click', () => {
-    csvFileInput.click();
+  csvUploadBtn?.addEventListener('click', () => {
+    csvFileInput?.click();
   });
 
-  csvFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  csvCancelBtn?.addEventListener('click', () => {
+    if (csvFileInput) csvFileInput.value = '';
+    if (csvPreviewContainer) csvPreviewContainer.hidden = true;
+  });
 
-    csvFileName.textContent = file.name;
+  csvFileInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentDraft) return;
+
+    if (csvFileName) {
+      csvFileName.textContent = `Arquivo: ${file.name}`;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target.result;
-      const result = parseImportCatalogCSV(text, currentDraft.content.catalogType);
-      
-      csvPreviewContainer.hidden = false;
-      csvSummaryText.textContent = `${result.summary.validCount} linhas válidas encontradas.`;
-      
-      if (result.errors.length > 0) {
-        csvErrorsList.hidden = false;
-        csvErrorsList.innerHTML = '<h5>Erros encontrados:</h5>' + 
-          result.errors.map(err => `<div class="csv-error-item">${err}</div>`).join('');
-      } else {
-        csvErrorsList.hidden = true;
-        csvErrorsList.innerHTML = '';
+      const text = String(event.target?.result || '');
+      const result = parseImportCatalogCSV(
+        text,
+        currentDraft.content.catalogType,
+        currentDraft.content
+      );
+
+      if (csvPreviewContainer) csvPreviewContainer.hidden = false;
+      if (csvSummaryText) {
+        csvSummaryText.textContent = `${result.summary.validCount} válidas · ${result.summary.errorCount} com erro`;
       }
 
-      // Store results inside the button to read when confirmed
-      csvApplyBtn.onclick = () => {
-        const mode = document.querySelector('input[name="csv-import-mode"]:checked').value;
-        const updatedContent = applyCSVToCatalog(currentDraft.content, result.validRows, mode);
-        
-        currentDraft.content = updatedContent;
-        initializeEditorWorkspace();
-        showFeedback('Planilha aplicada ao rascunho com sucesso! Salve para registrar.', 'success');
-        
-        // Reset file input
-        csvFileInput.value = '';
-        csvFileName.textContent = 'Nenhum arquivo selecionado';
-        csvPreviewContainer.hidden = true;
-      };
+      if (csvErrorsList) {
+        csvErrorsList.replaceChildren();
+        if (result.errors.length > 0) {
+          csvErrorsList.hidden = false;
+          const heading = document.createElement('h4');
+          heading.textContent = 'Ajustes necessários na planilha:';
+          csvErrorsList.appendChild(heading);
+
+          result.errors.forEach((err) => {
+            const rowErr = document.createElement('div');
+            rowErr.className = 'csv-error-item';
+            rowErr.textContent = err;
+            csvErrorsList.appendChild(rowErr);
+          });
+        } else {
+          csvErrorsList.hidden = true;
+        }
+      }
+
+      if (csvApplyBtn) {
+        csvApplyBtn.disabled = result.validRows.length === 0;
+        csvApplyBtn.onclick = () => {
+          const selectedMode =
+            document.querySelector('input[name="csv-import-mode"]:checked')?.value || 'merge';
+          const candidateContent = applyCSVToCatalog(
+            currentDraft.content,
+            result.validRows,
+            selectedMode
+          );
+
+          const limitCheck = validateCatalogLimits(candidateContent);
+          if (!limitCheck.ok) {
+            showFeedback(limitCheck.message, 'error');
+            return;
+          }
+
+          currentDraft.content = candidateContent;
+          selectedCategoryForItems = candidateContent.categories[0]?.id || null;
+          initializeEditorWorkspace();
+          showFeedback(
+            `Importação aplicada ao rascunho (${result.validRows.length} itens processados). Clique em Salvar Rascunho para gravar.`,
+            'success'
+          );
+
+          csvFileInput.value = '';
+          if (csvPreviewContainer) csvPreviewContainer.hidden = true;
+        };
+      }
     };
     reader.readAsText(file, 'UTF-8');
   });
 }
 
-// Initial paint
 function initializeEditorWorkspace() {
   setupEditorEvents();
 
-  editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-  
-  // Fill settings
-  editorWhatsapp.value = currentDraft.content.whatsapp || '';
-  editorWhatsappError.hidden = true;
-  editorCatalogType.value = currentDraft.content.catalogType || 'products';
+  if (editorRevisionIndicator) {
+    editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+  }
+  if (editorBusinessName) {
+    editorBusinessName.value = currentDraft.content.businessName || '';
+  }
+  if (editorWhatsapp) {
+    editorWhatsapp.value = currentDraft.content.whatsapp || '';
+  }
+  if (editorWhatsappError) {
+    editorWhatsappError.hidden = true;
+  }
+  if (editorCatalogType) {
+    editorCatalogType.value = currentDraft.content.catalogType || 'products';
+  }
 
-  // Toggle visible checkboxes
   const comp = currentDraft.content.components || {};
-  compDescription.checked = comp.description !== false;
-  compPhoto.checked = comp.photo !== false;
-  compPrice.checked = comp.price !== false;
-  compMinQuantity.checked = comp.minQuantity !== false;
-  compQuantitySelector.checked = comp.quantitySelector !== false;
-  compDuration.checked = comp.durationMinutes !== false;
+  if (compDescription) compDescription.checked = comp.description !== false;
+  if (compPhoto) compPhoto.checked = comp.photo !== false;
+  if (compPrice) compPrice.checked = comp.price !== false;
+  if (compMinQuantity) compMinQuantity.checked = Boolean(comp.minQuantity);
+  if (compQuantitySelector) compQuantitySelector.checked = comp.quantitySelector !== false;
+  if (compDuration) compDuration.checked = Boolean(comp.durationMinutes);
 
-  // Toggle visible order fields
   const fields = currentDraft.content.orderFields || {};
-  fieldDate.checked = fields.date !== false;
-  fieldDeliveryPickup.checked = fields.deliveryOrPickup !== false;
-  fieldNotes.checked = fields.notes !== false;
-  
-  editorTimeslots.value = (fields.timeSlots || []).join('\n');
-  timeslotsConfigGroup.hidden = currentDraft.content.catalogType !== 'booking';
+  if (fieldCustName) fieldCustName.checked = fields.customerName !== false;
+  if (fieldDate) fieldDate.checked = Boolean(fields.date);
+  if (fieldDeliveryPickup) fieldDeliveryPickup.checked = Boolean(fields.deliveryOrPickup);
+  if (fieldNotes) fieldNotes.checked = fields.notes !== false;
 
-  // Custom texts
+  if (editorTimeslots) {
+    editorTimeslots.value = (fields.timeSlots || []).join('\n');
+  }
+  if (timeslotsConfigGroup) {
+    timeslotsConfigGroup.hidden = false;
+  }
+
   const msgs = currentDraft.content.messages || {};
-  editorHeroTitle.value = msgs.heroTitle || currentDraft.content.businessName || '';
-  editorWelcomeText.value = msgs.welcomeText || '';
-  editorCtaLabel.value = msgs.ctaLabel || '';
-  editorWhatsappTemplate.value = msgs.whatsappTemplate || '';
+  if (editorHeroTitle) {
+    editorHeroTitle.value = msgs.heroTitle || currentDraft.content.businessName || '';
+  }
+  if (editorWelcomeText) {
+    editorWelcomeText.value = msgs.welcomeText || '';
+  }
+  if (editorCtaLabel) {
+    editorCtaLabel.value = msgs.ctaLabel || '';
+  }
+  if (editorWhatsappTemplate) {
+    editorWhatsappTemplate.value = msgs.whatsappTemplate || '';
+  }
 
-  // Sync category select dropdown
+  updateCsvModelLink();
   populateCategorySelect();
   renderCategories();
   renderItems();
@@ -435,81 +635,57 @@ function initializeEditorWorkspace() {
 
 function syncCatalogTypeDefaults() {
   const catType = currentDraft.content.catalogType;
-  
-  // Pre fill components default toggles
-  if (catType === 'booking') {
-    currentDraft.content.components = { name: true, description: true, photo: true, price: true, minQuantity: false, quantitySelector: false, durationMinutes: true };
-    currentDraft.content.orderFields = { date: true, timeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'], deliveryOrPickup: false, customerName: true, notes: true };
-    currentDraft.content.messages = {
-      heroTitle: currentDraft.content.businessName,
-      welcomeText: "Escolha o serviço desejado, selecione a data e o horário de preferência e confirme pelo WhatsApp.",
-      ctaLabel: "Confirmar agendamento no WhatsApp",
-      whatsappTemplate: "Olá! Meu nome é {nome}. Gostaria de agendar:\n{itens}\nData: {data} às {horario}\nTotal estimado: {total}"
-    };
-  } else if (catType === 'quote') {
-    currentDraft.content.components = { name: true, description: true, photo: true, price: false, minQuantity: false, quantitySelector: true, durationMinutes: false };
-    currentDraft.content.orderFields = { date: false, timeSlots: [], deliveryOrPickup: false, customerName: true, notes: true };
-    currentDraft.content.messages = {
-      heroTitle: currentDraft.content.businessName,
-      welcomeText: "Selecione os itens de seu interesse e envie sua solicitação de orçamento pelo WhatsApp.",
-      ctaLabel: "Solicitar orçamento no WhatsApp",
-      whatsappTemplate: "Olá! Meu nome é {nome}. Tenho interesse em solicitar orçamento para:\n{itens}"
-    };
-  } else {
-    currentDraft.content.components = { name: true, description: true, photo: true, price: true, minQuantity: false, quantitySelector: true, durationMinutes: false };
-    currentDraft.content.orderFields = { date: false, timeSlots: [], deliveryOrPickup: true, customerName: true, notes: true };
-    currentDraft.content.messages = {
-      heroTitle: currentDraft.content.businessName,
-      welcomeText: "Escolha seus itens abaixo, revise os dados do pedido e envie pelo WhatsApp.",
-      ctaLabel: "Enviar pedido no WhatsApp",
-      whatsappTemplate: "Olá! Tenho interesse nestes produtos:\n{itens}\nTotal estimado: {total}"
-    };
-  }
-
-  // Reload the form configs from the newly assigned draft content
+  const defaults = getCatalogDefaults(
+    catType,
+    currentDraft.content.businessName,
+    currentDraft.content.template
+  );
+  currentDraft.content.components = defaults.components;
+  currentDraft.content.orderFields = defaults.orderFields;
+  currentDraft.content.messages = defaults.messages;
   initializeEditorWorkspace();
 }
 
 function syncComponentsFromUI() {
   currentDraft.content.components = {
     name: true,
-    description: compDescription.checked,
-    photo: compPhoto.checked,
-    price: compPrice.checked,
-    minQuantity: compMinQuantity.checked,
-    quantitySelector: compQuantitySelector.checked,
-    durationMinutes: compDuration.checked
+    description: Boolean(compDescription?.checked),
+    photo: Boolean(compPhoto?.checked),
+    price: Boolean(compPrice?.checked),
+    minQuantity: Boolean(compMinQuantity?.checked),
+    quantitySelector: Boolean(compQuantitySelector?.checked),
+    durationMinutes: Boolean(compDuration?.checked)
   };
 }
 
 function syncOrderFieldsFromUI() {
   currentDraft.content.orderFields = {
-    date: fieldDate.checked,
-    timeSlots: currentDraft.content.orderFields.timeSlots || [],
-    deliveryOrPickup: fieldDeliveryPickup.checked,
-    customerName: true,
-    notes: fieldNotes.checked
+    date: Boolean(fieldDate?.checked),
+    timeSlots: currentDraft.content.orderFields?.timeSlots || [],
+    deliveryOrPickup: Boolean(fieldDeliveryPickup?.checked),
+    customerName: Boolean(fieldCustName?.checked),
+    notes: Boolean(fieldNotes?.checked)
   };
 }
 
 function syncMessagesFromUI() {
   currentDraft.content.messages = {
-    heroTitle: editorHeroTitle.value,
-    welcomeText: editorWelcomeText.value,
-    ctaLabel: editorCtaLabel.value,
-    whatsappTemplate: editorWhatsappTemplate.value
+    heroTitle: editorHeroTitle?.value || currentDraft.content.businessName || 'Vitrine',
+    welcomeText: editorWelcomeText?.value || '',
+    ctaLabel: editorCtaLabel?.value || '',
+    whatsappTemplate: editorWhatsappTemplate?.value || ''
   };
 }
 
-// Populate category dropdown select in Items panel
 function populateCategorySelect() {
-  editorCategorySelect.innerHTML = '';
+  if (!editorCategorySelect) return;
+  editorCategorySelect.replaceChildren();
   const categories = currentDraft.content.categories || [];
-  
+
   if (categories.length === 0) {
     const opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = 'Nenhuma categoria cadastrada';
+    opt.textContent = 'Nenhuma categoria criada';
     editorCategorySelect.appendChild(opt);
     selectedCategoryForItems = null;
     return;
@@ -518,45 +694,47 @@ function populateCategorySelect() {
   categories.forEach((cat, idx) => {
     const opt = document.createElement('option');
     opt.value = cat.id;
-    opt.textContent = cat.name || `Categoria sem nome ${idx + 1}`;
+    opt.textContent = cat.name || `Categoria ${idx + 1}`;
     editorCategorySelect.appendChild(opt);
   });
 
-  if (!selectedCategoryForItems || !categories.some(c => c.id === selectedCategoryForItems)) {
+  if (!selectedCategoryForItems || !categories.some((c) => c.id === selectedCategoryForItems)) {
     selectedCategoryForItems = categories[0].id;
   }
   editorCategorySelect.value = selectedCategoryForItems;
 }
 
-// Render categories pane (T011)
 function renderCategories() {
-  categoriesContainer.innerHTML = '';
+  if (!categoriesContainer) return;
+  categoriesContainer.replaceChildren();
   const categories = currentDraft.content.categories || [];
 
   if (categories.length === 0) {
-    categoriesContainer.innerHTML = '<p class="empty-msg">Nenhuma categoria cadastrada. Clique em "+ Categoria" para começar.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = 'Nenhuma categoria cadastrada. Clique em "+ Categoria" para começar.';
+    categoriesContainer.appendChild(empty);
     return;
   }
 
   categories.forEach((category, catIndex) => {
     const block = document.createElement('div');
     block.className = 'category-block';
-    block.dataset.index = catIndex;
+    block.dataset.index = String(catIndex);
 
     const labelGroup = document.createElement('div');
     labelGroup.className = 'form-group';
 
-    // Accessible Label (Fix AUD-007)
     const label = document.createElement('label');
     label.setAttribute('for', `cat-input-${category.id}`);
-    label.textContent = `Nome da Categoria ${catIndex + 1}`;
+    label.textContent = `Nome da categoria ${catIndex + 1}`;
 
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.id = `cat-input-${category.id}`;
     titleInput.className = 'category-title-input input-styled-height';
     titleInput.value = category.name || '';
-    titleInput.placeholder = 'Ex: Pizzas Clássicas';
+    titleInput.placeholder = 'Ex: Pizzas Artesanais';
     titleInput.addEventListener('input', () => {
       category.name = titleInput.value;
       populateCategorySelect();
@@ -569,11 +747,24 @@ function renderCategories() {
     const controls = document.createElement('div');
     controls.className = 'category-controls';
 
+    const editItemsBtn = document.createElement('button');
+    editItemsBtn.type = 'button';
+    editItemsBtn.className = 'button button-small button-secondary button-pill';
+    const itemLen = Array.isArray(category.items) ? category.items.length : 0;
+    editItemsBtn.textContent = `Ver itens (${itemLen})`;
+    editItemsBtn.addEventListener('click', () => {
+      selectedCategoryForItems = category.id;
+      populateCategorySelect();
+      renderItems();
+      setActiveTab('items');
+    });
+
     const moveUpBtn = document.createElement('button');
     moveUpBtn.type = 'button';
     moveUpBtn.className = 'button button-small button-secondary button-pill';
-    moveUpBtn.textContent = '▲ Sobe';
+    moveUpBtn.textContent = 'Subir';
     moveUpBtn.disabled = catIndex === 0;
+    moveUpBtn.setAttribute('aria-label', `Mover categoria ${category.name || catIndex + 1} para cima`);
     moveUpBtn.addEventListener('click', () => {
       moveCategory(catIndex, -1);
     });
@@ -581,8 +772,9 @@ function renderCategories() {
     const moveDownBtn = document.createElement('button');
     moveDownBtn.type = 'button';
     moveDownBtn.className = 'button button-small button-secondary button-pill';
-    moveDownBtn.textContent = '▼ Desce';
+    moveDownBtn.textContent = 'Descer';
     moveDownBtn.disabled = catIndex === categories.length - 1;
+    moveDownBtn.setAttribute('aria-label', `Mover categoria ${category.name || catIndex + 1} para baixo`);
     moveDownBtn.addEventListener('click', () => {
       moveCategory(catIndex, 1);
     });
@@ -591,15 +783,21 @@ function renderCategories() {
     deleteCatBtn.type = 'button';
     deleteCatBtn.className = 'button button-small button-secondary button-pill';
     deleteCatBtn.textContent = 'Excluir';
+    deleteCatBtn.setAttribute('aria-label', `Excluir categoria ${category.name || catIndex + 1}`);
     deleteCatBtn.addEventListener('click', () => {
       if (category.items && category.items.length > 0) {
-        if (!confirm(`Deseja mesmo excluir a categoria "${category.name}" e todos os seus ${category.items.length} itens?`)) {
+        if (
+          !confirm(
+            `Deseja excluir a categoria "${category.name || 'sem nome'}" e seus ${category.items.length} itens?`
+          )
+        ) {
           return;
         }
       }
       deleteCategory(catIndex);
     });
 
+    controls.appendChild(editItemsBtn);
     controls.appendChild(moveUpBtn);
     controls.appendChild(moveDownBtn);
     controls.appendChild(deleteCatBtn);
@@ -610,21 +808,33 @@ function renderCategories() {
   });
 }
 
-// Render items pane for chosen category
 function renderItems() {
-  itemsContainer.innerHTML = '';
+  if (!itemsContainer) return;
+  itemsContainer.replaceChildren();
+
   if (!selectedCategoryForItems) {
-    itemsContainer.innerHTML = '<p class="empty-msg">Cadastre uma categoria na aba anterior para adicionar itens.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = 'Clique em "+ Adicionar Item" ou importe uma planilha CSV para começar.';
+    itemsContainer.appendChild(empty);
     return;
   }
 
-  const category = (currentDraft.content.categories || []).find(c => c.id === selectedCategoryForItems);
+  const category = (currentDraft.content.categories || []).find(
+    (c) => c.id === selectedCategoryForItems
+  );
   if (!category) return;
 
   if (!category.items || category.items.length === 0) {
-    itemsContainer.innerHTML = '<p class="empty-msg">Nenhum item nesta categoria. Clique em "+ Adicionar Item".</p>';
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = 'Nenhum item nesta categoria. Clique em "+ Adicionar Item".';
+    itemsContainer.appendChild(empty);
     return;
   }
+
+  const comp = currentDraft.content.components || {};
+  const isQuote = currentDraft.content.catalogType === 'quote';
 
   category.items.forEach((item, itemIdx) => {
     const card = document.createElement('div');
@@ -633,12 +843,11 @@ function renderItems() {
     const fields = document.createElement('div');
     fields.className = 'item-fields';
 
-    // Item name with label (Fix AUD-007)
     const gName = document.createElement('div');
     gName.className = 'form-group';
     const lName = document.createElement('label');
     lName.setAttribute('for', `item-name-${item.id}`);
-    lName.textContent = 'Nome do Item (obrigatório)';
+    lName.textContent = 'Nome do item';
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.id = `item-name-${item.id}`;
@@ -651,126 +860,66 @@ function renderItems() {
     });
     gName.appendChild(lName);
     gName.appendChild(nameInput);
-
-    // Item Price with label (Fix AUD-007)
-    const gPrice = document.createElement('div');
-    gPrice.className = 'form-group';
-    const lPrice = document.createElement('label');
-    lPrice.setAttribute('for', `item-price-${item.id}`);
-    lPrice.textContent = 'Preço (BRL)';
-    const priceInput = document.createElement('input');
-    priceInput.type = 'text';
-    priceInput.id = `item-price-${item.id}`;
-    priceInput.className = 'item-input input-styled-height';
-    priceInput.placeholder = 'Ex: R$ 48,00';
-    priceInput.value = item.priceCents ? formatCentsToReais(item.priceCents) : '';
-    priceInput.addEventListener('input', () => {
-      maskMoneyInput(priceInput);
-      item.priceCents = parseReaisToCents(priceInput.value);
-      updateDraftAndPreview();
-    });
-    gPrice.appendChild(lPrice);
-    gPrice.appendChild(priceInput);
-
-    // Item description with label
-    const gDesc = document.createElement('div');
-    gDesc.className = 'form-group item-fields-full';
-    const lDesc = document.createElement('label');
-    lDesc.setAttribute('for', `item-desc-${item.id}`);
-    lDesc.textContent = 'Descrição do Item (opcional)';
-    const descInput = document.createElement('input');
-    descInput.type = 'text';
-    descInput.id = `item-desc-${item.id}`;
-    descInput.className = 'item-input input-styled-height';
-    descInput.value = item.description || '';
-    descInput.placeholder = 'Ex: Molho de tomate, muçarela...';
-    descInput.addEventListener('input', () => {
-      item.description = descInput.value;
-      updateDraftAndPreview();
-    });
-    gDesc.appendChild(lDesc);
-    gDesc.appendChild(descInput);
-
     fields.appendChild(gName);
-    fields.appendChild(gPrice);
-    fields.appendChild(gDesc);
 
-    // Photo/Image Upload block (T019)
-    if (currentDraft.content.components?.photo) {
-      const gPhoto = document.createElement('div');
-      gPhoto.className = 'form-group item-fields-full';
-      
-      const lPhoto = document.createElement('label');
-      lPhoto.textContent = 'Foto do Item (redimensionada automaticamente para WebP)';
-      gPhoto.appendChild(lPhoto);
-
-      const fileGroup = document.createElement('div');
-      fileGroup.className = 'file-upload-group';
-
-      const fileInp = document.createElement('input');
-      fileInp.type = 'file';
-      fileInp.accept = 'image/*';
-      fileInp.className = 'file-input-hidden';
-
-      const uploadBtn = document.createElement('button');
-      uploadBtn.type = 'button';
-      uploadBtn.className = 'button button-small button-secondary button-pill';
-      uploadBtn.textContent = item.imageUrl ? 'Alterar Foto' : 'Adicionar Foto';
-      uploadBtn.addEventListener('click', () => fileInp.click());
-
-      const statusSpan = document.createElement('span');
-      statusSpan.className = 'upload-status-text';
-      statusSpan.textContent = item.imageUrl ? '✓ Foto configurada' : 'Sem foto cadastrada';
-
-      fileInp.addEventListener('change', async () => {
-        const file = fileInp.files[0];
-        if (!file) return;
-
-        statusSpan.textContent = 'Processando imagem...';
-        try {
-          const webpBlob = await resizeAndConvertToWebP(file);
-          
-          if (currentIsOnline) {
-            statusSpan.textContent = 'Enviando para o servidor...';
-            const uploadedUrl = await uploadImageToSupabaseStorage(webpBlob, item.id);
-            item.imageUrl = uploadedUrl;
-            statusSpan.textContent = '✓ Upload concluído!';
-          } else {
-            // Offline mode blob preview
-            item.imageUrl = URL.createObjectURL(webpBlob);
-            statusSpan.textContent = '✓ Imagem configurada offline!';
-          }
-          
-          updateDraftAndPreview();
-        } catch (err) {
-          statusSpan.textContent = '❌ Erro no processamento.';
-          showFeedback('Erro ao processar/upload da imagem.', 'error');
-        }
+    if (comp.price !== false) {
+      const gPrice = document.createElement('div');
+      gPrice.className = 'form-group';
+      const lPrice = document.createElement('label');
+      lPrice.setAttribute('for', `item-price-${item.id}`);
+      lPrice.textContent = isQuote ? 'Preço (opcional no orçamento)' : 'Preço (BRL)';
+      const priceInput = document.createElement('input');
+      priceInput.type = 'text';
+      priceInput.id = `item-price-${item.id}`;
+      priceInput.className = 'item-input input-styled-height';
+      priceInput.placeholder = isQuote ? 'Opcional (ex: R$ 48,00)' : 'Ex: R$ 48,00';
+      priceInput.value = item.priceCents ? formatCentsToReais(item.priceCents) : '';
+      priceInput.addEventListener('input', () => {
+        maskMoneyInput(priceInput);
+        item.priceCents = parseReaisToCents(priceInput.value);
+        updateDraftAndPreview();
       });
-
-      fileGroup.appendChild(fileInp);
-      fileGroup.appendChild(uploadBtn);
-      fileGroup.appendChild(statusSpan);
-      gPhoto.appendChild(fileGroup);
-      fields.appendChild(gPhoto);
+      gPrice.appendChild(lPrice);
+      gPrice.appendChild(priceInput);
+      fields.appendChild(gPrice);
     }
 
-    // Min Quantity and Duration fields (depending on checkboxes)
-    if (currentDraft.content.components?.minQuantity) {
+    if (comp.description !== false) {
+      const gDesc = document.createElement('div');
+      gDesc.className = 'form-group item-fields-full';
+      const lDesc = document.createElement('label');
+      lDesc.setAttribute('for', `item-desc-${item.id}`);
+      lDesc.textContent = 'Descrição';
+      const descInput = document.createElement('input');
+      descInput.type = 'text';
+      descInput.id = `item-desc-${item.id}`;
+      descInput.className = 'item-input input-styled-height';
+      descInput.value = item.description || '';
+      descInput.placeholder = 'Ex: Molho de tomate San Marzano, muçarela fresca e manjericão.';
+      descInput.addEventListener('input', () => {
+        item.description = descInput.value;
+        updateDraftAndPreview();
+      });
+      gDesc.appendChild(lDesc);
+      gDesc.appendChild(descInput);
+      fields.appendChild(gDesc);
+    }
+
+    if (comp.minQuantity) {
       const gMin = document.createElement('div');
       gMin.className = 'form-group';
       const lMin = document.createElement('label');
       lMin.setAttribute('for', `item-min-${item.id}`);
-      lMin.textContent = 'Quantidade Mínima';
+      lMin.textContent = 'Quantidade mínima';
       const minInput = document.createElement('input');
       minInput.type = 'number';
       minInput.id = `item-min-${item.id}`;
       minInput.className = 'item-input input-styled-height';
       minInput.min = '1';
       minInput.max = '99';
-      minInput.value = item.minQuantity || 1;
+      minInput.value = String(item.minQuantity || 1);
       minInput.addEventListener('input', () => {
-        item.minQuantity = parseInt(minInput.value, 10) || 1;
+        item.minQuantity = Math.max(1, Math.min(99, parseInt(minInput.value, 10) || 1));
         updateDraftAndPreview();
       });
       gMin.appendChild(lMin);
@@ -778,7 +927,7 @@ function renderItems() {
       fields.appendChild(gMin);
     }
 
-    if (currentDraft.content.components?.durationMinutes) {
+    if (comp.durationMinutes) {
       const gDur = document.createElement('div');
       gDur.className = 'form-group';
       const lDur = document.createElement('label');
@@ -790,9 +939,9 @@ function renderItems() {
       durInput.className = 'item-input input-styled-height';
       durInput.min = '5';
       durInput.max = '480';
-      durInput.value = item.durationMinutes || 30;
+      durInput.value = String(item.durationMinutes || 30);
       durInput.addEventListener('input', () => {
-        item.durationMinutes = parseInt(durInput.value, 10) || 30;
+        item.durationMinutes = Math.max(5, Math.min(480, parseInt(durInput.value, 10) || 30));
         updateDraftAndPreview();
       });
       gDur.appendChild(lDur);
@@ -800,30 +949,110 @@ function renderItems() {
       fields.appendChild(gDur);
     }
 
+    if (comp.photo) {
+      const gPhoto = document.createElement('div');
+      gPhoto.className = 'form-group item-fields-full';
+
+      const fileInputId = `item-photo-file-${item.id}`;
+      const lPhoto = document.createElement('label');
+      lPhoto.setAttribute('for', fileInputId);
+      lPhoto.textContent = 'Foto do item (convertida no navegador para WebP até 200 KB)';
+      gPhoto.appendChild(lPhoto);
+
+      const fileGroup = document.createElement('div');
+      fileGroup.className = 'file-upload-group';
+
+      const fileInp = document.createElement('input');
+      fileInp.type = 'file';
+      fileInp.id = fileInputId;
+      fileInp.accept = 'image/*';
+      fileInp.className = 'file-input-hidden';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.type = 'button';
+      uploadBtn.className = 'button button-small button-secondary button-pill';
+      uploadBtn.textContent = item.imageUrl ? 'Trocar foto' : 'Enviar foto';
+      uploadBtn.addEventListener('click', () => fileInp.click());
+
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'upload-status-text';
+      statusSpan.textContent = item.imageUrl ? 'Foto vinculada ao item' : 'Sem foto';
+
+      fileGroup.appendChild(fileInp);
+      fileGroup.appendChild(uploadBtn);
+
+      if (item.imageUrl) {
+        const clearPhotoBtn = document.createElement('button');
+        clearPhotoBtn.type = 'button';
+        clearPhotoBtn.className = 'button button-small button-secondary button-pill';
+        clearPhotoBtn.textContent = 'Remover foto';
+        clearPhotoBtn.addEventListener('click', () => {
+          delete item.imageUrl;
+          renderItems();
+          updateDraftAndPreview();
+        });
+        fileGroup.appendChild(clearPhotoBtn);
+      }
+
+      fileGroup.appendChild(statusSpan);
+
+      fileInp.addEventListener('change', async () => {
+        const file = fileInp.files?.[0];
+        if (!file) return;
+
+        statusSpan.textContent = 'Convertendo para WebP...';
+        try {
+          const webpBlob = await resizeAndConvertToWebP(file);
+          if (currentIsOnline) {
+            statusSpan.textContent = 'Enviando imagem...';
+            const uploadedUrl = await uploadImageToSupabaseStorage(webpBlob, item.id);
+            item.imageUrl = uploadedUrl;
+            statusSpan.textContent = `Foto enviada (${Math.ceil(webpBlob.size / 1024)} KB)`;
+            renderItems();
+            updateDraftAndPreview();
+          } else {
+            statusSpan.textContent = `WebP pronta (${Math.ceil(webpBlob.size / 1024)} KB — faça login para salvar no bucket)`;
+            showFeedback(
+              'Imagem convertida para WebP com sucesso. Entre na sua conta para enviá-la ao armazenamento.',
+              'info'
+            );
+          }
+        } catch (err) {
+          statusSpan.textContent = 'Falha ao enviar imagem';
+          showFeedback(err?.message || 'Erro ao processar ou enviar a imagem.', 'error');
+        }
+      });
+
+      gPhoto.appendChild(fileGroup);
+      fields.appendChild(gPhoto);
+    }
+
     const controls = document.createElement('div');
     controls.className = 'item-controls';
 
-    // Toggle Ocultar / Ativo
     const activeLabel = document.createElement('label');
     activeLabel.className = 'toggle-container';
-    
+
     const activeCheckbox = document.createElement('input');
     activeCheckbox.type = 'checkbox';
-    activeCheckbox.checked = item.active !== false; // default is true
+    activeCheckbox.checked = item.active !== false;
     activeCheckbox.addEventListener('change', () => {
       item.active = activeCheckbox.checked;
       updateDraftAndPreview();
     });
 
-    const activeText = document.createTextNode('Ativo');
     activeLabel.appendChild(activeCheckbox);
-    activeLabel.appendChild(activeText);
+    activeLabel.appendChild(document.createTextNode('Visível na vitrine'));
 
     const removeItemBtn = document.createElement('button');
     removeItemBtn.type = 'button';
     removeItemBtn.className = 'button button-small button-secondary button-pill';
-    removeItemBtn.textContent = 'Excluir';
+    removeItemBtn.textContent = 'Excluir item';
+    removeItemBtn.setAttribute('aria-label', `Excluir item ${item.name || itemIdx + 1}`);
     removeItemBtn.addEventListener('click', () => {
+      if (item.name && !confirm(`Deseja excluir o item "${item.name}"?`)) {
+        return;
+      }
       removeItem(selectedCategoryForItems, itemIdx);
     });
 
@@ -836,100 +1065,122 @@ function renderItems() {
   });
 }
 
-// Client-side resizing and WebP conversion
-async function resizeAndConvertToWebP(file) {
+function canvasToWebpBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Falha na conversão da imagem para WebP.'));
+      },
+      'image/webp',
+      quality
+    );
+  });
+}
+
+async function decodeImageSource(file) {
+  if (typeof createImageBitmap === 'function') {
+    return createImageBitmap(file);
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 800; // max 800px dimension (WebP ~200KB target)
-
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Falha na conversão WebP.'));
-          }
-        }, 'image/webp', 0.8);
-      };
-      img.onerror = () => reject(new Error('Imagem inválida.'));
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
       img.src = e.target.result;
     };
-    reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo de imagem.'));
     reader.readAsDataURL(file);
   });
 }
 
-// Direct upload using accessToken to Supabase Storage bucket (FR-010)
-async function uploadImageToSupabaseStorage(blob, itemId) {
-  const token = sessionStorage.getItem('supabase_access_token');
-  const key = sessionStorage.getItem('supabase_publishable_key');
-  
-  if (!token || !key) {
-    throw new Error('Autenticação de armazenamento pendente. Salve ou reconecte.');
-  }
+async function resizeAndConvertToWebP(file) {
+  const maxBytes = 204800; // 200 KiB
+  const source = await decodeImageSource(file);
+  const srcWidth = source.width;
+  const srcHeight = source.height;
 
-  // Path matches expected: <site_id>/<item_id>-<hash_curto>.webp
-  const hash = Math.floor(Math.random() * 10000);
-  const path = `${currentSite.id}/${itemId}-${hash}.webp`;
-  
-  const uploadUrl = `https://qawlpsrfewosxsfgmmpm.supabase.co/storage/v1/object/catalog-images/${path}`;
+  const dimensionSteps = [800, 640, 480];
+  const qualitySteps = [0.82, 0.68, 0.52, 0.38];
+
+  try {
+    let lastBlob = null;
+    for (const maxDim of dimensionSteps) {
+      let width = srcWidth;
+      let height = srcHeight;
+      if (width > maxDim || height > maxDim) {
+        if (width >= height) {
+          height = Math.max(1, Math.round((height * maxDim) / width));
+          width = maxDim;
+        } else {
+          width = Math.max(1, Math.round((width * maxDim) / height));
+          height = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(source, 0, 0, width, height);
+
+      for (const quality of qualitySteps) {
+        const blob = await canvasToWebpBlob(canvas, quality);
+        lastBlob = blob;
+        if (blob.size <= maxBytes) {
+          return blob;
+        }
+      }
+    }
+
+    if (lastBlob && lastBlob.size <= maxBytes) {
+      return lastBlob;
+    }
+    throw new Error('A imagem excedeu 200 KB mesmo após compressão. Escolha uma imagem menor.');
+  } finally {
+    if (source && typeof source.close === 'function') {
+      source.close();
+    }
+  }
+}
+
+// Server-side authenticated proxy upload (uses HttpOnly session cookie — zero client token exposure)
+async function uploadImageToSupabaseStorage(blob, itemId) {
+  const safeId = String(itemId || 'item').replace(/[^a-zA-Z0-9._-]/g, '-');
+  const uploadUrl = `/api/sites/${encodeURIComponent(currentSite.id)}/upload?itemId=${encodeURIComponent(safeId)}`;
 
   const res = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'apikey': key,
       'Content-Type': 'image/webp'
     },
     body: blob
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Falha no upload: ${errText}`);
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Falha no upload (${res.status}).`);
   }
 
-  // Return public HTTPS URL
-  return `https://qawlpsrfewosxsfgmmpm.supabase.co/storage/v1/object/public/catalog-images/${path}`;
+  const data = await res.json();
+  return data.imageUrl;
 }
 
-// Helpers
 function formatCentsToReais(cents) {
-  if (typeof cents !== 'number' || isNaN(cents)) return 'R$ 0,00';
+  if (typeof cents !== 'number' || Number.isNaN(cents)) return 'R$ 0,00';
   const reais = cents / 100;
   return reais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function maskMoneyInput(inputEl) {
-  let value = inputEl.value.replace(/\D/g, ''); // only digits
+  const value = inputEl.value.replace(/\D/g, '');
   if (!value) {
     inputEl.value = '';
     return;
   }
-  let integerPart = value.slice(0, -2) || '0';
-  let decimalPart = value.slice(-2).padStart(2, '0');
-  integerPart = parseInt(integerPart, 10).toString();
-  
+  const integerPart = parseInt(value.slice(0, -2) || '0', 10).toString();
+  const decimalPart = value.slice(-2).padStart(2, '0');
   inputEl.value = `R$ ${integerPart},${decimalPart}`;
 }
 
@@ -938,12 +1189,11 @@ function parseReaisToCents(valStr) {
   return parseInt(digits, 10) || 0;
 }
 
-// Categories Actions
-function addCategory() {
+function addCategory(defaultName = '') {
   const id = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   currentDraft.content.categories.push({
     id,
-    name: '',
+    name: defaultName,
     items: []
   });
   selectedCategoryForItems = id;
@@ -968,14 +1218,16 @@ function moveCategory(catIndex, direction) {
     const temp = categories[catIndex];
     categories[catIndex] = categories[targetIndex];
     categories[targetIndex] = temp;
+    populateCategorySelect();
     renderCategories();
     updateDraftAndPreview();
   }
 }
 
-// Items Actions
 function addItem() {
-  const category = (currentDraft.content.categories || []).find(c => c.id === selectedCategoryForItems);
+  const category = (currentDraft.content.categories || []).find(
+    (c) => c.id === selectedCategoryForItems
+  );
   if (!category) return;
 
   if (!category.items) category.items = [];
@@ -992,89 +1244,93 @@ function addItem() {
   if (currentDraft.content.components?.durationMinutes) item.durationMinutes = 30;
 
   category.items.push(item);
+  renderCategories();
   renderItems();
   updateDraftAndPreview();
 }
 
 function removeItem(catId, itemIdx) {
-  const category = (currentDraft.content.categories || []).find(c => c.id === catId);
+  const category = (currentDraft.content.categories || []).find((c) => c.id === catId);
   if (category && category.items) {
     category.items.splice(itemIdx, 1);
+    renderCategories();
     renderItems();
     updateDraftAndPreview();
   }
 }
 
-// Reactively calculate size and counts and render live preview
 function updateDraftAndPreview() {
   if (!currentDraft) return;
 
-  // Size measurement
   const textEncoder = new TextEncoder();
   const serialized = JSON.stringify(currentDraft.content);
   const sizeInBytes = textEncoder.encode(serialized).length;
 
-  draftSizeCount.textContent = `${(sizeInBytes / 1024).toFixed(2)} KiB / 256 KiB`;
-  draftSizeProgress.value = sizeInBytes;
-  draftSizeWarning.hidden = sizeInBytes <= 262144;
+  if (draftSizeCount) {
+    draftSizeCount.textContent = `${(sizeInBytes / 1024).toFixed(1)} / 256 KiB`;
+  }
+  if (draftSizeProgress) draftSizeProgress.value = sizeInBytes;
+  if (draftSizeWarning) draftSizeWarning.hidden = sizeInBytes <= 262144;
 
-  // Counts measurement
   let totalCount = 0;
   let activeCount = 0;
 
-  (currentDraft.content.categories || []).forEach(cat => {
+  (currentDraft.content.categories || []).forEach((cat) => {
     if (cat.items) {
-      cat.items.forEach(item => {
-        totalCount++;
+      cat.items.forEach((item) => {
+        totalCount += 1;
         if (item.active !== false) {
-          activeCount++;
+          activeCount += 1;
         }
       });
     }
   });
 
-  // Display active item count
-  activeItemsCount.textContent = `${activeCount} / 20`;
-  activeItemsProgress.value = activeCount;
-  activeItemsWarning.hidden = activeCount <= 20;
+  if (activeItemsCount) activeItemsCount.textContent = `${activeCount} / 20`;
+  if (activeItemsProgress) activeItemsProgress.value = activeCount;
+  if (activeItemsWarning) activeItemsWarning.hidden = activeCount <= 20;
 
-  // Display total item count
-  totalItemsCount.textContent = `${totalCount} / 100`;
-  totalItemsProgress.value = totalCount;
-  totalItemsWarning.hidden = totalCount <= 100;
+  if (totalItemsCount) totalItemsCount.textContent = `${totalCount} / 100`;
+  if (totalItemsProgress) totalItemsProgress.value = totalCount;
+  if (totalItemsWarning) totalItemsWarning.hidden = totalCount <= 100;
 
-  // Disable save button if technically invalid size or limits exceeded
-  const isInvalid = sizeInBytes > 262144;
-  saveDraftButton.disabled = isInvalid;
+  if (saveDraftButton) {
+    saveDraftButton.disabled = sizeInBytes > 262144;
+  }
 
   renderLivePreview();
 }
 
-// Render dynamic instant visual storefront mock using StorefrontRenderer
 function renderLivePreview() {
-  liveStorefrontPreview.innerHTML = '';
-  
-  // Clone currentDraft.content to avoid affecting active input state during render
+  if (!liveStorefrontPreview || !currentDraft) return;
+
   const menuConfig = structuredClone(currentDraft.content);
-  
-  const renderer = new StorefrontRenderer(liveStorefrontPreview, menuConfig, {
-    isPreview: true,
-    targetWhatsapp: menuConfig.whatsapp
-  });
-  renderer.render();
+
+  if (!activePreviewRenderer || activePreviewRenderer.container !== liveStorefrontPreview) {
+    activePreviewRenderer = new StorefrontRenderer(liveStorefrontPreview, menuConfig, {
+      isPreview: true,
+      targetWhatsapp: menuConfig.whatsapp
+    });
+  } else {
+    activePreviewRenderer.menu = menuConfig;
+    activePreviewRenderer.options.targetWhatsapp = menuConfig.whatsapp;
+  }
+
+  activePreviewRenderer.render();
 }
 
-// Validate catalog draft payload locally before saving
 function validateCatalogLocal() {
   const { whatsapp, categories } = currentDraft.content;
 
   if (!whatsapp) {
-    showFeedback('Digite o número de WhatsApp comercial.', 'error');
+    showFeedback('Digite o número de WhatsApp comercial na aba Configurações.', 'error');
+    setActiveTab('settings');
     return false;
   }
 
   if (!/^[1-9]\d{7,14}$/.test(whatsapp)) {
     showFeedback('Número de WhatsApp comercial inválido. Exemplo: 5511999999999', 'error');
+    setActiveTab('settings');
     return false;
   }
 
@@ -1090,22 +1346,28 @@ function validateCatalogLocal() {
 
     if (cat.items) {
       cat.items.forEach((item, itemIndex) => {
-        totalCount++;
+        totalCount += 1;
         if (item.active !== false) {
-          activeCount++;
+          activeCount += 1;
         }
 
         if (!item.name || !item.name.trim()) {
-          showFeedback(`O item na categoria "${cat.name}" e posição ${itemIndex + 1} precisa ter um nome.`, 'error');
+          showFeedback(
+            `O item ${itemIndex + 1} na categoria "${cat.name || catIndex + 1}" precisa ter um nome.`,
+            'error'
+          );
           hasValidationErrors = true;
         }
 
-        // Only enforce price validation if price component is toggled on and it's NOT a quote mode
-        if (currentDraft.content.components?.price && currentDraft.content.catalogType !== 'quote') {
-          if (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0) {
-            showFeedback(`O preço do item "${item.name || `Item ${itemIndex + 1}`}" precisa ser um valor maior que R$ 0,00.`, 'error');
-            hasValidationErrors = true;
-          }
+        const priceRequired =
+          currentDraft.content.components?.price !== false &&
+          currentDraft.content.catalogType !== 'quote';
+        if (priceRequired && (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0)) {
+          showFeedback(
+            `O preço do item "${item.name || `Item ${itemIndex + 1}`}" precisa ser maior que R$ 0,00.`,
+            'error'
+          );
+          hasValidationErrors = true;
         }
       });
     }
@@ -1114,19 +1376,24 @@ function validateCatalogLocal() {
   if (hasValidationErrors) return false;
 
   if (activeCount > 20) {
-    showFeedback('O plano básico gratuito permite no máximo 20 itens ativos. Oculte alguns itens antes de salvar.', 'error');
+    showFeedback(
+      'O plano básico gratuito permite no máximo 20 itens ativos. Oculte alguns itens antes de salvar.',
+      'error'
+    );
     return false;
   }
 
   if (totalCount > 100) {
-    showFeedback('O limite técnico total é de 100 itens (ativos e ocultos). Remova alguns itens antes de salvar.', 'error');
+    showFeedback(
+      'O limite técnico total é de 100 itens (ativos e ocultos). Remova alguns itens antes de salvar.',
+      'error'
+    );
     return false;
   }
 
   return true;
 }
 
-// Handle save draft
 async function handleSaveDraft() {
   if (!validateCatalogLocal()) return;
 
@@ -1144,36 +1411,42 @@ async function handleSaveDraft() {
       if (res.ok) {
         const data = await res.json();
         currentDraft = data.draft;
-        editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-        showFeedback('Rascunho salvo com sucesso!', 'success');
-        conflictBanner.hidden = true;
+        currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
+        if (editorRevisionIndicator) {
+          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+        }
+        showFeedback('Rascunho salvo com sucesso.', 'success');
+        if (conflictBanner) conflictBanner.hidden = true;
       } else if (res.status === 409) {
         const data = await res.json();
-        conflictBanner.hidden = false;
-        showFeedback('Conflito de revisão detectado. Salve suas alterações locais ou recarregue.', 'error');
-        if (data.error && data.error.currentRevision) {
-          editorRevisionIndicator.textContent = `Revisão (Conflito): ${currentDraft.revision} (Atual no Servidor: ${data.error.currentRevision})`;
+        if (conflictBanner) conflictBanner.hidden = false;
+        showFeedback(
+          'Conflito de revisão detectado. Salve suas alterações locais ou recarregue.',
+          'error'
+        );
+        if (data.error?.currentRevision && editorRevisionIndicator) {
+          editorRevisionIndicator.textContent = `Revisão em conflito: ${currentDraft.revision} (servidor: ${data.error.currentRevision})`;
         }
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         showFeedback(data.error?.message || 'Erro ao salvar rascunho.', 'error');
       }
-    } catch (err) {
+    } catch {
       showFeedback('Erro de rede ao salvar rascunho.', 'error');
     }
   } else {
-    // Offline / Local save
     currentDraft.revision += 1;
     currentDraft.updatedAt = new Date().toISOString();
     localStorage.setItem(`vitrine_local_draft_${currentSite.id}`, JSON.stringify(currentDraft));
-    editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-    showFeedback('Rascunho local salvo com sucesso (revisão incrementada)!', 'success');
-    conflictBanner.hidden = true;
+    if (editorRevisionIndicator) {
+      editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+    }
+    showFeedback('Rascunho local salvo com sucesso.', 'success');
+    if (conflictBanner) conflictBanner.hidden = true;
   }
   updateDraftAndPreview();
 }
 
-// Handle publish storefront
 async function handlePublishSite() {
   if (!validateCatalogLocal()) return;
 
@@ -1191,10 +1464,16 @@ async function handlePublishSite() {
       if (saveRes.ok) {
         const savedData = await saveRes.json();
         currentDraft = savedData.draft;
-        editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+        currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
+        if (editorRevisionIndicator) {
+          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
+        }
       } else if (saveRes.status === 409) {
-        conflictBanner.hidden = false;
-        showFeedback('Conflito de revisão detectado antes de publicar. Recarregue o rascunho.', 'error');
+        if (conflictBanner) conflictBanner.hidden = false;
+        showFeedback(
+          'Conflito de revisão detectado antes de publicar. Recarregue o rascunho.',
+          'error'
+        );
         return;
       } else {
         const errData = await saveRes.json().catch(() => ({}));
@@ -1211,15 +1490,19 @@ async function handlePublishSite() {
         const pub = pubData.publication;
         if (publicationStatusBar && publicationStatusText && publicationViewLink) {
           const shortHash = String(pub.hash || '').slice(0, 12);
-          publicationStatusText.textContent = `Revisão ${pub.revision} publicada em ${pub.url} (SHA-256: ${shortHash}…)`;
+          publicationStatusText.textContent = `Revisão ${pub.revision} publicada em ${pub.url} (SHA-256: ${shortHash}...)`;
           publicationViewLink.href = pub.url;
           publicationStatusBar.hidden = false;
         }
-        showFeedback(`Vitrine publicada com sucesso em ${pub.url}!`, 'success');
+        if (editorOpenPublicLink) {
+          editorOpenPublicLink.href = pub.url;
+        }
+        showFeedback(`Vitrine publicada com sucesso em ${pub.url}.`, 'success');
       } else {
         const errData = await pubRes.json().catch(() => ({}));
         showFeedback(
-          errData.error?.message || 'Falha ao publicar vitrine. A publicação anterior foi preservada.',
+          errData.error?.message ||
+            'Falha ao publicar vitrine. A publicação anterior foi preservada.',
           'error'
         );
       }
@@ -1244,6 +1527,6 @@ async function handlePublishSite() {
       publicationViewLink.href = '/loja1';
       publicationStatusBar.hidden = false;
     }
-    showFeedback('Publicação validada com sucesso no modo local!', 'success');
+    showFeedback('Publicação validada com sucesso no modo local.', 'success');
   }
 }
