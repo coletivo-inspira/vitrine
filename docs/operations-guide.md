@@ -218,7 +218,7 @@ npx --yes wrangler@4.158.0 deploy --dry-run
 
 ## 6. Automação no GitHub Actions (Deploy Cloudflare e Migrações Supabase — Guia Windows em pt-BR)
 
-Este guia passo a passo foi pensado para quem utiliza **Windows** (pelo navegador Google Chrome, Microsoft Edge ou Firefox) e precisa configurar os **4 segredos** no GitHub para habilitar o deploy automático no Cloudflare Workers Free (`.github/workflows/deploy.yml`) e a aplicação manual assistida de migrações SQL no Supabase Free (`.github/workflows/db-migrate.yml`), mantendo **custo zero** (ADR 0005) e **permissões mínimas** (Princípio III da Constituição).
+Este guia passo a passo foi pensado para quem utiliza **Windows** (pelo navegador Google Chrome, Microsoft Edge ou Firefox) e precisa configurar os **4 segredos** no GitHub para habilitar o pipeline automático na branch `main` (`.github/workflows/deploy.yml`, que valida os testes, aplica migrações SQL pendentes no Supabase Free e faz o deploy no Cloudflare Workers Free) e o workflow manual de simulação/emergência de migrações (`.github/workflows/db-migrate.yml`), mantendo **custo zero** (ADR 0005) e **permissões mínimas** (Princípio III da Constituição).
 
 > **Regra de Segurança (Princípio III)**: Nenhum dos 4 valores abaixo deve ser salvo em arquivos do projeto no computador, colado em conversas públicas ou passado na linha de comando. Cole-os diretamente nos campos protegidos do GitHub.
 
@@ -228,8 +228,8 @@ Este guia passo a passo foi pensado para quem utiliza **Windows** (pelo navegado
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml` | Token de API da Cloudflare restrito ao template **Edit Cloudflare Workers** (apenas permissão `Account > Workers Scripts > Edit` na conta). |
 | `CLOUDFLARE_ACCOUNT_ID` | `deploy.yml` | Identificador hexadecimal de 32 caracteres da conta Cloudflare onde o Worker `vitrine-inspira` roda no plano gratuito. |
-| `SUPABASE_ACCESS_TOKEN` | `db-migrate.yml` | Personal Access Token (`sbp_...`) da conta Supabase usado pela CLI para vincular o projeto `qawlpsrfewosxsfgmmpm`. |
-| `SUPABASE_DB_PASSWORD` | `db-migrate.yml` | Senha do banco PostgreSQL do projeto `qawlpsrfewosxsfgmmpm`, lida pela Supabase CLI exclusivamente via variável de ambiente (nunca via `--db-url` ou `argv`). |
+| `SUPABASE_ACCESS_TOKEN` | `deploy.yml` e `db-migrate.yml` | Personal Access Token (`sbp_...`) da conta Supabase usado pela CLI para vincular o projeto `qawlpsrfewosxsfgmmpm`. |
+| `SUPABASE_DB_PASSWORD` | `deploy.yml` e `db-migrate.yml` | Senha do banco PostgreSQL do projeto `qawlpsrfewosxsfgmmpm`, lida pela Supabase CLI exclusivamente via variável de ambiente (nunca via `--db-url` ou `argv`). |
 
 ### 6.2 Como criar o Token de API da Cloudflare (`CLOUDFLARE_API_TOKEN`) com Permissão Mínima
 
@@ -292,29 +292,36 @@ Você pode copiar o **Account ID** (32 caracteres alfanuméricos) em qualquer um
      - **Name**: `SUPABASE_DB_PASSWORD`
      - **Secret**: cole (`Ctrl + V`) a senha do banco PostgreSQL do projeto `qawlpsrfewosxsfgmmpm` e clique em **Add secret**.
 
-### 6.6 Como executar o Workflow de Migração do Banco (`db-migrate.yml`) — Simulação (`dry_run`) Primeiro
+### 6.6 Como funcionam as Migrações Automáticas e o Deploy no Merge em `main` (`deploy.yml`)
 
-O workflow `.github/workflows/db-migrate.yml` **nunca roda sozinho em push** (`workflow_dispatch` apenas), garantindo que nenhuma alteração de schema ocorra sem revisão explícita do **Operador Inspira**.
+Depois que os 4 segredos (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN` e `SUPABASE_DB_PASSWORD`) estiverem cadastrados (Seção 6.5), todo merge/push na branch `main` (ou clique manual em **Actions** → **Deploy Cloudflare Worker** → **Run workflow**) executa automaticamente três jobs encadeados em série (`verify` → `migrate` → `deploy`):
 
-1. **Passo 1 — Executar primeiro em modo Simulação (`dry_run = true`)**:
+1. **Job `verify` (Testes antes de tocar no banco)**:
+   - Executa `npm ci` e `npm test`. Se qualquer teste falhar, o pipeline para aqui e o banco remoto não é tocado.
+2. **Job `migrate` (`needs: verify` — Migrações automáticas no Supabase)**:
+   - Compartilha o grupo de concorrência `supabase-db-migrate-qawlpsrfewosxsfgmmpm` (`cancel-in-progress: false`) com o workflow manual para nunca rodar em paralelo com ele.
+   - Vincula o projeto oficial (`supabase link --project-ref qawlpsrfewosxsfgmmpm`), registra no log o que está pendente (`supabase db push --remote --dry-run`) e em seguida aplica as migrações pendentes (`supabase db push --remote --yes`). Quando não há migrações novas, o comando é um *no-op* seguro.
+3. **Job `deploy` (`needs: migrate` — Build, Deploy do Worker e Smoke Check)**:
+   - Executa `npm ci`, `npm run build` e `npx --yes wrangler@4.158.0 deploy`.
+   - Realiza a verificação leve pós-deploy (*smoke check*) exclusivamente no endereço `*.workers.dev` na rota `/api/auth/config` (domínios personalizados não sofrem smoke automatizado por estarem protegidos por desafio anti-bot da Cloudflare).
+
+#### Regras de Operação e Recuperação de Migrações (`append-only` e *fix forward*)
+
+- **Migrações são estritamente *append-only* (somente adição)**: Jamais edite ou renomeie um arquivo `.sql` em `supabase/migrations/` que já tenha sido aplicado na `main`. Toda nova alteração de banco deve ser criada em um **novo arquivo de migração com um *timestamp* posterior** (ex.: `YYYYMMDDHHMM_descricao.sql` maior que o último arquivo existente).
+- **Se o job `migrate` falhar, o `deploy` não roda**: Como o job `deploy` depende de `migrate` (`needs: migrate`), qualquer erro SQL interrompe o pipeline antes do deploy do Worker, mantendo a versão anterior do Worker no ar sem indisponibilidade. Para corrigir, **nunca reescreva o histórico de migrações aplicadas**: diagnostique o erro nos logs do Actions e avance corrigindo para a frente (*fix forward*) por meio de uma nova migração com *timestamp* posterior.
+
+### 6.7 Como usar o Botão Manual de Migração (`db-migrate.yml`) para Simulação Pré-Merge (`dry_run`) e Emergências
+
+O workflow `.github/workflows/db-migrate.yml` permanece disponível exclusivamente via botão manual (`workflow_dispatch`) para **simulações antes do merge (*pre-merge dry run*)** ou execuções manuais de emergência pelo **Operador Inspira**:
+
+1. **Simulação Pré-Merge (`dry_run = true`)**:
    - No repositório `https://github.com/coletivo-inspira/vitrine`, clique na aba **Actions** no topo da página.
    - Na coluna lateral esquerda (abaixo de *All workflows*), clique em **Supabase Database Migrate**.
    - À direita, na faixa azul clara (*This workflow has a workflow_dispatch event trigger*), clique no botão **Run workflow** ▼.
-   - Mantenha **Use workflow from**: `Branch: main`.
+   - Escolha a branch desejada em **Use workflow from** (por exemplo, a branch do PR antes do merge ou `Branch: main`).
    - Mantenha a caixa **Executar apenas em modo simulação (--dry-run), sem alterar o banco remoto** (`dry_run`) **marcada** (`true`, que já é o padrão).
-   - Clique no botão verde **Run workflow**.
-   - Aguarde alguns segundos, clique na execução que apareceu no topo da lista e abra o job **migrate** para conferir nos logs quais arquivos SQL em `supabase/migrations/*.sql` seriam aplicados no projeto `qawlpsrfewosxsfgmmpm`.
-2. **Passo 2 — Aplicar de fato as migrações no banco (`dry_run = false`)**:
-   - Somente após confirmar que o resultado da simulação (`dry_run`) no Passo 1 ficou verde e listou apenas as migrações esperadas (`supabase db push --remote --dry-run`), volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼.
-   - **Desmarque** a caixa `dry_run` (deixando-a desativada / `false`).
-   - Clique no botão verde **Run workflow** para executar `supabase db push --remote --yes` contra o projeto remoto `qawlpsrfewosxsfgmmpm` (ou, localmente no terminal com variáveis de ambiente configuradas, `npx supabase db push --remote --dry-run` seguido de `npx supabase db push --remote`).
-
-### 6.7 Como funciona o Deploy Automático no Cloudflare Workers (`deploy.yml`)
-
-- Depois que `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` estiverem cadastrados (Seção 6.5), todo merge/push na branch `main` (ou clique manual em **Actions** → **Deploy Cloudflare Worker** → **Run workflow**) executará automaticamente:
-  1. `npm ci`
-  2. `npm test`
-  3. `npm run build`
-  4. `npx --yes wrangler@4.158.0 deploy`
-  5. Verificação leve pós-deploy (*smoke check*) exclusivamente no endereço `*.workers.dev` na rota `/api/auth/config` (domínios personalizados não sofrem smoke automatizado por estarem protegidos por desafio anti-bot da Cloudflare).
+   - Clique no botão verde **Run workflow** e confira no log do job **migrate** a saída de `supabase db push --remote --dry-run` listando quais arquivos SQL em `supabase/migrations/*.sql` estão pendentes no projeto `qawlpsrfewosxsfgmmpm`.
+2. **Aplicação Manual de Emergência (`dry_run = false`)**:
+   - Na operação normal, **não é necessário clicar manualmente com `dry_run = false`**, pois o merge na `main` já aplica as migrações automaticamente no `deploy.yml` (Seção 6.6).
+   - Caso seja necessário aplicar migrações manualmente fora de um merge em `main` (somente após validar o `dry_run = true`), volte em **Actions** → **Supabase Database Migrate** → **Run workflow** ▼, **desmarque** a caixa `dry_run` (`false`) e clique em **Run workflow** para executar `supabase db push --remote --yes` contra o projeto remoto `qawlpsrfewosxsfgmmpm` (ou, localmente no terminal com variáveis de ambiente configuradas, `npx supabase db push --remote --dry-run` seguido de `npx supabase db push --remote`).
 
