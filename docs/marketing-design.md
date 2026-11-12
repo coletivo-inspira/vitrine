@@ -93,14 +93,14 @@ texto #27322E, superfície suave #FBEDE5, ação #C74414 com texto branco e bord
 #DDDCD6. Syne nos títulos, DM Sans no corpo; malha pontilhada discreta, bordas
 finas e sombras suaves. Preservar a distribuição do estudo. Logo e Orb oficiais
 mantêm suas cores e proporções; a variação pertence ao produto, não altera o
-brandbook global. Liquid Glass permanece complementar.
+brandbook global. Liquid Glass permanece complementar, exceto pelo cabeçalho flutuante (`header.site-header.wrap`), que adota elementos Liquid Glass (fundo translúcido com blur de 20px-24px e saturação de 140%, bordas sutis e realces de luz) por decisão explícita de Lino em 2026-11-12 para dar um visual premium e flutuante.
 
 Referência secundária: [Apple — Materials](https://developer.apple.com/design/human-interface-guidelines/materials).
 Usar transparência, profundidade e movimento somente onde o brandbook permite, sem
 alegar uso do componente nativo Apple. Materiais distintos, leitura e preferências
 de acessibilidade precisam continuar funcionando sem blur.
 
-Não haverá vidro em todos os blocos, textos sobre fotografia difícil de ler,
+Não haverá vidro em todos os outros blocos, textos sobre fotografia difícil de ler,
 refratores WebGL, partículas ou animação contínua de fundo. Começar com CSS leve,
 Syne/DM Sans com arquivos e licença conferidos e movimento breve; sem biblioteca paga.
 Orb conforme a referência oficial: uma por página, canto inferior esquerdo ou

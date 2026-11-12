@@ -255,7 +255,7 @@ registro substitui a orientação anterior de montar a Orb dentro do rodapé.
 
 ## Portal
 
-**Escopo estrito de superfície:** Os tokens e efeitos **Liquid Glass** definidos nesta seção aplicam-se **exclusivamente ao portal administrativo** (`web/portal/` / `painel.inspira.dev.br/portal`). O site de divulgação (`web/index.html` e `web/styles.css`) e a página `404.html` **mantêm estritamente a direção "no glass"** (superfícies sólidas sem `backdrop-filter`), **exceto pelo cabeçalho flutuante (`header.site-header.wrap`)** que utiliza elementos Liquid Glass para um design translúcido e premium.
+**Escopo estrito de superfície:** Os tokens e efeitos **Liquid Glass** definidos nesta seção aplicam-se **exclusivamente ao portal administrativo** (`web/portal/` / `painel.inspira.dev.br/portal`). O site de divulgação (`web/index.html` e `web/styles.css`) e a página `404.html` **mantêm estritamente a direção "no glass"** (superfícies sólidas sem `backdrop-filter`), **exceto pelo cabeçalho flutuante (`header.site-header.wrap`)**, que adota elementos Liquid Glass por decisão explícita de Lino em 2026-11-12 para alcançar um design translúcido, flutuante e premium.
 
 ### Referências e Identidade
 - **Base funcional e composição:** seção "Vitrine de soluções" e pilares do hub `inspira.dev.br` (cards com linha superior de categoria e status, eyebrow, título, descrição, rodapé com tags e filtros em pílula).
