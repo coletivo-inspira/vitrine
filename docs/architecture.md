@@ -8,7 +8,7 @@ Portal autenticado → API autorizada → dados privados de vitrines e rascunhos
 Publicador no servidor → projeção pública validada → artefato imutável → hospedagem estática → visitante.
 Provedor de identidade → sessão verificada no servidor; nunca identidade fornecida pelo formulário.
 
-Backend aprovado: Supabase Auth/Postgres com RLS. Worker para orquestração permanece proposta; hospedagem Cloudflare escolhida, com configuração e volume a validar. Acesso público deve consumir apenas versões publicadas, sem consultar tabelas administrativas. Identidade, sessão, email, custos internos e credenciais não entram no artefato. O telefone comercial será público, com ciência do proprietário. `src/public-menu.mjs` implementa apenas essa projeção explícita; não implementa autorização.
+Backend aprovado: Supabase Auth/Postgres com RLS. Worker para orquestração permanece proposta; hospedagem Cloudflare escolhida, com configuração e volume a validar. Acesso público deve consumir apenas versões publicadas, sem consultar tabelas administrativas. Identidade, sessão, email, custos internos e credenciais não entram no artefato. O telefone comercial será público, com ciência do proprietário, exceto quando ele liga "Receber pedidos pela Mila" (ADR 0012): aí o artefato leva o WhatsApp da Mila e um código da vitrine, e o telefone do dono fica só no rascunho, consultado por operadores via `lookup_mila_relay`, com auditoria. `src/public-menu.mjs` implementa apenas essa projeção explícita; não implementa autorização.
 
 ## Modelo de persistência a validar
 

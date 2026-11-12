@@ -37,6 +37,10 @@ _Evitar_: negócio para designar o modelo.
 
 **Case**: Exemplo autorizado de um trabalho realizado, publicado no portfólio da Inspira.
 
+**Mila**: Assistente da equipe Vitrine Inspira no WhatsApp. É uma pessoa, não um robô (ADR 0012). Faz a triagem de orçamentos e repassa ao dono os pedidos das vitrines com "Receber pedidos pela Mila" ligado.
+
+**Código da vitrine**: Identificador público `#VI-XXXXXX-XXXX`, derivado do slug, que abre cada pedido enviado à Mila e permite localizar a vitrine sem expor o número do dono.
+
 **Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento, CMS institucional e benefícios comerciais; não se confunde com proprietário de vitrine.
 
 **Organização cliente (Inquilino / Tenant)**: Agrupador comercial de um cliente que pode possuir uma ou mais vitrines sob cotas controladas, mantendo o isolamento de acesso por vitrine.
