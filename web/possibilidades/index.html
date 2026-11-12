@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F7F7F4">
+  <meta name="description" content="Explore as possibilidades da Vitrine Inspira: exemplos reais de alimentação, arte, design, fotografia, mídia e saúde para inspirar sua próxima vitrine.">
+  <title>Possibilidades — Vitrine Inspira</title>
+  <link rel="icon" href="../assets/brand/vitrine-icon.svg" type="image/svg+xml">
+  <link rel="preload" href="../assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="../assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
+  <script src="../theme.js"></script>
+  <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../app.js"></script>
+  <script src="../categories.js" defer></script>
+  <script src="../assets/brand/dot-trail.js" defer></script>
+  <script src="../assets/brand/inspira-orb.js" data-href="https://inspira.dev.br/" defer></script>
+  <link rel="canonical" href="https://vitrine.inspira.dev.br/possibilidades/">
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Vitrine Inspira — início">
+      <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+      <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+    </a>
+    <div class="header-controls">
+    <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+      <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+      <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+    </button>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Abrir menu" hidden>
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    </div>
+    <nav id="site-nav" aria-label="Navegação principal">
+      <a href="/como-funciona/">Como funciona</a>
+      <a href="/possibilidades/" aria-current="page">Possibilidades</a>
+      <a href="/planos/">Planos</a>
+      <a href="/orcamento/">Orçamento</a>
+      <a href="https://painel.inspira.dev.br/">Entrar</a>
+      <a class="button button-small" href="https://painel.inspira.dev.br/">Criar minha vitrine</a>
+    </nav>
+  </header>
+
+  <main id="conteudo">
+    <section class="possibilities wrap section-space" id="possibilidades" aria-labelledby="possibilities-title">
+      <div class="section-heading">
+        <h2 id="possibilities-title">Uma base pronta.<br>Novas possibilidades.</h2>
+        <p>Da primeira vitrine a uma ideia só sua. O modelo é um ponto de partida, não o limite do projeto.</p>
+      </div>
+      
+      <div class="area-choices" role="group" aria-label="Explorar exemplos por área" hidden>
+        <button class="area-choice area-food" type="button" data-area="food" aria-pressed="false" aria-controls="area-food">
+          <svg class="split-v" viewBox="0 0 130 122" aria-hidden="true">
+            <path class="v-left" d="M0 0H26L65 86V122L43 108Z"/>
+            <path class="v-right" d="M65 86L103 0H130L87 108L65 122Z"/>
+          </svg>
+          <span>Alimentação</span>
+        </button>
+        <button class="area-choice area-art" type="button" data-area="art" aria-pressed="false" aria-controls="area-art">
+          <svg class="split-v" viewBox="0 0 130 122" aria-hidden="true">
+            <path class="v-left" d="M0 0H26L65 86V122L43 108Z"/>
+            <path class="v-right" d="M65 86L103 0H130L87 108L65 122Z"/>
+          </svg>
+          <span>Arte & design</span>
+        </button>
+        <button class="area-choice area-photo" type="button" data-area="photo" aria-pressed="false" aria-controls="area-photo">
+          <svg class="split-v" viewBox="0 0 130 122" aria-hidden="true">
+            <path class="v-left" d="M0 0H26L65 86V122L43 108Z"/>
+            <path class="v-right" d="M65 86L103 0H130L87 108L65 122Z"/>
+          </svg>
+          <span>Fotografia & mídia</span>
+        </button>
+        <button class="area-choice area-health" type="button" data-area="health" aria-pressed="false" aria-controls="area-health">
+          <svg class="split-v" viewBox="0 0 130 122" aria-hidden="true">
+            <path class="v-left" d="M0 0H26L65 86V122L43 108Z"/>
+            <path class="v-right" d="M65 86L103 0H130L87 108L65 122Z"/>
+          </svg>
+          <span>Saúde</span>
+        </button>
+        <button class="area-choice area-tech" type="button" data-area="tech" aria-pressed="false" aria-controls="area-tech">
+          <svg class="split-v" viewBox="0 0 130 122" aria-hidden="true">
+            <path class="v-left" d="M0 0H26L65 86V122L43 108Z"/>
+            <path class="v-right" d="M65 86L103 0H130L87 108L65 122Z"/>
+          </svg>
+          <span>Tecnologia</span>
+        </button>
+      </div>
+
+      <div class="area-panels">
+        <section class="area-panel area-food" id="area-food" aria-labelledby="area-title-food">
+          <div class="area-heading">
+            <h3 id="area-title-food">Alimentação</h3>
+            <p>Sabores, vitrines e encontros. Sites para dar espaço ao seu negócio de alimentação.</p>
+          </div>
+          <div class="area-examples">
+            <a class="area-example example-preview" href="https://coletivo-inspira.github.io/pastus/#inicio" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/pastus.jpg" width="1280" height="900" alt="Prévia do site Pastus Fogo & Parrilla" loading="lazy">
+              <span>Pastus Fogo & Parrilla<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://cacia.inspira.dev.br/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/cacia.jpg" width="1280" height="900" alt="Prévia do site Bar da Cácia" loading="lazy">
+              <span>Bar da Cácia<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://aldeiamix.inspira.dev.br/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/aldeiamix.jpg" width="1280" height="900" alt="Prévia do site Aldeia MIX" loading="lazy">
+              <span>Aldeia MIX<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+          </div>
+        </section>
+
+        <section class="area-panel area-art" id="area-art" aria-labelledby="area-title-art">
+          <div class="area-heading">
+            <h3 id="area-title-art">Arte & design</h3>
+            <p>Projetos e processos criativos com uma apresentação que acompanha sua identidade.</p>
+          </div>
+          <div class="area-examples">
+            <a class="area-example example-preview" href="https://danibraga.hudilabs.com/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/dani.jpg" width="1280" height="900" alt="Prévia do site Dani Braga Design" loading="lazy">
+              <span>Dani Braga Design<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://fantaze.inspira.dev.br/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/fantaze.jpg" width="1280" height="900" alt="Prévia do site Fantaze" loading="lazy">
+              <span>Fantaze<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+          </div>
+        </section>
+
+        <section class="area-panel area-photo" id="area-photo" aria-labelledby="area-title-photo">
+          <div class="area-heading">
+            <h3 id="area-title-photo">Fotografia & mídia</h3>
+            <p>Imagem, comunicação e produção de conteúdo em um portfólio próprio.</p>
+          </div>
+          <div class="area-examples">
+            <a class="area-example example-preview" href="https://nathaliaverri.inspira.dev.br/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/nathalia.jpg" width="1280" height="900" alt="Prévia do site Nathália Verri" loading="lazy">
+              <span>Nathália Verri<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+          </div>
+        </section>
+
+        <section class="area-panel area-health" id="area-health" aria-labelledby="area-title-health">
+          <div class="area-heading">
+            <h3 id="area-title-health">Saúde</h3>
+            <p>Informações sobre o atendimento e caminhos simples para o primeiro contato.</p>
+          </div>
+          <div class="area-examples">
+            <a class="area-example example-preview" href="https://felipecarvalhopsi.com/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/felipe.jpg" width="1280" height="900" alt="Prévia do site Felipe Carvalho" loading="lazy">
+              <span>Felipe Carvalho<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://nexaenfermagem.hudilabs.com/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/nexa.jpg" width="1280" height="900" alt="Prévia do site Nexa Enfermagem" loading="lazy">
+              <span>Nexa Enfermagem<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://saracoutinho.hudilabs.com/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/sara.jpg" width="1280" height="900" alt="Prévia do site Sara Coutinho" loading="lazy">
+              <span>Sara Coutinho<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+            <a class="area-example example-preview" href="https://cassiobraganca.hudilabs.com/" target="_blank" rel="noopener noreferrer">
+              <img src="../assets/showcase/cassio.jpg" width="1280" height="900" alt="Prévia do site Cássio Bragança" loading="lazy">
+              <span>Cássio Bragança<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span class="visually-hidden"> (abre em nova aba)</span></span>
+            </a>
+          </div>
+        </section>
+
+        <section class="area-panel area-tech" id="area-tech" aria-labelledby="area-title-tech">
+          <div class="area-heading">
+            <h3 id="area-title-tech">Tecnologia</h3>
+            <p>Um espaço para apresentar soluções, produtos e projetos digitais.</p>
+          </div>
+          <p class="area-empty">Ainda não há exemplo publicado nesta área. <a href="/orcamento/">Converse sobre seu projeto</a>.</p>
+        </section>
+      </div>
+      
+      <p class="section-note">Exemplos reais organizados por área de atuação. Estes trabalhos mostram possibilidades; não são modelos prontos para contratação.</p>
+    </section>
+
+    <section class="wrap section-space" id="projetos" aria-labelledby="projects-title" hidden>
+      <div class="section-heading">
+        <h2 id="projects-title">Feito com a Inspira.</h2>
+        <p>Trabalhos reais, possibilidades para a sua próxima ideia.</p>
+      </div>
+      <div class="projects-grid" id="project-list"></div>
+    </section>
+
+    <section class="teasers wrap section-space" aria-labelledby="teasers-title">
+      <div class="mila-cta-content">
+        <div>
+          <h2>Pronto para criar a sua?</h2>
+          <p>Coloque seus produtos na vitrine em minutos e comece a receber pedidos pelo WhatsApp.</p>
+          <a class="button" href="https://painel.inspira.dev.br/">Crie sua vitrine grátis <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer compact-footer">
+    <div class="wrap">
+      <p>
+        © 2026 <a href="https://inspira.dev.br/">Coletivo Inspira</a>. Todos os direitos reservados.
+        <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer" class="footer-logo-link">
+          <img src="../assets/brand/coletivo-inspira.svg" alt="Coletivo Inspira" width="20" height="20" class="footer-logo">
+        </a>
+      </p>
+    </div>
+  </footer>
+  <a href="/orcamento/" class="fixed-quote-btn">Orçamento com a Mila</a>
+</body>
+</html>

@@ -52,3 +52,5 @@ _Evitar_: negócio para designar o modelo.
 **CMS Institucional**: Área exclusiva dos Operadores Inspira no portal para atualizar banners, textos, seções, modelos e cases da página principal da plataforma sem alterar código.
 
 **Sandbox de extensão**: Contêiner isolado em origem opaca (`<iframe sandbox="allow-scripts">` sem `allow-same-origin`) onde componentes personalizados em HTML/CSS/JS ou de repositórios externos executam sem acesso a cookies ou dados de outros clientes.
+
+**Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.

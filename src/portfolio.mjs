@@ -28,5 +28,5 @@ export function quoteContactLink(teamPhone, publishedCase = null) {
   const reference = publishedCase
     ? ` Tenho como referência ${text(publishedCase.title, 'title', 120)} (${text(publishedCase.id, 'id', 64)}).`
     : '';
-  return `https://wa.me/${teamPhone}?text=${encodeURIComponent(`Olá! Gostaria de um orçamento para minha vitrine.${reference}`)}`;
+  return `https://wa.me/${teamPhone}?text=${encodeURIComponent(`Olá, Mila! Eu estava vendo a Vitrine Inspira e fiquei interessado em fazer um orçamento.${reference}`)}`;
 }

@@ -37,7 +37,8 @@ test('quote link encodes case reference and opens only the configured team numbe
   assert.equal(url.origin, 'https://wa.me');
   assert.equal(url.pathname, '/5511999999999');
   assert.equal(url.searchParams.size, 1);
-  assert.match(url.searchParams.get('text'), /A & B \(example\)/);
+  assert.equal(url.searchParams.get('text'), 'Olá, Mila! Eu estava vendo a Vitrine Inspira e fiquei interessado em fazer um orçamento. Tenho como referência A & B (example).');
+  assert.equal(new URL(quoteContactLink('5511999999999')).searchParams.get('text'), 'Olá, Mila! Eu estava vendo a Vitrine Inspira e fiquei interessado em fazer um orçamento.');
 });
 test('committed catalog passes the public projection contract', async () => {
   const catalog = JSON.parse(await readFile(new URL('../content/portfolio.json', import.meta.url), 'utf8'));

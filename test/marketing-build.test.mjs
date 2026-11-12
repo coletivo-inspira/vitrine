@@ -36,3 +36,65 @@ test('marketing package excludes private sources and resolves its local assets',
   assert.match(app, /new URL\('\.\/data\/contact\.json', import\.meta\.url\)/);
   await promisify(execFile)(process.execPath, ['scripts/build.mjs'], { cwd: root });
 });
+
+test('every nav link on marketing pages points to a page that exists in dist/', async () => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const output = resolve(root, 'dist');
+  
+  const marketingPages = [
+    'index.html',
+    'como-funciona/index.html',
+    'possibilidades/index.html',
+    'planos/index.html',
+    'orcamento/index.html'
+  ];
+  
+  for (const page of marketingPages) {
+    const html = await readFile(resolve(output, page), 'utf8');
+    const navMatch = html.match(/<nav id="site-nav"[^>]*>([\s\S]*?)<\/nav>/);
+    assert.ok(navMatch, `Missing nav in ${page}`);
+    const navContent = navMatch[1];
+    
+    for (const linkMatch of navContent.matchAll(/href="([^"]+)"/g)) {
+      const href = linkMatch[1];
+      if (href.startsWith('https://') || href.startsWith('http://') || href.startsWith('#')) {
+        continue;
+      }
+      
+      let targetFile;
+      if (href === '/') {
+        targetFile = 'index.html';
+      } else {
+        const cleanPath = href.replace(/^\/|\/$/g, '');
+        targetFile = `${cleanPath}/index.html`;
+      }
+      
+      const absoluteTarget = resolve(output, targetFile);
+      const statResult = await stat(absoluteTarget);
+      assert.ok(statResult.isFile(), `Nav link href="${href}" in ${page} resolves to missing file: ${targetFile}`);
+    }
+  }
+});
+
+test('no user-visible catálogo or cardápio exists on marketing pages in dist/', async () => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const output = resolve(root, 'dist');
+  
+  const marketingPages = [
+    'index.html',
+    'como-funciona/index.html',
+    'possibilidades/index.html',
+    'planos/index.html',
+    'orcamento/index.html'
+  ];
+  
+  for (const page of marketingPages) {
+    const html = await readFile(resolve(output, page), 'utf8');
+    const textOnly = html.replace(/<[^>]*>/g, ' ');
+    const hasCatalogo = /(?:catálogo|catalogo)/i.test(textOnly);
+    const hasCardapio = /(?:cardápio|cardapio)/i.test(textOnly);
+    
+    assert.ok(!hasCatalogo, `Page ${page} contains forbidden terminology "catálogo": ... ${textOnly.match(/[^ ]{0,20}(?:catálogo|catalogo)[^ ]{0,20}/i)?.[0]} ...`);
+    assert.ok(!hasCardapio, `Page ${page} contains forbidden terminology "cardápio": ... ${textOnly.match(/[^ ]{0,20}(?:cardápio|cardapio)[^ ]{0,20}/i)?.[0]} ...`);
+  }
+});

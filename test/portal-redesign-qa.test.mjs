@@ -70,6 +70,10 @@ test('QA Test Suite - Spec 008 CSS Contracts and Static Assets', async (t) => {
   await t.test('4. Security checks - verify no script tags or inline styles that could compromise CSP', async () => {
     const htmlFiles = [
       './web/index.html',
+      './web/como-funciona/index.html',
+      './web/possibilidades/index.html',
+      './web/planos/index.html',
+      './web/orcamento/index.html',
       './web/portal/index.html',
       './web/vitrine/index.html',
       './web/404.html'
