@@ -5,8 +5,12 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import {
+  PORTAL_CSP_HEADER,
+  PORTAL_ORIGIN,
   PORTAL_STORAGE_CSP_HEADER,
+  PUBLIC_SITE_ORIGIN,
   STOREFRONT_STORAGE_CSP_HEADER,
+  STRICT_CSP_HEADER,
   SUPABASE_PUBLIC_PROJECT_URL,
   clearPublicationsCache,
   createApiHandler
@@ -18,19 +22,26 @@ import {
   ALLOWED_STOREFRONT_TYPES,
   ALLOWED_TEMPLATES,
   ALLOWED_WHATSAPP_VARIABLES,
+  REQUIRED_PROFILE_FIELDS,
+  RESERVED_SLUGS,
+  assertProfileComplete,
   buildCustomizationWhatsappUrl,
   createInitialDraftContent,
+  getMissingRequiredProfileFields,
+  isProfileComplete,
   migrateLegacyDraftContent,
   validateCatalogImagePath,
   validateCustomizationRequestInput,
   validateDraftContent,
   validateProfileInput,
-  validateSiteInput
+  validateSiteInput,
+  validateSlug
 } from '../src/portal-validation.mjs';
 import {
   FORBIDDEN_PUBLIC_KEYS,
   compilePublicStorefront,
-  projectPublicStorefrontMenu
+  projectPublicStorefrontMenu,
+  renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -1614,4 +1625,429 @@ test('Operações globais exigem operador e gravam a transição do pedido no ba
   assert.equal((await asRole(db, USER_A, () => move('em_analise'), 'authenticated', true)).rows[0].status, 'em_analise');
   const audit = await db.query("select action, summary from public.audit_logs where entity_id = $1", [request.id]);
   assert.deepEqual(audit.rows, [{ action: 'status_changed', summary: { from: 'novo', to: 'em_analise' } }]);
+});
+
+test('PR A - Roteamento por Host, Domínios Canônicos, Slugs Reservados, Perfil Obrigatório e Seção por Item', async (t) => {
+  await t.test('1. Slugs reservados incluem como-funciona, possibilidades, planos e orcamento', () => {
+    for (const slug of ['como-funciona', 'possibilidades', 'planos', 'orcamento']) {
+      assert.ok(RESERVED_SLUGS.includes(slug), `${slug} deve estar em RESERVED_SLUGS`);
+      assert.throws(() => validateSlug(slug), (err) => err.code === 'INVALID_SLUG');
+      assert.throws(
+        () => validateSiteInput({ name: 'Teste', slug }),
+        (err) => err.code === 'INVALID_SLUG'
+      );
+    }
+  });
+
+  await t.test('2. Perfil obrigatório no primeiro acesso: POST /api/sites retorna 409 PROFILE_INCOMPLETE até preencher os 4 campos obrigatórios (interests opcional)', async () => {
+    const api = createApiHandler();
+    const origin = 'https://painel.inspira.dev.br';
+
+    assert.deepEqual(REQUIRED_PROFILE_FIELDS, [
+      'displayName',
+      'businessName',
+      'city',
+      'whatsapp'
+    ]);
+    assert.equal(isProfileComplete({}), false);
+    assert.deepEqual(getMissingRequiredProfileFields({ displayName: 'Ana' }), [
+      'businessName',
+      'city',
+      'whatsapp'
+    ]);
+    assert.throws(
+      () => assertProfileComplete({ displayName: 'Ana' }),
+      (err) => err.status === 409 && err.code === 'PROFILE_INCOMPLETE'
+    );
+
+    // Tentativa inicial sem perfil -> 409 PROFILE_INCOMPLETE
+    const resEmpty = await api.fetch(
+      new Request(`${origin}/api/sites`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: origin,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Padaria da Ana',
+          slug: 'padaria-da-ana',
+          storefrontType: 'food',
+          template: 'products-v1',
+          catalogType: 'products'
+        })
+      })
+    );
+    assert.equal(resEmpty.status, 409);
+    const bodyEmpty = await resEmpty.json();
+    assert.equal(bodyEmpty.error.code, 'PROFILE_INCOMPLETE');
+    assert.deepEqual(bodyEmpty.error.missingFields, [
+      'displayName',
+      'businessName',
+      'city',
+      'whatsapp'
+    ]);
+
+    // Salva perfil parcial (sem whatsapp) -> continua 409 PROFILE_INCOMPLETE
+    await api.fetch(
+      new Request(`${origin}/api/profile`, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: origin,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: 'Ana Clara',
+          businessName: 'Padaria da Ana',
+          city: 'Belo Horizonte, MG',
+          whatsapp: ''
+        })
+      })
+    );
+
+    const resPartial = await api.fetch(
+      new Request(`${origin}/api/sites`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: origin,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Padaria da Ana',
+          slug: 'padaria-da-ana'
+        })
+      })
+    );
+    assert.equal(resPartial.status, 409);
+    const bodyPartial = await resPartial.json();
+    assert.equal(bodyPartial.error.code, 'PROFILE_INCOMPLETE');
+    assert.deepEqual(bodyPartial.error.missingFields, ['whatsapp']);
+
+    // Salva os 4 campos obrigatórios (sem interests, que é opcional) -> POST /api/sites retorna 201 e herda o WhatsApp do perfil
+    await api.fetch(
+      new Request(`${origin}/api/profile`, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: origin,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: 'Ana Clara',
+          businessName: 'Padaria da Ana',
+          city: 'Belo Horizonte, MG',
+          whatsapp: '5531988887777',
+          interests: []
+        })
+      })
+    );
+
+    const resCreated = await api.fetch(
+      new Request(`${origin}/api/sites`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-owner',
+          Origin: origin,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Padaria da Ana',
+          slug: 'padaria-da-ana',
+          storefrontType: 'food',
+          template: 'products-v1',
+          catalogType: 'products'
+        })
+      })
+    );
+    assert.equal(resCreated.status, 201);
+    const createdBody = await resCreated.json();
+    assert.equal(createdBody.site.slug, 'padaria-da-ana');
+    assert.equal(createdBody.draft.content.whatsapp, '5531988887777');
+  });
+
+  await t.test('3. Campo opcional section por item (como no Google Forms): validação, publicação e retrocompatibilidade sem seções', async () => {
+    const draftWithSections = {
+      schemaVersion: 1,
+      template: 'products-v1',
+      storefrontType: 'food',
+      catalogType: 'products',
+      slug: 'padaria-artesanal',
+      businessName: 'Padaria Artesanal',
+      whatsapp: '5531988887777',
+      items: [
+        {
+          id: 'pao-fermentacao',
+          name: 'Pão de Fermentação Natural',
+          description: 'Casca crocante e miolo alveolado.',
+          section: 'Pães',
+          priceCents: 2400,
+          active: true
+        },
+        {
+          id: 'baguete-tradicional',
+          name: 'Baguete Francesa',
+          section: 'Pães',
+          priceCents: 1600,
+          active: true
+        },
+        {
+          id: 'sonho-creme',
+          name: 'Sonho de Creme de Baunilha',
+          section: 'Doces',
+          priceCents: 1200,
+          active: true
+        }
+      ]
+    };
+
+    const validated = validateDraftContent(draftWithSections);
+    assert.equal(validated.activeItems, 3);
+
+    // Rejeita section inválida (> 160 caracteres ou payload perigoso)
+    assert.throws(
+      () =>
+        validateDraftContent({
+          ...draftWithSections,
+          items: [
+            {
+              ...draftWithSections.items[0],
+              section: 'S'.repeat(161)
+            }
+          ]
+        }),
+      (err) => err.status === 422 && err.code === 'INVALID_ITEM'
+    );
+    assert.throws(
+      () =>
+        validateDraftContent({
+          ...draftWithSections,
+          items: [
+            {
+              ...draftWithSections.items[0],
+              section: '<script>alert(1)</script>'
+            }
+          ]
+        }),
+      (err) => err.status === 422 && err.code === 'INVALID_ITEM'
+    );
+
+    const compiledWithSections = await compilePublicStorefront(draftWithSections, {
+      slug: 'padaria-artesanal',
+      name: 'Padaria Artesanal',
+      storefrontType: 'food',
+      template: 'products-v1'
+    });
+    assert.equal(compiledWithSections.menu.items[0].section, 'Pães');
+    assert.equal(compiledWithSections.menu.items[2].section, 'Doces');
+    assert.deepEqual(
+      compiledWithSections.menu.categories.map((c) => c.name),
+      ['Pães', 'Doces']
+    );
+    const htmlWithSections = renderStorefrontHtml(compiledWithSections.menu);
+    assert.match(htmlWithSections, /<h2 class="menu-category-title">Pães<\/h2>/);
+    assert.match(htmlWithSections, /<h2 class="menu-category-title">Doces<\/h2>/);
+
+    // Vitrine sem section nos itens continua funcionando exatamente como antes
+    const draftWithoutSections = {
+      ...draftWithSections,
+      items: [
+        {
+          id: 'pao-fermentacao',
+          name: 'Pão de Fermentação Natural',
+          priceCents: 2400,
+          active: true
+        }
+      ]
+    };
+    const compiledWithoutSections = await compilePublicStorefront(draftWithoutSections, {
+      slug: 'padaria-artesanal',
+      name: 'Padaria Artesanal',
+      storefrontType: 'food',
+      template: 'products-v1'
+    });
+    assert.equal('section' in compiledWithoutSections.menu.items[0], false);
+    assert.equal(compiledWithoutSections.menu.categories.length, 1);
+    assert.equal(compiledWithoutSections.menu.categories[0].name, 'Cardápio');
+  });
+
+  await t.test('4. Tabela de roteamento por host (vitrine.inspira.dev.br, painel.inspira.dev.br e *.workers.dev)', async () => {
+    clearPublicationsCache();
+    const api = createApiHandler();
+    const env = {
+      SUPABASE_URL: SUPABASE_PUBLIC_PROJECT_URL,
+      SUPABASE_ANON_KEY: 'sb_publishable_routing_test_key',
+      PUBLIC_SITE_ORIGIN,
+      PORTAL_ORIGIN
+    };
+
+    // Publica vitrine pizza-a (que já vem semeada em createMemoryStore) para testar /{slug real}
+    const pubPizzaARes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/sites/20000000-0000-0000-0000-000000000001/publish', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer token-owner' }
+      })
+    );
+    assert.equal(pubPizzaARes.status, 200);
+
+    // 4.1 painel.inspira.dev.br
+    // / serve o portal (200) sem redirect e com PORTAL_CSP_HEADER
+    const painelRootRes = await api.fetch(new Request('https://painel.inspira.dev.br/'), env);
+    assert.equal(painelRootRes.status, 200);
+    assert.equal(painelRootRes.headers.get('location'), null);
+    assert.equal(painelRootRes.headers.get('content-security-policy'), PORTAL_CSP_HEADER);
+    assert.match(await painelRootRes.text(), /Painel Administrativo/);
+
+    // Roteamento também funciona via cabeçalho Host
+    const painelHostHeaderRes = await api.fetch(
+      new Request('http://localhost/', {
+        headers: { Host: 'painel.inspira.dev.br' }
+      }),
+      env
+    );
+    assert.equal(painelHostHeaderRes.status, 200);
+    assert.equal(painelHostHeaderRes.headers.get('content-security-policy'), PORTAL_CSP_HEADER);
+
+    // /portal e /portal/ redirecionam 301 para https://painel.inspira.dev.br/ (preservando query string como ?code=...)
+    for (const [path, expectedLoc] of [
+      ['/portal', 'https://painel.inspira.dev.br/'],
+      ['/portal/', 'https://painel.inspira.dev.br/'],
+      ['/portal/index.html', 'https://painel.inspira.dev.br/'],
+      ['/portal/?code=pkce123', 'https://painel.inspira.dev.br/?code=pkce123']
+    ]) {
+      const res = await api.fetch(new Request(`https://painel.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 301, `Esperado 301 para painel.inspira.dev.br${path}`);
+      assert.equal(res.headers.get('location'), expectedLoc);
+    }
+
+    // /vitrine em painel. redireciona 301 para https://vitrine.inspira.dev.br/
+    for (const path of ['/vitrine', '/vitrine/']) {
+      const res = await api.fetch(new Request(`https://painel.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 301);
+      assert.equal(res.headers.get('location'), 'https://vitrine.inspira.dev.br/');
+    }
+
+    // Rotas de marketing e vitrines em painel. redirecionam 301 para vitrine.inspira.dev.br no mesmo caminho
+    for (const path of [
+      '/loja1',
+      '/pizza-a',
+      '/como-funciona',
+      '/como-funciona/',
+      '/possibilidades',
+      '/possibilidades/',
+      '/planos',
+      '/planos/',
+      '/orcamento',
+      '/orcamento/'
+    ]) {
+      const res = await api.fetch(new Request(`https://painel.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 301, `Esperado 301 para painel.inspira.dev.br${path}`);
+      assert.equal(res.headers.get('location'), `https://vitrine.inspira.dev.br${path}`);
+    }
+
+    // /404 em painel. retorna 404
+    const painel404Res = await api.fetch(new Request('https://painel.inspira.dev.br/404'), env);
+    assert.equal(painel404Res.status, 404);
+
+    // /api/auth/config funciona em painel.
+    const painelAuthCfg = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/config'),
+      env
+    );
+    assert.equal(painelAuthCfg.status, 200);
+    const painelAuthJson = await painelAuthCfg.json();
+    assert.equal(painelAuthJson.PUBLIC_SITE_ORIGIN, 'https://vitrine.inspira.dev.br');
+    assert.equal(painelAuthJson.PORTAL_ORIGIN, 'https://painel.inspira.dev.br');
+
+    // 4.2 vitrine.inspira.dev.br
+    // / e novas páginas de marketing servem 200 com STRICT_CSP_HEADER
+    for (const path of ['/', '/como-funciona', '/possibilidades', '/planos', '/orcamento']) {
+      const res = await api.fetch(new Request(`https://vitrine.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 200, `Esperado 200 em vitrine.inspira.dev.br${path}`);
+      assert.equal(res.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+    }
+
+    // /portal* em vitrine. redireciona 301 para https://painel.inspira.dev.br/
+    for (const [path, expectedLoc] of [
+      ['/portal', 'https://painel.inspira.dev.br/'],
+      ['/portal/', 'https://painel.inspira.dev.br/'],
+      ['/portal/?code=abc', 'https://painel.inspira.dev.br/?code=abc']
+    ]) {
+      const res = await api.fetch(new Request(`https://vitrine.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 301, `Esperado 301 em vitrine.inspira.dev.br${path}`);
+      assert.equal(res.headers.get('location'), expectedLoc);
+    }
+
+    // /vitrine e /vitrine/ em vitrine. redirecionam 301 para https://vitrine.inspira.dev.br/
+    for (const path of ['/vitrine', '/vitrine/']) {
+      const res = await api.fetch(new Request(`https://vitrine.inspira.dev.br${path}`), env);
+      assert.equal(res.status, 301);
+      assert.equal(res.headers.get('location'), 'https://vitrine.inspira.dev.br/');
+    }
+
+    // /loja1 e /pizza-a servem 200 em vitrine.inspira.dev.br
+    for (const slug of ['/loja1', '/pizza-a']) {
+      const res = await api.fetch(new Request(`https://vitrine.inspira.dev.br${slug}`), env);
+      assert.equal(res.status, 200);
+    }
+
+    // /404 e slug não publicado retornam 404 em vitrine.inspira.dev.br
+    for (const notFoundPath of ['/404', '/slug-inexistente']) {
+      const res = await api.fetch(
+        new Request(`https://vitrine.inspira.dev.br${notFoundPath}`),
+        env
+      );
+      assert.equal(res.status, 404);
+    }
+
+    // /api/auth/config funciona em vitrine.inspira.dev.br
+    const vitrineAuthCfg = await api.fetch(
+      new Request('https://vitrine.inspira.dev.br/api/auth/config'),
+      env
+    );
+    assert.equal(vitrineAuthCfg.status, 200);
+
+    // 4.3 *.workers.dev
+    // /portal* redireciona 301 para https://painel.inspira.dev.br/
+    for (const [path, expectedLoc] of [
+      ['/portal', 'https://painel.inspira.dev.br/'],
+      ['/portal/', 'https://painel.inspira.dev.br/'],
+      ['/portal/?code=xyz', 'https://painel.inspira.dev.br/?code=xyz']
+    ]) {
+      const res = await api.fetch(
+        new Request(`https://vitrine-inspira.vitrineinspira.workers.dev${path}`),
+        env
+      );
+      assert.equal(res.status, 301);
+      assert.equal(res.headers.get('location'), expectedLoc);
+    }
+
+    // Demais rotas públicas em *.workers.dev redirecionam 301 para https://vitrine.inspira.dev.br
+    for (const [path, expectedLoc] of [
+      ['/', 'https://vitrine.inspira.dev.br/'],
+      ['/vitrine', 'https://vitrine.inspira.dev.br/'],
+      ['/loja1', 'https://vitrine.inspira.dev.br/loja1'],
+      ['/pizza-a', 'https://vitrine.inspira.dev.br/pizza-a'],
+      ['/como-funciona', 'https://vitrine.inspira.dev.br/como-funciona'],
+      ['/possibilidades', 'https://vitrine.inspira.dev.br/possibilidades'],
+      ['/planos', 'https://vitrine.inspira.dev.br/planos'],
+      ['/orcamento', 'https://vitrine.inspira.dev.br/orcamento']
+    ]) {
+      const res = await api.fetch(
+        new Request(`https://vitrine-inspira.vitrineinspira.workers.dev${path}`),
+        env
+      );
+      assert.equal(res.status, 301, `Esperado 301 em workers.dev${path}`);
+      assert.equal(res.headers.get('location'), expectedLoc);
+    }
+
+    // /api/* permanece em *.workers.dev (sem redirect) para o smoke check do deploy
+    const workersAuthCfg = await api.fetch(
+      new Request('https://vitrine-inspira.vitrineinspira.workers.dev/api/auth/config'),
+      env
+    );
+    assert.equal(workersAuthCfg.status, 200);
+    assert.equal(workersAuthCfg.headers.get('location'), null);
+  });
 });

@@ -141,6 +141,13 @@ async function setupAuditDatabase() {
   ]);
 
   await db.query(
+    `insert into public.profiles (user_id, display_name, business_name, city, whatsapp) values
+      ($1, 'Tenant A', 'Pizzaria Tenant A', 'Belo Horizonte, MG', '5511911111111'),
+      ($2, 'Tenant B', 'Pizzaria Tenant B', 'São Paulo, SP', '5511933333333')`,
+    [TENANT_A_ID, TENANT_B_ID]
+  );
+
+  await db.query(
     `insert into public.sites (id, owner_user_id, slug, name, template) values
       ($1, $4, 'pizzaria-tenant-a1', 'Pizzaria Tenant A1', 'pizzeria-v1'),
       ($2, $4, 'pizzaria-tenant-a2', 'Pizzaria Tenant A2', 'pizzeria-v1'),
@@ -222,6 +229,38 @@ async function setupAuditDatabase() {
       if (url.pathname === '/auth/v1/.well-known/jwks.json' && method === 'GET') {
         jwksFetchCount += 1;
         return new Response(JSON.stringify(activeJwks), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.pathname === '/rest/v1/profiles' && method === 'GET') {
+        const userIdFilter = url.searchParams.get('user_id');
+        const userId = userIdFilter?.startsWith('eq.') ? userIdFilter.slice(3) : null;
+        const rows = await asRole(role, sub, async () => {
+          return (
+            await db.query(
+              'select user_id, display_name, business_name, city, whatsapp, created_at, updated_at from public.profiles where user_id = $1 limit 1',
+              [userId]
+            )
+          ).rows;
+        });
+        return new Response(JSON.stringify(rows), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.pathname === '/rest/v1/profile_interests' && method === 'GET') {
+        const userIdFilter = url.searchParams.get('user_id');
+        const userId = userIdFilter?.startsWith('eq.') ? userIdFilter.slice(3) : null;
+        const rows = await asRole(role, sub, async () => {
+          return (
+            await db.query(
+              'select interest from public.profile_interests where user_id = $1 order by created_at asc',
+              [userId]
+            )
+          ).rows;
+        });
+        return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });

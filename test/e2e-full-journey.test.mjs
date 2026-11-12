@@ -172,6 +172,94 @@ async function createPgliteSupabaseHarness() {
           headers: { 'content-type': 'application/json' }
         });
       }
+      if (url.pathname === '/rest/v1/profiles') {
+        if (method === 'GET') {
+          const userIdFilter = url.searchParams.get('user_id');
+          const userId = userIdFilter?.startsWith('eq.') ? userIdFilter.slice(3) : null;
+          const rows = await runAsJwtRole(request, async () => {
+            const res = await db.query(
+              'select user_id, display_name, business_name, city, whatsapp, created_at, updated_at from public.profiles where user_id = $1 limit 1',
+              [userId]
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (method === 'POST') {
+          const body = await request.json();
+          const rows = await runAsJwtRole(request, async () => {
+            const res = await db.query(
+              `insert into public.profiles (user_id, display_name, business_name, city, whatsapp)
+               values ($1, $2, $3, $4, $5)
+               on conflict (user_id) do update
+                 set display_name = excluded.display_name,
+                     business_name = excluded.business_name,
+                     city = excluded.city,
+                     whatsapp = excluded.whatsapp
+               returning user_id, display_name, business_name, city, whatsapp, created_at, updated_at`,
+              [
+                body.user_id,
+                body.display_name ?? '',
+                body.business_name ?? '',
+                body.city ?? '',
+                body.whatsapp ?? ''
+              ]
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
+      if (url.pathname === '/rest/v1/profile_interests') {
+        if (method === 'GET') {
+          const userIdFilter = url.searchParams.get('user_id');
+          const userId = userIdFilter?.startsWith('eq.') ? userIdFilter.slice(3) : null;
+          const rows = await runAsJwtRole(request, async () => {
+            const res = await db.query(
+              'select interest from public.profile_interests where user_id = $1 order by created_at asc',
+              [userId]
+            );
+            return res.rows;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (method === 'DELETE') {
+          const userIdFilter = url.searchParams.get('user_id');
+          const userId = userIdFilter?.startsWith('eq.') ? userIdFilter.slice(3) : null;
+          await runAsJwtRole(request, async () => {
+            await db.query('delete from public.profile_interests where user_id = $1', [userId]);
+          });
+          return new Response(null, { status: 204 });
+        }
+        if (method === 'POST') {
+          const body = await request.json();
+          const entries = Array.isArray(body) ? body : [body];
+          const rows = await runAsJwtRole(request, async () => {
+            const inserted = [];
+            for (const entry of entries) {
+              const res = await db.query(
+                'insert into public.profile_interests (user_id, interest) values ($1, $2) returning user_id, interest',
+                [entry.user_id, entry.interest]
+              );
+              inserted.push(...res.rows);
+            }
+            return inserted;
+          });
+          return new Response(JSON.stringify(rows), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
       if (url.pathname === '/rest/v1/sites') {
         if (method === 'GET') {
           const idFilter = url.searchParams.get('id');
@@ -510,7 +598,7 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
     assert.equal(homeRes.headers.get('x-frame-options'), 'DENY');
 
     const portalPageRes = await worker.fetch(
-      new Request('https://painel.inspira.dev.br/portal/'),
+      new Request('https://painel.inspira.dev.br/'),
       env
     );
     assert.equal(portalPageRes.status, 200);
@@ -520,9 +608,33 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
       /connect-src 'self' https:\/\/qawlpsrfewosxsfgmmpm\.supabase\.co;/
     );
 
+    const portalLegacyRedirectRes = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/portal/'),
+      env
+    );
+    assert.equal(portalLegacyRedirectRes.status, 301);
+    assert.equal(portalLegacyRedirectRes.headers.get('location'), 'https://painel.inspira.dev.br/');
+
     const homeHtml = await homeRes.text();
     assert.match(homeHtml, /Vitrine Inspira/);
     assert.doesNotMatch(homeHtml, /service_role|SUPABASE_SERVICE_ROLE/i);
+
+    for (const mktPath of [
+      '/como-funciona',
+      '/como-funciona/',
+      '/possibilidades',
+      '/possibilidades/',
+      '/planos',
+      '/planos/',
+      '/orcamento',
+      '/orcamento/'
+    ]) {
+      const mktRes = await worker.fetch(new Request(`https://vitrine.inspira.dev.br${mktPath}`), env);
+      assert.equal(mktRes.status, 200, `Esperado 200 em https://vitrine.inspira.dev.br${mktPath}`);
+      assert.equal(mktRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+      const mktHtml = await mktRes.text();
+      assert.match(mktHtml, /Vitrine Inspira/);
+    }
 
     const portfolioRes = await worker.fetch(
       new Request('https://vitrine.inspira.dev.br/data/portfolio.json'),
@@ -670,6 +782,44 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
   });
 
   await t.test('3. Criação de Vitrine (pizzaria-aurora), listagem, edição de cardápio com centavos inteiros, revisão 1 -> 2 e conflito 409', async () => {
+    const incompleteRes = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/api/sites', {
+        method: 'POST',
+        headers: {
+          Cookie: `__Host-vitrine_session=${auroraJwt}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'Pizzaria Aurora Artesanal',
+          slug: 'pizzaria-aurora',
+          template: 'pizzeria-v1',
+          whatsapp: '5511977776666'
+        })
+      }),
+      env
+    );
+    assert.equal(incompleteRes.status, 409);
+    assert.equal((await incompleteRes.json()).error.code, 'PROFILE_INCOMPLETE');
+
+    const saveProfileRes = await worker.fetch(
+      new Request('https://painel.inspira.dev.br/api/profile', {
+        method: 'PUT',
+        headers: {
+          Cookie: `__Host-vitrine_session=${auroraJwt}`,
+          Origin: 'https://painel.inspira.dev.br',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: 'Aurora Costa',
+          businessName: 'Pizzaria Aurora Artesanal',
+          city: 'Belo Horizonte, MG',
+          whatsapp: '5511977776666'
+        })
+      }),
+      env
+    );
+    assert.equal(saveProfileRes.status, 200);
+
     const createRes = await worker.fetch(
       new Request('https://painel.inspira.dev.br/api/sites', {
         method: 'POST',
@@ -1066,25 +1216,27 @@ test('Fase 5 - Suíte E2E Opaque-Box de Ponta a Ponta (Worker + Static Assets di
     // Simula novo isolate (cold start) limpando a memória do Worker
     clearPublicationsCache();
 
-    for (const host of [
-      'https://vitrine.inspira.dev.br',
+    const pageRes = await worker.fetch(new Request('https://vitrine.inspira.dev.br/pipira'), env);
+    assert.equal(pageRes.status, 200, 'GET https://vitrine.inspira.dev.br/pipira deve retornar 200');
+    assert.match(pageRes.headers.get('content-type') || '', /text\/html/i);
+    assert.equal(pageRes.headers.get('cache-control'), STOREFRONT_CACHE_CONTROL);
+    assert.equal(pageRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
+    assert.equal(pageRes.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(pageRes.headers.get('x-frame-options'), 'DENY');
+    const html = await pageRes.text();
+    assert.match(html, /Pipira Forno &amp; Brasa/);
+    assert.match(html, /\/pipira/);
+    assert.match(html, /Pipira Especial da Casa/);
+    assert.match(html, /R\$\s*58,90/);
+    assert.doesNotMatch(html, /Essa página<br>não está aqui\./);
+
+    for (const redirectHost of [
       'https://painel.inspira.dev.br',
       'https://vitrine-inspira.inspira.workers.dev'
     ]) {
-      clearPublicationsCache();
-      const pageRes = await worker.fetch(new Request(`${host}/pipira`), env);
-      assert.equal(pageRes.status, 200, `GET ${host}/pipira deve retornar 200`);
-      assert.match(pageRes.headers.get('content-type') || '', /text\/html/i);
-      assert.equal(pageRes.headers.get('cache-control'), STOREFRONT_CACHE_CONTROL);
-      assert.equal(pageRes.headers.get('content-security-policy'), STRICT_CSP_HEADER);
-      assert.equal(pageRes.headers.get('x-content-type-options'), 'nosniff');
-      assert.equal(pageRes.headers.get('x-frame-options'), 'DENY');
-      const html = await pageRes.text();
-      assert.match(html, /Pipira Forno &amp; Brasa/);
-      assert.match(html, /\/pipira/);
-      assert.match(html, /Pipira Especial da Casa/);
-      assert.match(html, /R\$\s*58,90/);
-      assert.doesNotMatch(html, /Essa página<br>não está aqui\./);
+      const redirRes = await worker.fetch(new Request(`${redirectHost}/pipira`), env);
+      assert.equal(redirRes.status, 301, `GET ${redirectHost}/pipira deve redirecionar 301`);
+      assert.equal(redirRes.headers.get('location'), 'https://vitrine.inspira.dev.br/pipira');
     }
 
     // Verifica leitura cold-start de /data/vitrines/pipira/menu.json e release imutável por hash

@@ -13,12 +13,14 @@ import {
   PortalValidationError,
   RESERVED_SLUGS,
   assertNoDangerousTextPayload,
+  assertProfileComplete,
   computeStorefrontInsights,
   createInitialDraftContent,
   extractDraftItems,
   formatProfileRecord,
   isBotUserAgent,
   isValidSlug,
+   isValidWhatsapp,
   measureDraftBytes,
   migrateLegacyDraftContent,
   validateCatalogImagePath,
@@ -47,6 +49,8 @@ const DEFAULT_SESSION_MAX_AGE_SECONDS = 3600;
 const MAX_SESSION_MAX_AGE_SECONDS = 86400;
 const LOGOUT_COOKIE_HEADER = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
 export const SUPABASE_PUBLIC_PROJECT_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
+export const PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
+export const PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
 export const STRICT_CSP_HEADER =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
 export const PORTAL_CSP_HEADER =
@@ -2570,6 +2574,120 @@ const DEFAULT_NOT_FOUND_HTML = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Página não encontrada — Vitrine Inspira</title><link rel="stylesheet" href="/styles.css"><link rel="icon" href="/assets/brand/plus.svg"></head><body><main class="wrap section-space"><a class="brand" href="/"><img src="/assets/brand/plus.svg" width="36" height="36" alt="">Vitrine Inspira</a><h1 class="section-space">Essa página<br>não está aqui.</h1><p>O endereço pode ter mudado ou ainda não ter sido publicado.</p><p><a class="text-link" href="/">Voltar ao início →</a></p></main></body></html>
 `;
 
+const DEFAULT_PORTAL_HTML = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Painel Administrativo — Vitrine Inspira</title><link rel="stylesheet" href="./portal.css"></head><body><main id="conteudo-portal"></main><script type="module" src="./portal.js"></script></body></html>
+`;
+
+const DEFAULT_MARKETING_HTML = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vitrine Inspira — Seu negócio, em vitrine</title><link rel="stylesheet" href="/styles.css"></head><body><main class="wrap"><h1>Vitrine Inspira</h1></main><script type="module" src="/app.js"></script></body></html>
+`;
+
+const MARKETING_SUBPAGE_SLUGS = new Set([
+  'como-funciona',
+  'possibilidades',
+  'planos',
+  'orcamento'
+]);
+
+const PORTAL_SHARED_ROOT_ASSETS = new Set([
+  '/theme.js',
+  '/styles.css',
+  '/favicon.ico'
+]);
+
+const MARKETING_ONLY_ROOT_ASSETS = new Set([
+  '/app.js',
+  '/categories.js',
+  '/dot-trail.js'
+]);
+
+function resolvePublicOrigins(env = {}, deps = {}) {
+  const publicSiteOrigin = String(
+    env?.PUBLIC_SITE_ORIGIN ?? deps?.publicSiteOrigin ?? PUBLIC_SITE_ORIGIN
+  )
+    .trim()
+    .replace(/\/+$/, '');
+  const portalOrigin = String(
+    env?.PORTAL_ORIGIN ?? deps?.portalOrigin ?? PORTAL_ORIGIN
+  )
+    .trim()
+    .replace(/\/+$/, '');
+  let publicSiteHost = 'vitrine.inspira.dev.br';
+  let portalHost = 'painel.inspira.dev.br';
+  try {
+    publicSiteHost = new URL(publicSiteOrigin).hostname.toLowerCase();
+  } catch {
+    // keep default
+  }
+  try {
+    portalHost = new URL(portalOrigin).hostname.toLowerCase();
+  } catch {
+    // keep default
+  }
+  return { publicSiteOrigin, portalOrigin, publicSiteHost, portalHost };
+}
+
+function resolveRequestHostname(request, url) {
+  const rawHost = (request.headers.get('host') || '').trim();
+  if (rawHost) {
+    const cleaned = rawHost.split(',')[0].trim().replace(/:\d+$/, '').toLowerCase();
+    if (cleaned) return cleaned;
+  }
+  return (url.hostname || '').toLowerCase();
+}
+
+function redirectResponse(targetUrl, status = 301) {
+  return new Response(null, {
+    status,
+    headers: {
+      ...PUBLIC_SECURITY_HEADERS,
+      location: targetUrl,
+      'cache-control': 'no-store'
+    }
+  });
+}
+
+async function renderPortalAssetResponse(request, assetPathname, method, assetsFetcher) {
+  if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+    const assetUrl = new URL(assetPathname, request.url);
+    const assetRes = await assetsFetcher.fetch(
+      new Request(assetUrl, {
+        method: method === 'HEAD' ? 'HEAD' : 'GET',
+        headers: request.headers
+      })
+    );
+    if (assetRes && assetRes.status !== 404) {
+      const headers = new Headers(assetRes.headers);
+      headers.set('content-security-policy', PORTAL_CSP_HEADER);
+      for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) {
+        if (k !== 'content-security-policy' && !headers.has(k)) {
+          headers.set(k, v);
+        }
+      }
+      return new Response(method === 'HEAD' ? null : assetRes.body, {
+        status: assetRes.status,
+        statusText: assetRes.statusText,
+        headers
+      });
+    }
+    if (assetPathname !== '/portal/index.html') {
+      return renderNotFoundPageResponse(request, method, assetsFetcher);
+    }
+  }
+  if (assetPathname === '/portal/index.html') {
+    return new Response(method === 'HEAD' ? null : DEFAULT_PORTAL_HTML, {
+      status: 200,
+      headers: {
+        ...PUBLIC_SECURITY_HEADERS,
+        'content-security-policy': PORTAL_CSP_HEADER,
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=0, must-revalidate'
+      }
+    });
+  }
+  return renderNotFoundPageResponse(request, method, assetsFetcher);
+}
+
 async function renderNotFoundPageResponse(request, method, assetsFetcher) {
   let html = DEFAULT_NOT_FOUND_HTML;
   if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
@@ -2988,6 +3106,112 @@ export function createApiHandler(deps = {}) {
     }
 
     if (pathname !== '/api' && !pathname.startsWith('/api/')) {
+      const { publicSiteOrigin, portalOrigin, publicSiteHost, portalHost } =
+        resolvePublicOrigins(env, deps);
+      const hostname = resolveRequestHostname(request, url);
+      const isPortalHost = hostname === portalHost;
+      const isPublicSiteHost = hostname === publicSiteHost;
+      const isWorkersDevHost = hostname.endsWith('.workers.dev');
+
+      if (isWorkersDevHost) {
+        if (pathname === '/portal' || pathname.startsWith('/portal/')) {
+          return redirectResponse(`${portalOrigin}/${url.search}`, 301);
+        }
+        if (
+          pathname === '/vitrine' ||
+          pathname === '/vitrine/' ||
+          pathname === '/vitrine/index.html'
+        ) {
+          return redirectResponse(`${publicSiteOrigin}/${url.search}`, 301);
+        }
+        return redirectResponse(`${publicSiteOrigin}${pathname}${url.search}`, 301);
+      }
+
+      if (isPortalHost) {
+        if (pathname === '/' || pathname === '/index.html') {
+          return renderPortalAssetResponse(request, '/portal/index.html', method, assetsFetcher);
+        }
+        if (
+          pathname === '/portal' ||
+          pathname === '/portal/' ||
+          pathname === '/portal/index.html'
+        ) {
+          return redirectResponse(`${portalOrigin}/${url.search}`, 301);
+        }
+        if (PORTAL_SHARED_ROOT_ASSETS.has(pathname) || pathname.startsWith('/assets/')) {
+          if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
+            const assetRes = await assetsFetcher.fetch(request);
+            if (assetRes.status !== 404) {
+              const headers = new Headers(assetRes.headers);
+              if (!headers.has('content-security-policy')) {
+                headers.set('content-security-policy', STRICT_CSP_HEADER);
+              }
+              for (const [k, v] of Object.entries(PUBLIC_SECURITY_HEADERS)) {
+                if (!headers.has(k)) {
+                  headers.set(k, v);
+                }
+              }
+              return new Response(method === 'HEAD' ? null : assetRes.body, {
+                status: assetRes.status,
+                statusText: assetRes.statusText,
+                headers
+              });
+            }
+          }
+          return renderNotFoundPageResponse(request, method, assetsFetcher);
+        }
+        if (!MARKETING_ONLY_ROOT_ASSETS.has(pathname)) {
+          const portalSubAssetMatch = pathname.match(
+            /^\/(?:portal\/)?([a-z0-9][a-z0-9._-]*\.(?:css|js|mjs|csv|svg|png|webp|jpg|ico|woff2?|ttf))$/i
+          );
+          if (portalSubAssetMatch) {
+            return renderPortalAssetResponse(
+              request,
+              `/portal/${portalSubAssetMatch[1]}`,
+              method,
+              assetsFetcher
+            );
+          }
+        }
+        if (pathname.startsWith('/portal/')) {
+          return redirectResponse(`${portalOrigin}/${url.search}`, 301);
+        }
+        if (pathname === '/404' || pathname === '/404.html') {
+          return renderNotFoundPageResponse(request, method, assetsFetcher);
+        }
+        if (
+          pathname === '/vitrine' ||
+          pathname === '/vitrine/' ||
+          pathname === '/vitrine/index.html'
+        ) {
+          return redirectResponse(`${publicSiteOrigin}/${url.search}`, 301);
+        }
+        return redirectResponse(`${publicSiteOrigin}${pathname}${url.search}`, 301);
+      }
+
+      if (isPublicSiteHost) {
+        if (pathname === '/portal' || pathname.startsWith('/portal/')) {
+          return redirectResponse(`${portalOrigin}/${url.search}`, 301);
+        }
+        if (
+          pathname === '/vitrine' ||
+          pathname === '/vitrine/' ||
+          pathname === '/vitrine/index.html'
+        ) {
+          return redirectResponse(`${publicSiteOrigin}/${url.search}`, 301);
+        }
+      } else if (
+        pathname === '/vitrine' ||
+        pathname === '/vitrine/' ||
+        pathname === '/vitrine/index.html'
+      ) {
+        return redirectResponse(`${url.origin}/${url.search}`, 301);
+      }
+
+      if (pathname === '/404' || pathname === '/404.html') {
+        return renderNotFoundPageResponse(request, method, assetsFetcher);
+      }
+
       const publicResponse = await handlePublicStorefrontOrMenuRequest(
         request,
         pathname,
@@ -2998,8 +3222,24 @@ export function createApiHandler(deps = {}) {
       if (publicResponse) {
         return publicResponse;
       }
+      const trimmedMarketingSlug = pathname.replace(/^\/+|\/+$/g, '').replace(/\/index\.html$/, '');
       if (assetsFetcher && typeof assetsFetcher.fetch === 'function') {
-        const assetRes = await assetsFetcher.fetch(request);
+        let assetRes = await assetsFetcher.fetch(request);
+        if (
+          assetRes.status === 404 &&
+          MARKETING_SUBPAGE_SLUGS.has(trimmedMarketingSlug)
+        ) {
+          const subpageIndexUrl = new URL(`/${trimmedMarketingSlug}/index.html`, request.url);
+          const subpageRes = await assetsFetcher.fetch(
+            new Request(subpageIndexUrl, {
+              method: method === 'HEAD' ? 'HEAD' : 'GET',
+              headers: request.headers
+            })
+          );
+          if (subpageRes && subpageRes.status !== 404) {
+            assetRes = subpageRes;
+          }
+        }
         if (
           assetRes.status === 404 &&
           !/text\/html/i.test(assetRes.headers.get('content-type') || '')
@@ -3023,6 +3263,20 @@ export function createApiHandler(deps = {}) {
           status: assetRes.status,
           statusText: assetRes.statusText,
           headers
+        });
+      }
+      if (
+        pathname === '/' ||
+        pathname === '/index.html' ||
+        MARKETING_SUBPAGE_SLUGS.has(trimmedMarketingSlug)
+      ) {
+        return new Response(method === 'HEAD' ? null : DEFAULT_MARKETING_HTML, {
+          status: 200,
+          headers: {
+            ...PUBLIC_SECURITY_HEADERS,
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'public, max-age=0, must-revalidate'
+          }
         });
       }
       return renderNotFoundPageResponse(request, method, assetsFetcher);
@@ -3205,9 +3459,12 @@ export function createApiHandler(deps = {}) {
             'Configuração pública de autenticação do Supabase indisponível.'
           );
         }
+        const { publicSiteOrigin, portalOrigin } = resolvePublicOrigins(env, deps);
         return jsonResponse(200, {
           supabaseUrl: rawUrl,
-          publishableKey: String(rawKey).trim()
+          publishableKey: String(rawKey).trim(),
+          PUBLIC_SITE_ORIGIN: publicSiteOrigin,
+          PORTAL_ORIGIN: portalOrigin
         });
       }
 
@@ -3573,13 +3830,27 @@ export function createApiHandler(deps = {}) {
             catalogType,
             whatsapp
           } = validateSiteInput(parsed);
+
+          const profile =
+            typeof store.getProfile === 'function'
+              ? await store.getProfile(user.id, { token: user.token, env })
+              : null;
+          assertProfileComplete(profile);
+
+          const effectiveWhatsapp =
+            parsed?.whatsapp !== undefined
+              ? whatsapp
+              : isValidWhatsapp(profile?.whatsapp)
+                ? profile.whatsapp.trim()
+                : whatsapp;
+
           const content = createInitialDraftContent({
             slug,
             name,
             storefrontType,
             template,
             catalogType,
-            whatsapp
+            whatsapp: effectiveWhatsapp
           });
           const created = await store.createSite(
             {

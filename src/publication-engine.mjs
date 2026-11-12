@@ -62,7 +62,8 @@ const ALLOWED_ITEM_KEYS = new Set([
   'description',
   'imageUrl',
   'minQuantity',
-  'durationMinutes'
+  'durationMinutes',
+  'section'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -112,6 +113,20 @@ function sanitizeOptionalDescription(raw) {
       422,
       'INVALID_ITEM_DESCRIPTION',
       'A descrição de cada item deve ter no máximo 280 caracteres.'
+    );
+  }
+  return trimmed;
+}
+
+function sanitizeOptionalSection(raw) {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > 160) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ITEM',
+      'A seção do item (section) deve ter no máximo 160 caracteres.'
     );
   }
   return trimmed;
@@ -333,6 +348,10 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
         if (desc !== undefined) {
           extras.description = desc;
         }
+        const section = sanitizeOptionalSection(rawItem.section);
+        if (section !== undefined) {
+          extras.section = section;
+        }
         if (typeof rawItem.imageUrl === 'string' && rawItem.imageUrl.trim()) {
           extras.imageUrl = validateSafePublicHttpsUrl(rawItem.imageUrl.trim(), 422);
         }
@@ -369,6 +388,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       id: item.id,
       name: item.name,
       ...(extras.description !== undefined ? { description: extras.description } : {}),
+      ...(extras.section !== undefined ? { section: extras.section } : {}),
       ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),
       priceCents: item.priceCents,
       ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
@@ -433,11 +453,51 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     .map((item) => ({ ...item }));
 
   if (unassignedItems.length > 0) {
-    projectedCategories.push({
-      id: projectedCategories.length === 0 ? 'cardapio' : 'outros-itens',
-      name: projectedCategories.length === 0 ? 'Cardápio' : 'Outros Itens',
-      items: unassignedItems
-    });
+    const hasSectionedItems = unassignedItems.some(
+      (item) => typeof item.section === 'string' && item.section.trim()
+    );
+    if (hasSectionedItems) {
+      const groupedBySection = new Map();
+      const unsectioned = [];
+      for (const item of unassignedItems) {
+        const sec = typeof item.section === 'string' ? item.section.trim() : '';
+        if (sec) {
+          if (!groupedBySection.has(sec)) {
+            groupedBySection.set(sec, []);
+          }
+          groupedBySection.get(sec).push(item);
+        } else {
+          unsectioned.push(item);
+        }
+      }
+      let secIdx = projectedCategories.length;
+      for (const [secName, secItems] of groupedBySection.entries()) {
+        secIdx += 1;
+        let catId = slugifyCategoryId(secName, secIdx - 1);
+        if (seenCategoryIds.has(catId)) {
+          catId = `${catId}-${secIdx}`;
+        }
+        seenCategoryIds.add(catId);
+        projectedCategories.push({
+          id: catId,
+          name: secName,
+          items: secItems
+        });
+      }
+      if (unsectioned.length > 0) {
+        projectedCategories.push({
+          id: projectedCategories.length === 0 ? 'cardapio' : 'outros-itens',
+          name: projectedCategories.length === 0 ? 'Cardápio' : 'Outros Itens',
+          items: unsectioned
+        });
+      }
+    } else {
+      projectedCategories.push({
+        id: projectedCategories.length === 0 ? 'cardapio' : 'outros-itens',
+        name: projectedCategories.length === 0 ? 'Cardápio' : 'Outros Itens',
+        items: unassignedItems
+      });
+    }
   }
 
   const sanitizedComponents = validateComponentsConfig(
