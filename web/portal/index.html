@@ -83,9 +83,10 @@
     <footer class="site-footer compact-footer">
       <div class="wrap">
         <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer" class="coletivo-logo-link">
-          <img src="../assets/brand/coletivo-inspira.svg" alt="Coletivo Inspira" class="coletivo-logo">
+          <img src="../assets/brand/coletivo-inspira.svg" alt="Coletivo Inspira" class="coletivo-logo coletivo-logo-light">
+          <img src="../assets/brand/coletivo-inspira-inverse.svg" alt="Coletivo Inspira" class="coletivo-logo coletivo-logo-dark">
         </a>
-        <p>© 2026 <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer">Coletivo Inspira</a>. Todos os direitos reservados.</p>
+        <p>© 2026 <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer">Coletivo Inspira</a></p>
       </div>
     </footer>
   </section>
@@ -148,10 +149,6 @@
         </div>
         
         <div class="top-bar-middle">
-          <label id="showcase-switcher" class="showcase-switcher" hidden>
-            <span>Vitrine</span>
-            <select id="showcase-switcher-select" class="select-styled"></select>
-          </label>
           <!-- Mode indicator for local evaluation in top bar -->
           <div id="demo-mode-badge" class="demo-badge shell-demo-badge" hidden aria-label="Modo Local de Demonstração">
             <span class="badge-dot"></span>
@@ -186,7 +183,7 @@
             <div id="gate-avatar-placeholder" class="gate-avatar-placeholder">U</div>
             <div class="account-card-info">
               <span class="account-card-title">Conta Google Conectada</span>
-              <span id="gate-email" class="account-card-email">Conectado como ...</span>
+              <span id="gate-email" class="account-card-email">Conta Google conectada</span>
             </div>
           </div>
 
@@ -207,26 +204,18 @@
             </div>
 
             <div class="form-group">
-              <label for="gate-whatsapp">WhatsApp do Negócio (somente dígitos, ex: 5551999999999)</label>
-              <input type="text" id="gate-whatsapp" name="whatsapp" placeholder="5551999999999" required class="item-input input-styled-height">
-              <span id="gate-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: 5551999999999).</span>
+              <label for="gate-whatsapp">WhatsApp do Negócio</label>
+              <input type="text" id="gate-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+55 (51) 99999-9999" required class="item-input input-styled-height">
+              <span id="gate-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
             </div>
 
             <div class="form-group">
-              <label class="label-spaced">Áreas e Recursos de Interesse (opcional)</label>
-              <span class="form-help help-block-spaced">Selecione as opções clicando nelas:</span>
-              <div id="gate-interests-chips-container" class="chips-container">
-                <button type="button" class="chip-btn" data-interest="cardapio-digital">Vitrine Online</button>
-                <button type="button" class="chip-btn" data-interest="agendamento">Agendamento de Serviços</button>
-                <button type="button" class="chip-btn" data-interest="orcamento">Lista de Interesse/Orçamento</button>
-                <button type="button" class="chip-btn" data-interest="identidade-visual">Identidade Visual</button>
-                <button type="button" class="chip-btn" data-interest="dominio-proprio">Domínio Próprio</button>
-                <button type="button" class="chip-btn" data-interest="fotografia">Fotografia de Produtos</button>
-                <button type="button" class="chip-btn" data-interest="tecnologia">Integrações e Tecnologia</button>
-              </div>
+              <label for="gate-interests-combobox" class="label-spaced">Áreas e Recursos de Interesse (opcional)</label>
+              <span class="form-help help-block-spaced">Busque na lista ou digite uma área própria (até 8 opções):</span>
+              <div id="gate-interests-chips-container" class="chips-container"></div>
             </div>
 
-            <button type="submit" class="button button-pill btn-align-left">Criar minha conta</button>
+            <button type="submit" class="button button-pill btn-align-center">Criar minha conta</button>
           </form>
         </section>
 
@@ -235,7 +224,7 @@
           <button id="platform-cms-open" class="button button-small button-secondary button-pill" type="button" hidden>Administração da plataforma</button>
           <div class="section-header">
             <h1 class="display-title">Painel Inicial</h1>
-            <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe a completude do seu perfil, suas vitrines e solicitações.</p>
+            <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe suas vitrines, métricas e solicitações.</p>
           </div>
 
           <!-- Onboarding Checklist -->
@@ -262,18 +251,6 @@
           </div>
           
           <div class="dashboard-hub-grid">
-            <!-- Profile Completeness Card -->
-            <div class="portal-card hub-card completeness-card">
-              <div class="card-eyebrow">Configuração</div>
-              <h3>Completude do Perfil</h3>
-              <div class="progress-bar-container">
-                <span class="progress-text" id="profile-progress-text">0% completo</span>
-                <progress id="profile-completeness-bar" max="100" value="0"></progress>
-              </div>
-              <p id="profile-missing-fields" class="missing-fields-text">Cidade, WhatsApp e interesses pendentes.</p>
-              <button id="hub-complete-profile-btn" class="button button-small button-secondary button-pill" type="button">Completar Perfil</button>
-            </div>
-
             <!-- Vitrines Summary Card -->
             <div class="portal-card hub-card vitrines-summary-card">
               <div class="card-eyebrow">Meus Projetos</div>
@@ -482,7 +459,7 @@
               <div id="profile-avatar-placeholder" class="gate-avatar-placeholder">U</div>
               <div class="account-card-info">
                 <span class="account-card-title">Conta Google Conectada</span>
-                <span id="profile-email" class="account-card-email">Conectado como ...</span>
+                <span id="profile-email" class="account-card-email">Conta Google conectada</span>
               </div>
             </div>
 
@@ -503,23 +480,15 @@
               </div>
 
               <div class="form-group">
-                <label for="profile-whatsapp">WhatsApp do Negócio (somente dígitos, ex: 5551999999999)</label>
-                <input type="text" id="profile-whatsapp" name="whatsapp" placeholder="5551999999999">
-                <span id="profile-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: 5551999999999).</span>
+                <label for="profile-whatsapp">WhatsApp do Negócio</label>
+                <input type="text" id="profile-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+55 (51) 99999-9999">
+                <span id="profile-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
               </div>
 
               <div class="form-group">
-                <label class="label-spaced">Áreas e Recursos de Interesse</label>
-                <span class="form-help help-block-spaced">Selecione as opções clicando nelas:</span>
-                <div id="interests-chips-container" class="chips-container">
-                  <button type="button" class="chip-btn" data-interest="cardapio-digital">Vitrine Online</button>
-                  <button type="button" class="chip-btn" data-interest="agendamento">Agendamento de Serviços</button>
-                  <button type="button" class="chip-btn" data-interest="orcamento">Lista de Interesse/Orçamento</button>
-                  <button type="button" class="chip-btn" data-interest="identidade-visual">Identidade Visual</button>
-                  <button type="button" class="chip-btn" data-interest="dominio-proprio">Domínio Próprio</button>
-                  <button type="button" class="chip-btn" data-interest="fotografia">Fotografia de Produtos</button>
-                  <button type="button" class="chip-btn" data-interest="tecnologia">Integrações e Tecnologia</button>
-                </div>
+                <label for="profile-interests-combobox" class="label-spaced">Áreas e Recursos de Interesse</label>
+                <span class="form-help help-block-spaced">Busque na lista ou digite uma área própria (até 8 opções):</span>
+                <div id="interests-chips-container" class="chips-container"></div>
               </div>
 
               <button type="submit" class="button button-pill btn-align-left">Salvar Perfil</button>
@@ -959,9 +928,9 @@
                   </div>
 
                   <div class="form-group">
-                    <label for="editor-whatsapp">WhatsApp para Pedidos (somente dígitos com DDI, ex: 5511999999999)</label>
-                    <input type="text" id="editor-whatsapp" name="whatsapp" required placeholder="5511999999999" class="item-input input-styled-height">
-                    <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número internacional válido de WhatsApp (ex: 5511999999999).</span>
+                    <label for="editor-whatsapp">WhatsApp do Negócio</label>
+                    <input type="text" id="editor-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="+55 (51) 99999-9999" class="item-input input-styled-height">
+                    <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
                   </div>
 
                   <div class="form-group">
@@ -1125,9 +1094,10 @@
       <footer class="site-footer compact-footer">
         <div class="wrap">
           <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer" class="coletivo-logo-link">
-            <img src="../assets/brand/coletivo-inspira.svg" alt="Coletivo Inspira" class="coletivo-logo">
+            <img src="../assets/brand/coletivo-inspira.svg" alt="Coletivo Inspira" class="coletivo-logo coletivo-logo-light">
+            <img src="../assets/brand/coletivo-inspira-inverse.svg" alt="Coletivo Inspira" class="coletivo-logo coletivo-logo-dark">
           </a>
-          <p>© 2026 <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer">Coletivo Inspira</a>. Todos os direitos reservados.</p>
+          <p>© 2026 <a href="https://inspira.dev.br/" target="_blank" rel="noopener noreferrer">Coletivo Inspira</a></p>
         </div>
       </footer>
     </div>

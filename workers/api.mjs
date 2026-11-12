@@ -517,12 +517,20 @@ export async function verifyJwtEs256(
       return null;
     }
 
-    return {
+    const verified = {
       id: userId,
       role: payload.role,
       iss: payload.iss,
       aud: payload.aud
     };
+    if (typeof payload.email === 'string' && payload.email.trim()) {
+      verified.email = payload.email.trim();
+    }
+    const meta = sanitizeVerifiedUserMetadata(payload.user_metadata);
+    if (meta) {
+      verified.user_metadata = meta;
+    }
+    return verified;
   } catch {
     return null;
   }
@@ -587,7 +595,15 @@ export async function verifyJwtHs256(
     if (!userId) {
       return null;
     }
-    return { id: userId };
+    const verified = { id: userId };
+    if (typeof payload.email === 'string' && payload.email.trim()) {
+      verified.email = payload.email.trim();
+    }
+    const meta = sanitizeVerifiedUserMetadata(payload.user_metadata);
+    if (meta) {
+      verified.user_metadata = meta;
+    }
+    return verified;
   } catch {
     return null;
   }
@@ -770,6 +786,30 @@ export function extractSessionToken(request) {
   return null;
 }
 
+function sanitizeVerifiedUserMetadata(rawMeta) {
+  if (!rawMeta || typeof rawMeta !== 'object' || Array.isArray(rawMeta)) {
+    return undefined;
+  }
+  const clean = {};
+  for (const key of ['full_name', 'name', 'avatar_url', 'picture']) {
+    if (typeof rawMeta[key] === 'string' && rawMeta[key].trim()) {
+      clean[key] = rawMeta[key].trim();
+    }
+  }
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
+function serializeSessionUser(user) {
+  const out = { id: user.id };
+  if (typeof user.email === 'string' && user.email) {
+    out.email = user.email;
+  }
+  if (user.user_metadata && typeof user.user_metadata === 'object' && Object.keys(user.user_metadata).length > 0) {
+    out.user_metadata = user.user_metadata;
+  }
+  return out;
+}
+
 function normalizeVerifiedUser(result, token) {
   if (!result) return null;
   if (typeof result === 'string' && result.trim()) {
@@ -783,7 +823,19 @@ function normalizeVerifiedUser(result, token) {
       (typeof result.user?.id === 'string' && result.user.id.trim()) ||
       null;
     if (id) {
-      return { id, token };
+      const normalized = { id, token };
+      const rawEmail =
+        (typeof result.email === 'string' && result.email.trim()) ||
+        (typeof result.user?.email === 'string' && result.user.email.trim()) ||
+        null;
+      if (rawEmail) {
+        normalized.email = rawEmail;
+      }
+      const meta = sanitizeVerifiedUserMetadata(result.user_metadata ?? result.user?.user_metadata);
+      if (meta) {
+        normalized.user_metadata = meta;
+      }
+      return normalized;
     }
   }
   return null;
@@ -1651,7 +1703,16 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           )
         });
         if (!insInterestsRes.ok) {
-          throw new Error(`Supabase profile_interests insert error: ${insInterestsRes.status}`);
+          const errInfo = await readUpstreamErrorDetails(insInterestsRes);
+          logUpstreamError('upsertProfile.interests', errInfo);
+          if (errInfo.code === '23514') {
+            throw new PortalValidationError(
+              422,
+              'INVALID_INTERESTS',
+              'Não foi possível salvar a área personalizada no banco de dados. Selecione apenas as opções prontas da lista ou aplique a atualização do banco.'
+            );
+          }
+          throw createUpstreamStoreError('upsertProfile.interests', errInfo);
         }
       }
 
@@ -3487,9 +3548,7 @@ export function createApiHandler(deps = {}) {
           }
           return jsonResponse(200, {
             authenticated: true,
-            user: {
-              id: user.id
-            }
+            user: serializeSessionUser(user)
           });
         }
 
@@ -3580,9 +3639,7 @@ export function createApiHandler(deps = {}) {
             200,
             {
               authenticated: true,
-              user: {
-                id: user.id
-              }
+              user: serializeSessionUser(user)
             },
             {
               'set-cookie': buildSessionCookieHeader(user.token, maxAgeSeconds)

@@ -27,6 +27,7 @@ import {
   assertProfileComplete,
   buildCustomizationWhatsappUrl,
   createInitialDraftContent,
+  formatProfileRecord,
   getMissingRequiredProfileFields,
   isProfileComplete,
   migrateLegacyDraftContent,
@@ -2049,5 +2050,123 @@ test('PR A - Roteamento por Host, Domínios Canônicos, Slugs Reservados, Perfil
     );
     assert.equal(workersAuthCfg.status, 200);
     assert.equal(workersAuthCfg.headers.get('location'), null);
+  });
+
+  await t.test('5. Sessão com email e user_metadata do Google (sem vazar token) e interesses personalizados (outro:)', async () => {
+    const api = createApiHandler({
+      authVerifier: async (token) => {
+        if (token === 'token-google-user') {
+          return {
+            id: '10000000-0000-0000-0000-000000000001',
+            email: 'maria@exemplo.com',
+            user_metadata: {
+              full_name: 'Maria Silva',
+              avatar_url: 'https://lh3.googleusercontent.com/a/avatar-maria',
+              provider_token: 'secret-should-not-leak'
+            },
+            secret: 'do-not-expose'
+          };
+        }
+        return null;
+      }
+    });
+
+    const getSessionRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        headers: { Authorization: 'Bearer token-google-user' }
+      })
+    );
+    assert.equal(getSessionRes.status, 200);
+    const getSessionBody = await getSessionRes.json();
+    assert.deepEqual(getSessionBody, {
+      authenticated: true,
+      user: {
+        id: '10000000-0000-0000-0000-000000000001',
+        email: 'maria@exemplo.com',
+        user_metadata: {
+          full_name: 'Maria Silva',
+          avatar_url: 'https://lh3.googleusercontent.com/a/avatar-maria'
+        }
+      }
+    });
+    assert.equal('token' in getSessionBody.user, false);
+    assert.equal('provider_token' in getSessionBody.user.user_metadata, false);
+
+    const postSessionRes = await api.fetch(
+      new Request('https://painel.inspira.dev.br/api/auth/session', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://painel.inspira.dev.br',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accessToken: 'token-google-user' })
+      })
+    );
+    assert.equal(postSessionRes.status, 200);
+    const postSessionBody = await postSessionRes.json();
+    assert.deepEqual(postSessionBody.user, getSessionBody.user);
+
+    // Chaves antigas do HTML devem ser rejeitadas
+    for (const legacyKey of ['orcamento', 'fotografia', 'tecnologia']) {
+      assert.throws(
+        () =>
+          validateProfileInput({
+            displayName: 'Maria',
+            businessName: 'Ateliê',
+            city: 'POA',
+            whatsapp: '5551999999999',
+            interests: [legacyKey]
+          }),
+        (err) => err?.code === 'INVALID_INTERESTS' && err?.status === 422
+      );
+    }
+
+    // Área digitada válida (outro:) é aceita e preservada por formatProfileRecord
+    const validCustom = validateProfileInput({
+      displayName: 'Maria',
+      businessName: 'Ateliê',
+      city: 'POA',
+      whatsapp: '5551999999999',
+      interests: ['cardapio-digital', 'outro:  Cerâmica   artesanal ']
+    });
+    assert.deepEqual(validCustom.interests, ['cardapio-digital', 'outro:Cerâmica artesanal']);
+    const formattedRec = formatProfileRecord(
+      '10000000-0000-0000-0000-000000000001',
+      validCustom,
+      validCustom.interests
+    );
+    assert.deepEqual(formattedRec.interests, ['cardapio-digital', 'outro:Cerâmica artesanal']);
+
+    // Rejeita texto perigoso, HTML, curto demais (<2), longo demais (>40) e mais de 8 itens
+    for (const badInterests of [
+      ['outro:a'],
+      [`outro:${'x'.repeat(41)}`],
+      ['outro:<script>alert(1)</script>'],
+      ['outro:<b>teste</b>'],
+      ['outro:javascript:alert(1)'],
+      [
+        'cardapio-digital',
+        'agendamento',
+        'orcamento-whatsapp',
+        'dominio-proprio',
+        'identidade-visual',
+        'fotografia-conteudo',
+        'automacao-atendimento',
+        'design-sob-medida',
+        'outro:Nona área'
+      ]
+    ]) {
+      assert.throws(
+        () =>
+          validateProfileInput({
+            displayName: 'Maria',
+            businessName: 'Ateliê',
+            city: 'POA',
+            whatsapp: '5551999999999',
+            interests: badInterests
+          }),
+        (err) => err?.code === 'INVALID_INTERESTS' && err?.status === 422
+      );
+    }
   });
 });

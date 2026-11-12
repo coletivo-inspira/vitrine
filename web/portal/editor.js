@@ -1,5 +1,6 @@
 import { renderStructureFields } from './showcase-structure.js';
 import { showFeedback } from './portal.js';
+import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import {
   parseImportCatalogCSV,
@@ -531,10 +532,8 @@ function setupEditorEvents() {
     updateDraftAndPreview();
   });
 
-  editorWhatsapp?.addEventListener('input', () => {
+  attachWhatsappMask(editorWhatsapp, (rawPhone) => {
     if (!currentDraft) return;
-    const rawPhone = editorWhatsapp.value.replace(/\D/g, '');
-    editorWhatsapp.value = rawPhone;
     currentDraft.content.whatsapp = rawPhone;
 
     if (editorWhatsappError) {
@@ -711,7 +710,7 @@ function initializeEditorWorkspace() {
     editorBusinessName.value = currentDraft.content.businessName || '';
   }
   if (editorWhatsapp) {
-    editorWhatsapp.value = currentDraft.content.whatsapp || '';
+    editorWhatsapp.value = formatWhatsappBR(currentDraft.content.whatsapp || '');
   }
   if (editorWhatsappError) {
     editorWhatsappError.hidden = true;
