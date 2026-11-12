@@ -24,7 +24,7 @@ let currentInsightsData = null;
 // DOM Elements
 const authSection = globalThis.document?.getElementById('auth-section');
 const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
-const dashboardSection = globalThis.document?.getElementById('dashboard-section');
+const vitrinesSection = globalThis.document?.getElementById('vitrines-section');
 const insightsSection = globalThis.document?.getElementById('insights-section');
 const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
@@ -99,6 +99,55 @@ const backToDashboardButton = globalThis.document?.getElementById('back-to-dashb
 const RESERVED_SLUGS = ['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout'];
 export const DEFAULT_SUPABASE_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 
+export function getSectionFromHash(hash) {
+  const hashToSection = {
+    '#inicio': 'inicio',
+    '#vitrines': 'vitrines',
+    '#dashboard': 'vitrines',
+    '#insights': 'insights',
+    '#perfil': 'perfil',
+    '#pedidos': 'pedidos',
+    '#wizard': 'wizard',
+    '#editor': 'editor'
+  };
+  return hashToSection[hash] || 'inicio';
+}
+
+export function handleRouting() {
+  if (!currentUser) {
+    showSection('auth');
+    return;
+  }
+  const hash = globalThis.window?.location?.hash || '';
+  const section = getSectionFromHash(hash);
+  
+  if (section === 'editor' && !activeSite) {
+    if (globalThis.window) {
+      globalThis.window.location.hash = '#vitrines';
+    }
+    return;
+  }
+  
+  if (section === 'wizard') {
+    openWizard();
+    return;
+  }
+
+  // Set hash if it's empty to keep deep links consistent and trigger onSection/showSection
+  if (globalThis.window && !globalThis.window.location.hash && section === 'inicio') {
+    globalThis.window.location.hash = '#inicio';
+    return;
+  }
+
+  showSection(section);
+}
+
+function setupHashRouting() {
+  globalThis.window?.addEventListener('hashchange', () => {
+    handleRouting();
+  });
+}
+
 // Initialize App
 globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
@@ -106,13 +155,14 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupProfileChips();
   setupWizardFlow();
   setupInsightsControls();
+  setupHashRouting();
   await checkSession();
   if (currentUser) {
     await loadProfile();
     await loadCustomizationRequests();
     await loadInsightsForActiveSite();
     updateHubSummary();
-    showSection('inicio');
+    handleRouting();
   }
 });
 
@@ -121,28 +171,28 @@ function setupAppShellNavigation() {
   globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      const section = link.getAttribute('data-section');
-      if (section) {
-        showSection(section);
+      const hash = link.getAttribute('href');
+      if (hash && globalThis.window) {
+        globalThis.window.location.hash = hash;
       }
     });
   });
 
   // Hub shortcuts
   globalThis.document?.getElementById('hub-complete-profile-btn')?.addEventListener('click', () => {
-    showSection('perfil');
+    if (globalThis.window) globalThis.window.location.hash = '#perfil';
   });
   globalThis.document?.getElementById('hub-create-site-btn')?.addEventListener('click', () => {
-    openWizard();
+    if (globalThis.window) globalThis.window.location.hash = '#wizard';
   });
   globalThis.document?.getElementById('hub-new-request-btn')?.addEventListener('click', () => {
-    showSection('pedidos');
+    if (globalThis.window) globalThis.window.location.hash = '#pedidos';
   });
   globalThis.document?.getElementById('hub-open-insights-btn')?.addEventListener('click', () => {
-    showSection('insights');
+    if (globalThis.window) globalThis.window.location.hash = '#insights';
   });
   wizardOpenBtn?.addEventListener('click', () => {
-    openWizard();
+    if (globalThis.window) globalThis.window.location.hash = '#wizard';
   });
 }
 
@@ -185,7 +235,7 @@ function setupEventListeners() {
 
   // Back to Dashboard from Editor
   backToDashboardButton?.addEventListener('click', () => {
-    showSection('dashboard');
+    if (globalThis.window) globalThis.window.location.hash = '#vitrines';
   });
 
   // Profile Form Submit
@@ -212,7 +262,7 @@ function setupWizardFlow() {
   // Cancel Buttons
   globalThis.document?.querySelectorAll('.wizard-cancel-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      showSection('dashboard');
+      if (globalThis.window) globalThis.window.location.hash = '#vitrines';
     });
   });
 
@@ -523,7 +573,9 @@ export async function exchangePkceCode(code, deps = {}) {
     if (demoModeBadge) demoModeBadge.hidden = true;
     if (logoutButton) logoutButton.hidden = false;
     
-    onSection('dashboard');
+    const initialHash = deps.locationHash ?? deps.location?.hash ?? globalThis.window?.location?.hash ?? '';
+    const initialSection = getSectionFromHash(initialHash);
+    onSection(initialSection);
     await loadSitesFn();
     return { ok: true, user: sessionData.user, sites };
   } catch {
@@ -553,7 +605,10 @@ export async function checkSession(deps = {}) {
       if (logoutButton) logoutButton.hidden = false;
       
       await loadSitesFn();
-      onSection('dashboard');
+      
+      const initialHash = deps.locationHash ?? deps.location?.hash ?? globalThis.window?.location?.hash ?? '';
+      const initialSection = getSectionFromHash(initialHash);
+      onSection(initialSection);
       
       return { ok: true, user: data.user, sites };
     } else if (res.status === 401) {
@@ -755,7 +810,7 @@ export function showSection(section) {
   if (section !== 'auth') {
     // Show/Hide authenticated content panes
     if (inicioSection) inicioSection.hidden = section !== 'inicio';
-    if (dashboardSection) dashboardSection.hidden = section !== 'dashboard';
+    if (vitrinesSection) vitrinesSection.hidden = section !== 'vitrines';
     if (insightsSection) insightsSection.hidden = section !== 'insights';
     if (perfilSection) perfilSection.hidden = section !== 'perfil';
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
@@ -1363,7 +1418,7 @@ async function handleCreateWizardSite() {
         wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
         await loadSites();
         updateHubSummary();
-        showSection('dashboard');
+        if (globalThis.window) globalThis.window.location.hash = '#vitrines';
       } else if (res.status === 409) {
         showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine.', 'error');
       } else {
@@ -1381,7 +1436,7 @@ async function handleCreateWizardSite() {
             wizardForm.reset();
             await loadSites();
             updateHubSummary();
-            showSection('dashboard');
+            if (globalThis.window) globalThis.window.location.hash = '#vitrines';
             return;
           }
         }
@@ -1433,14 +1488,16 @@ async function handleCreateWizardSite() {
     
     loadLocalSites();
     updateHubSummary();
-    showSection('dashboard');
+    if (globalThis.window) globalThis.window.location.hash = '#vitrines';
   }
 }
 
 // Open Catalog Editor screen
 function openEditor(site) {
   activeSite = site;
-  showSection('editor');
+  if (globalThis.window && globalThis.window.location.hash !== '#editor') {
+    globalThis.window.location.hash = '#editor';
+  }
   loadEditor(site, isOnline);
 }
 

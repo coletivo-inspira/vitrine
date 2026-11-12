@@ -672,7 +672,7 @@ test('Frente QA - Contratos HTTP das APIs do Portal', async (t) => {
     }
     assert.equal(replaceStateCalls.length, 1);
     assert.equal(replaceStateCalls[0].url, '/portal/');
-    assert.deepEqual(sectionChanges, ['dashboard']);
+    assert.deepEqual(sectionChanges, ['inicio']);
     assert.equal(sitesLoadedCount, 1);
     assert.equal(feedbackMessages.length, 0);
 
