@@ -1,4 +1,10 @@
+import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
+import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
+import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
+import { validateCmsSection } from '../src/platform-cms.mjs';
+import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import {
+  ALLOWED_TEMPLATES,
   CATALOG_IMAGES_BUCKET,
   DEFAULT_STOREFRONT_TYPE,
   DEFAULT_TEMPLATE,
@@ -6,8 +12,10 @@ import {
   MAX_EVENTS_BATCH_BYTES,
   PortalValidationError,
   RESERVED_SLUGS,
+  assertNoDangerousTextPayload,
   computeStorefrontInsights,
   createInitialDraftContent,
+  extractDraftItems,
   formatProfileRecord,
   isBotUserAgent,
   isValidSlug,
@@ -24,8 +32,15 @@ import {
 } from '../src/portal-validation.mjs';
 import {
   compilePublicStorefront,
+  computeSha256Hex,
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
+
+const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
+const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
+const TEAM_ROLES = ['owner', 'admin'];
+const DRAFT_EDITOR_ROLES = ['owner', 'admin', 'editor'];
+const UUID_PATTERN = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
 const SESSION_COOKIE_NAME = '__Host-vitrine_session';
 const DEFAULT_SESSION_MAX_AGE_SECONDS = 3600;
@@ -40,6 +55,10 @@ export const PORTAL_STORAGE_CSP_HEADER =
   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL} data: blob:; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const STOREFRONT_STORAGE_CSP_HEADER =
   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
+const SANDBOX_HOST = 'sandbox.inspira.dev.br';
+const SANDBOX_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors https:; sandbox allow-scripts";
+const WIDGET_FRAME_CSP = `; frame-src https://${SANDBOX_HOST}`;
+
 export const STOREFRONT_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
@@ -888,6 +907,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
   const sites = new Map();
   const drafts = new Map();
   const memberships = [];
+  const auditLogs = [];
   const profiles = new Map();
   const customizationRequests = [];
   const publicationsBySlug = new Map();
@@ -1020,6 +1040,52 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       if (!exists) {
         memberships.push({ siteId, userId, role });
       }
+    },
+
+    async listReleases(siteId) {
+      return [...publicationsByHash.values()].filter(entry => entry.siteId === siteId)
+        .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.revision - a.revision)
+        .slice(0, 5);
+    },
+
+    async rollbackRelease(siteId, revision, actorId) {
+      const publication = (await this.listReleases(siteId)).find(entry => entry.revision === revision);
+      if (!publication) return null;
+      publicationsBySlug.set(publication.slug, publication);
+      auditLogs.push({
+        siteId, actorUserId: actorId, action: 'rollback', entityType: 'publication',
+        entityId: String(revision), summary: { artifactHash: publication.hash },
+        createdAt: new Date().toISOString()
+      });
+      return publication;
+    },
+
+    async listAuditLogs(siteId) {
+      return structuredClone(auditLogs.filter(entry => entry.siteId === siteId).slice(-50).reverse());
+    },
+
+    async listMembers(siteId) {
+      return memberships.filter(entry => entry.siteId === siteId)
+        .map(({ userId, role }) => ({ userId, role }));
+    },
+
+    async changeMember(siteId, userId, role, actorId) {
+      const index = memberships.findIndex(entry => entry.siteId === siteId && entry.userId === userId);
+      const site = sites.get(siteId);
+      const currentRole = getRoleForSite(site, userId);
+      const actorRole = getRoleForSite(site, actorId);
+      if (currentRole === 'owner' || ((role === 'admin' || currentRole === 'admin') && actorRole !== 'owner')) {
+        return false;
+      }
+      if (index !== -1) memberships.splice(index, 1);
+      if (role) memberships.push({ siteId, userId, role });
+      if (!role && index === -1) return false;
+      auditLogs.push({
+        siteId, actorUserId: actorId, entityType: 'membership', entityId: userId,
+        action: role ? (index === -1 ? 'insert' : 'update') : 'delete',
+        summary: { role: role ?? currentRole }, createdAt: new Date().toISOString()
+      });
+      return true;
     },
 
     async getProfile(userId) {
@@ -1200,7 +1266,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     async updateDraft({ siteId, userId, revision, content }) {
       const site = sites.get(siteId);
       const role = getRoleForSite(site, userId);
-      if (role !== 'owner') {
+      if (!DRAFT_EDITOR_ROLES.includes(role)) {
         return { status: 'not_found' };
       }
       const current = drafts.get(siteId);
@@ -1374,6 +1440,9 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.components ? { components: rawMenu.components } : {}),
     ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
     ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
+    ...(rawMenu.structure ? { structure: {
+      themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
+    } } : {}),
     ...(hasCategories
       ? { categories: rawMenu.categories }
       : { items: Array.isArray(rawMenu.items) ? rawMenu.items : [] })
@@ -1652,9 +1721,360 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       };
     },
 
+    async readPlatformOperations(resource, { token }) {
+      const queries = {
+        overview: 'rpc/read_platform_overview',
+        'audit-logs': 'audit_logs?select=id,action,entity_type,entity_id,created_at,summary&order=created_at.desc,id.desc&limit=50',
+        'customization-requests': 'customization_requests?select=id,status,goal,storefront_type,created_at&order=created_at.desc,id.desc&limit=50'
+      };
+      const response = await fetchImpl(`${baseUrl}/rest/v1/${queries[resource]}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar a administração da plataforma.');
+      return response.json();
+    },
+
+    async updateCustomizationStatus(id, status, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/customization_requests?id=eq.${encodeURIComponent(id)}&select=id,status`,
+        {
+          method: 'PATCH', headers: authHeaders(token, { prefer: 'return=representation' }),
+          body: JSON.stringify({ status })
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (error?.message === 'INVALID_CUSTOMIZATION_TRANSITION') {
+          throw new PortalValidationError(409, 'INVALID_CUSTOMIZATION_TRANSITION', 'A solicitação mudou. Confira a etapa atual.');
+        }
+        throw new Error('Falha ao atualizar a solicitação.');
+      }
+      return (await response.json())[0] ?? null;
+    },
+
+    async isPlatformAdmin(userId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/platform_operators?user_id=eq.${encodeURIComponent(userId)}&role=eq.platform_admin&select=role`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar a autorização da plataforma.');
+      return (await response.json()).length > 0;
+    },
+
+    async listCms({ token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/platform_cms?select=section_key,draft_content,draft_visible,draft_order,published_at&order=draft_order.asc,section_key.asc`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar o CMS.');
+      return (await response.json()).map(row => ({
+        sectionKey: row.section_key, content: row.draft_content,
+        visible: row.draft_visible, displayOrder: row.draft_order, publishedAt: row.published_at
+      }));
+    },
+
+    async readPublicCms() {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_platform_cms`, {
+        headers: anonHeaders()
+      });
+      if (!response.ok) throw new Error('Falha ao consultar o conteúdo institucional.');
+      return (await response.json()).map(row => ({
+        sectionKey: row.section_key,
+        ...validateCmsSection(row.section_key, { content: row.content, visible: row.visible, displayOrder: row.display_order })
+      }));
+    },
+
+    async updateCms(sectionKey, input, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/platform_cms?section_key=eq.${encodeURIComponent(sectionKey)}&select=section_key`,
+        {
+          method: 'PATCH',
+          headers: authHeaders(token, { prefer: 'return=representation' }),
+          body: JSON.stringify({
+            draft_content: input.content, draft_visible: input.visible, draft_order: input.displayOrder
+          })
+        }
+      );
+      if (!response.ok) throw new Error('Falha ao salvar a seção institucional.');
+      return (await response.json()).length > 0;
+    },
+
+    async publishCms(expectedSections, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/publish_platform_cms`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ expected_sections: expectedSections })
+      });
+      if (!response.ok) throw new Error('Falha ao publicar o conteúdo institucional.');
+      return response.json();
+    },
+
+    async listWidgets(siteId, { token }) {
+      const query = new URLSearchParams({
+        site_id: 'eq.' + siteId, active: 'eq.true', select: 'id,name,version_tag,bundle_hash_sha256'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/custom_components?${query}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar os componentes aprovados.');
+      return (await response.json()).map(widget => ({
+        id: widget.id, name: widget.name, version: widget.version_tag, hash: widget.bundle_hash_sha256
+      }));
+    },
+
+    async approveWidget(widget, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/custom_components`, {
+        method: 'POST', headers: authHeaders(token, { prefer: 'return=minimal' }),
+        body: JSON.stringify(widget)
+      });
+      if (response.status === 409) {
+        throw new PortalValidationError(409, 'WIDGET_VERSION_EXISTS', 'Esta versão do componente já existe.');
+      }
+      if (!response.ok) throw new Error('Falha ao aprovar o componente.');
+    },
+
+    async readSandboxBundle(id, hash) {
+      const query = new URLSearchParams({ widget_id: id, bundle_hash: hash });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_sandbox_bundle?${query}`, { headers: anonHeaders() });
+      if (!response.ok) throw new Error('Falha ao carregar o componente.');
+      return response.json();
+    },
+
+    async listDomains(siteId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/custom_domains?site_id=eq.${encodeURIComponent(siteId)}&order=created_at.desc`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar domínios.');
+      return response.json();
+    },
+
+    async addDomain(siteId, challenge, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/custom_domains`, {
+        method: 'POST', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify({
+          site_id: siteId, hostname: challenge.hostname,
+          is_apex: challenge.is_apex, cname_target: challenge.cname_target
+        })
+      });
+      if (response.status === 409) {
+        throw new PortalValidationError(409, 'HOSTNAME_TAKEN', 'Este endereço já está vinculado.');
+      }
+      if (!response.ok) throw new Error('Falha ao cadastrar o domínio.');
+      return (await response.json())[0];
+    },
+
+    async pendingDomains(env) {
+      const url = new URL(`${baseUrl}/rest/v1/custom_domains`);
+      url.search = new URLSearchParams({
+        status: 'eq.verifying', cf_hostname_id: 'not.is.null', order: 'lease_until.asc', limit: '8'
+      });
+      const token = env.SUPABASE_SERVICE_ROLE_KEY;
+      const response = await fetchImpl(url, { headers: { apikey: token, authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error('Falha ao consultar domínios pendentes.');
+      return response.json();
+    },
+
+    async changeDomain(domain, change, { env, claim = false, remove = false }) {
+      const endpoint = new URL(`${baseUrl}/rest/v1/custom_domains`);
+      endpoint.search = new URLSearchParams({
+        id: 'eq.' + domain.id, site_id: 'eq.' + domain.site_id,
+        lease_until: claim ? 'lt.' + new Date().toISOString() : 'eq.' + domain.lease_until,
+        ...(claim ? { status: 'eq.' + domain.status } : {})
+      });
+      const token = env.SUPABASE_SERVICE_ROLE_KEY;
+      const response = await fetchImpl(endpoint, {
+        method: remove ? 'DELETE' : 'PATCH',
+        headers: {
+          apikey: token, authorization: `Bearer ${token}`, 'content-type': 'application/json',
+          prefer: 'return=representation'
+        },
+        ...(remove ? {} : { body: JSON.stringify(change) })
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (error?.message?.includes('DOMAIN_QUOTA_REACHED')) {
+          throw new PortalValidationError(403, 'DOMAIN_QUOTA_REACHED', 'A cota de domínios da plataforma foi atingida.');
+        }
+        throw new Error('Falha ao atualizar o estado do domínio.');
+      }
+      return (await response.json())[0] ?? null;
+    },
+
+    async resolveDomain(hostname) {
+      const endpoint = new URL(`${baseUrl}/rest/v1/rpc/resolve_showcase_hostname`);
+      endpoint.searchParams.set('requested_hostname', hostname);
+      const response = await fetchImpl(endpoint, { headers: anonHeaders() });
+      if (!response.ok) throw new Error('Falha ao resolver o domínio.');
+      return response.json();
+    },
+
+    async listAssets(siteId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/assets?site_id=eq.${encodeURIComponent(siteId)}&upload_state=eq.ready&order=created_at.desc`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar a biblioteca.');
+      return (await response.json()).map(row => ({
+        id: row.id, key: row.object_key, url: row.public_url,
+        bytes: row.byte_size, provider: row.storage_provider
+      }));
+    },
+
+    async reserveAsset(asset, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/assets`, {
+        method: 'POST',
+        headers: authHeaders(token, { prefer: 'return=minimal' }),
+        body: JSON.stringify(asset)
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (error?.message?.includes('ASSET_QUOTA_EXCEEDED')) {
+          throw new PortalValidationError(409, 'ASSET_QUOTA_EXCEEDED', 'Limite de arquivos da vitrine atingido.');
+        }
+        throw new Error('Falha ao reservar espaço para o arquivo.');
+      }
+    },
+
+    async completeAsset(id, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/assets?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify({ upload_state: 'ready' })
+      });
+      if (!response.ok || !(await response.json()).length) throw new Error('Falha ao registrar o arquivo.');
+    },
+
+    async removeAsset(id, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/assets?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: authHeaders(token)
+      });
+      if (!response.ok) throw new Error('Falha ao remover o arquivo da biblioteca.');
+    },
+
+    async listPlatformTemplates({ token }) {
+      const fields = 'code,name,storefront_type,catalog_type,default_tokens,default_sections';
+      const query = new URLSearchParams({
+        select: fields, order: 'name.asc', limit: '100'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar os modelos.');
+      return response.json();
+    },
+
+    async createPlatformTemplate(code, baseCode, template, { token }) {
+      const query = new URLSearchParams({
+        code: 'eq.' + baseCode, select: 'storefront_type,catalog_type,schema_version'
+      });
+      const baseResponse = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!baseResponse.ok) throw new Error('Falha ao consultar o modelo-base.');
+      const [base] = await baseResponse.json();
+      if (!base) return null;
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates`, {
+        method: 'POST', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify({ ...base, ...template, code })
+      });
+      if (response.status === 409) throw new PortalValidationError(409, 'TEMPLATE_EXISTS', 'Já existe um modelo com esse identificador.');
+      if (!response.ok) throw new Error('Falha ao cadastrar o modelo.');
+      return (await response.json())[0] ?? null;
+    },
+
+    async listStructureTemplates(catalogType, { token }) {
+      const query = new URLSearchParams({
+        catalog_type: 'eq.' + catalogType, active: 'eq.true', is_custom_only: 'eq.false',
+        select: 'code,name', order: 'name.asc', limit: '100'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?${query}`, { headers: authHeaders(token) });
+      if (!response.ok) throw new Error('Falha ao consultar modelos compatíveis.');
+      return response.json();
+    },
+
+    async updatePlatformTemplate(code, template, { token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(code)}`, {
+        method: 'PATCH', headers: authHeaders(token, { prefer: 'return=representation' }),
+        body: JSON.stringify(template)
+      });
+      if (!response.ok) throw new Error('Falha ao salvar o modelo.');
+      return (await response.json())[0] ?? null;
+    },
+
+    async getStructureDefaults(template, { token }) {
+      const [templateResult, moduleResult] = await Promise.all([
+        fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&is_custom_only=eq.false&select=default_tokens,default_sections,catalog_type`,
+          { headers: authHeaders(token) }),
+        fetchImpl(`${baseUrl}/rest/v1/modules?active=eq.true&select=code,default_config`,
+          { headers: authHeaders(token) })
+      ]);
+      if (!templateResult.ok || !moduleResult.ok) throw new Error('Falha ao consultar os modelos da vitrine.');
+      const [row] = await templateResult.json();
+      return {
+        catalogType: row?.catalog_type,
+        template: { defaultTokens: row?.default_tokens, defaultSections: row?.default_sections },
+        modules: Object.fromEntries((await moduleResult.json()).map(entry => [entry.code, entry.default_config]))
+      };
+    },
+
+    async listReleases(siteId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/publication_releases?site_id=eq.${encodeURIComponent(siteId)}&order=published_at.desc,revision.desc&limit=5`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar as versões publicadas.');
+      return Promise.all((await response.json()).map(async row => ({
+        ...await hydratePublicationRecord(row),
+        storedHash: row.artifact_hash
+      })));
+    },
+
+    async rollbackRelease(siteId, revision, _actorId, { token }) {
+      const release = (await this.listReleases(siteId, { token })).find(entry => entry.revision === revision);
+      if (!release || release.hash !== release.storedHash) return null;
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/rollback_showcase`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ target_site: siteId, target_revision: revision, target_hash: release.hash })
+      });
+      if (!response.ok) throw new Error('Falha ao restaurar a versão publicada.');
+      return hydratePublicationRecord(await response.json());
+    },
+
+    async listAuditLogs(siteId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/audit_logs?site_id=eq.${encodeURIComponent(siteId)}&order=created_at.desc,id.desc&limit=50`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar o histórico da vitrine.');
+      return (await response.json()).map(row => ({
+        siteId: row.site_id, actorUserId: row.actor_user_id, action: row.action,
+        entityType: row.entity_type, entityId: row.entity_id,
+        summary: row.summary, createdAt: row.created_at
+      }));
+    },
+
+    async listMembers(siteId, { token }) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/site_memberships?site_id=eq.${encodeURIComponent(siteId)}&select=user_id,role&order=user_id.asc`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar a equipe da vitrine.');
+      return (await response.json()).map(row => ({ userId: row.user_id, role: row.role }));
+    },
+
+    async changeMember(siteId, userId, role, _actorId, { token }) {
+      const endpoint = `${baseUrl}/rest/v1/site_memberships`;
+      const response = role
+        ? await fetchImpl(`${baseUrl}/rest/v1/rpc/set_showcase_member`, {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ target_site: siteId, target_user: userId, target_role: role })
+        })
+        : await fetchImpl(`${endpoint}?site_id=eq.${encodeURIComponent(siteId)}&user_id=eq.${encodeURIComponent(userId)}`, {
+          method: 'DELETE',
+          headers: authHeaders(token, { prefer: 'return=representation' })
+        });
+      if ([400, 401, 403, 409].includes(response.status)) return false;
+      if (!response.ok) throw new Error('Falha ao atualizar a equipe da vitrine.');
+      return Boolean(role) || (await response.json()).length > 0;
+    },
+
     async listSites(userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at&order=created_at.asc`,
+        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)&order=created_at.asc`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -1670,14 +2090,15 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         name: row.name,
         storefrontType: row.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
         template: row.template ?? DEFAULT_TEMPLATE,
-        role: row.owner_user_id === userId ? 'owner' : 'collaborator',
+        role: row.owner_user_id === userId ? 'owner' :
+          row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
         updatedAt: row.updated_at ?? row.created_at
       }));
     },
 
     async getSite(siteId, userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at`,
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -1697,7 +2118,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         name: row.name,
         storefrontType: row.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
         template: row.template ?? DEFAULT_TEMPLATE,
-        role: row.owner_user_id === userId ? 'owner' : 'collaborator',
+        role: row.owner_user_id === userId ? 'owner' :
+          row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
         updatedAt: row.updated_at ?? row.created_at
       };
     },
@@ -2281,9 +2703,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
         status: 200,
         headers: {
           ...PUBLIC_SECURITY_HEADERS,
-          'content-security-policy': hasExternalStorageImages
-            ? STOREFRONT_STORAGE_CSP_HEADER
-            : STRICT_CSP_HEADER,
+          'content-security-policy': (hasExternalStorageImages ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER) +
+            (pub.menu.structure ? WIDGET_FRAME_CSP : ''),
           'content-type': 'text/html; charset=utf-8',
           'cache-control': STOREFRONT_CACHE_CONTROL,
           etag: `"${pub.hash}"`
@@ -2383,6 +2804,125 @@ function validateMutationOriginAndJson(
   return null;
 }
 
+async function loadStructureDefaults(store, site, draft, options, code = draft.content.structure?.templateCode) {
+  if (code != null && (typeof code !== 'string' || !TEMPLATE_CODE_PATTERN.test(code))) {
+    throw new PortalValidationError(422, 'INVALID_TEMPLATE', 'Identificador de modelo inválido.');
+  }
+  const defaults = await store.getStructureDefaults?.(code ?? site.template, options);
+  if (code != null && (!defaults?.catalogType || defaults.catalogType !== draft.content.catalogType)) {
+    throw new PortalValidationError(422, 'INCOMPATIBLE_TEMPLATE', 'Escolha um modelo ativo compatível com este catálogo.');
+  }
+  return defaults;
+}
+
+async function resolveDraftForPublication(store, site, draft, options) {
+  if (!draft.content.structure) return draft.content;
+  const defaults = await loadStructureDefaults(store, site, draft, options);
+  const resolved = resolveShowcaseManifest(draft.content.structure, defaults?.template, {}, defaults?.modules);
+  await assertApprovedWidgets(store, site.id, resolved.pages, options);
+  return {
+    ...draft.content,
+    structure: { themeOverrides: resolved.theme, navigationMenus: resolved.navigation, pages: resolved.pages }
+  };
+}
+
+async function assertApprovedWidgets(store, siteId, pages, options) {
+  const widgets = (Array.isArray(pages) ? pages : []).flatMap(page => Array.isArray(page?.sections) ? page.sections : [])
+    .filter(section => section?.moduleCode === 'custom_sandbox' && section.active !== false);
+  if (!widgets.length) return;
+  const approved = await store.listWidgets?.(siteId, options) ?? [];
+  if (widgets.some(({ config }) => !approved.some(widget =>
+    widget.id === config?.widgetId && widget.hash === config?.bundleHash
+  ))) throw new PortalValidationError(422, 'UNAPPROVED_WIDGET', 'Há um componente sem aprovação para esta vitrine.');
+}
+
+async function handleSandboxPage(request, url, store) {
+  const headers = {
+    'content-security-policy': SANDBOX_CSP,
+    'content-type': 'text/html; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+    'x-robots-tag': 'noindex, nofollow',
+    'referrer-policy': 'no-referrer',
+    'cache-control': 'no-store',
+    'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()'
+  };
+  const match = url.pathname.match(/^\/embed\/([a-f0-9-]+)$/);
+  const hash = url.searchParams.get('v');
+  if (!match || !UUID_PATTERN.test(match[1]) || !/^[a-f0-9]{64}$/.test(hash ?? '') ||
+      !['GET', 'HEAD'].includes(request.method) || !store.readSandboxBundle) {
+    return new Response(null, { status: 404, headers });
+  }
+  try {
+    const bundle = await store.readSandboxBundle(match[1], hash);
+    if (typeof bundle !== 'string' || await computeSha256Hex(bundle) !== hash) {
+      return new Response(null, { status: 404, headers });
+    }
+    return new Response(request.method === 'HEAD' ? null : bundle, { headers });
+  } catch {
+    return new Response(null, { status: 502, headers });
+  }
+}
+
+function domainPresentation(row) {
+  return {
+    id: row.id, hostname: row.hostname, isApex: row.is_apex, status: row.status, sslStatus: row.ssl_status,
+    txtName: row.verification_txt_name, txtValue: row.verification_txt_value, cnameTarget: row.cname_target
+  };
+}
+
+function isExternalHostname(hostname) {
+  return hostname.includes('.') && !hostname.endsWith('.inspira.dev.br') &&
+    !hostname.endsWith('.workers.dev') && !hostname.endsWith('.pages.dev') &&
+    hostname !== 'inspira.dev.br' && hostname !== '127.0.0.1';
+}
+
+async function handleCustomHostname(request, url, store, assets, context) {
+  if (!['GET', 'HEAD'].includes(request.method) || typeof store.resolveDomain !== 'function') {
+    return new Response(null, { status: 404 });
+  }
+  const slug = await store.resolveDomain(url.hostname);
+  if (!isValidSlug(slug)) return new Response(null, { status: 404 });
+  const path = url.pathname === '/' ? `/${slug}` : url.pathname;
+  const publicPaths = new Set([`/${slug}`, `/${slug}/`, `/data/vitrines/${slug}/menu.json`]);
+  if (!publicPaths.has(path)) return new Response(null, { status: 404 });
+  const cache = globalThis.caches?.default;
+  const key = new Request(url.origin + path);
+  const cached = await cache?.match(key);
+  const refresh = async () => {
+    const response = await handlePublicStorefrontOrMenuRequest(
+      request, path, 'GET', store, assets
+    );
+    if (response?.ok && cache) {
+      const headers = new Headers(response.headers);
+      headers.set('cache-control', STOREFRONT_CACHE_CONTROL);
+      headers.set('x-vitrine-cached-at', String(Date.now()));
+      await cache.put(key, new Response(response.clone().body, { headers }));
+    }
+    return response ?? new Response(null, { status: 404 });
+  };
+  if (cached && Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) > 300_000 && context?.waitUntil) {
+    context.waitUntil(refresh().catch(() => {}));
+  }
+  const response = cached ?? await refresh();
+  if (request.method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
+  return response;
+}
+
+function createAssetStorage(env, deps, token, provider) {
+  if (provider === 'r2') {
+    return env.R2_BUCKET && env.R2_PUBLIC_BASE_URL
+      ? new R2StorageProvider({ binding: env.R2_BUCKET, publicBaseUrl: env.R2_PUBLIC_BASE_URL })
+      : null;
+  }
+  return new SupabaseStorageProvider({
+    baseUrl: String(env.SUPABASE_URL ?? deps.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL).replace(/\/+$/, ''),
+    bucket: CATALOG_IMAGES_BUCKET,
+    anonKey: env.SUPABASE_ANON_KEY ?? deps.supabaseAnonKey ?? '',
+    token,
+    fetchImpl: deps.fetch
+  });
+}
+
 export function createApiHandler(deps = {}) {
   const defaultStore = normalizeStore(deps.store);
 
@@ -2406,6 +2946,46 @@ export function createApiHandler(deps = {}) {
     const method = (request.method || 'GET').toUpperCase();
     const store = resolveStore(env);
     const assetsFetcher = env?.ASSETS ?? deps?.assets;
+
+    if (url.hostname === SANDBOX_HOST) return handleSandboxPage(request, url, store);
+
+    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname)) {
+      try {
+        return await handleCustomHostname(request, url, store, assetsFetcher, _ctx);
+      } catch {
+        return new Response(null, { status: 503 });
+      }
+    }
+
+    const previewMatch = pathname.match(/^\/__preview\/([^/]+)\/?$/);
+    if (previewMatch) {
+      const headers = {
+        ...PUBLIC_SECURITY_HEADERS,
+        'cache-control': 'no-store',
+        'x-robots-tag': 'noindex, nofollow',
+        'referrer-policy': 'no-referrer',
+        'content-security-policy': STOREFRONT_STORAGE_CSP_HEADER + WIDGET_FRAME_CSP,
+        'content-type': 'text/html; charset=utf-8'
+      };
+      if (method !== 'GET') return new Response(null, { status: 405, headers });
+      try {
+        const siteId = previewMatch[1];
+        const secret = env.PREVIEW_HMAC_SECRET;
+        const user = await resolveSessionUser(request, env, deps);
+        const revision = secret && user && await verifyPreviewToken(secret, url.searchParams.get('token'), siteId, user.id);
+        if (!revision) return new Response(null, { status: 404, headers });
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        const draft = site && await store.getDraft(siteId, user.id, options);
+        if (draft?.revision !== revision) return new Response(null, { status: 404, headers });
+        const content = await resolveDraftForPublication(store, site, draft, options);
+        const { menu } = await compilePublicStorefront(content, site, { revision });
+        return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
+      } catch (error) {
+        const status = error instanceof PortalValidationError ? 422 : 500;
+        return new Response(null, { status, headers });
+      }
+    }
 
     if (pathname !== '/api' && !pathname.startsWith('/api/')) {
       const publicResponse = await handlePublicStorefrontOrMenuRequest(
@@ -2449,6 +3029,165 @@ export function createApiHandler(deps = {}) {
     }
 
     try {
+      if (pathname === '/api/public/platform-cms' && method === 'GET') {
+        const cache = globalThis.caches?.default;
+        const key = new Request(url.origin + pathname);
+        const refresh = async () => {
+          const sections = typeof store.readPublicCms === 'function' ? await store.readPublicCms() : [];
+          const response = jsonResponse(200, { sections }, {
+            'cache-control': 'public, max-age=60, stale-while-revalidate=300',
+            'x-vitrine-cached-at': String(Date.now())
+          });
+          if (cache) await cache.put(key, response.clone()).catch(() => {});
+          return response;
+        };
+        const cached = await cache?.match(key);
+        if (cached && Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) < 360_000) {
+          if (Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) >= 60_000 && _ctx.waitUntil) {
+            _ctx.waitUntil(refresh().catch(() => {}));
+          }
+          return cached;
+        }
+        return await refresh();
+      }
+
+      const operations = pathname.match(/^\/api\/admin\/(overview|audit-logs|customization-requests)(?:\/([^/]+))?\/?$/);
+      if (operations) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        const [, resource, id] = operations;
+        if (method === 'GET' && !id) {
+          const data = await store.readPlatformOperations(resource, options);
+          const key = { overview: 'overview', 'audit-logs': 'logs', 'customization-requests': 'requests' }[resource];
+          return jsonResponse(200, { [key]: data });
+        }
+        if (method === 'PATCH' && resource === 'customization-requests' && id) {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+          if (guardError) return guardError;
+          const { parsed } = await parseJsonRequest(request);
+          if (!UUID_PATTERN.test(id) || !['em_analise', 'respondido', 'encerrado'].includes(parsed?.status)) {
+            return errorResponse(422, 'INVALID_CUSTOMIZATION_STATUS', 'Informe uma solicitação e etapa válidas.');
+          }
+          const updated = await store.updateCustomizationStatus(id, parsed.status, options);
+          if (!updated) return errorResponse(404, 'CUSTOMIZATION_REQUEST_NOT_FOUND', 'Solicitação não encontrada.');
+          return jsonResponse(200, { request: updated });
+        }
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para administração.');
+      }
+
+      if (pathname === '/api/admin/templates') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method === 'GET') return jsonResponse(200, { templates: await store.listPlatformTemplates(options) });
+        if (method !== 'POST') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para modelos.');
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        const { parsed } = await parseJsonRequest(request);
+        const { code, name, defaultTokens, defaultSections, baseCode } = parsed ?? {};
+        if (typeof code !== 'string' || !TEMPLATE_CODE_PATTERN.test(code) ||
+            (baseCode !== undefined && !ALLOWED_TEMPLATES.includes(baseCode)) || typeof name !== 'string' || !name.trim() || name.trim().length > 120 ||
+            !defaultTokens || !Array.isArray(defaultSections) ||
+            defaultSections.some(entry => entry?.moduleCode === 'custom_sandbox')) {
+          return errorResponse(422, 'INVALID_TEMPLATE', 'Informe um modelo suportado, nome e estrutura válidos.');
+        }
+        assertNoDangerousTextPayload(name);
+        const validated = resolveShowcaseManifest({ themeOverrides: defaultTokens }, { defaultSections });
+        const patch = {
+          name: name.trim(),
+          default_tokens: validated.theme,
+          default_sections: validated.pages[0].sections
+        };
+        const template = baseCode === undefined
+          ? await store.updatePlatformTemplate(code, patch, options)
+          : await store.createPlatformTemplate(code, baseCode, patch, options);
+        if (!template) return errorResponse(404, 'TEMPLATE_NOT_FOUND', 'Modelo não encontrado.');
+        return jsonResponse(200, { template });
+      }
+
+      if (pathname === '/api/admin/custom-components') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method !== 'POST') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para componentes.');
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        const { parsed } = await parseJsonRequest(request);
+        const { siteId, slug, name, version, bundleHtml, sourceRepo, bundleHash } = parsed ?? {};
+        if (typeof siteId !== 'string' || !UUID_PATTERN.test(siteId) ||
+            typeof slug !== 'string' || !/^[a-z0-9_-]{2,64}$/.test(slug) ||
+            typeof name !== 'string' || !name.trim() || name.length > 120 ||
+            typeof version !== 'string' || !/^[a-z0-9._-]{1,32}$/i.test(version) ||
+            typeof bundleHtml !== 'string' || !bundleHtml.trim() || utf8Encoder.encode(bundleHtml).byteLength > 65536 ||
+            (sourceRepo !== undefined && (typeof sourceRepo !== 'string' || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(sourceRepo)))) {
+          return errorResponse(422, 'INVALID_WIDGET', 'Informe a vitrine, identificação, versão e pacote HTML válidos.');
+        }
+        const hash = await computeSha256Hex(bundleHtml);
+        if ((sourceRepo || bundleHash) && bundleHash !== hash) {
+          return errorResponse(422, 'WIDGET_HASH_MISMATCH', 'O hash informado não corresponde ao pacote HTML.');
+        }
+        const id = crypto.randomUUID();
+        await store.approveWidget({
+          id, site_id: siteId, slug, name: name.trim(), version_tag: version,
+          source_type: sourceRepo ? 'github_release' : 'inline_bundle', source_repo: sourceRepo ?? null,
+          bundle_html: bundleHtml, bundle_hash_sha256: hash, approved_by: user.id,
+          sandbox_url: `https://${SANDBOX_HOST}/embed/${id}?v=${hash}`
+        }, options);
+        return jsonResponse(201, { id, hash });
+      }
+
+      const cmsMatch = pathname.match(/^\/api\/admin\/cms(?:\/([a-z0-9_-]+))?\/?$/);
+      if (cmsMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (!await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        const sectionKey = cmsMatch[1];
+        if (!sectionKey && method === 'GET') {
+          return jsonResponse(200, { sections: await store.listCms(options) });
+        }
+        if (sectionKey && (method === 'PUT' || (method === 'POST' && sectionKey === 'publish'))) {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true, requireJson: true
+          });
+          if (guardError) return guardError;
+          if (method === 'PUT') {
+            const { parsed } = await parseJsonRequest(request);
+            const section = validateCmsSection(sectionKey, parsed);
+            if (!await store.updateCms(sectionKey, section, options)) {
+              return errorResponse(404, 'SECTION_NOT_FOUND', 'Seção institucional não encontrada.');
+            }
+            return jsonResponse(200, { sectionKey, ...section });
+          }
+          const sections = await store.listCms(options);
+          const expected = Object.fromEntries(sections.map(section => [
+            section.sectionKey, validateCmsSection(section.sectionKey, section)
+          ]));
+          if (!await store.publishCms(expected, options)) {
+            return errorResponse(409, 'CMS_CHANGED', 'O rascunho mudou durante a publicação. Recarregue e tente novamente.');
+          }
+          const cache = globalThis.caches?.default;
+          if (cache) {
+            const origins = new Set([url.origin, 'https://vitrine.inspira.dev.br']);
+            await Promise.allSettled([...origins].map(origin => cache.delete(origin + '/api/public/platform-cms')));
+          }
+          return jsonResponse(200, { published: true });
+        }
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para o CMS.');
+      }
+
       if (pathname === '/api/auth/config') {
         if (method !== 'GET') {
           return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/auth/config.');
@@ -2860,6 +3599,287 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/sites.');
       }
 
+      const domainMatch = pathname.match(/^\/api\/sites\/([^/]+)\/domains(?:\/([^/]+)(\/verify)?)?\/?$/);
+      if (domainMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const [, siteId, domainId, verify] = domainMatch;
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        if (!site || !TEAM_ROLES.includes(site.role)) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+        if (!store.listDomains) return errorResponse(503, 'DOMAINS_UNAVAILABLE', 'Domínios indisponíveis neste ambiente.');
+        if (method === 'GET' && !domainId) {
+          const domains = (await store.listDomains(siteId, options)).map(domainPresentation);
+          return jsonResponse(200, { domains, defaultUrl: `https://vitrine.inspira.dev.br/${site.slug}` });
+        }
+        const isCreate = method === 'POST' && !domainId;
+        const isVerify = method === 'POST' && Boolean(verify);
+        const isDelete = method === 'DELETE' && domainId && !verify;
+        if (!isCreate && !isVerify && !isDelete) {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para domínios.');
+        }
+        const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+        if (guardError) return guardError;
+        if (!env.CF_SAAS_CNAME_TARGET || !env.CF_SAAS_ZONE_ID || !env.CF_SAAS_API_TOKEN || !env.SUPABASE_SERVICE_ROLE_KEY) {
+          return errorResponse(503, 'DOMAINS_UNAVAILABLE', 'A integração de domínios ainda não foi configurada.');
+        }
+        if (isCreate) {
+          const { parsed } = await parseJsonRequest(request);
+          const hostname = validateCustomHostname(parsed?.hostname);
+          const domain = await store.addDomain(siteId, createDomainChallenge(hostname, env.CF_SAAS_CNAME_TARGET), options);
+          return jsonResponse(201, { domain: domainPresentation(domain) });
+        }
+        if (!UUID_PATTERN.test(domainId)) return errorResponse(404, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.');
+        const domain = (await store.listDomains(siteId, options)).find(entry => entry.id === domainId);
+        if (!domain) return errorResponse(404, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.');
+        if (isVerify && (domain.cname_target !== env.CF_SAAS_CNAME_TARGET || !await verifyDomainDns(domain, deps.fetch))) {
+          return errorResponse(409, 'DNS_NOT_VERIFIED', 'Os registros DNS ainda não correspondem às instruções.');
+        }
+        const provider = new CloudflareHostnames(env.CF_SAAS_ZONE_ID, env.CF_SAAS_API_TOKEN, deps.fetch);
+        const claimed = await store.changeDomain(domain, {
+          lease_until: new Date(Date.now() + 45_000).toISOString(),
+          ...(isVerify && !['active', 'verifying'].includes(domain.status) ? { status: 'verifying' } : {})
+        }, { env, claim: true });
+        if (!claimed) return errorResponse(409, 'DOMAIN_BUSY', 'Este domínio está sendo processado.');
+        try {
+          let remote = await provider.find(domain.hostname);
+          if (remote && remote.id !== domain.cf_hostname_id && !(isDelete && domain.status === 'pending_dns')) {
+            return errorResponse(409, 'HOSTNAME_TAKEN', 'Este endereço já está configurado na zona.');
+          }
+          if (isDelete) {
+            if (remote && remote.id === domain.cf_hostname_id) await provider.remove(remote.id);
+            await store.changeDomain(claimed, null, { env, remove: true });
+            return new Response(null, { status: 204 });
+          }
+          remote ??= await provider.create(domain.hostname);
+          const active = remote.status === 'active' && remote.ssl?.status === 'active';
+          const updated = await store.changeDomain(claimed, {
+            status: active ? 'active' : 'verifying',
+            ssl_status: remote.ssl?.status === 'active' ? 'active' : 'pending',
+            cf_hostname_id: remote.id,
+            verified_at: active ? new Date().toISOString() : null
+          }, { env });
+          return jsonResponse(200, { domain: domainPresentation(updated) });
+        } catch (error) {
+          if (error?.code === 'DOMAIN_QUOTA_REACHED' && !claimed.cf_hostname_id) {
+            await store.changeDomain(claimed, { status: 'pending_dns' }, { env });
+          }
+          throw error;
+        } finally {
+          await store.changeDomain(claimed, { lease_until: '-infinity' }, { env }).catch(() => {});
+        }
+      }
+
+      const structureMatch = pathname.match(/^\/api\/sites\/([^/]+)\/structure\/?$/);
+      if (structureMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const siteId = structureMatch[1];
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        const draft = site && await store.getDraft(siteId, user.id, options);
+        if (!draft) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (method === 'GET') {
+          const defaults = await loadStructureDefaults(store, site, draft, options);
+          const structure = draft.content.structure ?? {};
+          return jsonResponse(200, {
+            revision: draft.revision, structure,
+            templates: await store.listStructureTemplates?.(draft.content.catalogType, options) ?? [],
+            widgets: await store.listWidgets?.(siteId, options) ?? [],
+            resolved: resolveShowcaseManifest(structure, defaults?.template, {}, defaults?.modules)
+          });
+        }
+        if (method !== 'PUT') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para estrutura.');
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true, requireJson: true
+        });
+        if (guardError) return guardError;
+        if (!DRAFT_EDITOR_ROLES.includes(site.role)) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+        const { parsed } = await parseJsonRequest(request);
+        const revision = validateRevision(parsed?.expectedRevision);
+        const selecting = Object.hasOwn(parsed, 'templateCode');
+        const code = selecting ? parsed.templateCode ?? undefined : draft.content.structure?.templateCode;
+        const defaults = await loadStructureDefaults(store, site, draft, options, code ?? null);
+        let edits = selecting ? draft.content.structure ?? {} : parsed;
+        if (selecting && Object.hasOwn(parsed, 'pages')) {
+          const previous = await loadStructureDefaults(store, site, draft, options);
+          const beforeSwitch = resolveShowcaseManifest(parsed, previous?.template, {}, previous?.modules);
+          edits = extractShowcaseOverrides(beforeSwitch, previous?.template, {}, previous?.modules);
+        }
+        const resolved = resolveShowcaseManifest(edits, defaults?.template, {}, defaults?.modules);
+        await assertApprovedWidgets(store, siteId, resolved.pages, options);
+        const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
+        if (code !== undefined) structure.templateCode = code;
+        const content = { ...draft.content, structure };
+        validateDraftContent(content);
+        const updated = await store.updateDraft({ siteId, userId: user.id, revision, content }, options);
+        if (updated.status === 'conflict') {
+          return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
+        }
+        if (updated.status !== 'ok') return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        return jsonResponse(200, { draft: updated.draft, resolved });
+      }
+
+      const toggleMatch = pathname.match(/^\/api\/sites\/([^/]+)\/quick-toggle\/?$/);
+      if (toggleMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        if (method !== 'PATCH') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para disponibilidade.');
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true, requireJson: true
+        });
+        if (guardError) return guardError;
+        const siteId = toggleMatch[1];
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        const draft = DRAFT_EDITOR_ROLES.includes(site?.role) && await store.getDraft(siteId, user.id, options);
+        if (!draft) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+
+        const { parsed } = await parseJsonRequest(request);
+        const { targetType, targetId, active, expectedRevision } = parsed ?? {};
+        if (expectedRevision !== undefined && validateRevision(expectedRevision) !== draft.revision) {
+          return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
+        }
+        if (!['item', 'category', 'section'].includes(targetType) ||
+            typeof targetId !== 'string' || !targetId.trim() || typeof active !== 'boolean') {
+          return errorResponse(422, 'INVALID_TOGGLE', 'Informe o tipo, identificador e estado desejado.');
+        }
+        const content = structuredClone(draft.content);
+        const defaults = targetType === 'section' ? await loadStructureDefaults(store, site, draft, options) : undefined;
+        const resolved = targetType === 'section'
+          ? resolveShowcaseManifest(content.structure ?? {}, defaults?.template, {}, defaults?.modules)
+          : null;
+        const targets = targetType === 'item' ? extractDraftItems(content)
+          : targetType === 'category' ? content.categories ?? []
+          : resolved.pages.flatMap(page => page.sections);
+        const matching = targets.filter(entry => entry?.id === targetId);
+        if (!matching.length) return errorResponse(404, 'TARGET_NOT_FOUND', 'O elemento não foi encontrado no rascunho.');
+        if (matching.length > 1) return errorResponse(409, 'AMBIGUOUS_TARGET', 'O identificador corresponde a mais de um elemento.');
+        const [target] = matching;
+        target.active = active;
+        if (targetType === 'item' && Object.hasOwn(target, 'available')) target.available = active;
+        if (resolved) {
+          const code = content.structure?.templateCode;
+          content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
+          if (code !== undefined) content.structure.templateCode = code;
+        }
+        validateDraftContent(content);
+        const updated = await store.updateDraft({ siteId, userId: user.id, revision: draft.revision, content }, options);
+        if (updated.status === 'conflict') {
+          return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
+        }
+        if (updated.status !== 'ok') return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        return jsonResponse(200, { draft: updated.draft });
+      }
+
+      const releaseMatch = pathname.match(/^\/api\/sites\/([^/]+)\/(releases|rollback)\/?$/);
+      if (releaseMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const [, siteId, operation] = releaseMatch;
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        if (!site || (operation === 'rollback' && !TEAM_ROLES.includes(site.role))) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+        if (operation === 'releases' && method === 'GET') {
+          const releases = (await store.listReleases(siteId, options)).map(entry => ({
+            revision: entry.revision, artifactHash: entry.hash, publishedAt: entry.publishedAt
+          }));
+          return jsonResponse(200, { releases });
+        }
+        if (operation === 'rollback' && method === 'POST') {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true, requireJson: true
+          });
+          if (guardError) return guardError;
+          const { parsed } = await parseJsonRequest(request);
+          const revision = validateRevision(parsed?.targetRevision);
+          const publication = await store.rollbackRelease(siteId, revision, user.id, options);
+          if (!publication) return errorResponse(404, 'RELEASE_NOT_FOUND', 'Versão indisponível para restauração.');
+          publicationFetchedAtBySlug.set(publication.slug, Date.now());
+          await sharedPublicPublications.savePublication(publication);
+          if (globalThis.caches?.default) {
+            const cacheUrls = [publication.url, publication.menuUrl].map(path => new URL(path, url.origin).href);
+            await Promise.allSettled(cacheUrls.map(cacheUrl => caches.default.delete(cacheUrl)));
+          }
+          return jsonResponse(200, { publication });
+        }
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para versões.');
+      }
+
+      const previewTokenMatch = pathname.match(/^\/api\/sites\/([^/]+)\/preview-token\/?$/);
+      if (previewTokenMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        if (method !== 'POST') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para prévia.');
+        const guardError = validateMutationOriginAndJson(request, url, {
+          requireOrigin: true, requireJson: true
+        });
+        if (guardError) return guardError;
+        const siteId = previewTokenMatch[1];
+        const draft = await store.getDraft(siteId, user.id, { token: user.token, env });
+        if (!draft) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (!env.PREVIEW_HMAC_SECRET) {
+          return errorResponse(503, 'PREVIEW_UNAVAILABLE', 'A prévia segura ainda não foi configurada.');
+        }
+        const token = await signPreviewToken(env.PREVIEW_HMAC_SECRET, siteId, user.id, draft.revision);
+        return jsonResponse(200, { url: `/__preview/${encodeURIComponent(siteId)}?token=${token}` });
+      }
+
+      const auditMatch = pathname.match(/^\/api\/sites\/([^/]+)\/audit-logs\/?$/);
+      if (auditMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        if (method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para o histórico.');
+        const siteId = auditMatch[1];
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        if (!site) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        return jsonResponse(200, { logs: await store.listAuditLogs(siteId, options) });
+      }
+
+      const membersMatch = pathname.match(/^\/api\/sites\/([^/]+)\/members(?:\/([^/]+))?\/?$/);
+      if (membersMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const [, siteId, memberId] = membersMatch;
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        if (!site || !TEAM_ROLES.includes(site.role)) {
+          return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        }
+
+        if (method === 'GET' && !memberId) {
+          return jsonResponse(200, { members: await store.listMembers(siteId, options) });
+        }
+
+        if ((method === 'POST' && !memberId) || (method === 'DELETE' && memberId)) {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true, requireJson: true
+          });
+          if (guardError) return guardError;
+          const { parsed } = method === 'POST' ? await parseJsonRequest(request) : {};
+          const targetUser = memberId ?? parsed?.userId;
+          const role = memberId ? null : parsed?.role;
+          if (typeof targetUser !== 'string' || !UUID_PATTERN.test(targetUser) ||
+              (!memberId && !MEMBER_ROLES.includes(role))) {
+            return errorResponse(422, 'INVALID_MEMBER', 'Informe um usuário e um papel válidos.');
+          }
+
+          if (!await store.changeMember(siteId, targetUser, role, user.id, options)) {
+            return errorResponse(403, 'FORBIDDEN_MEMBER_CHANGE', 'A alteração do membro foi recusada.');
+          }
+          return role ? jsonResponse(200, { member: { userId: targetUser, role } }) : new Response(null, { status: 204 });
+        }
+
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para gestão da equipe.');
+      }
+
       const draftMatch = pathname.match(/^\/api\/sites\/([^/]+)\/draft\/?$/);
       if (draftMatch) {
         const user = await resolveSessionUser(request, env, deps);
@@ -2888,7 +3908,7 @@ export function createApiHandler(deps = {}) {
           if (typeof store.getSite === 'function') {
             site = await store.getSite(siteId, user.id, { token: user.token, env });
           }
-          if (site && site.role && site.role !== 'owner') {
+          if (site && site.role && !DRAFT_EDITOR_ROLES.includes(site.role)) {
             return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
           }
 
@@ -2935,6 +3955,14 @@ export function createApiHandler(deps = {}) {
               'INVALID_SLUG',
               'O identificador (slug) do rascunho não pode divergir do slug da vitrine.'
             );
+          }
+
+          if (parsed.content.structure && Object.hasOwn(parsed.content.structure, 'templateCode')) {
+            if (parsed.content.catalogType !== existingDraft.content.catalogType) {
+              delete parsed.content.structure.templateCode;
+            } else if (parsed.content.structure.templateCode !== existingDraft.content.structure?.templateCode) {
+              return errorResponse(422, 'INVALID_TEMPLATE_CHANGE', 'Troque o modelo na edição de estrutura.');
+            }
           }
 
           const updateResult = await store.updateDraft(
@@ -2997,12 +4025,13 @@ export function createApiHandler(deps = {}) {
           const allSites = await store.listSites(user.id, { token: user.token, env });
           site = allSites.find((entry) => entry.id === siteId) ?? null;
         }
-        if (!site || (site.role && site.role !== 'owner')) {
+        if (!site || (site.role && !TEAM_ROLES.includes(site.role))) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
+        const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
-        const compiled = await compilePublicStorefront(draft.content, site, {
+        const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
           siteId: site.id
         });
@@ -3016,7 +4045,45 @@ export function createApiHandler(deps = {}) {
         return jsonResponse(200, { publication: compiled.publication });
       }
 
-      const uploadMatch = pathname.match(/^\/api\/sites\/([^/]+)\/upload\/?$/);
+      const assetMatch = pathname.match(/^\/api\/sites\/([^/]+)\/assets(?:\/([^/]+))?\/?$/);
+      if (assetMatch && method !== 'POST') {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const [, siteId, assetId] = assetMatch;
+        const options = { token: user.token, env };
+        const site = await store.getSite(siteId, user.id, options);
+        if (!site) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (!store.listAssets) return errorResponse(503, 'ASSETS_UNAVAILABLE', 'Biblioteca indisponível neste ambiente.');
+        if (method === 'GET' && !assetId) {
+          const assets = await store.listAssets(siteId, options);
+          return jsonResponse(200, { assets, maxAssets: 100, maxBytes: 20971520 });
+        }
+        if (method === 'DELETE' && assetId && DRAFT_EDITOR_ROLES.includes(site.role)) {
+          const guardError = validateMutationOriginAndJson(request, url, {
+            requireOrigin: true, requireJson: true
+          });
+          if (guardError) return guardError;
+          const asset = (await store.listAssets(siteId, options)).find(entry => entry.id === assetId);
+          if (!asset) return errorResponse(404, 'ASSET_NOT_FOUND', 'Arquivo não encontrado.');
+          validateCatalogImagePath(asset.key, siteId);
+          const [draft, releases] = await Promise.all([
+            store.getDraft(siteId, user.id, options), store.listReleases(siteId, options)
+          ]);
+          const contentUsesAsset = content => extractDraftItems(content).some(item => item?.imageUrl === asset.url);
+          if (contentUsesAsset(draft?.content) || releases.some(release => contentUsesAsset(release.menu))) {
+            return errorResponse(409, 'ASSET_IN_USE', 'O arquivo está vinculado ao rascunho ou a uma versão publicada.');
+          }
+          const storage = createAssetStorage(env, deps, user.token, asset.provider);
+          if (!storage || !await storage.delete(asset.key)) {
+            return errorResponse(502, 'STORAGE_DELETE_ERROR', 'Não foi possível excluir o arquivo do armazenamento.');
+          }
+          await store.removeAsset(assetId, options);
+          return new Response(null, { status: 204 });
+        }
+        return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para a biblioteca.');
+      }
+
+      const uploadMatch = pathname.match(/^\/api\/sites\/([^/]+)\/upload\/?$/) ?? (assetMatch && !assetMatch[2] ? assetMatch : null);
       if (uploadMatch) {
         const user = await resolveSessionUser(request, env, deps);
         if (!user) {
@@ -3042,7 +4109,7 @@ export function createApiHandler(deps = {}) {
           const allSites = await store.listSites(user.id, { token: user.token, env });
           site = allSites.find((entry) => entry.id === siteId) ?? null;
         }
-        if (!site) {
+        if (!site || !DRAFT_EDITOR_ROLES.includes(site.role)) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
@@ -3121,37 +4188,42 @@ export function createApiHandler(deps = {}) {
           site.id
         );
 
-        const baseUrl = String(
-          env?.SUPABASE_URL ?? deps?.supabaseUrl ?? SUPABASE_PUBLIC_PROJECT_URL
-        ).replace(/\/+$/, '');
-        const anonKey = env?.SUPABASE_ANON_KEY ?? deps?.supabaseAnonKey ?? '';
-        const uploadUrl = `${baseUrl}/storage/v1/object/${CATALOG_IMAGES_BUCKET}/${validatedPath}`;
-
-        const fetchImpl = deps?.fetch ?? globalThis.fetch;
-        const storageRes = await fetchImpl(uploadUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-            apikey: anonKey,
-            'Content-Type': 'image/webp',
-            'x-upsert': 'true'
-          },
-          body: bodyBlob
-        });
-
-        if (!storageRes || !storageRes.ok) {
-          return errorResponse(
-            502,
-            'STORAGE_UPLOAD_ERROR',
-            'Falha ao enviar a imagem para o armazenamento da vitrine.'
-          );
+        const provider = env.R2_BUCKET && env.R2_PUBLIC_BASE_URL ? 'r2' : 'supabase';
+        const storage = createAssetStorage(env, deps, user.token, provider);
+        let assetId;
+        const options = { token: user.token, env };
+        if (assetMatch) {
+          if (!store.reserveAsset) {
+            return errorResponse(503, 'ASSETS_UNAVAILABLE', 'Biblioteca indisponível neste ambiente.');
+          }
+          assetId = crypto.randomUUID();
+          const digest = await crypto.subtle.digest('SHA-256', bodyBlob);
+          const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          await store.reserveAsset({
+            id: assetId, site_id: site.id, storage_provider: provider,
+            object_key: validatedPath, public_url: storage.url(validatedPath),
+            mime_type: 'image/webp', byte_size: bodyBlob.byteLength, sha256_hex: hash
+          }, options);
+        }
+        let publicUrl;
+        try {
+          publicUrl = await storage.put(validatedPath, bodyBlob);
+          if (publicUrl && assetId) await store.completeAsset(assetId, options);
+        } catch {
+          publicUrl = null;
+        }
+        if (!publicUrl) {
+          if (assetId && await storage.delete(validatedPath).catch(() => false)) {
+            await store.removeAsset(assetId, options);
+          }
+          return errorResponse(502, 'STORAGE_UPLOAD_ERROR', 'Falha ao enviar a imagem para o armazenamento da vitrine.');
         }
 
-        const publicUrl = `${baseUrl}/storage/v1/object/public/${CATALOG_IMAGES_BUCKET}/${validatedPath}`;
         return jsonResponse(200, {
           imageUrl: publicUrl,
           path: validatedPath,
-          bytes: bodyBlob.byteLength
+          bytes: bodyBlob.byteLength,
+          ...(assetId ? { id: assetId } : {})
         });
       }
 
@@ -3197,10 +4269,31 @@ export function createApiHandler(deps = {}) {
   return handler;
 }
 
+async function refreshPendingDomainCertificates(env) {
+  if (!env.CF_SAAS_API_TOKEN || !env.CF_SAAS_ZONE_ID || !env.SUPABASE_SERVICE_ROLE_KEY ||
+      !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return;
+  const store = createSupabaseRestStore({ supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY });
+  const provider = new CloudflareHostnames(env.CF_SAAS_ZONE_ID, env.CF_SAAS_API_TOKEN);
+  for (const domain of await store.pendingDomains(env)) {
+    try {
+      const remote = await provider.find(domain.hostname);
+      if (remote?.id !== domain.cf_hostname_id || remote?.status !== 'active' || remote.ssl?.status !== 'active') continue;
+      await store.changeDomain(domain, {
+        status: 'active', ssl_status: 'active', verified_at: new Date().toISOString()
+      }, { env });
+    } catch {
+      // A próxima execução poderá reconsultar o certificado.
+    }
+  }
+}
+
 const defaultApiHandler = createApiHandler();
 
 export default {
   async fetch(request, env = {}, ctx = {}) {
     return defaultApiHandler(request, env, ctx);
+  },
+  async scheduled(_event, env) {
+    await refreshPendingDomainCertificates(env);
   }
 };

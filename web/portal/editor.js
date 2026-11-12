@@ -1,3 +1,4 @@
+import { renderStructureFields } from './showcase-structure.js';
 import { showFeedback } from './portal.js';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import {
@@ -10,6 +11,19 @@ import {
 let currentSite = null;
 let currentIsOnline = false;
 let currentDraft = null;
+let savedDraftContent = '';
+let editorLoadGeneration = 0;
+
+export function clearEditor() {
+  editorLoadGeneration += 1;
+  currentDraft = null;
+  currentSite = null;
+  savedDraftContent = '';
+}
+
+export function hasUnsavedDraftChanges() {
+  return Boolean(currentDraft && JSON.stringify(currentDraft.content) !== savedDraftContent);
+}
 let selectedCategoryForItems = null;
 let activePreviewRenderer = null;
 
@@ -26,6 +40,11 @@ const publicationViewLink = globalThis.document?.getElementById('publication-vie
 const conflictBanner = globalThis.document?.getElementById('conflict-banner');
 const reloadConflictButton = globalThis.document?.getElementById('reload-conflict-button');
 const copyConflictButton = globalThis.document?.getElementById('copy-conflict-button');
+
+const securePreviewButton = globalThis.document?.getElementById('secure-preview-button');
+const publicationHistory = globalThis.document?.getElementById('publication-history');
+const historyStatus = globalThis.document?.getElementById('publication-history-status');
+const historyList = globalThis.document?.getElementById('publication-history-list');
 
 // Meters & warnings
 const activeItemsCount = globalThis.document?.getElementById('active-items-count');
@@ -240,11 +259,42 @@ export function normalizeDraftForEditor(rawContent, site = {}) {
 }
 
 export async function loadEditor(site, isOnline) {
+  const generation = ++editorLoadGeneration;
   currentSite = site;
   currentIsOnline = isOnline;
   currentDraft = null;
   selectedCategoryForItems = null;
   activePreviewRenderer = null;
+
+  const team = globalThis.document?.getElementById('team-management');
+  if (team) {
+    team.open = false;
+    team.hidden = !isOnline || !['owner', 'admin'].includes(site.role);
+  }
+  if (domainPanel) {
+    domainPanel.open = false;
+    domainPanel.hidden = !isOnline || !['owner', 'admin'].includes(site.role);
+    domainList.replaceChildren();
+    defaultDomain.href = `https://vitrine.inspira.dev.br/${site.slug}`;
+    defaultDomain.textContent = defaultDomain.href;
+  }
+  if (assetLibrary) {
+    assetLibrary.open = false;
+    assetLibrary.hidden = !isOnline || !['owner', 'admin', 'editor'].includes(site.role);
+    assetList.replaceChildren();
+  }
+  if (structurePanel) {
+    structurePanel.open = false;
+    structurePanel.hidden = !isOnline || !['owner', 'admin', 'editor'].includes(site.role);
+    structureFields.replaceChildren();
+  }
+  if (securePreviewButton) securePreviewButton.hidden = !isOnline;
+  if (publicationHistory) {
+    publicationHistory.open = false;
+    publicationHistory.hidden = !isOnline;
+    historyStatus.textContent = '';
+    historyList.replaceChildren();
+  }
 
   if (conflictBanner) conflictBanner.hidden = true;
   if (publicationStatusBar) publicationStatusBar.hidden = true;
@@ -269,17 +319,19 @@ export async function loadEditor(site, isOnline) {
       const res = await fetch(`/api/sites/${site.id}/draft`);
       if (res.ok) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = data.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, site);
         const initialTab =
           currentDraft.content.categories.length > 0 ? 'items' : 'settings';
         setActiveTab(initialTab);
         initializeEditorWorkspace();
+        savedDraftContent = JSON.stringify(currentDraft.content);
       } else {
-        showFeedback('Erro ao carregar o rascunho remoto.', 'error');
+        if (generation === editorLoadGeneration) showFeedback('Erro ao carregar o rascunho remoto.', 'error');
       }
     } catch {
-      showFeedback('Falha de rede ao buscar o rascunho.', 'error');
+      if (generation === editorLoadGeneration) showFeedback('Falha de rede ao buscar o rascunho.', 'error');
     }
   } else {
     const saved = localStorage.getItem(`vitrine_local_draft_${site.id}`);
@@ -299,6 +351,7 @@ export async function loadEditor(site, isOnline) {
       currentDraft.content.categories.length > 0 ? 'items' : 'settings';
     setActiveTab(initialTab);
     initializeEditorWorkspace();
+    savedDraftContent = JSON.stringify(currentDraft.content);
   }
 }
 
@@ -797,6 +850,9 @@ function renderCategories() {
       deleteCategory(catIndex);
     });
 
+    if (currentIsOnline && ['owner', 'admin', 'editor'].includes(currentSite.role)) {
+      controls.appendChild(quickToggleButton(category, 'category'));
+    }
     controls.appendChild(editItemsBtn);
     controls.appendChild(moveUpBtn);
     controls.appendChild(moveDownBtn);
@@ -1056,6 +1112,9 @@ function renderItems() {
       removeItem(selectedCategoryForItems, itemIdx);
     });
 
+    if (currentIsOnline && ['owner', 'admin', 'editor'].includes(currentSite.role)) {
+      controls.appendChild(quickToggleButton(item, 'item'));
+    }
     controls.appendChild(activeLabel);
     controls.appendChild(removeItemBtn);
 
@@ -1119,14 +1178,18 @@ async function resizeAndConvertToWebP(file) {
         }
       }
 
-      const canvas = document.createElement('canvas');
+      const canvas = typeof OffscreenCanvas === 'function'
+        ? new OffscreenCanvas(width, height)
+        : document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(source, 0, 0, width, height);
 
       for (const quality of qualitySteps) {
-        const blob = await canvasToWebpBlob(canvas, quality);
+        const blob = typeof canvas.convertToBlob === 'function'
+          ? await canvas.convertToBlob({ type: 'image/webp', quality })
+          : await canvasToWebpBlob(canvas, quality);
         lastBlob = blob;
         if (blob.size <= maxBytes) {
           return blob;
@@ -1395,7 +1458,8 @@ function validateCatalogLocal() {
 }
 
 async function handleSaveDraft() {
-  if (!validateCatalogLocal()) return;
+  if (!currentDraft || !validateCatalogLocal()) return;
+  const generation = editorLoadGeneration;
 
   if (currentIsOnline) {
     try {
@@ -1408,17 +1472,21 @@ async function handleSaveDraft() {
         })
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (res.ok) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = data.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
         if (editorRevisionIndicator) {
           editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
         }
+        savedDraftContent = JSON.stringify(currentDraft.content);
         showFeedback('Rascunho salvo com sucesso.', 'success');
         if (conflictBanner) conflictBanner.hidden = true;
       } else if (res.status === 409) {
         const data = await res.json();
+        if (generation !== editorLoadGeneration) return;
         if (conflictBanner) conflictBanner.hidden = false;
         showFeedback(
           'Conflito de revisão detectado. Salve suas alterações locais ou recarregue.',
@@ -1429,9 +1497,11 @@ async function handleSaveDraft() {
         }
       } else {
         const data = await res.json().catch(() => ({}));
+        if (generation !== editorLoadGeneration) return;
         showFeedback(data.error?.message || 'Erro ao salvar rascunho.', 'error');
       }
     } catch {
+      if (generation !== editorLoadGeneration) return;
       showFeedback('Erro de rede ao salvar rascunho.', 'error');
     }
   } else {
@@ -1441,6 +1511,7 @@ async function handleSaveDraft() {
     if (editorRevisionIndicator) {
       editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
     }
+    savedDraftContent = JSON.stringify(currentDraft.content);
     showFeedback('Rascunho local salvo com sucesso.', 'success');
     if (conflictBanner) conflictBanner.hidden = true;
   }
@@ -1448,7 +1519,8 @@ async function handleSaveDraft() {
 }
 
 async function handlePublishSite() {
-  if (!validateCatalogLocal()) return;
+  if (!currentDraft || !validateCatalogLocal()) return;
+  const generation = editorLoadGeneration;
 
   if (currentIsOnline) {
     try {
@@ -1461,13 +1533,16 @@ async function handlePublishSite() {
         })
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (saveRes.ok) {
         const savedData = await saveRes.json();
+        if (generation !== editorLoadGeneration) return;
         currentDraft = savedData.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
         if (editorRevisionIndicator) {
           editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
         }
+        savedDraftContent = JSON.stringify(currentDraft.content);
       } else if (saveRes.status === 409) {
         if (conflictBanner) conflictBanner.hidden = false;
         showFeedback(
@@ -1477,6 +1552,7 @@ async function handlePublishSite() {
         return;
       } else {
         const errData = await saveRes.json().catch(() => ({}));
+        if (generation !== editorLoadGeneration) return;
         showFeedback(errData.error?.message || 'Erro ao salvar rascunho antes de publicar.', 'error');
         return;
       }
@@ -1485,8 +1561,10 @@ async function handlePublishSite() {
         method: 'POST'
       });
 
+      if (generation !== editorLoadGeneration) return;
       if (pubRes.ok) {
         const pubData = await pubRes.json();
+        if (generation !== editorLoadGeneration) return;
         const pub = pubData.publication;
         if (publicationStatusBar && publicationStatusText && publicationViewLink) {
           const shortHash = String(pub.hash || '').slice(0, 12);
@@ -1498,6 +1576,7 @@ async function handlePublishSite() {
           editorOpenPublicLink.href = pub.url;
         }
         showFeedback(`Vitrine publicada com sucesso em ${pub.url}.`, 'success');
+        void refreshPublicationHistory();
       } else {
         const errData = await pubRes.json().catch(() => ({}));
         showFeedback(
@@ -1530,3 +1609,422 @@ async function handlePublishSite() {
     showFeedback('Publicação validada com sucesso no modo local.', 'success');
   }
 }
+
+
+function quickToggleButton(target, targetType) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button-small button-secondary button-pill';
+  button.textContent = target.active === false ? 'Reativar no rascunho' : 'Ocultar no rascunho';
+  button.addEventListener('click', async () => {
+    const site = currentSite;
+    const draft = currentDraft;
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/quick-toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetType, targetId: target.id, active: target.active === false, expectedRevision: draft.revision
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message ?? 'Não foi possível alterar a disponibilidade.');
+      if (site !== currentSite || draft !== currentDraft) return;
+      draft.revision = data.draft.revision;
+      target.active = target.active === false;
+      if (Object.hasOwn(target, 'available')) target.available = target.active;
+      if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${draft.revision}`;
+      renderCategories();
+      renderItems();
+      updateDraftAndPreview();
+      showFeedback('Disponibilidade salva no rascunho.', 'success');
+    } catch (error) {
+      if (site === currentSite) showFeedback(error.message, 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
+  return button;
+}
+
+async function publicationRequest(site, action, payload) {
+  const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/${action}`, payload === undefined ? {} : {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || 'Não foi possível concluir a operação.');
+  return data;
+}
+
+securePreviewButton?.addEventListener('click', async () => {
+  const site = currentSite;
+  securePreviewButton.disabled = true;
+  try {
+    const data = await publicationRequest(site, 'preview-token', {});
+    if (site === currentSite) location.assign(data.url);
+  } catch (error) {
+    if (site === currentSite) showFeedback(error.message, 'error');
+  } finally {
+    securePreviewButton.disabled = false;
+  }
+});
+
+async function refreshPublicationHistory() {
+  if (!publicationHistory?.open || !currentIsOnline) return;
+  const site = currentSite;
+  historyList.replaceChildren();
+  historyStatus.textContent = 'Carregando versões…';
+  try {
+    const { releases } = await publicationRequest(site, 'releases');
+    if (site !== currentSite || !publicationHistory.open) return;
+    historyStatus.textContent = releases.length ? '' : 'Nenhuma versão publicada.';
+    for (const release of releases) {
+      const entry = document.createElement('li');
+      const date = new Date(release.publishedAt).toLocaleString('pt-BR');
+      entry.textContent = `Revisão ${release.revision} · ${date} `;
+      if (['owner', 'admin'].includes(site.role)) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'button button-small button-secondary button-pill';
+        button.textContent = 'Restaurar';
+        button.setAttribute('aria-label', `Restaurar revisão ${release.revision}`);
+        button.addEventListener('click', async () => {
+          if (!window.confirm(`Publicar novamente a revisão ${release.revision}?`)) return;
+          button.disabled = true;
+          try {
+            await publicationRequest(site, 'rollback', { targetRevision: release.revision });
+            if (site === currentSite) showFeedback(`Revisão ${release.revision} restaurada.`, 'success');
+          } catch (error) {
+            if (site === currentSite) showFeedback(error.message, 'error');
+          } finally {
+            button.disabled = false;
+          }
+        });
+        entry.append(button);
+      }
+      historyList.append(entry);
+    }
+  } catch (error) {
+    if (site === currentSite) historyStatus.textContent = error.message;
+  }
+}
+
+publicationHistory?.addEventListener('toggle', refreshPublicationHistory);
+
+const team = globalThis.document?.getElementById('team-management');
+const teamForm = globalThis.document?.getElementById('team-form');
+const teamStatus = globalThis.document?.getElementById('team-status');
+const teamMembers = globalThis.document?.getElementById('team-members');
+const teamAudit = globalThis.document?.getElementById('team-audit');
+const teamRoleLabels = { owner: 'Proprietário', admin: 'Administrador', editor: 'Editor', viewer: 'Leitor', collaborator: 'Colaborador' };
+
+async function refreshTeam() {
+  if (!team?.open || !currentIsOnline) return;
+  const site = currentSite;
+  teamMembers.replaceChildren();
+  teamAudit.replaceChildren();
+  teamStatus.textContent = 'Carregando equipe…';
+  try {
+    const [{ members }, { logs }] = await Promise.all([
+      publicationRequest(site, 'members'),
+      publicationRequest(site, 'audit-logs')
+    ]);
+    if (site !== currentSite || !team.open) return;
+    teamStatus.textContent = members.length ? '' : 'Nenhum membro adicional.';
+    for (const member of members) {
+      const row = document.createElement('li');
+      row.textContent = `${teamRoleLabels[member.role] ?? member.role} · ${member.userId} `;
+      if (member.role !== 'admin' || site.role === 'owner') {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'button button-small button-secondary button-pill';
+        remove.textContent = 'Remover';
+        remove.setAttribute('aria-label', `Remover membro ${member.userId}`);
+        remove.addEventListener('click', async () => {
+          if (!window.confirm('Remover o acesso deste membro à vitrine?')) return;
+          remove.disabled = true;
+          try {
+            const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/members/${encodeURIComponent(member.userId)}`, {
+              method: 'DELETE', headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error('Não foi possível remover o membro.');
+            if (site === currentSite) await refreshTeam();
+          } catch (error) {
+            if (site === currentSite) teamStatus.textContent = error.message;
+          } finally {
+            remove.disabled = false;
+          }
+        });
+        row.append(remove);
+      }
+      teamMembers.append(row);
+    }
+    for (const log of logs) {
+      const row = document.createElement('li');
+      const action = { insert: 'Adição', update: 'Alteração', delete: 'Remoção', rollback: 'Restauração' }[log.action] ?? log.action;
+      row.textContent = `${new Date(log.createdAt).toLocaleString('pt-BR')} · ${action} · ${log.entityId}`;
+      teamAudit.append(row);
+    }
+  } catch (error) {
+    if (site === currentSite) teamStatus.textContent = error.message;
+  }
+}
+
+team?.addEventListener('toggle', refreshTeam);
+teamForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const site = currentSite;
+  const values = new FormData(teamForm);
+  const submit = teamForm.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  try {
+    await publicationRequest(site, 'members', { userId: values.get('userId').trim(), role: values.get('role') });
+    if (site === currentSite) {
+      teamForm.reset();
+      await refreshTeam();
+    }
+  } catch (error) {
+    if (site === currentSite) teamStatus.textContent = error.message;
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+const structurePanel = globalThis.document?.getElementById('showcase-structure');
+const structureStatus = globalThis.document?.getElementById('showcase-structure-status');
+const structureFields = globalThis.document?.getElementById('showcase-structure-fields');
+
+structurePanel?.addEventListener('toggle', async () => {
+  if (!structurePanel.open || !currentSite) return;
+  const site = currentSite;
+  const endpoint = `/api/sites/${encodeURIComponent(site.id)}/structure`;
+  structureFields.replaceChildren();
+  structureStatus.textContent = 'Carregando estrutura…';
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error('Não foi possível consultar a estrutura.');
+    const { resolved, revision, widgets, templates, structure: savedStructure } = await response.json();
+    if (site !== currentSite || !structurePanel.open) return;
+    structureStatus.textContent = '';
+    let expectedRevision = revision;
+    const render = (layout, selected) => renderStructureFields(structureFields, layout, async structure => {
+      try {
+        if (currentDraft?.revision !== expectedRevision) {
+          throw new Error('A revisão mudou. Feche e abra o editor de estrutura para recarregar.');
+        }
+        const saved = await fetch(endpoint, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expectedRevision, ...structure })
+        });
+        const data = await saved.json();
+        if (!saved.ok) throw new Error(data.error?.message ?? 'Não foi possível salvar a estrutura.');
+        if (site !== currentSite) return;
+        expectedRevision = data.draft.revision;
+        currentDraft.revision = expectedRevision;
+        currentDraft.content.structure = data.draft.content.structure;
+        if (savedDraftContent) {
+          const previous = JSON.parse(savedDraftContent);
+          previous.structure = data.draft.content.structure;
+          savedDraftContent = JSON.stringify(previous);
+        }
+        if (Object.hasOwn(structure, 'templateCode')) render(data.resolved, data.draft.content.structure.templateCode);
+        if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${expectedRevision}`;
+        structureStatus.textContent = 'Estrutura salva. Abra a prévia para conferir.';
+      } catch (error) {
+        if (site === currentSite) structureStatus.textContent = error.message;
+      }
+    }, widgets, null, { templates, selected });
+    render(resolved, savedStructure?.templateCode);
+  } catch (error) {
+    if (site === currentSite) structureStatus.textContent = error.message;
+  }
+});
+
+const assetLibrary = globalThis.document?.getElementById('asset-library');
+const assetStatus = globalThis.document?.getElementById('asset-library-status');
+const assetInput = globalThis.document?.getElementById('asset-library-upload');
+const assetList = globalThis.document?.getElementById('asset-library-list');
+
+function assetEndpoint(site, id) {
+  return `/api/sites/${encodeURIComponent(site.id)}/assets${id ? '/' + encodeURIComponent(id) : ''}`;
+}
+
+async function loadAssetLibrary() {
+  if (!assetLibrary?.open || !currentSite) return;
+  const site = currentSite;
+  assetStatus.textContent = 'Carregando arquivos…';
+  try {
+    const response = await fetch(assetEndpoint(site));
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message ?? 'Não foi possível carregar os arquivos.');
+    if (site !== currentSite || !assetLibrary.open) return;
+    const used = data.assets.reduce((total, item) => total + item.bytes, 0);
+    const mib = bytes => (bytes / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    assetStatus.textContent = `${data.assets.length} de ${data.maxAssets} arquivos · ${mib(used)} de ${mib(data.maxBytes)} MiB`;
+    assetList.replaceChildren();
+    for (const asset of data.assets) {
+      const entry = document.createElement('li');
+      const link = document.createElement('a');
+      link.textContent = asset.key.split('/').at(-1);
+      const url = new URL(asset.url);
+      if (url.protocol !== 'https:') continue;
+      link.href = url.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'button button-small button-secondary button-pill';
+      remove.textContent = 'Excluir';
+      remove.addEventListener('click', async () => {
+        if (!window.confirm(`Excluir ${link.textContent}?`)) return;
+        remove.disabled = true;
+        try {
+          const result = await fetch(assetEndpoint(site, asset.id), {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' }
+          });
+          if (!result.ok) {
+            const error = await result.json();
+            throw new Error(error.error?.message ?? 'Não foi possível excluir o arquivo.');
+          }
+          if (site === currentSite) await loadAssetLibrary();
+        } catch (error) {
+          if (site === currentSite) assetStatus.textContent = error.message;
+        } finally {
+          remove.disabled = false;
+        }
+      });
+      entry.append(link, ' ', remove);
+      assetList.append(entry);
+    }
+  } catch (error) {
+    if (site === currentSite) assetStatus.textContent = error.message;
+  }
+}
+
+assetLibrary?.addEventListener('toggle', loadAssetLibrary);
+assetInput?.addEventListener('change', async () => {
+  const file = assetInput.files[0];
+  if (!file || !currentSite) return;
+  const site = currentSite;
+  assetInput.disabled = true;
+  assetStatus.textContent = 'Preparando imagem…';
+  try {
+    const blob = await resizeAndConvertToWebP(file);
+    const response = await fetch(assetEndpoint(site), {
+      method: 'POST', headers: { 'Content-Type': 'image/webp' }, body: blob
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error?.message ?? 'Não foi possível enviar a imagem.');
+    }
+    if (site === currentSite) await loadAssetLibrary();
+  } catch (error) {
+    if (site === currentSite) assetStatus.textContent = error.message;
+  } finally {
+    assetInput.value = '';
+    assetInput.disabled = false;
+  }
+});
+
+const domainPanel = globalThis.document?.getElementById('custom-domains');
+const domainList = globalThis.document?.getElementById('custom-domains-list');
+const domainStatus = globalThis.document?.getElementById('custom-domains-status');
+const defaultDomain = globalThis.document?.getElementById('default-showcase-domain');
+const domainFields = globalThis.document?.getElementById('custom-domains-fields');
+
+function domainAction(text, type = 'button') {
+  const button = document.createElement('button');
+  button.type = type;
+  button.textContent = text;
+  button.className = 'button button-small button-secondary button-pill';
+  return button;
+}
+
+function renderDomainForm(site) {
+  const form = document.createElement('form');
+  const label = document.createElement('label');
+  const hostname = document.createElement('input');
+  hostname.placeholder = 'cardapio.exemplo.com.br';
+  hostname.required = true;
+  hostname.maxLength = 253;
+  hostname.autocomplete = 'off';
+  label.append('Domínio próprio ', hostname);
+  const submit = domainAction('Vincular domínio', 'submit');
+  form.append(label, submit);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    try {
+      await publicationRequest(site, 'domains', { hostname: hostname.value.trim() });
+      if (site === currentSite) await refreshDomains();
+    } catch (error) {
+      if (site === currentSite) domainStatus.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  domainFields.replaceChildren(form);
+}
+
+async function refreshDomains() {
+  if (!domainPanel?.open || !currentSite) return;
+  const site = currentSite;
+  domainStatus.textContent = 'Consultando domínios…';
+  try {
+    const { domains } = await publicationRequest(site, 'domains');
+    if (site !== currentSite || !domainPanel.open) return;
+    domainStatus.textContent = domains.length ? '' : 'Nenhum domínio próprio vinculado.';
+    domainList.replaceChildren();
+    renderDomainForm(site);
+    for (const domain of domains) {
+      const entry = document.createElement('li');
+      const name = document.createElement('strong');
+      name.textContent = domain.hostname;
+      const details = document.createElement('p');
+      const state = { active: 'Ativo', pending_dns: 'Aguardando DNS', verifying: 'Em verificação', failed: 'Falhou', suspended: 'Suspenso' }[domain.status];
+      details.textContent = `${state} · HTTPS ${domain.sslStatus === 'active' ? 'ativo' : 'pendente'}`;
+      const dns = document.createElement('p');
+      dns.textContent = `TXT ${domain.txtName} → ${domain.txtValue}. CNAME ${domain.hostname} → ${domain.cnameTarget}.`;
+      if (domain.isApex) dns.textContent += ' Para a raiz, use DNS com CNAME flattening ou vincule um subdomínio.';
+      const verify = domainAction('Verificar DNS e HTTPS');
+      verify.addEventListener('click', async () => {
+        verify.disabled = true;
+        try {
+          await publicationRequest(site, `domains/${domain.id}/verify`, {});
+          if (site === currentSite) await refreshDomains();
+        } catch (error) {
+          if (site === currentSite) domainStatus.textContent = error.message;
+        } finally {
+          verify.disabled = false;
+        }
+      });
+      const remove = domainAction('Desvincular');
+      remove.addEventListener('click', async () => {
+        if (!window.confirm(`Desvincular ${domain.hostname}?`)) return;
+        remove.disabled = true;
+        try {
+          const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/domains/${domain.id}`, {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' }
+          });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error?.message ?? 'Não foi possível desvincular o domínio.');
+          }
+          if (site === currentSite) await refreshDomains();
+        } catch (error) {
+          if (site === currentSite) domainStatus.textContent = error.message;
+        } finally {
+          remove.disabled = false;
+        }
+      });
+      entry.append(name, details, dns, verify, remove);
+      domainList.append(entry);
+    }
+  } catch (error) {
+    if (site === currentSite) domainStatus.textContent = error.message;
+  }
+}
+domainPanel?.addEventListener('toggle', refreshDomains);

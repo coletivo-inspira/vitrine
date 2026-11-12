@@ -187,7 +187,7 @@ export async function bootStorefront(deps = {}) {
   const navigatorObj = deps.navigator ?? globalThis.navigator;
   const slug =
     deps.slug ??
-    resolveStorefrontSlug(deps.pathname ?? globalThis.location?.pathname, deps.search ?? globalThis.location?.search);
+    doc.body?.dataset?.storefrontSlug ?? resolveStorefrontSlug(deps.pathname ?? globalThis.location?.pathname, deps.search ?? globalThis.location?.search);
 
   const statusBanner = doc.getElementById('storefront-status');
   const nameHeading = doc.getElementById('storefront-name');
@@ -241,7 +241,7 @@ export async function bootStorefront(deps = {}) {
       statusBanner.hidden = true;
     }
 
-    const categories = normalizeStorefrontCategories(menu);
+    const categories = catalogContainer ? normalizeStorefrontCategories(menu) : [];
     const validItemIds = [];
     for (const cat of categories) {
       for (const item of cat.items ?? []) {
@@ -273,6 +273,17 @@ export async function bootStorefront(deps = {}) {
       globalThis.addEventListener('pagehide', () => collector.flush());
     }
 
+    const customHero = menu.structure?.pages?.find(page => page.slug === 'home')
+      ?.sections?.find(section => section.moduleCode === 'hero')?.config;
+    if (customHero?.headline) {
+      const heading = doc.getElementById('storefront-name');
+      if (heading) heading.textContent = customHero.headline;
+    }
+    if (customHero?.subtitle) {
+      const subtitle = doc.getElementById('storefront-subtitle');
+      if (subtitle) subtitle.textContent = customHero.subtitle;
+    }
+
     if (categoryNav) {
       categoryNav.replaceChildren();
       categories.forEach((category, idx) => {
@@ -286,6 +297,8 @@ export async function bootStorefront(deps = {}) {
         categoryNav.appendChild(chip);
       });
     }
+
+    if (!catalogContainer) return null;
 
     const renderer = new StorefrontRenderer(catalogContainer, menu, {
       isPublicPage: true,
@@ -314,4 +327,16 @@ if (typeof document !== 'undefined' && !globalThis.__VITRINE_DISABLE_AUTOBOOT__)
   } else {
     bootStorefront();
   }
+}
+
+const sandboxWidgets = [...(globalThis.document?.querySelectorAll('iframe.storefront-widget') ?? [])];
+if (sandboxWidgets.length) {
+  globalThis.addEventListener('message', event => {
+    if (event.origin !== 'null' || event.data?.type !== 'vitrine:sandbox:resize' ||
+        !Number.isSafeInteger(event.data.heightPx) || event.data.heightPx < 120 || event.data.heightPx > 1200) return;
+    const iframe = sandboxWidgets.find(element =>
+      element.contentWindow === event.source && element.dataset.widgetId === event.data.widgetId
+    );
+    if (iframe) iframe.height = String(event.data.heightPx);
+  });
 }

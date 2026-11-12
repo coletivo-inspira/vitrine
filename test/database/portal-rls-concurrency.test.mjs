@@ -159,16 +159,16 @@ test('Frente QA - RLS e Concorrência de Portal no Banco de Dados', async (t) =>
     await db.query('insert into public.sites(id, owner_user_id, slug, name) values ($1, $2, $3, $4)', [siteB, owner, 'pizza-b', 'Pizza B']);
     await db.query('insert into public.site_memberships(site_id, user_id) values ($1, $2)', [siteA, member]);
 
-    // Tentativas de inserção/mutação por colaborador ou qualquer usuário autenticado devem falhar com 42501 (insufficient privilege)
+    // A inserção é recusada e a exclusão não afeta nenhuma associação.
     await assert.rejects(
       () => asUser(db, member, () => db.query('insert into public.site_memberships(site_id, user_id) values ($1, $2)', [siteB, member])),
       (err) => err.code === '42501'
     );
 
-    await assert.rejects(
-      () => asUser(db, member, () => db.query('delete from public.site_memberships where site_id = $1', [siteA])),
-      (err) => err.code === '42501'
+    const deleted = await asUser(db, member, () =>
+      db.query('delete from public.site_memberships where site_id = $1 returning user_id', [siteA])
     );
+    assert.deepEqual(deleted.rows, []);
   });
 
   await t.test('Cenário 5: Requisições anon para sites, memberships e drafts falham', async () => {

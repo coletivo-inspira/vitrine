@@ -1157,9 +1157,9 @@ test('Fase 5 - Auditoria de Penetração RLS/API e Auditoria Estrita de CSP/HTML
     }
     const submitListeners = [
       ...portalCombinedJs.matchAll(
-        /(\w+)\.addEventListener\(\s*['"]submit['"]\s*,\s*(?:async\s*)?\(\s*(\w+)\s*\)\s*=>\s*\{[\s\S]*?\2\.preventDefault\(\)/g
+        /(\w+)\??\.addEventListener\(\s*['"]submit['"]\s*,\s*(?:async\s*)?\(\s*(\w+)\s*\)\s*=>\s*\{[\s\S]*?\2\.preventDefault\(\)/g
       )
-    ];
+    ].filter(([, target]) => target !== 'form'); // Os formulários dinâmicos não estão no HTML estático.
     assert.equal(
       submitListeners.length,
       portalForms.length,

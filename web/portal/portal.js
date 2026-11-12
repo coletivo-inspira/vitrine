@@ -1,4 +1,5 @@
-import { loadEditor } from './editor.js';
+import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './platform-cms.js';
+import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 
 // State variables
 let isOnline = false;
@@ -577,6 +578,7 @@ export async function exchangePkceCode(code, deps = {}) {
     const initialSection = getSectionFromHash(initialHash);
     onSection(initialSection);
     await loadSitesFn();
+    void detectPlatformCms(true);
     return { ok: true, user: sessionData.user, sites };
   } catch {
     return handlePkceFailure(
@@ -605,6 +607,7 @@ export async function checkSession(deps = {}) {
       if (logoutButton) logoutButton.hidden = false;
       
       await loadSitesFn();
+      void detectPlatformCms(true);
       
       const initialHash = deps.locationHash ?? deps.location?.hash ?? globalThis.window?.location?.hash ?? '';
       const initialSection = getSectionFromHash(initialHash);
@@ -783,8 +786,11 @@ async function handleLogout() {
   globalThis.sessionStorage?.removeItem('pkce_verifier');
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
   currentUser = null;
+  void detectPlatformCms(false);
   sites = [];
   activeSite = null;
+  clearEditor();
+  syncShowcaseSwitcher();
   profile = {
     displayName: '',
     businessName: '',
@@ -806,6 +812,7 @@ export function showSection(section) {
   // Toggle Auth section
   if (authSection) authSection.hidden = section !== 'auth';
   if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
+  showPlatformCms(section === 'platform-cms');
 
   if (section !== 'auth') {
     // Show/Hide authenticated content panes
@@ -1322,7 +1329,25 @@ function loadLocalSites() {
   renderSites();
 }
 
+const showcaseSwitcher = globalThis.document?.getElementById('showcase-switcher');
+const showcaseSelect = globalThis.document?.getElementById('showcase-switcher-select');
+
+function syncShowcaseSwitcher() {
+  if (!showcaseSelect) return;
+  showcaseSwitcher.hidden = sites.length < 2;
+  showcaseSelect.replaceChildren(new Option('Escolher vitrine', ''));
+  for (const site of sites) showcaseSelect.add(new Option(`${site.name} · /${site.slug}`, site.id));
+  showcaseSelect.value = sites.some(site => site.id === activeSite?.id) ? activeSite.id : '';
+}
+
+showcaseSelect?.addEventListener('change', () => {
+  const site = sites.find(entry => entry.id === showcaseSelect.value);
+  if (site) openEditor(site);
+  else syncShowcaseSwitcher();
+});
+
 function renderSites() {
+  syncShowcaseSwitcher();
   if (!sitesListContainer) return;
 
   if (sites.length === 0) {
@@ -1494,11 +1519,20 @@ async function handleCreateWizardSite() {
 
 // Open Catalog Editor screen
 function openEditor(site) {
+  if (activeSite?.id === site.id && !editorSection?.hidden) {
+    syncShowcaseSwitcher();
+    return;
+  }
+  if (hasUnsavedDraftChanges() && !globalThis.window.confirm('Trocar de vitrine e descartar as alterações ainda não salvas?')) {
+    syncShowcaseSwitcher();
+    return;
+  }
   activeSite = site;
+  syncShowcaseSwitcher();
   if (globalThis.window && globalThis.window.location.hash !== '#editor') {
     globalThis.window.location.hash = '#editor';
   }
-  loadEditor(site, isOnline);
+  void loadEditor(site, isOnline);
 }
 
 // ==========================================
@@ -2146,3 +2180,5 @@ export function renderInsightsPanel(insights) {
   }
 }
 
+
+initializePlatformCms(() => showSection('platform-cms'));

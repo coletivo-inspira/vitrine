@@ -1,3 +1,4 @@
+import { projectShowcaseManifest } from './showcase-structure.mjs';
 import { publicMenu, whatsappLink } from './public-menu.mjs';
 import {
   DEFAULT_TEMPLATE,
@@ -50,7 +51,8 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'orderFields',
   'messages',
   'items',
-  'categories'
+  'categories',
+  'structure'
 ]);
 
 const ALLOWED_ITEM_KEYS = new Set([
@@ -139,6 +141,14 @@ export function assertNoPrivateLeakage(menuArtifact) {
         'PRIVATE_FIELD_LEAKAGE',
         `Campo não permitido no artefato público: ${key}`
       );
+    }
+  }
+
+  if (menuArtifact.structure !== undefined) {
+    const { theme, navigation, pages } = menuArtifact.structure ?? {};
+    const projected = projectShowcaseManifest({ themeOverrides: theme, navigationMenus: navigation, pages });
+    if (JSON.stringify(projected) !== JSON.stringify(menuArtifact.structure)) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'A estrutura pública contém campos não permitidos.');
     }
   }
 
@@ -281,7 +291,10 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
 
   let baseMenu;
   try {
-    const publicMenuDraft = toPublicMenuDraft(migrated, site);
+    const visibleContent = Array.isArray(migrated.categories)
+      ? { ...migrated, categories: migrated.categories.filter(category => category?.active !== false) }
+      : migrated;
+    const publicMenuDraft = toPublicMenuDraft(visibleContent, site);
     baseMenu = publicMenu(publicMenuDraft);
   } catch (err) {
     if (err instanceof PortalValidationError) {
@@ -343,7 +356,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
   }
   if (Array.isArray(migrated.categories)) {
     for (const cat of migrated.categories) {
-      if (cat && typeof cat === 'object') {
+      if (cat && typeof cat === 'object' && cat.active !== false) {
         collectSourceExtras(cat.items);
       }
     }
@@ -456,7 +469,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     orderFields: sanitizedOrderFields,
     messages: sanitizedMessages,
     items: projectedItems,
-    categories: projectedCategories
+    categories: projectedCategories,
+    ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {})
   };
 
   for (const item of menu.items) {
@@ -566,9 +580,104 @@ export function renderStorefrontCatalogMarkup(menu) {
   return { chipsHtml, sectionsHtml };
 }
 
-export function renderStorefrontHtml(menu, baseTemplateHtml) {
-  const { chipsHtml, sectionsHtml } = renderStorefrontCatalogMarkup(menu);
-  if (typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
+function renderNavigation(links, label) {
+  if (!links?.length) return '';
+  return `<nav class="storefront-module-nav" aria-label="${label}">${links.map(link =>
+    `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`
+  ).join('')}</nav>`;
+}
+
+const catalogModules = new Set(['catalog_grid', 'service_booking', 'quote_request']);
+
+function renderStorefrontHero(menu, config = {}, id = '', navigation = '') {
+  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="storefront-hero" aria-labelledby="storefront-name">
+      <div class="storefront-hero-copy">
+        <p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>
+        <h1 id="storefront-name">${escapeHtml(config.headline || menu.name)}</h1>
+        <p id="storefront-subtitle" class="storefront-subtitle">${escapeHtml(config.subtitle || 'Escolha seus itens e envie pelo WhatsApp.')}</p>
+      </div>
+      ${navigation}
+    </section>`;
+}
+
+function renderCategoryNavigation(chipsHtml) {
+  return `<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>`;
+}
+
+function renderStorefrontCatalog({ chipsHtml, sectionsHtml }, id = '', columns) {
+  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} aria-label="Catálogo da vitrine">
+      ${renderCategoryNavigation(chipsHtml)}
+      <div id="storefront-catalog" class="storefront-catalog"${columns ? ` data-columns="${columns}"` : ''}>
+        ${sectionsHtml}
+      </div>
+    </section>`;
+}
+
+function renderPublicSections(pages, menu, catalog) {
+  let catalogRendered = false;
+  let mainHeroRendered = false;
+  return (pages ?? []).map(page => {
+    const blocks = page.sections.map(({ id, moduleCode, config }) => {
+      const section = content => content ? `<section id="${escapeHtml(id)}" class="storefront-module">${content}</section>` : '';
+      if (catalogModules.has(moduleCode)) {
+        if (catalogRendered) return '';
+        catalogRendered = true;
+        return renderStorefrontCatalog(catalog, id, config.columns);
+      }
+      switch (moduleCode) {
+        case 'about_story':
+          return section(config.bio ? `<h2>Sobre</h2><p>${escapeHtml(config.bio)}</p>` : '');
+        case 'hours_location':
+          return section(config.scheduleText || config.addressText
+            ? `<h2>Horários e localização</h2><p>${escapeHtml(config.scheduleText)}</p><p>${escapeHtml(config.addressText)}</p>` : '');
+        case 'faq':
+          return section(config.items?.length ? `<h2>Perguntas frequentes</h2>${config.items.map(item =>
+            `<details><summary>${escapeHtml(item.q)}</summary><p>${escapeHtml(item.a)}</p></details>`
+          ).join('')}` : '');
+        case 'testimonials':
+          return section(config.items?.length ? `<h2>Depoimentos</h2>${config.items.map(item =>
+            `<blockquote><p>${escapeHtml(item.quote)}</p><footer>${escapeHtml(item.name)}</footer></blockquote>`
+          ).join('')}` : '');
+        case 'links_bio':
+          return section(renderNavigation(config.links, 'Links'));
+        case 'custom_sandbox':
+          return section(`<iframe class="storefront-widget" title="Componente da vitrine" sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy" data-widget-id="${config.widgetId}" src="https://sandbox.inspira.dev.br/embed/${config.widgetId}?v=${config.bundleHash}"></iframe>`);
+        case 'hero':
+          if (page.slug === 'home' && !mainHeroRendered) {
+            mainHeroRendered = true;
+            return renderStorefrontHero(menu, config, id);
+          }
+          return section(config.headline
+            ? `<h2>${escapeHtml(config.headline)}</h2><p>${escapeHtml(config.subtitle ?? '')}</p>` : '');
+        default:
+          return '';
+      }
+    }).join('');
+    if (!blocks) return '';
+    return page.slug === 'home' ? blocks
+      : `<section id="pagina-${escapeHtml(page.slug)}" class="storefront-module"><h2>${escapeHtml(page.title)}</h2>${blocks}</section>`;
+  }).join('');
+}
+
+export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = true } = {}) {
+  const catalog = renderStorefrontCatalogMarkup(menu);
+  const { chipsHtml, sectionsHtml } = catalog;
+  const structure = menu.structure ? projectShowcaseManifest({
+    themeOverrides: menu.structure.theme, navigationMenus: menu.structure.navigation, pages: menu.structure.pages
+  }) : null;
+  const home = structure?.pages.find(page => page.slug === 'home');
+  const hero = home?.sections.find(section => section.moduleCode === 'hero')?.config;
+  const topNav = renderNavigation(structure?.navigation.header, 'Navegação da vitrine');
+  const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
+  const modularHtml = structure
+    ? renderPublicSections(structure.pages, menu, catalog)
+    : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) +
+      `<div id="storefront-catalog" class="storefront-catalog">${sectionsHtml}</div>`;
+  const theme = structure?.theme;
+  const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
+  const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
+  const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
+  if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
     return baseTemplateHtml
       .replace(
         '<title id="storefront-page-title">Cardápio Digital — Vitrine Inspira</title>',
@@ -580,7 +689,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml) {
       )
       .replace(
         '<h1 id="storefront-name">Carregando cardápio...</h1>',
-        `<h1 id="storefront-name">${escapeHtml(menu.name)}</h1>`
+        `<h1 id="storefront-name">${escapeHtml(hero?.headline || menu.name)}</h1>`
       )
       .replace(
         '<nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio"></nav>',
@@ -603,13 +712,14 @@ export function renderStorefrontHtml(menu, baseTemplateHtml) {
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/vitrine/vitrine.css">
 </head>
-<body>
-  <a class="skip-link" href="#cardapio-principal">Pular para o cardápio</a>
+<body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>
+  <a class="skip-link" href="#cardapio-principal">Pular para o conteúdo</a>
   <header class="storefront-topbar wrap">
     <div class="storefront-brand-meta">
       <span class="storefront-template-tag">Cardápio Digital</span>
       <span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>
     </div>
+    ${topNav}
     <div class="storefront-header-actions">
       <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
         <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
@@ -618,23 +728,13 @@ export function renderStorefrontHtml(menu, baseTemplateHtml) {
     </div>
   </header>
   <main id="cardapio-principal" class="wrap storefront-main">
-    <section class="storefront-hero" aria-labelledby="storefront-name">
-      <div class="storefront-hero-copy">
-        <p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>
-        <h1 id="storefront-name">${escapeHtml(menu.name)}</h1>
-        <p id="storefront-subtitle" class="storefront-subtitle">
-          Escolha seus itens abaixo e toque em <strong>Pedir no WhatsApp</strong> para enviar seu pedido com mensagem preenchida.
-        </p>
-      </div>
-      <nav id="category-nav" class="category-chips" aria-label="Categorias do cardápio">${chipsHtml}</nav>
-    </section>
     <div id="storefront-status" class="storefront-status" role="status" aria-live="polite" hidden></div>
-    <div id="storefront-catalog" class="storefront-catalog">
-${sectionsHtml}
-    </div>
+    ${structure && !hero ? `<h1 id="storefront-name" class="storefront-accessible-title">${escapeHtml(menu.name)}</h1>` : ''}
+    ${modularHtml}
   </main>
   <footer class="storefront-footer">
     <div class="wrap storefront-footer-inner">
+      ${footerNav}
       <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
         <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
         <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
@@ -647,7 +747,7 @@ ${sectionsHtml}
       </p>
     </div>
   </footer>
-  <script type="module" src="/vitrine/vitrine.js"></script>
+  ${interactive ? '<script type="module" src="/vitrine/vitrine.js"></script>' : ''}
 </body>
 </html>`;
 }

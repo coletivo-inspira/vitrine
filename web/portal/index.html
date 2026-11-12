@@ -98,6 +98,10 @@
         </div>
         
         <div class="top-bar-middle">
+          <label id="showcase-switcher" class="showcase-switcher" hidden>
+            <span>Vitrine</span>
+            <select id="showcase-switcher-select" class="select-styled"></select>
+          </label>
           <!-- Mode indicator for local evaluation in top bar -->
           <div id="demo-mode-badge" class="demo-badge shell-demo-badge" hidden aria-label="Modo Local de Demonstração">
             <span class="badge-dot"></span>
@@ -121,6 +125,7 @@
 
         <!-- Section 1: Início (Home Dashboard) -->
         <section id="inicio-section" class="shell-section">
+          <button id="platform-cms-open" class="button button-small button-secondary button-pill" type="button" hidden>Administração da plataforma</button>
           <div class="section-header">
             <h1 class="display-title">Painel Inicial</h1>
             <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe a completude do seu perfil, suas vitrines e solicitações.</p>
@@ -193,6 +198,29 @@
         </section>
 
         <!-- Section 2B: Insights Panel -->
+        <section id="platform-cms-section" class="shell-section" hidden>
+          <h1>Administração da plataforma</h1>
+          <details id="platform-operations" class="portal-card">
+            <summary>Indicadores, solicitações e auditoria</summary>
+            <p id="platform-operations-status" role="status"></p>
+            <ul id="platform-overview"></ul>
+            <h2>Pedidos de customização</h2>
+            <ul id="platform-requests"></ul>
+            <h2>Atividade recente</h2>
+            <ul id="platform-audit"></ul>
+          </details>
+          <details id="platform-templates" class="portal-card">
+            <summary>Modelos de vitrine</summary>
+            <p id="platform-templates-status" role="status"></p>
+            <label>Modelo <select id="platform-template-select"></select></label>
+            <button id="platform-template-copy" type="button" class="button button-small button-secondary button-pill">Criar a partir deste modelo</button>
+            <div id="platform-template-fields"></div>
+          </details>
+          <p id="platform-cms-status" role="status"></p>
+          <div id="platform-cms-fields"></div>
+          <button id="platform-cms-publish" class="button button-pill" type="button">Publicar página institucional</button>
+        </section>
+
         <section id="insights-section" class="shell-section" hidden>
           <div class="section-header insights-header-flex">
             <div>
@@ -590,10 +618,57 @@
 
               <div class="editor-save-container">
                 <a id="editor-open-public-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine</a>
+                <button id="secure-preview-button" class="button button-small button-secondary button-pill" type="button" hidden>Abrir prévia salva</button>
                 <button id="save-draft-button" class="button button-small button-secondary button-pill" type="button">Salvar Rascunho</button>
                 <button id="publish-site-button" class="button button-small button-pill" type="button">Publicar Vitrine</button>
               </div>
             </div>
+
+            <details id="publication-history" class="portal-card" hidden>
+              <summary>Versões publicadas</summary>
+              <p id="publication-history-status" role="status"></p>
+              <ul id="publication-history-list"></ul>
+            </details>
+
+            <details id="team-management" class="portal-card" hidden>
+              <summary>Equipe e permissões</summary>
+              <p id="team-status" role="status"></p>
+              <ul id="team-members"></ul>
+              <form id="team-form">
+                <label>ID da conta <input name="userId" required autocomplete="off"></label>
+                <label>Papel
+                  <select name="role">
+                    <option value="viewer">Leitor</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </label>
+                <button class="button button-small button-pill" type="submit">Salvar membro</button>
+              </form>
+              <h3>Histórico de alterações</h3>
+              <ul id="team-audit"></ul>
+            </details>
+
+            <details id="showcase-structure" class="portal-card" hidden>
+              <summary>Identidade, menus e páginas</summary>
+              <p id="showcase-structure-status" role="status"></p>
+              <div id="showcase-structure-fields"></div>
+            </details>
+
+            <details id="asset-library" class="portal-card" hidden>
+              <summary>Biblioteca de arquivos</summary>
+              <p id="asset-library-status" role="status"></p>
+              <label>Adicionar imagem <input id="asset-library-upload" type="file" accept="image/*"></label>
+              <ul id="asset-library-list"></ul>
+            </details>
+
+            <details id="custom-domains" class="portal-card" hidden>
+              <summary>Domínios e publicação</summary>
+              <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
+              <p id="custom-domains-status" role="status"></p>
+              <div id="custom-domains-fields"></div>
+              <ul id="custom-domains-list"></ul>
+            </details>
 
             <!-- Compact inline meters -->
             <div class="editor-compact-meters" aria-label="Limites do rascunho">
