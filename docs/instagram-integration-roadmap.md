@@ -9,7 +9,7 @@ Dono entra no painel → seleciona sua vitrine → conecta e autoriza o Instagra
 ## Receita de configuração e implementação futura
 
 1. Confirmar que @ganjastudio.br usa conta profissional (Empresa ou Criador), identificar responsável pelo app Meta e uma conta de teste. (Ver [Configuração Meta](instagram/configuracao-meta.md))
-2. No console Meta, criar/configurar o app com Instagram Login; mapear a permissão mínima de leitura instagram_business_basic. Registrar IDs públicos e responsáveis, nunca tokens ou segredos. (Ver [Configuração Meta](instagram/configuracao-meta.md))
+2. No console Meta, configurar o app com a **Configuração da API com login unificado** (a de login empresarial no Instagram está obsoleta), com a permissão única de leitura `instagram_basic`. Registrar responsáveis, nunca IDs reais, tokens ou segredos. (Ver [Configuração Meta](instagram/configuracao-meta.md))
 3. Cadastrar retorno HTTPS do OAuth e páginas de privacidade/exclusão; mapear revogação e desconexão. Confirmar revisão, acesso para contas externas e verificações exigidas no console antes de liberar clientes. (Ver [Configuração Meta](instagram/configuracao-meta.md))
 4. Integrar “Conectar Instagram” à vitrine selecionada no painel. A sessão do painel identifica o dono; o consentimento Instagram autoriza a leitura. Validar acesso no servidor e proteger o retorno OAuth contra troca de conta/vitrine. (Ver [Conectar por Vitrine](instagram/conectar-por-vitrine.md))
 5. Definir executor/agendamento sobre a arquitetura Cloudflare/Supabase já escolhida. Confirmar infraestrutura operacional, cotas, frequência e proteção/renovação dos tokens. Não contratar planos nem fazer upgrade automático. (Ver [Sincronização periódica](instagram/sincronizacao.md))
@@ -65,6 +65,6 @@ O planejamento completo desta integração está distribuído em documentos dedi
 
 ## Referências
 
-- [API com Instagram Login — coleção oficial Meta](https://www.postman.com/meta/instagram/folder/1z5vxzu/instagram-api-with-instagram-login): contas profissionais e permissões; confirmar requisitos operacionais no console ao executar #48.
+- [API do Instagram com login unificado — documentação oficial Meta](https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-unified-login): configuração recomendada para novas integrações; passo a passo no console em [Configuração Meta](instagram/configuracao-meta.md).
 - [Arquitetura do Vitrine](architecture.md), [roadmap](roadmap.md) e specs 008/009.
 - [Roteiro do piloto Ganja](https://github.com/coletivo-inspira/ganja/blob/codex/instagram-integration-roadmap/docs/instagram-integration-roadmap.md).

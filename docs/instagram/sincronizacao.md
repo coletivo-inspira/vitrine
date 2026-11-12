@@ -13,7 +13,7 @@ Este documento detalha as etapas 5 e 6 do roteiro [`docs/instagram-integration-r
 - **Imagens e vídeos fora da base**: arquivos binários de fotos e vídeos **não são baixados nem copiados** para o banco PostgreSQL nem para o armazenamento de objetos da plataforma. A Vitrine persiste apenas metadados textuais e links (`media_url`, `thumbnail_url` e `permalink`), mantendo o armazenamento das mídias na origem (Instagram, sob responsabilidade do proprietário da conta, assim como ocorre com fotos de itens da vitrine em pastas públicas do Google Drive).
 - **Sem tempo real e sem histórico ilimitado**: a atualização ocorre por agendamento periódico, sem promessa de reflexão instantânea após uma postagem no aplicativo do Instagram e sem retenção de histórico ilimitado.
 - **Dependências entre documentos (a confirmar)**:
-  - Configuração do aplicativo Meta único, permissões aprovadas (`instagram_business_basic`) e webhooks obrigatórios de conformidade da Meta: **a confirmar** no documento da [issue #48](https://github.com/coletivo-inspira/vitrine/issues/48) (`docs/instagram/configuracao-meta.md`).
+  - Configuração do aplicativo Meta único: **decidida** no documento da [issue #48](https://github.com/coletivo-inspira/vitrine/issues/48) ([`configuracao-meta.md`](configuracao-meta.md)) — login unificado, permissão única `instagram_basic`, chamadas em `graph.facebook.com` com o ID da conta do Instagram no caminho, token de usuário do sistema configurado para não expirar e nenhum webhook da Meta nesta fase (não há campo de webhook para novas mídias).
   - Esquema final da tabela de vínculo OAuth, troca inicial do código de autorização por token de longa duração e ações de reconexão/desconexão no painel: **a confirmar** no documento da [issue #49](https://github.com/coletivo-inspira/vitrine/issues/49) (`docs/instagram/conectar-por-vitrine.md`).
   - Formato exato do contrato JSON público de leitura, invalidação de cache na borda e disparo de webhook assinado ("feed atualizado") para sites conectados: **a confirmar** no documento da [issue #51](https://github.com/coletivo-inspira/vitrine/issues/51) (`docs/instagram/interface-publica-feed.md`).
 
@@ -52,7 +52,7 @@ Para não violar o teto de **50 subrequests** nem os **10 ms de CPU** por execu�
      - Até 10 subrequests reservadas para `refreshPendingDomainCertificates(env)`.
      - 1 subrequest no Supabase para listar o lote de até 5 vitrines elegíveis.
      - Por vitrine (até 5 vitrines × 4 subrequests = 20 subrequests):
-       - 1 subrequest ao Instagram para dados do perfil (`id`, `username`, `name`, `profile_picture_url`, `media_count`) e eventual renovação de token quando aplicável;
+       - 1 subrequest à Graph API para dados do perfil (`id`, `username`, `name`, `profile_picture_url`, `media_count`);
        - 1 a 2 subrequests ao Instagram para buscar páginas de mídias com filhos de carrossel embutidos;
        - 1 subrequest em lote (`UPSERT`) ao Supabase para gravar mídias e atualizar os ponteiros de sincronização da vitrine.
      - Total estimado: **~31 subrequests**, mantendo folga segura abaixo do limite rígido de 50 subrequests do Cloudflare Workers Free.
@@ -62,7 +62,7 @@ Para não violar o teto de **50 subrequests** nem os **10 ms de CPU** por execu�
 
 ## 4. Importação inicial paginada e tipos de mídia
 
-Na primeira conexão da vitrine (ou após reconexão), o sincronizador importa o conteúdo acessível pela API oficial (`Instagram API with Instagram Login`, permissão `instagram_business_basic`, **a confirmar** em #48) usando paginação baseada em cursor:
+Na primeira conexão da vitrine (ou após reconexão), o sincronizador importa o conteúdo acessível pela API oficial (API do Instagram com login unificado, permissão `instagram_basic`, decidida em #48) chamando `GET https://graph.facebook.com/<versão>/<ig_account_id>` para o perfil e `GET https://graph.facebook.com/<versão>/<ig_account_id>/media` para as mídias (nunca `/me`, que nesse token representa o usuário do sistema), usando paginação baseada em cursor:
 
 ### Paginação fatiada entre ciclos
 
@@ -106,11 +106,11 @@ Caso um registro de vídeo não traga `thumbnail_url` válido da API, o item per
 ## 6. Credenciais no servidor, renovação de token e reconexão
 
 - **Segredos restritos ao servidor**: o token OAuth de longa duração de cada vitrine fica armazenado apenas no backend (tabela privada sem leitura via `anon` ou `authenticated` comum, acessível somente pelo Worker no servidor, **esquema detalhado a confirmar** em #49). Nenhum token, chave de API ou cabeçalho de autorização é incluído em logs, URLs públicas, artefatos publicados ou respostas ao navegador.
-- **Renovação preventiva automática**:
-  - Os tokens de longa duração do Instagram possuem validade padrão de **60 dias** e podem ser renovados após 24 horas de emissão enquanto ainda estiverem válidos.
-  - Durante o ciclo do Cron Trigger, se a vitrine estiver conectada e `token_expires_at` estiver a **15 dias ou menos** do vencimento (com pelo menos 24 horas desde a última renovação), o Worker chama o endpoint oficial de renovação (`ig_refresh_token`) no servidor e atualiza `token_expires_at` para mais 60 dias.
+- **Sem renovação periódica**:
+  - Com o login unificado, cada vitrine recebe um token de usuário do sistema do portfólio empresarial do dono, configurado no console para **não expirar** (#48). Não há job de renovação de 60 dias nem chamada a `ig_refresh_token`, o que também libera subrequests do Cron Trigger.
+  - Se a configuração da Meta não oferecer "Nunca", `token_expires_at` guarda a validade recebida e o painel avisa o dono **15 dias** antes do vencimento para reconectar; a Vitrine não pede `business_management` para renovar tokens por API.
 - **Expiração, revogação e necessidade de reconexão**:
-  - Se a renovação ou a leitura do feed receber erro de autorização da Meta (HTTP `400`/`401`, código OAuth `190` indicando token expirado, senha alterada ou permissão revogada pelo usuário nas configurações do Instagram), o Worker **interrompe imediatamente** os agendamentos automáticos daquela vitrine (`next_sync_at = NULL`), altera o estado do vínculo para `reconnect_required` (**nomenclatura final de estados a confirmar** em #49) e registra apenas o código de diagnóstico sanitizado (`TOKEN_EXPIRED` ou `PERMISSION_REVOKED`).
+  - Se a leitura do feed receber erro de token da Meta (HTTP `400`/`401`, código OAuth `190`: app removido do portfólio, conta movida para outro portfólio, acesso revogado ou token vencido), ou erro `(#10)` de conta que deixou de ser profissional, o Worker **interrompe imediatamente** os agendamentos automáticos daquela vitrine (`next_sync_at = NULL`), altera o estado do vínculo para `reconnect_required` (**nomenclatura final de estados a confirmar** em #49) e registra apenas o código de diagnóstico sanitizado (`TOKEN_EXPIRED` ou `PERMISSION_REVOKED`).
   - O painel passa a exibir o aviso para que o proprietário clique novamente em "Conectar Instagram" naquela vitrine.
 
 ---
@@ -157,6 +157,6 @@ Para proteger as cotas gratuitas da Cloudflare e do Supabase e evitar bloqueios 
 | Executor e agendador na infraestrutura existente sem planos pagos | `scheduled()` em `workers/api.mjs` via Cron Trigger gratuito (`17 * * * *` em `wrangler.jsonc`), respeitando 10 ms de CPU e 50 subrequests por execução no Cloudflare Workers Free e armazenamento apenas de metadados no Supabase Free (500 MB). |
 | Importação inicial paginada e tipos de mídia | Paginação por cursor (`after`) fatiada em até 2 páginas por execução (`backfill_cursor`), cobrindo `IMAGE`, `CAROUSEL_ALBUM` (com `children` na mesma chamada) e `VIDEO`/`REELS` (com `thumbnail_url` obrigatório para capa), salvando apenas links e metadados. |
 | Intervalo proposto após validar cotas (sem tempo real) | Agendador horário processando lotes de até 5 vitrines por execução, com intervalo alvo de 2 a 6 horas por vitrine (base de 3 horas com *jitter*). |
-| Credenciais no servidor, proteção, renovação e reconexão | Tokens de longa duração restritos ao servidor (`SUPABASE_SERVICE_ROLE_KEY`), renovados preventivamente quando faltarem <= 15 dias para expirar; erros OAuth `190`/`401` pausam o cron da vitrine e exigem reconexão no painel. |
+| Credenciais no servidor, proteção, renovação e reconexão | Tokens de usuário do sistema (login unificado, sem expiração) restritos ao servidor (`SUPABASE_SERVICE_ROLE_KEY`), sem job de renovação; erros OAuth `190`/`401` pausam o cron da vitrine e exigem reconexão no painel. |
 | Deduplicação, atualização de URLs, posts removidos, retries e última sincronização | `UPSERT` idempotente por `(site_id, ig_media_id)`, atualização periódica de `media_url`/`thumbnail_url` assinadas, remoção de posts ausentes na janela ativa, *exponential backoff* entre ciclos (até 5 falhas consecutivas) e registro de `last_synced_at`. |
 | Retenção/exclusão e comportamento em indisponibilidade e revogação | Teto de retenção ativa por vitrine (proposta de até 50 publicações, sem histórico ilimitado), preservação da última leitura válida em falhas `5xx`/`429` da Meta e exclusão completa por `site_id` em desconexão/revogação. |
