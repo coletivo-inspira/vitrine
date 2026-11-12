@@ -21,7 +21,8 @@ export const RESERVED_SLUGS = Object.freeze([
   'como-funciona',
   'possibilidades',
   'planos',
-  'orcamento'
+  'orcamento',
+  'por-cidade'
 ]);
 
 export const DEFAULT_TEMPLATE = 'pizzeria-v1';
@@ -56,6 +57,64 @@ export const ALLOWED_ITEM_PRICE_MODES = Object.freeze([
   'trade',
   'quota'
 ]);
+
+export const BRAZIL_UFS = Object.freeze([
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
+  'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+]);
+const LOCALITY_CITY_PATTERN = /^[\p{L}][\p{L}\s.'’-]{0,58}[\p{L}.]$/u;
+
+export function slugifyCity(city, uf) {
+  const base = String(city ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const state = String(uf ?? '').trim().toLowerCase();
+  return base && state ? `${base}-${state}` : '';
+}
+
+export function validateLocality(raw, errorStatus = 422) {
+  if (raw === undefined || raw === null) {
+    return { listed: false, city: '', uf: '' };
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new PortalValidationError(errorStatus, 'INVALID_LOCALITY', 'Configuração de cidade inválida.');
+  }
+  const listed = raw.listed === true;
+  const city = typeof raw.city === 'string' ? raw.city.trim().replace(/\s+/g, ' ') : '';
+  const uf = typeof raw.uf === 'string' ? raw.uf.trim().toUpperCase() : '';
+  if (city && !LOCALITY_CITY_PATTERN.test(city)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INVALID_LOCALITY_CITY',
+      'Informe o nome da cidade com 2 a 60 letras (sem números ou símbolos).'
+    );
+  }
+  if (uf && !BRAZIL_UFS.includes(uf)) {
+    throw new PortalValidationError(errorStatus, 'INVALID_LOCALITY_UF', 'Escolha um estado (UF) válido.');
+  }
+  if (listed && (!city || !uf)) {
+    throw new PortalValidationError(
+      errorStatus,
+      'INCOMPLETE_LOCALITY',
+      'Para aparecer na página da cidade, informe a cidade e o estado (UF).'
+    );
+  }
+  return { listed, city, uf };
+}
+
+export function projectPublicLocality(raw) {
+  let locality;
+  try {
+    locality = validateLocality(raw);
+  } catch {
+    return undefined;
+  }
+  if (!locality.listed) return undefined;
+  return { city: locality.city, uf: locality.uf, citySlug: slugifyCity(locality.city, locality.uf) };
+}
 
 export const ALLOWED_PROFILE_INTERESTS = Object.freeze([
   'cardapio-digital',
@@ -1356,6 +1415,10 @@ export function validateDraftContent(content, options = {}) {
       rawBusinessName ?? 'Vitrine',
       effectiveTemplate
     );
+  }
+
+  if (content.locality !== undefined) {
+    validateLocality(content.locality, 422);
   }
 
   const allowZeroPrice =

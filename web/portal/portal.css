@@ -5301,3 +5301,52 @@ textarea {
 }
 
 
+
+/* Página por cidade (spec 012) */
+.locality-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.locality-legend {
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.locality-optin {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.locality-fields-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 12px;
+}
+
+.locality-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.locality-field label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.locality-field input,
+.locality-field select {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .locality-fields-row {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+}

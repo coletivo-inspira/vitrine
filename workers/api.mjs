@@ -42,6 +42,24 @@ import {
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import {
+  CITY_PAGE_SIZE,
+  cityFromSummaryRow,
+  finalizeCityListingPage,
+  isValidCitySlug,
+  paginateCityListings,
+  parseCityListingQuery,
+  projectCityListings,
+  sortCities,
+  summarizeCities,
+  toPublicListing
+} from '../src/city-listings.mjs';
+import {
+  renderCityIndexHtml,
+  renderCityNotFoundHtml,
+  renderCityPageHtml,
+  renderCityUnavailableHtml
+} from '../src/city-page.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1386,6 +1404,20 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       return null;
     },
 
+    listCityListingRows() {
+      return [...publicationsBySlug.values()].flatMap((publication) =>
+        projectCityListings(publication.menu, publication.publishedAt)
+      );
+    },
+
+    async listCityIndex() {
+      return summarizeCities(this.listCityListingRows());
+    },
+
+    async listCityListings({ citySlug, priceMode = null, cursor = null, limit = CITY_PAGE_SIZE }) {
+      return paginateCityListings(this.listCityListingRows(), { citySlug, priceMode, cursor, limit });
+    },
+
     async getPublicationByHash(slug, hash) {
       const key = `${slug}:${hash}`;
       if (publicationsByHash.has(key)) {
@@ -1650,8 +1682,15 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
 
 export const PUBLICATION_CACHE_TTL_MS = 30 * 1000;
 const publicationFetchedAtBySlug = new Map();
+const CITY_INDEX_CACHE_TTL_MS = 60 * 1000;
+const CITY_INDEX_MAX_ROWS = 1000;
+const CITY_LISTING_COLUMNS =
+  'city_slug,city,uf,site_slug,site_name,item_id,item_position,item_name,price_mode,price_cents,description,conditions,trade_for,image_url,published_at,sort_key';
+const cityIndexCache = { value: null, fetchedAt: 0 };
 
 export function clearPublicationsCache() {
+  cityIndexCache.value = null;
+  cityIndexCache.fetchedAt = 0;
   sharedPublicPublications.publicationsBySlug.clear();
   sharedPublicPublications.publicationsByHash.clear();
   publicationFetchedAtBySlug.clear();
@@ -1675,6 +1714,7 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.components ? { components: rawMenu.components } : {}),
     ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
     ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
+    ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
@@ -2749,6 +2789,55 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return sharedPublicPublications.getPublicationByHash(slug, hash);
     },
 
+    async listCityIndex() {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.listCityIndex();
+      }
+      const nowMs = Date.now();
+      if (cityIndexCache.value && nowMs - cityIndexCache.fetchedAt < CITY_INDEX_CACHE_TTL_MS) {
+        return cityIndexCache.value;
+      }
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/city_listing_cities?select=city_slug,city,uf,offer_count,donation_count,trade_count,total_count&order=uf.asc,city.asc&limit=${CITY_INDEX_MAX_ROWS}`,
+        { method: 'GET', headers: anonHeaders() }
+      );
+      if (!response?.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        logUpstreamError('listCityIndex', errInfo);
+        throw createUpstreamStoreError('listCityIndex', errInfo);
+      }
+      const rows = await response.json();
+      const cities = sortCities((Array.isArray(rows) ? rows : []).map(cityFromSummaryRow));
+      cityIndexCache.value = cities;
+      cityIndexCache.fetchedAt = nowMs;
+      return cities;
+    },
+
+    async listCityListings({ citySlug, priceMode = null, cursor = null, limit = CITY_PAGE_SIZE }) {
+      if (!baseUrl || !supabaseAnonKey || typeof fetchImpl !== 'function') {
+        return sharedPublicPublications.listCityListings({ citySlug, priceMode, cursor, limit });
+      }
+      const params = new URLSearchParams({
+        select: CITY_LISTING_COLUMNS,
+        city_slug: `eq.${citySlug}`,
+        order: 'sort_key.desc',
+        limit: String(limit + 1)
+      });
+      if (priceMode) params.set('price_mode', `eq.${priceMode}`);
+      if (cursor) params.set('sort_key', `lt.${cursor}`);
+      const response = await fetchImpl(`${baseUrl}/rest/v1/city_listings?${params}`, {
+        method: 'GET',
+        headers: anonHeaders()
+      });
+      if (!response?.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        logUpstreamError('listCityListings', errInfo);
+        throw createUpstreamStoreError('listCityListings', errInfo);
+      }
+      const rows = await response.json();
+      return finalizeCityListingPage(Array.isArray(rows) ? rows : [], limit);
+    },
+
     async recordSiteMetricBatch(slug, events, { now = new Date() } = {}) {
       if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
         const rpcRes = await fetchImpl(`${baseUrl}/rest/v1/rpc/record_site_metric_batch`, {
@@ -3094,6 +3183,118 @@ const RESERVED_PUBLIC_PATHS = new Set([
   'dot-trail.js',
   'favicon.ico'
 ]);
+
+const CITY_INDEX_PATHS = new Set(['/por-cidade', '/por-cidade/', '/data/por-cidade/index.json']);
+const CITY_PAGE_PATTERN = /^\/por-cidade\/([a-z0-9-]+)\/?$/;
+const CITY_JSON_PATTERN = /^\/data\/por-cidade\/([a-z0-9-]+)\.json$/;
+const CITY_EDGE_REFRESH_MS = 300_000;
+
+function matchCityRoute(pathname) {
+  if (CITY_INDEX_PATHS.has(pathname)) {
+    return { kind: 'index', json: pathname.endsWith('.json') };
+  }
+  const page = pathname.match(CITY_PAGE_PATTERN);
+  if (page) return { kind: 'city', json: false, citySlug: page[1] };
+  const data = pathname.match(CITY_JSON_PATTERN);
+  if (data && data[1] !== 'index') return { kind: 'city', json: true, citySlug: data[1] };
+  return null;
+}
+
+function cityResponse(status, body, { json = false, hasImages = false, cacheable = true } = {}) {
+  return new Response(body, {
+    status,
+    headers: {
+      ...PUBLIC_SECURITY_HEADERS,
+      'content-security-policy': hasImages ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER,
+      'content-type': json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8',
+      'cache-control': cacheable ? STOREFRONT_CACHE_CONTROL : 'no-store'
+    }
+  });
+}
+
+async function renderCityRoute(route, query, store) {
+  const listCityIndex = store.listCityIndex
+    ? (...args) => store.listCityIndex(...args)
+    : (...args) => sharedPublicPublications.listCityIndex(...args);
+  const listCityListings = store.listCityListings
+    ? (...args) => store.listCityListings(...args)
+    : (...args) => sharedPublicPublications.listCityListings(...args);
+  try {
+    const cities = await listCityIndex();
+    if (route.kind === 'index') {
+      return route.json
+        ? cityResponse(200, JSON.stringify({ schemaVersion: 1, cities }), { json: true })
+        : cityResponse(200, renderCityIndexHtml({ cities }));
+    }
+    const city = isValidCitySlug(route.citySlug)
+      ? cities.find((entry) => entry.citySlug === route.citySlug)
+      : null;
+    if (!city) {
+      return route.json
+        ? cityResponse(404, JSON.stringify({ error: { code: 'CITY_NOT_FOUND', message: 'Cidade sem itens listados.' } }), { json: true, cacheable: false })
+        : cityResponse(404, renderCityNotFoundHtml(), { cacheable: false });
+    }
+    const page = await listCityListings({
+      citySlug: city.citySlug,
+      priceMode: query.priceMode,
+      cursor: query.cursor,
+      limit: CITY_PAGE_SIZE
+    });
+    const listings = page.rows.map(toPublicListing);
+    const hasImages = listings.some((listing) => listing.item.imageUrl);
+    if (route.json) {
+      return cityResponse(200, JSON.stringify({
+        schemaVersion: 1,
+        city,
+        mode: query.modeKey,
+        items: listings,
+        nextCursor: page.nextCursor
+      }), { json: true });
+    }
+    return cityResponse(200, renderCityPageHtml({
+      city,
+      listings,
+      modeKey: query.modeKey,
+      cursor: query.cursor,
+      nextCursor: page.nextCursor
+    }), { hasImages });
+  } catch (error) {
+    if (!error?.upstream) console.error(JSON.stringify({ event: 'city_page_error', message: sanitizeDiagnosticText(String(error?.message ?? '')) }));
+    return route.json
+      ? cityResponse(503, JSON.stringify({ error: { code: 'CITY_PAGE_UNAVAILABLE', message: 'Página por cidade indisponível.' } }), { json: true, cacheable: false })
+      : cityResponse(503, renderCityUnavailableHtml(), { cacheable: false });
+  }
+}
+
+async function handleCityRequest(request, url, method, store, context) {
+  const route = matchCityRoute(url.pathname);
+  if (!route) return null;
+  if (method !== 'GET' && method !== 'HEAD') {
+    return new Response(null, { status: 405, headers: { ...PUBLIC_SECURITY_HEADERS, allow: 'GET, HEAD' } });
+  }
+  const query = route.kind === 'city' ? parseCityListingQuery(url.searchParams) : { modeKey: 'todos', priceMode: null, cursor: null };
+  const normalizedSearch = new URLSearchParams();
+  if (query.priceMode) normalizedSearch.set('modo', query.modeKey);
+  if (query.cursor) normalizedSearch.set('depois', query.cursor);
+  const cacheKey = new Request(`${url.origin}${url.pathname}${normalizedSearch.size ? `?${normalizedSearch}` : ''}`);
+  const cache = globalThis.caches?.default;
+  const refresh = async () => {
+    const response = await renderCityRoute(route, query, store);
+    if (response.status === 200 && cache) {
+      const headers = new Headers(response.headers);
+      headers.set('x-vitrine-cached-at', String(Date.now()));
+      await cache.put(cacheKey, new Response(response.clone().body, { status: 200, headers })).catch(() => {});
+    }
+    return response;
+  };
+  const cached = await cache?.match(cacheKey).catch(() => null);
+  if (cached && Date.now() - Number(cached.headers.get('x-vitrine-cached-at')) > CITY_EDGE_REFRESH_MS && context?.waitUntil) {
+    context.waitUntil(refresh().catch(() => {}));
+  }
+  const response = cached ?? await refresh();
+  if (method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
+  return response;
+}
 
 async function handlePublicStorefrontOrMenuRequest(request, pathname, method, store, assetsFetcher) {
   if (method !== 'GET' && method !== 'HEAD') {
@@ -3579,6 +3780,11 @@ export function createApiHandler(deps = {}) {
 
       if (pathname === '/404' || pathname === '/404.html') {
         return renderNotFoundPageResponse(request, method, assetsFetcher);
+      }
+
+      const cityPageResponse = await handleCityRequest(request, url, method, store, _ctx);
+      if (cityPageResponse) {
+        return cityPageResponse;
       }
 
       const publicResponse = await handlePublicStorefrontOrMenuRequest(

@@ -62,4 +62,8 @@ _Evitar_: rifa, sorteio, bilhete, número da sorte.
 
 **Curtida**: Marcação anônima de um visitante em um item da vitrine publicada, contada no servidor uma vez por visitante e item; o visitante é lembrado só por um cookie funcional, sem login, IP ou dados pessoais.
 
+**Página por cidade**: Página pública (`/por-cidade`) que reúne os itens de lance, doação e troca das vitrines publicadas que autorizaram aparecer na sua cidade; mostra só dados públicos da vitrine e dos itens, e o contato acontece na vitrine.
+
+**Localidade da vitrine**: Cidade e UF informadas pelo proprietário em Ajustes, com autorização explícita para a página por cidade; não se confunde com a cidade do perfil pessoal.
+
 **Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing.
