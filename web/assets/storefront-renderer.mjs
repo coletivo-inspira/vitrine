@@ -67,8 +67,12 @@ export class StorefrontRenderer {
     this.offers = new Map(); // itemId -> offerCents
     this.tradeProposals = new Map(); // itemId -> text
     this.itemErrors = new Map(); // itemId -> error message
+    this.likeButtons = [];
     this.validationMessage = '';
     this.idPrefix = this.options.isPreview ? 'preview-sf' : 'public-sf';
+    if (this.options.isPublicPage && typeof this.options.likes?.subscribe === 'function') {
+      this.options.likes.subscribe((itemId, message) => this.syncLikeButtons(itemId, message));
+    }
 
     const orderFields = this.getResolvedOrderFields();
     this.customerDetails = {
@@ -418,6 +422,7 @@ export class StorefrontRenderer {
 
   render() {
     if (!this.container) return;
+    this.likeButtons = [];
     if (typeof this.container.replaceChildren === 'function') {
       this.container.replaceChildren();
     } else {
@@ -696,6 +701,99 @@ export class StorefrontRenderer {
     return true;
   }
 
+  renderLikeButton(item, parent, cardBody) {
+    const likes = this.options.likes;
+    if (!this.options.isPublicPage || !likes || !item?.id || item.active === false) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sf-like-button';
+    button.setAttribute('data-like-item-id', String(item.id));
+
+    if (typeof document.createElementNS === 'function') {
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const icon = document.createElementNS(svgNs, 'svg');
+      icon.setAttribute('class', 'sf-like-icon');
+      icon.setAttribute('width', '20');
+      icon.setAttribute('height', '20');
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.setAttribute('aria-hidden', 'true');
+      icon.setAttribute('focusable', 'false');
+      const path = document.createElementNS(svgNs, 'path');
+      path.setAttribute(
+        'd',
+        'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z'
+      );
+      icon.appendChild(path);
+      button.appendChild(icon);
+    }
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'sf-like-count';
+    countSpan.setAttribute('aria-hidden', 'true');
+    button.appendChild(countSpan);
+
+    const entry = {
+      itemId: String(item.id),
+      name: item.name || 'este item',
+      button,
+      countSpan,
+      cardBody,
+      notice: null
+    };
+    button.addEventListener('click', () => {
+      likes.toggle(entry.itemId);
+    });
+
+    this.likeButtons.push(entry);
+    this.updateLikeButton(entry);
+    parent.appendChild(button);
+  }
+
+  updateLikeButton(entry) {
+    const state = this.options.likes.getState(entry.itemId);
+    const { button } = entry;
+    const countLabel = state.count === 1 ? '1 curtida' : `${state.count} curtidas`;
+
+    button.hidden = !state.available;
+    if (state.liked) button.classList.add('is-liked');
+    else button.classList.remove('is-liked');
+    button.setAttribute('aria-pressed', state.liked ? 'true' : 'false');
+    button.setAttribute('aria-busy', state.pending ? 'true' : 'false');
+    button.setAttribute('aria-label', `Curtir ${entry.name} (${countLabel})`);
+    button.title = state.liked ? 'Remover curtida' : 'Curtir';
+    entry.countSpan.textContent = state.count > 0 ? String(state.count) : '';
+    return state;
+  }
+
+  syncLikeButtons(itemId = null, message = '') {
+    for (const entry of this.likeButtons) {
+      if (itemId !== null && entry.itemId !== itemId) continue;
+      const state = this.updateLikeButton(entry);
+      if (itemId === null) continue;
+
+      if (state.pending && state.liked) {
+        entry.button.classList.add('is-popping');
+        entry.button.addEventListener(
+          'animationend',
+          () => entry.button.classList.remove('is-popping'),
+          { once: true }
+        );
+      }
+
+      if (message && entry.cardBody && !entry.notice) {
+        entry.notice = document.createElement('p');
+        entry.notice.className = 'sf-item-error sf-like-error';
+        entry.notice.setAttribute('role', 'status');
+        entry.cardBody.appendChild(entry.notice);
+      }
+      if (entry.notice) {
+        entry.notice.textContent = message;
+        entry.notice.hidden = !message;
+      }
+    }
+  }
+
   renderItemCard(item, grid, resolvedComponents, catalogType) {
     if (!item) return;
     const isInactive = item.active === false;
@@ -753,7 +851,10 @@ export class StorefrontRenderer {
         titleRow.appendChild(hiddenBadge);
       }
 
+      this.renderLikeButton(item, titleRow, body);
       body.appendChild(titleRow);
+    } else {
+      this.renderLikeButton(item, body, body);
     }
 
     if (resolvedComponents.description && typeof item.description === 'string' && item.description.trim()) {

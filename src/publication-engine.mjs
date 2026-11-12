@@ -898,7 +898,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.
       </p>
       <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">
-        Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais.
+        Privacidade (LGPD): esta vitrine contabiliza apenas estatísticas agregadas de visitas e escolhas de itens, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais. Ao curtir um item, um cookie funcional e anônimo guarda sua curtida para que ela não seja contada duas vezes.
       </p>
     </div>
   </footer>
