@@ -223,4 +223,209 @@ test('Frente QA - RLS e Concorrência de Portal no Banco de Dados', async (t) =>
       (err) => err.code === '23514'
     );
   });
+
+  await t.test('Cenário 7: Persistência pública em publications / publication_releases, RLS e backfill da migração (pipira rev 6)', async () => {
+    const db = await setupDb();
+    t.after(() => db.close());
+
+    await db.query(
+      'insert into public.sites(id, owner_user_id, slug, name) values ($1, $2, $3, $4)',
+      [siteA, owner, 'pipira', 'Pipira Forno & Brasa']
+    );
+    await db.query(
+      'insert into public.site_memberships(site_id, user_id) values ($1, $2)',
+      [siteA, member]
+    );
+
+    const validMenu = {
+      schemaVersion: 1,
+      template: 'pizzeria-v1',
+      slug: 'pipira',
+      name: 'Pipira Forno & Brasa',
+      whatsapp: '5511999999999',
+      currency: 'BRL',
+      items: [{ id: 'marg', name: 'Margherita', priceCents: 4800 }],
+      categories: [
+        {
+          id: 'pizzas',
+          name: 'Pizzas',
+          items: [{ id: 'marg', name: 'Margherita', priceCents: 4800 }]
+        }
+      ]
+    };
+    const validHash = 'a'.repeat(64);
+
+    // 1. Anon, stranger e member não podem inserir em public.publications
+    await assert.rejects(
+      () =>
+        asUser(
+          db,
+          null,
+          () =>
+            db.query(
+              'insert into public.publications (site_id, slug, revision, artifact_hash, menu) values ($1, $2, 6, $3, $4::jsonb)',
+              [siteA, 'pipira', validHash, JSON.stringify(validMenu)]
+            ),
+          'anon'
+        ),
+      (err) => err.code === '42501'
+    );
+
+    for (const unauthUser of [stranger, member]) {
+      await assert.rejects(
+        () =>
+          asUser(db, unauthUser, () =>
+            db.query(
+              'insert into public.publications (site_id, slug, revision, artifact_hash, menu) values ($1, $2, 6, $3, $4::jsonb)',
+              [siteA, 'pipira', validHash, JSON.stringify(validMenu)]
+            )
+          ),
+        (err) => err.code === '42501'
+      );
+    }
+
+    // 2. Owner publica revisão 6 e o trigger arquiva automaticamente em publication_releases
+    await asUser(db, owner, async () => {
+      const ins = await db.query(
+        'insert into public.publications (site_id, slug, revision, artifact_hash, menu) values ($1, $2, 6, $3, $4::jsonb) returning slug, revision, artifact_hash',
+        [siteA, 'pipira', validHash, JSON.stringify(validMenu)]
+      );
+      assert.equal(ins.rows.length, 1);
+      assert.equal(ins.rows[0].slug, 'pipira');
+      assert.equal(ins.rows[0].revision, 6);
+    });
+
+    // Persiste para o teste de leitura anônima (pois asUser faz rollback ao final do bloco)
+    await db.query(
+      'insert into public.publications (site_id, slug, revision, artifact_hash, menu) values ($1, $2, 6, $3, $4::jsonb)',
+      [siteA, 'pipira', validHash, JSON.stringify(validMenu)]
+    );
+
+    // 3. Anon lê os campos públicos de publications e publication_releases, mas não pode ler site_id nem alterar dados
+    await asUser(
+      db,
+      null,
+      async () => {
+        const pubRes = await db.query(
+          'select slug, revision, status, artifact_hash, menu from public.publications where slug = $1',
+          ['pipira']
+        );
+        assert.equal(pubRes.rows.length, 1);
+        assert.equal(pubRes.rows[0].revision, 6);
+        assert.equal(pubRes.rows[0].menu.name, 'Pipira Forno & Brasa');
+
+        const relRes = await db.query(
+          'select slug, revision, artifact_hash, menu from public.publication_releases where slug = $1 and artifact_hash = $2',
+          ['pipira', validHash]
+        );
+        assert.equal(relRes.rows.length, 1);
+        assert.equal(relRes.rows[0].revision, 6);
+      },
+      'anon'
+    );
+
+    await assert.rejects(
+      () =>
+        asUser(
+          db,
+          null,
+          () => db.query('select site_id from public.publications where slug = $1', ['pipira']),
+          'anon'
+        ),
+      (err) => err.code === '42501'
+    );
+    await assert.rejects(
+      () =>
+        asUser(
+          db,
+          null,
+          () => db.query('delete from public.publications where slug = $1', ['pipira']),
+          'anon'
+        ),
+      (err) => err.code === '42501'
+    );
+
+    // 4. Rejeita menu contendo chaves privadas proibidas (constraint check 23514)
+    const leakedMenu = { ...validMenu, ownerEmail: 'leak@example.com' };
+    await assert.rejects(
+      () =>
+        asUser(db, owner, () =>
+          db.query(
+            'update public.publications set menu = $1::jsonb where site_id = $2',
+            [JSON.stringify(leakedMenu), siteA]
+          )
+        ),
+      (err) => err.code === '23514'
+    );
+
+    // 5. Backfill automático na migração 202611120001_public_publications.sql para vitrine já existente (ex.: pipira rev 6)
+    const preMigrationDb = new PGlite();
+    t.after(() => preMigrationDb.close());
+    await preMigrationDb.exec(`
+      create role anon nologin;
+      create role authenticated nologin;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema auth to authenticated, anon;
+      grant execute on function auth.uid() to authenticated, anon;
+    `);
+    const root = fileURLToPath(new URL('../../', import.meta.url));
+    const migrationsDir = resolve(root, 'supabase/migrations');
+    await preMigrationDb.exec(await readFile(resolve(migrationsDir, '202611070001_site_access.sql'), 'utf8'));
+    await preMigrationDb.exec(await readFile(resolve(migrationsDir, '202611110001_portal_schema.sql'), 'utf8'));
+
+    await preMigrationDb.query('insert into auth.users (id) values ($1)', [owner]);
+    await preMigrationDb.query(
+      'insert into public.sites (id, owner_user_id, slug, name) values ($1, $2, $3, $4)',
+      [siteA, owner, 'pipira', 'Pipira Forno & Brasa']
+    );
+    await preMigrationDb.query(
+      'insert into public.drafts (site_id, revision, content) values ($1, 6, $2::jsonb)',
+      [
+        siteA,
+        JSON.stringify({
+          schemaVersion: 1,
+          template: 'pizzeria-v1',
+          slug: 'pipira',
+          businessName: 'Pipira Forno & Brasa',
+          whatsapp: '5511999999999',
+          categories: [
+            {
+              name: 'Pizzas Artesanais',
+              items: [
+                {
+                  id: 'pipira-1',
+                  name: 'Pipira Clássica',
+                  description: 'Queijo coalho e manjericão.',
+                  priceCents: 5200,
+                  active: true
+                },
+                {
+                  id: 'pipira-oculta',
+                  name: 'Receita em Teste',
+                  priceCents: 6000,
+                  active: false
+                }
+              ]
+            }
+          ]
+        })
+      ]
+    );
+
+    await preMigrationDb.exec(await readFile(resolve(migrationsDir, '202611120001_public_publications.sql'), 'utf8'));
+
+    const backfilled = await preMigrationDb.query(
+      'select slug, revision, status, artifact_hash, menu from public.publications where slug = $1',
+      ['pipira']
+    );
+    assert.equal(backfilled.rows.length, 1);
+    assert.equal(backfilled.rows[0].slug, 'pipira');
+    assert.equal(backfilled.rows[0].revision, 6);
+    assert.equal(backfilled.rows[0].status, 'active');
+    assert.equal(backfilled.rows[0].menu.items.length, 1);
+    assert.equal(backfilled.rows[0].menu.items[0].id, 'pipira-1');
+  });
 });

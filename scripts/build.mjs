@@ -45,9 +45,8 @@ try {
     }
   );
 
-  await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
-  await cp(new URL('../web/', import.meta.url), output, { recursive: true });
+  await cp(new URL('../web/', import.meta.url), output, { recursive: true, force: true });
   const notFoundPath = resolve(output, '404.html');
   const notFound = await readFile(notFoundPath, 'utf8');
   await writeFile(notFoundPath, notFound.replaceAll('__SITE_BASE__', basePath));
