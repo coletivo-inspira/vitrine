@@ -81,6 +81,12 @@
       <polyline points="7 23 3 19 7 15"/>
       <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
     </symbol>
+    <symbol id="icon-users-quota" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
   </svg>
   
   <!-- Auth / Login Section (Unauthenticated screen) -->
@@ -1029,6 +1035,13 @@
                             <strong>Troca</strong>
                           </span>
                           <span>Combinar troca pelo WhatsApp</span>
+                        </button>
+                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="quota">
+                          <span class="toolbar-mode-row">
+                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-users-quota"/></svg>
+                            <strong>Cotas de apoio</strong>
+                          </span>
+                          <span>Meta dividida em partes iguais, sem sorteio</span>
                         </button>
                       </div>
                     </div>

@@ -15,6 +15,12 @@ import {
   toggleVariableInTemplate
 } from './order-message-tools.mjs';
 import {
+  QUOTA_MAX_TOTAL,
+  QUOTA_MIN_TOTAL,
+  QUOTA_TEXT_MAX_LENGTH,
+  findProhibitedQuotaTerm
+} from '../assets/quota-rules.mjs';
+import {
   parseImportCatalogCSV,
   applyCSVToCatalog,
   exportCatalogToCSV,
@@ -1473,6 +1479,7 @@ function renderItems() {
     if (mode === 'offer') return 'Item de lance';
     if (mode === 'donation') return 'Doação';
     if (mode === 'trade') return 'Troca';
+    if (mode === 'quota') return 'Cotas de apoio';
     return 'Item à venda';
   };
 
@@ -1547,20 +1554,23 @@ function renderItems() {
 
       const previewSub = document.createElement('p');
       previewSub.className = 'item-preview-subtitle soft-text';
+      const quotaText = `Cotas de ${item.priceCents ? formatCentsToReais(item.priceCents) : 'R$ 0,00'} · ${item.quotaFilled || 0}/${item.quotaTotal || 0} confirmadas`;
       const priceText =
-        itemPriceMode === 'donation'
-          ? 'Doação'
-          : itemPriceMode === 'trade'
-            ? item.tradeFor
-              ? `Aceito: ${item.tradeFor}`
-              : 'Troca'
-            : itemPriceMode === 'offer'
-              ? item.priceCents
-                ? `Lance mín.: ${formatCentsToReais(item.priceCents)}`
-                : 'Faça sua oferta'
-              : item.priceCents
-                ? formatCentsToReais(item.priceCents)
-                : '';
+        itemPriceMode === 'quota'
+          ? quotaText
+          : itemPriceMode === 'donation'
+            ? 'Doação'
+            : itemPriceMode === 'trade'
+              ? item.tradeFor
+                ? `Aceito: ${item.tradeFor}`
+                : 'Troca'
+              : itemPriceMode === 'offer'
+                ? item.priceCents
+                  ? `Lance mín.: ${formatCentsToReais(item.priceCents)}`
+                  : 'Faça sua oferta'
+                : item.priceCents
+                  ? formatCentsToReais(item.priceCents)
+                  : '';
       const sectionText = item.section ? `Seção: ${item.section}` : '';
       const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
       previewSub.textContent = details.join(' · ');
@@ -1689,6 +1699,11 @@ function renderItems() {
     gName.appendChild(nameInput);
     fields.appendChild(gName);
 
+    const termWarning = document.createElement('p');
+    termWarning.className = 'item-quota-term-warning item-fields-full';
+    termWarning.setAttribute('role', 'status');
+    fields.appendChild(termWarning);
+
     // Selector: Tipo do item (Products & Quote)
     if (!isBooking) {
       const gMode = document.createElement('div');
@@ -1703,7 +1718,8 @@ function renderItems() {
         ['fixed', 'Item à venda (preço fixo)'],
         ['offer', 'Item de lance'],
         ['donation', 'Doação'],
-        ['trade', 'Troca']
+        ['trade', 'Troca'],
+        ['quota', 'Cotas de apoio (sem sorteio)']
       ]) {
         const opt = document.createElement('option');
         opt.value = val;
@@ -1720,6 +1736,9 @@ function renderItems() {
         }
         if (nextMode === 'donation' || nextMode === 'trade') {
           item.priceCents = 0;
+        }
+        if (nextMode === 'quota') {
+          applyQuotaDefaults(item);
         }
         renderItems();
         updateDraftAndPreview();
@@ -1803,6 +1822,8 @@ function renderItems() {
       gTrade.appendChild(lTrade);
       gTrade.appendChild(tradeInput);
       fields.appendChild(gTrade);
+    } else if (itemPriceMode === 'quota') {
+      renderQuotaFields(item, fields);
     }
 
     // New Google Forms field: Section name (grupo de agrupamento opcional)
@@ -1972,6 +1993,19 @@ function renderItems() {
       fields.appendChild(gPhoto);
     }
 
+    const refreshTermWarning = () => {
+      const term = findProhibitedQuotaTerm(
+        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+        { quota: itemPriceMode === 'quota' }
+      );
+      termWarning.hidden = !term;
+      termWarning.textContent = term
+        ? `Remova "${term}": a vitrine não aceita rifa, sorteio, prêmio ou promessa de retorno financeiro.`
+        : '';
+    };
+    refreshTermWarning();
+    card.addEventListener('input', refreshTermWarning);
+
     card.appendChild(fields);
 
     // CARD FOOTER (Google Forms style)
@@ -1982,7 +2016,7 @@ function renderItems() {
     const quickAddLinks = document.createElement('div');
     quickAddLinks.className = 'quick-add-links';
     
-    if (item._showPrice === false) {
+    if (item._showPrice === false && itemPriceMode !== 'quota') {
       const addPriceLink = document.createElement('button');
       addPriceLink.type = 'button';
       addPriceLink.className = 'text-link-btn';
@@ -2247,6 +2281,113 @@ function moveCategory(catIndex, direction) {
   }
 }
 
+function applyQuotaDefaults(item) {
+  if (!Number.isSafeInteger(item.quotaTotal)) item.quotaTotal = 10;
+  if (!Number.isSafeInteger(item.quotaFilled)) item.quotaFilled = 0;
+  if (!Number.isSafeInteger(item.priceCents)) item.priceCents = 0;
+  item._showPrice = true;
+}
+
+function parseQuotaInteger(raw, min, max) {
+  const parsed = parseInt(String(raw ?? '').replace(/\D/g, ''), 10);
+  if (!Number.isSafeInteger(parsed)) return min;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function renderQuotaFields(item, fields) {
+  const callout = document.createElement('p');
+  callout.className = 'item-quota-legal-callout item-fields-full';
+  callout.textContent =
+    'Cotas de apoio dividem uma meta em partes iguais, sem sorteio: toda cota garante o mesmo benefício. ' +
+    'Não use para rifa, sorteio, prêmio ou promessa de retorno financeiro (exigem autorização federal). ' +
+    'Combine o pagamento direto com cada apoiador.';
+  fields.appendChild(callout);
+
+  const makeGroup = (id, labelText, input) => {
+    const group = document.createElement('div');
+    group.className = 'form-group item-fields-full';
+    const label = document.createElement('label');
+    label.setAttribute('for', id);
+    label.textContent = labelText;
+    input.id = id;
+    group.appendChild(label);
+    group.appendChild(input);
+    fields.appendChild(group);
+    return group;
+  };
+
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text';
+  priceInput.inputMode = 'numeric';
+  priceInput.className = 'item-input input-styled-height';
+  priceInput.placeholder = 'Ex: R$ 20,00';
+  priceInput.value = item.priceCents ? formatCentsToReais(item.priceCents) : '';
+  priceInput.addEventListener('input', () => {
+    maskMoneyInput(priceInput);
+    item.priceCents = parseReaisToCents(priceInput.value);
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-price-${item.id}`, 'Valor de cada cota (BRL)', priceInput);
+
+  const totalInput = document.createElement('input');
+  totalInput.type = 'number';
+  totalInput.inputMode = 'numeric';
+  totalInput.min = String(QUOTA_MIN_TOTAL);
+  totalInput.max = String(QUOTA_MAX_TOTAL);
+  totalInput.className = 'item-input input-styled-height';
+  totalInput.value = String(item.quotaTotal ?? 10);
+
+  const filledInput = document.createElement('input');
+  filledInput.type = 'number';
+  filledInput.inputMode = 'numeric';
+  filledInput.min = '0';
+  filledInput.max = String(item.quotaTotal ?? 10);
+  filledInput.className = 'item-input input-styled-height';
+  filledInput.value = String(item.quotaFilled ?? 0);
+
+  totalInput.addEventListener('change', () => {
+    item.quotaTotal = parseQuotaInteger(totalInput.value, QUOTA_MIN_TOTAL, QUOTA_MAX_TOTAL);
+    totalInput.value = String(item.quotaTotal);
+    filledInput.max = String(item.quotaTotal);
+    if ((item.quotaFilled ?? 0) > item.quotaTotal) {
+      item.quotaFilled = item.quotaTotal;
+      filledInput.value = String(item.quotaFilled);
+    }
+    updateDraftAndPreview();
+  });
+  filledInput.addEventListener('change', () => {
+    item.quotaFilled = parseQuotaInteger(filledInput.value, 0, item.quotaTotal ?? QUOTA_MAX_TOTAL);
+    filledInput.value = String(item.quotaFilled);
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-total-${item.id}`, `Total de cotas (${QUOTA_MIN_TOTAL} a ${QUOTA_MAX_TOTAL})`, totalInput);
+  makeGroup(`item-quota-filled-${item.id}`, 'Cotas já confirmadas', filledInput);
+
+  const rewardInput = document.createElement('input');
+  rewardInput.type = 'text';
+  rewardInput.maxLength = QUOTA_TEXT_MAX_LENGTH;
+  rewardInput.className = 'item-input input-styled-height';
+  rewardInput.placeholder = 'Ex: 1 pão de fermentação natural por cota';
+  rewardInput.value = item.quotaReward || '';
+  rewardInput.addEventListener('input', () => {
+    item.quotaReward = rewardInput.value;
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-reward-${item.id}`, 'O que cada cota garante (opcional)', rewardInput);
+
+  const condInput = document.createElement('input');
+  condInput.type = 'text';
+  condInput.maxLength = QUOTA_TEXT_MAX_LENGTH;
+  condInput.className = 'item-input input-styled-height';
+  condInput.placeholder = 'Ex: entrega quando a meta fechar; devolução se não fechar';
+  condInput.value = item.conditions || '';
+  condInput.addEventListener('input', () => {
+    item.conditions = condInput.value;
+    updateDraftAndPreview();
+  });
+  makeGroup(`item-quota-conditions-${item.id}`, 'Condições (opcional)', condInput);
+}
+
 function addItem(type = 'price', priceMode = 'fixed') {
   const category = (currentDraft.content.categories || []).find(
     (c) => c.id === selectedCategoryForItems
@@ -2282,6 +2423,8 @@ function addItem(type = 'price', priceMode = 'fixed') {
     item._showPrice = true;
     item._showPhoto = true;
   }
+
+  if (priceMode === 'quota') applyQuotaDefaults(item);
 
   if (currentDraft.content.components?.minQuantity && priceMode === 'fixed') item.minQuantity = 1;
   if (currentDraft.content.components?.durationMinutes) item.durationMinutes = 30;
@@ -2583,6 +2726,42 @@ function validateCatalogLocal() {
         if (priceRequired && (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0)) {
           showFeedback(
             `O preço do item "${item.name || `Item ${itemIndex + 1}`}" precisa ser maior que R$ 0,00.`,
+            'error'
+          );
+          hasValidationErrors = true;
+        }
+
+        const itemLabel = item.name || `Item ${itemIndex + 1}`;
+        if (itemPriceMode === 'quota') {
+          if (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0) {
+            showFeedback(`Informe o valor de cada cota do item "${itemLabel}".`, 'error');
+            hasValidationErrors = true;
+          }
+          if (
+            !Number.isSafeInteger(item.quotaTotal) ||
+            item.quotaTotal < QUOTA_MIN_TOTAL ||
+            item.quotaTotal > QUOTA_MAX_TOTAL
+          ) {
+            showFeedback(
+              `O total de cotas do item "${itemLabel}" deve ficar entre ${QUOTA_MIN_TOTAL} e ${QUOTA_MAX_TOTAL}.`,
+              'error'
+            );
+            hasValidationErrors = true;
+          } else if ((item.quotaFilled ?? 0) > item.quotaTotal) {
+            showFeedback(
+              `As cotas confirmadas do item "${itemLabel}" não podem passar do total.`,
+              'error'
+            );
+            hasValidationErrors = true;
+          }
+        }
+        const prohibitedTerm = findProhibitedQuotaTerm(
+          [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+          { quota: itemPriceMode === 'quota' }
+        );
+        if (prohibitedTerm) {
+          showFeedback(
+            `Remova "${prohibitedTerm}" do item "${itemLabel}": a vitrine não aceita rifa, sorteio, prêmio ou promessa de retorno financeiro.`,
             'error'
           );
           hasValidationErrors = true;

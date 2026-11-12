@@ -29,6 +29,9 @@ _Evitar_: negócio para designar o modelo.
 
 **Item ativo**: Item do cardápio selecionado para aparecer na próxima publicação.
 
+**Cota de apoio**: Parte igual de uma meta (equipamento, projeto ou lote de compra coletiva) reservada pelo visitante pelo WhatsApp. Toda cota garante o mesmo benefício declarado, sem sorteio, prêmio ou retorno financeiro; o pagamento é combinado direto com o proprietário. Ver `specs/014-cotas/research.md`.
+_Evitar_: rifa, sorteio, bilhete, número da sorte.
+
 **Assinatura**: Contratação periódica de benefícios para uma vitrine, como endereço personalizado; não equivale à compra de um domínio.
 
 **Vínculo de domínio**: Associação de um endereço verificado à vitrine, sem transferência de propriedade do domínio.

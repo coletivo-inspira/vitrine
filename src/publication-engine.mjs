@@ -70,6 +70,9 @@ const ALLOWED_ITEM_KEYS = new Set([
   'priceMode',
   'conditions',
   'tradeFor',
+  'quotaTotal',
+  'quotaFilled',
+  'quotaReward',
   'description',
   'imageUrl',
   'minQuantity',
@@ -395,9 +398,21 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
         const extras = {};
         if (
           typeof rawItem.priceMode === 'string' &&
-          ['offer', 'donation', 'trade'].includes(rawItem.priceMode.trim())
+          ['offer', 'donation', 'trade', 'quota'].includes(rawItem.priceMode.trim())
         ) {
           extras.priceMode = rawItem.priceMode.trim();
+        }
+        if (extras.priceMode === 'quota') {
+          extras.quotaTotal = rawItem.quotaTotal;
+          extras.quotaFilled = Number.isSafeInteger(rawItem.quotaFilled) ? rawItem.quotaFilled : 0;
+          const quotaReward = sanitizeOptionalItemShortText(
+            rawItem.quotaReward,
+            'INVALID_QUOTA_REWARD',
+            'O campo "O que cada cota garante"'
+          );
+          if (quotaReward !== undefined) {
+            extras.quotaReward = quotaReward;
+          }
         }
         const conditions = sanitizeOptionalItemShortText(
           rawItem.conditions,
@@ -461,6 +476,9 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
       ...(extras.priceMode !== undefined ? { priceMode: extras.priceMode } : {}),
       ...(extras.conditions !== undefined ? { conditions: extras.conditions } : {}),
       ...(extras.tradeFor !== undefined ? { tradeFor: extras.tradeFor } : {}),
+      ...(extras.quotaTotal !== undefined ? { quotaTotal: extras.quotaTotal } : {}),
+      ...(extras.quotaFilled !== undefined ? { quotaFilled: extras.quotaFilled } : {}),
+      ...(extras.quotaReward !== undefined ? { quotaReward: extras.quotaReward } : {}),
       ...(extras.description !== undefined ? { description: extras.description } : {}),
       ...(extras.section !== undefined ? { section: extras.section } : {}),
       ...(extras.imageUrl !== undefined ? { imageUrl: extras.imageUrl } : {}),

@@ -6,6 +6,13 @@ import { ORDER_RELAY_MILA, isMilaRelayCode, withMilaRelayPrefix } from './mila-r
  * Strictly CSP-safe: zero inline scripts, zero inline styles, zero innerHTML with untrusted data, zero emojis.
  */
 
+import {
+  QUOTA_MAX_PER_SELECTION,
+  QUOTA_NO_DRAW_NOTICE,
+  QUOTA_PAYMENT_NOTICE,
+  getQuotaRemaining
+} from './quota-rules.mjs';
+
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
     return 'R$ 0,00';
@@ -93,7 +100,76 @@ export class StorefrontRenderer {
     if (raw === 'offer' || raw === 'donation' || raw === 'trade') {
       return raw;
     }
+    if (raw === 'quota' && Number.isSafeInteger(item?.quotaTotal) && item.quotaTotal > 0) {
+      return 'quota';
+    }
     return 'fixed';
+  }
+
+  getQuotaSelectionLimit(item) {
+    return Math.min(getQuotaRemaining(item), QUOTA_MAX_PER_SELECTION);
+  }
+
+  setQuotaQuantity(item, delta) {
+    if (!item || item.active === false || this.getItemPriceMode(item) !== 'quota') return false;
+    const limit = this.getQuotaSelectionLimit(item);
+    const current = this.cart.get(item.id) || 0;
+    const next = Math.max(0, Math.min(current + delta, limit));
+    if (next === current) {
+      if (delta > 0 && limit > 0 && current >= limit) {
+        this.itemErrors.set(
+          item.id,
+          limit === 1 ? 'Resta apenas 1 cota disponível.' : `Restam apenas ${limit} cotas disponíveis.`
+        );
+        this.render();
+      }
+      return false;
+    }
+    this.itemErrors.delete(item.id);
+    if (next === 0) {
+      this.cart.delete(item.id);
+    } else {
+      this.cart.set(item.id, next);
+    }
+    if (
+      next > current &&
+      this.options.isPublicPage &&
+      typeof globalThis.recordStorefrontEvent === 'function'
+    ) {
+      globalThis.recordStorefrontEvent('item_select', {
+        itemId: item.id,
+        count: next - current
+      });
+    }
+    if (typeof this.options.onUpdate === 'function') {
+      this.options.onUpdate(this);
+    }
+    this.render();
+    return true;
+  }
+
+  getQuotaTotal() {
+    let total = 0;
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'quota') {
+        total += (item.priceCents || 0) * this.cart.get(item.id);
+      }
+    }
+    return total;
+  }
+
+  getQuotaCount() {
+    let count = 0;
+    for (const item of this.getAllActiveItems()) {
+      if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'quota') {
+        count += this.cart.get(item.id);
+      }
+    }
+    return count;
+  }
+
+  formatQuotaCount(count) {
+    return count === 1 ? '1 cota' : `${count} cotas`;
   }
 
   hasSelectedOffers() {
@@ -592,18 +668,28 @@ export class StorefrontRenderer {
       const info = document.createElement('div');
       info.className = 'cart-bar-info';
 
+      const quotaCount = this.getQuotaCount();
+      const otherCount = cartCount - quotaCount;
       const countStrong = document.createElement('strong');
       countStrong.textContent =
         catalogType === 'booking'
           ? cartCount === 1
             ? '1 serviço selecionado'
             : `${cartCount} serviços selecionados`
-          : cartCount === 1
-            ? '1 item selecionado'
-            : `${cartCount} itens selecionados`;
+          : quotaCount > 0
+            ? [
+                otherCount > 0 ? (otherCount === 1 ? '1 item' : `${otherCount} itens`) : '',
+                `${this.formatQuotaCount(quotaCount)} reservada${quotaCount === 1 ? '' : 's'}`
+              ]
+                .filter(Boolean)
+                .join(' e ')
+            : cartCount === 1
+              ? '1 item selecionado'
+              : `${cartCount} itens selecionados`;
       info.appendChild(countStrong);
 
       const cartTotal = this.getCartTotal();
+      const quotaTotal = this.getQuotaTotal();
       if (
         resolvedComponents.price &&
         (cartTotal > 0 || (catalogType !== 'quote' && this.hasSelectedFixedPriceItems()))
@@ -614,6 +700,17 @@ export class StorefrontRenderer {
           ? `${this.formatPrice(cartTotal)} (sem os lances)`
           : this.formatPrice(cartTotal);
         info.appendChild(totalVal);
+        if (quotaTotal > 0) {
+          const quotaVal = document.createElement('span');
+          quotaVal.className = 'cart-bar-total sf-cart-quota-total';
+          quotaVal.textContent = `+ ${this.formatPrice(quotaTotal)} em cotas`;
+          info.appendChild(quotaVal);
+        }
+      } else if (quotaTotal > 0) {
+        const quotaVal = document.createElement('span');
+        quotaVal.className = 'cart-bar-total sf-cart-quota-total';
+        quotaVal.textContent = `${this.formatPrice(quotaTotal)} em cotas`;
+        info.appendChild(quotaVal);
       } else if (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0) {
         const durVal = document.createElement('span');
         durVal.className = 'cart-bar-total';
@@ -842,7 +939,9 @@ export class StorefrontRenderer {
             ? 'Lance'
             : priceMode === 'donation'
               ? 'Doação'
-              : 'Troca';
+              : priceMode === 'quota'
+                ? 'Cotas'
+                : 'Troca';
         titleRow.appendChild(modeBadge);
       }
 
@@ -878,6 +977,10 @@ export class StorefrontRenderer {
       tradeP.className = 'sf-item-condition-note';
       tradeP.textContent = `Aceito em troca: ${item.tradeFor.trim()}`;
       body.appendChild(tradeP);
+    }
+
+    if (priceMode === 'quota') {
+      this.renderQuotaDetails(item, body);
     }
 
     const showDuration = Boolean(resolvedComponents.durationMinutes && item.durationMinutes > 0);
@@ -1009,6 +1112,8 @@ export class StorefrontRenderer {
       donateBtn.textContent = qty > 0 ? 'Selecionado' : 'Quero receber';
       donateBtn.addEventListener('click', () => this.toggleSingleSelect(item));
       footer.appendChild(donateBtn);
+    } else if (priceMode === 'quota') {
+      this.renderQuotaFooter(item, footer, qty, isInactive);
     } else if (priceMode === 'trade') {
       footer.classList.add('sf-footer-stacked');
       const tradeHeader = document.createElement('div');
@@ -1146,6 +1251,118 @@ export class StorefrontRenderer {
     card.appendChild(body);
     card.appendChild(footer);
     grid.appendChild(card);
+  }
+
+  renderQuotaDetails(item, body) {
+    const total = item.quotaTotal;
+    const remaining = getQuotaRemaining(item);
+    const filled = total - remaining;
+
+    if (typeof item.quotaReward === 'string' && item.quotaReward.trim()) {
+      const rewardP = document.createElement('p');
+      rewardP.className = 'sf-item-condition-note';
+      rewardP.textContent = `Cada cota garante: ${item.quotaReward.trim()}`;
+      body.appendChild(rewardP);
+    }
+
+    if (typeof item.conditions === 'string' && item.conditions.trim()) {
+      const condP = document.createElement('p');
+      condP.className = 'sf-item-condition-note';
+      condP.textContent = `Condições: ${item.conditions.trim()}`;
+      body.appendChild(condP);
+    }
+
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'sf-quota-progress';
+
+    const progressId = `${this.idPrefix}-quota-progress-${item.id}`;
+    const progressLabel = document.createElement('label');
+    progressLabel.className = 'sf-quota-progress-label';
+    progressLabel.setAttribute('for', progressId);
+    progressLabel.textContent = `${filled} de ${total} cotas confirmadas`;
+
+    const progressBar = document.createElement('progress');
+    progressBar.id = progressId;
+    progressBar.className = 'sf-quota-bar';
+    progressBar.max = total;
+    progressBar.value = filled;
+    progressBar.setAttribute('max', String(total));
+    progressBar.setAttribute('value', String(filled));
+
+    const goalP = document.createElement('p');
+    goalP.className = 'sf-quota-goal';
+    goalP.textContent = `Meta: ${this.formatPrice((item.priceCents || 0) * total)} · ${
+      remaining === 0 ? 'meta atingida' : `${this.formatQuotaCount(remaining)} disponíve${remaining === 1 ? 'l' : 'is'}`
+    }`;
+
+    progressWrap.appendChild(progressLabel);
+    progressWrap.appendChild(progressBar);
+    progressWrap.appendChild(goalP);
+    body.appendChild(progressWrap);
+
+    const legal = document.createElement('p');
+    legal.className = 'sf-quota-legal';
+    legal.textContent = `${QUOTA_NO_DRAW_NOTICE} ${QUOTA_PAYMENT_NOTICE}`;
+    body.appendChild(legal);
+  }
+
+  renderQuotaFooter(item, footer, qty, isInactive) {
+    const remaining = getQuotaRemaining(item);
+
+    const price = document.createElement('span');
+    price.className = 'menu-item-price sf-quota-price';
+    price.textContent = `${this.formatPrice(item.priceCents || 0)} por cota`;
+    footer.appendChild(price);
+
+    if (remaining === 0) {
+      const soldOut = document.createElement('span');
+      soldOut.className = 'sf-quote-tag sf-quota-soldout';
+      soldOut.textContent = 'Cotas esgotadas';
+      footer.appendChild(soldOut);
+      return;
+    }
+
+    const name = item.name || 'item';
+    const qtyDiv = document.createElement('div');
+    qtyDiv.className = 'qty-selector';
+    qtyDiv.setAttribute('role', 'group');
+    qtyDiv.setAttribute('aria-label', `Cotas de ${name}`);
+
+    const decBtn = document.createElement('button');
+    decBtn.type = 'button';
+    decBtn.className = 'btn-qty';
+    decBtn.textContent = '−';
+    decBtn.disabled = qty === 0 || isInactive;
+    decBtn.setAttribute('aria-label', `Remover uma cota de ${name}`);
+    decBtn.addEventListener('click', () => this.setQuotaQuantity(item, -1));
+
+    const qtyVal = document.createElement('span');
+    qtyVal.className = 'qty-val';
+    qtyVal.textContent = String(qty);
+    qtyVal.setAttribute('aria-live', 'polite');
+
+    const incBtn = document.createElement('button');
+    incBtn.type = 'button';
+    incBtn.className = 'btn-qty';
+    incBtn.textContent = '+';
+    incBtn.disabled = isInactive || qty >= this.getQuotaSelectionLimit(item);
+    incBtn.setAttribute('aria-label', `Reservar mais uma cota de ${name}`);
+    incBtn.addEventListener('click', () => this.setQuotaQuantity(item, 1));
+
+    qtyDiv.appendChild(decBtn);
+    qtyDiv.appendChild(qtyVal);
+    qtyDiv.appendChild(incBtn);
+    footer.appendChild(qtyDiv);
+
+    const errText = this.itemErrors.get(item.id);
+    if (errText) {
+      footer.classList.add('sf-footer-stacked');
+      const errEl = document.createElement('p');
+      errEl.className = 'sf-item-error';
+      errEl.setAttribute('role', 'alert');
+      errEl.textContent = errText;
+      footer.appendChild(errEl);
+    }
   }
 
   renderStage2(parent) {
@@ -1460,6 +1677,10 @@ export class StorefrontRenderer {
         itemLines.push(`- ${item.name || 'Item'} — Lance: ${this.formatPrice(offerCents)}`);
       } else if (priceMode === 'donation') {
         itemLines.push(`- Doação: ${item.name || 'Item'}`);
+      } else if (priceMode === 'quota') {
+        itemLines.push(
+          `- ${this.formatQuotaCount(qty)} de apoio: ${item.name || 'Item'} (${qty} × ${this.formatPrice(item.priceCents || 0)} = ${this.formatPrice((item.priceCents || 0) * qty)})`
+        );
       } else if (priceMode === 'trade') {
         const proposal = (this.tradeProposals.get(item.id) || '').trim();
         itemLines.push(
@@ -1482,8 +1703,17 @@ export class StorefrontRenderer {
 
     const cartTotal = this.getCartTotal();
     const hasOffers = this.hasSelectedOffers();
-    const totalStr =
-      resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
+    const quotaTotal = this.getQuotaTotal();
+    const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
+    if (quotaTotal > 0) {
+      if (!quotaOnly) {
+        itemLines.push(`Cotas reservadas (à parte do total): ${this.formatPrice(quotaTotal)}`);
+      }
+      itemLines.push('Cotas: reserva sem sorteio; o pagamento é combinado nesta conversa.');
+    }
+    const totalStr = quotaOnly
+      ? `${this.formatPrice(quotaTotal)} em cotas`
+      : resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)
         ? hasOffers
           ? `${this.formatPrice(cartTotal)} (sem os lances)`
           : this.formatPrice(cartTotal)
@@ -1575,6 +1805,13 @@ export class StorefrontRenderer {
       } else if (priceMode === 'donation') {
         titleSpan.textContent = `Doação: ${item.name || 'Item'}`;
         itemRow.appendChild(titleSpan);
+      } else if (priceMode === 'quota') {
+        titleSpan.textContent = `${this.formatQuotaCount(qty)} de apoio: ${item.name || 'Item'}`;
+        itemRow.appendChild(titleSpan);
+        const priceSpan = document.createElement('span');
+        priceSpan.className = 'review-item-price';
+        priceSpan.textContent = this.formatPrice((item.priceCents || 0) * qty);
+        itemRow.appendChild(priceSpan);
       } else if (priceMode === 'trade') {
         const proposal = (this.tradeProposals.get(item.id) || '').trim();
         titleSpan.textContent = proposal
@@ -1604,9 +1841,12 @@ export class StorefrontRenderer {
 
     const cartTotal = this.getCartTotal();
     const hasOffers = this.hasSelectedOffers();
+    const quotaTotal = this.getQuotaTotal();
+    const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
     if (
-      (resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)) ||
-      (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0)
+      !quotaOnly &&
+      ((resolvedComponents.price && (catalogType !== 'quote' || cartTotal > 0 || hasOffers)) ||
+        (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0))
     ) {
       const totalDiv = document.createElement('div');
       totalDiv.className = 'review-total-divider';
@@ -1628,6 +1868,24 @@ export class StorefrontRenderer {
           : `${this.getCartTotalDuration()} min`;
       totalDiv.appendChild(totalVal);
       card.appendChild(totalDiv);
+    }
+
+    if (quotaTotal > 0) {
+      const quotaDiv = document.createElement('div');
+      quotaDiv.className = 'review-total-divider';
+      const quotaLabel = document.createElement('strong');
+      quotaLabel.textContent = 'Total em cotas (reserva)';
+      const quotaVal = document.createElement('span');
+      quotaVal.className = 'review-total-val';
+      quotaVal.textContent = this.formatPrice(quotaTotal);
+      quotaDiv.appendChild(quotaLabel);
+      quotaDiv.appendChild(quotaVal);
+      card.appendChild(quotaDiv);
+
+      const quotaNote = document.createElement('p');
+      quotaNote.className = 'sf-quota-legal';
+      quotaNote.textContent = `${QUOTA_NO_DRAW_NOTICE} ${QUOTA_PAYMENT_NOTICE}`;
+      card.appendChild(quotaNote);
     }
 
     const detailPairs = [];
