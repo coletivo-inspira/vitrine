@@ -1,5 +1,5 @@
 import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
-import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
+import { assertPublishableSocialProof, resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
@@ -53,6 +53,9 @@ import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlan
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
+import {
+  fetchShowcaseRoute, nonCanonicalDomainResponse, resolveShowcaseRoute, runSubscriptionLifecycle
+} from '../src/billing/lifecycle.mjs';
 import {
   CITY_PAGE_SIZE,
   cityFromSummaryRow,
@@ -2362,6 +2365,10 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return response.json();
     },
 
+    async resolveDomainRoute(hostname) {
+      return fetchShowcaseRoute({ baseUrl, headers: anonHeaders(), fetch: fetchImpl }, hostname);
+    },
+
     async listAssets(siteId, { token }) {
       const response = await fetchImpl(
         `${baseUrl}/rest/v1/assets?site_id=eq.${encodeURIComponent(siteId)}&upload_state=eq.ready&order=created_at.desc`,
@@ -3612,7 +3619,9 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
         (Array.isArray(pub.menu?.items) &&
           pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())) ||
           pub.menu?.structure?.pages?.some((page) => page.sections?.some((section) =>
-            section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')))
+            (section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')) ||
+            (section.moduleCode === 'testimonials' &&
+              section.config?.items?.some((item) => /^https:/.test(item?.photoUrl ?? '')))))
       );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
@@ -3909,14 +3918,14 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
     if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
     return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
   }
-  if (!['GET', 'HEAD'].includes(request.method) || typeof store.resolveDomain !== 'function') {
-    return new Response(null, { status: 404 });
-  }
-  const slug = await store.resolveDomain(url.hostname);
+  if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 404 });
+  const route = await resolveShowcaseRoute(store, url.hostname);
+  const slug = route?.slug;
   if (!isValidSlug(slug)) return new Response(null, { status: 404 });
   const path = customDomainPath(slug, url.pathname);
   const publicPaths = customDomainPublicPaths(slug, path);
   if (!publicPaths.has(path)) return new Response(null, { status: 404 });
+  if (!route.canonical) return nonCanonicalDomainResponse(resolvePublicOrigins(env, deps).publicSiteOrigin, path);
   const cache = globalThis.caches?.default;
   const key = new Request(url.origin + path);
   const cached = await cache?.match(key);
@@ -5098,6 +5107,7 @@ export function createApiHandler(deps = {}) {
           edits = extractShowcaseOverrides(beforeSwitch, previous?.template, {}, previous?.modules);
         }
         const resolved = resolveShowcaseManifest(edits, defaults?.template, {}, defaults?.modules);
+        assertPublishableSocialProof(resolved.pages);
         await assertApprovedWidgets(store, siteId, resolved.pages, options);
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         if (code !== undefined) structure.templateCode = code;
@@ -5696,10 +5706,12 @@ export default {
     return defaultApiHandler(request, env, ctx);
   },
   async scheduled(_event, env) {
-    try {
-      await refreshPendingDomainCertificates(env);
-    } finally {
-      await purgeExpiredLinktreeDemos(env).catch(() => {});
-    }
+    const results = await Promise.allSettled([
+      refreshPendingDomainCertificates(env),
+      runSubscriptionLifecycle(env),
+      purgeExpiredLinktreeDemos(env).catch(() => {})
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
   }
 };

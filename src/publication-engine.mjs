@@ -1,4 +1,5 @@
-import { projectShowcaseManifest } from './showcase-structure.mjs';
+import { assertPublishableSocialProof, projectShowcaseManifest } from './showcase-structure.mjs';
+import { renderFaqBlock } from '../web/assets/faq-block.mjs';
 import { publicMenu, whatsappLink } from './public-menu.mjs';
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import {
@@ -432,6 +433,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
 
   const planLimits = { maxActiveItems: limits.maxActiveItems, planName: limits.planName };
   validateDraftContent(migrated, planLimits);
+  if (migrated.structure) assertPublishableSocialProof(migrated.structure.pages);
   const relayViaMila = resolveOrderRelayMode(migrated) === ORDER_RELAY_MILA;
 
   let baseMenu;
@@ -993,6 +995,26 @@ function renderHighlights(config, id) {
     </section>`;
 }
 
+const TESTIMONIAL_PHOTO_SIZE = 56;
+
+function renderTestimonials(config, id) {
+  const items = (config.items ?? []).filter(item => item?.quote && item?.name);
+  if (!items.length) return '';
+  const headingId = `${id}-titulo`;
+  // A foto é decorativa (alt vazio): o nome já está no texto do cartão.
+  return `<section id="${escapeHtml(id)}" class="storefront-module storefront-testimonials" aria-labelledby="${escapeHtml(headingId)}">
+      <h2 id="${escapeHtml(headingId)}">Depoimentos</h2>
+      <ul class="storefront-testimonials-list" data-count="${items.length}">${items.map(item => `
+        <li class="storefront-testimonial">
+          <figure>
+            <blockquote><p>${escapeHtml(item.quote)}</p></blockquote>
+            <figcaption>${item.photoUrl ? `<img src="${escapeHtml(item.photoUrl)}" alt="" width="${TESTIMONIAL_PHOTO_SIZE}" height="${TESTIMONIAL_PHOTO_SIZE}" loading="lazy" decoding="async">` : ''}<span class="storefront-testimonial-person"><span class="storefront-testimonial-name">${escapeHtml(item.name)}</span>${item.context ? `<span class="storefront-testimonial-context">${escapeHtml(item.context)}</span>` : ''}</span></figcaption>
+          </figure>
+        </li>`).join('')}
+      </ul>
+    </section>`;
+}
+
 function renderCategoryNavigation(chipsHtml) {
   return `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`;
 }
@@ -1025,13 +1047,9 @@ function renderPublicSections(pages, menu, catalog, placeHtml = '') {
           return section(config.scheduleText || config.addressText
             ? `<h2>Horários e localização</h2><p>${escapeHtml(config.scheduleText)}</p><p>${escapeHtml(config.addressText)}</p>` : '');
         case 'faq':
-          return section(config.items?.length ? `<h2>Perguntas frequentes</h2>${config.items.map(item =>
-            `<details><summary>${escapeHtml(item.q)}</summary><p>${escapeHtml(item.a)}</p></details>`
-          ).join('')}` : '');
+          return renderFaqBlock(config, { id });
         case 'testimonials':
-          return section(config.items?.length ? `<h2>Depoimentos</h2>${config.items.map(item =>
-            `<blockquote><p>${escapeHtml(item.quote)}</p><footer>${escapeHtml(item.name)}</footer></blockquote>`
-          ).join('')}` : '');
+          return renderTestimonials(config, id);
         case 'links_bio':
           return section(renderNavigation(config.links, 'Links'));
         case 'highlights':

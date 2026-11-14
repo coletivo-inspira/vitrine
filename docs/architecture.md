@@ -94,6 +94,18 @@ evento, sem dados pessoais) e as RPCs `billing_attach_checkout` e `billing_apply
 só para `service_role`; o webhook grava o id e muda `public.subscriptions` na mesma
 transação. Configuração, eventos, cotas e testes em `docs/billing/asaas.md`.
 
+## Ciclo da assinatura (ADR 0013, issue #114)
+
+`src/billing/lifecycle.mjs` e a migração `20261116000100_subscription_lifecycle.sql`.
+O Cron existente chama `billing_lifecycle_tick` uma vez por execução (`active`/`past_due`
+vencida → `grace` até vencimento + 7 dias → `suspended`); o webhook reativa. Os direitos
+seguem as datas em `private.site_entitlements`, que agora também mantém o plano de uma
+assinatura `canceled` até `current_period_end`. Domínio próprio é canônico só com o
+recurso `custom_domain` (`resolve_showcase_host`); sem ele, `302` para
+`vitrine.inspira.dev.br/<endereço>`. A faixa do Início lê `GET /api/billing/notice`.
+Nada em `sites`, `drafts`, `publications` ou `site_memberships` é apagado. Operação na
+seção 3 de `docs/operations-guide.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

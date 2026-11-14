@@ -1986,6 +1986,180 @@ html:has(.selection-drawer[open]) {
   border-block-start: 1px solid var(--line);
 }
 
+/* Depoimentos: cartões em grade, sem carrossel. */
+.storefront-testimonials-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storefront-testimonial {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.storefront-testimonial figure {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  margin: 0;
+  padding: 22px;
+}
+
+.storefront-testimonial blockquote {
+  margin: 0;
+}
+
+.storefront-testimonial blockquote p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+}
+
+.storefront-testimonial blockquote p::before {
+  content: "“";
+}
+
+.storefront-testimonial blockquote p::after {
+  content: "”";
+}
+
+.storefront-testimonial figcaption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.storefront-testimonial figcaption img {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--offer-surface);
+}
+
+.storefront-testimonial-person {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.storefront-testimonial-name {
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+.storefront-testimonial-context {
+  color: var(--ink-soft);
+  font-size: 14px;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 640px) {
+  .storefront-testimonials-list:not([data-count="1"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .storefront-testimonials-list:not([data-count="1"], [data-count="2"], [data-count="4"]) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Perguntas frequentes: details/summary nativos, divisórias finas e alvo ≥ 44 px. */
+.storefront-faq-list {
+  border-top: 1px solid var(--line);
+}
+
+.storefront-faq-item {
+  border-bottom: 1px solid var(--line);
+}
+
+.storefront-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding-block: 12px;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.4;
+  list-style: none;
+  cursor: pointer;
+}
+
+.storefront-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.storefront-faq-item summary:hover .storefront-faq-question {
+  color: var(--primary);
+}
+
+.storefront-faq-item summary:focus-visible {
+  outline-offset: 2px;
+  border-radius: var(--radius-status);
+}
+
+.storefront-faq-question {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.storefront-faq-icon {
+  flex: none;
+  fill: none;
+  stroke: var(--storefront-custom-accent, var(--primary));
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: transform 0.2s cubic-bezier(.16, 1, .3, 1);
+}
+
+html[data-theme="dark"] .storefront-faq-icon {
+  stroke: var(--primary);
+}
+
+.storefront-faq-item[open] .storefront-faq-icon {
+  transform: rotate(45deg);
+}
+
+.storefront-faq-answer {
+  padding-bottom: 18px;
+  color: var(--ink-soft);
+}
+
+.storefront-faq-answer p {
+  max-width: 65ch;
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storefront-faq-icon {
+    transition: none;
+  }
+}
+
 .storefront-module-nav {
   display: flex;
   flex-wrap: wrap;
