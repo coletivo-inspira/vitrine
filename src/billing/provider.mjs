@@ -10,6 +10,10 @@
 //   cancelSubscription(subscriptionId) -> { canceled: true }
 //   verifyWebhook(request) -> Promise<boolean>
 //   parseWebhookEvent(payload) -> NormalizedEvent | null
+//   listPayments(subscriptionId) -> Payment[] (opcional; histórico do painel, issue #115)
+//
+// Payment: { id, dueDate, paidDate, valueCents, state, invoiceUrl, receiptUrl }, com
+// `state` em pending, paid, overdue, refunded ou other e links só do provedor.
 //
 // NormalizedEvent: { id, providerType, kind, subscriptionId, paymentId, periodEnd }
 // `kind` é um de WEBHOOK_EVENT_KINDS; eventos que não mudam a assinatura usam 'other'.

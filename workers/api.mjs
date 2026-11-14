@@ -45,7 +45,9 @@ import {
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
-import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
+import {
+  assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, planGateSummary, requirePlanFeature
+} from '../src/entitlements.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
@@ -4960,6 +4962,18 @@ export function createApiHandler(deps = {}) {
             sharedPublicPublications.publicationsBySlug.delete(slug);
           }
         });
+      }
+
+      const entitlementsMatch = pathname.match(/^\/api\/sites\/([^/]+)\/entitlements\/?$/);
+      if (entitlementsMatch) {
+        if (method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET para consultar o plano da vitrine.');
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        const site = await store.getSite(entitlementsMatch[1], user.id, options);
+        if (!site) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        const summary = planGateSummary(await loadSiteEntitlements(store, site.id, options));
+        return jsonResponse(200, summary, { 'cache-control': 'no-store' });
       }
 
       const domainMatch = pathname.match(/^\/api\/sites\/([^/]+)\/domains(?:\/([^/]+)(\/verify)?)?\/?$/);
