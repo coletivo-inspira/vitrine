@@ -47,6 +47,7 @@ import {
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
+import { publicationFooterOptions } from '../src/storefront-footer.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -1809,6 +1810,7 @@ async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      ...(rawMenu.supportBadge === false ? { supportBadge: false } : {}),
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -3990,7 +3992,8 @@ export function createApiHandler(deps = {}) {
         const { menu } = await compilePublicStorefront(content, site, {
           revision,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements })
+          ...publicationSeoOptions({ slug: site.slug, entitlements }),
+          ...publicationFooterOptions({ entitlements })
         });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
@@ -5406,7 +5409,8 @@ export function createApiHandler(deps = {}) {
           revision: draft.revision,
           siteId: site.id,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements, domains })
+          ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
+          ...publicationFooterOptions({ entitlements })
         });
 
         if (typeof store.savePublication === 'function') {
