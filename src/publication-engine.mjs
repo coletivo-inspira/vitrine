@@ -6,8 +6,10 @@ import {
   ORDER_RELAY_MILA,
   buildMilaRelayCode,
   buildPublicOrderRelay,
-  resolveOrderRelayMode
+  resolveOrderRelayMode,
+  withMilaRelayPrefix
 } from '../web/assets/mila-relay.mjs';
+import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
 import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
@@ -804,14 +806,62 @@ function renderNavigation(links, label) {
 
 const catalogModules = new Set(['catalog_grid', 'service_booking', 'quote_request']);
 
-function renderStorefrontHero(menu, config = {}, id = '', navigation = '') {
-  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="storefront-hero" aria-labelledby="storefront-name">
+const HERO_IMAGE_WIDTH = 800;
+const HERO_IMAGE_HEIGHT = 1000;
+
+function heroWhatsappHref(menu) {
+  const phone = String(menu.whatsapp ?? '').replace(/\D/g, '');
+  if (!phone) return '';
+  const message = withMilaRelayPrefix(
+    `Olá! Vi a vitrine ${menu.name} e gostaria de conversar.`, menu.orderRelay, menu.name
+  );
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+export function resolveHeroActionHref(target, menu, { hasCatalog = true } = {}) {
+  if (target === 'selecao') return hasCatalog ? '#storefront-catalog' : '#vitrine-principal';
+  if (target === 'whatsapp') return heroWhatsappHref(menu);
+  if (target?.startsWith('pagina:')) {
+    const slug = target.slice('pagina:'.length);
+    return slug === 'home' ? '#vitrine-principal' : `#pagina-${slug}`;
+  }
+  return target?.startsWith('#') ? target : '';
+}
+
+function renderHeroAction(action, className, menu, options) {
+  const href = action?.label ? resolveHeroActionHref(action.target, menu, options) : '';
+  if (!href) return '';
+  const external = href.startsWith('https://') ? ' target="_blank" rel="noopener noreferrer"' : '';
+  return `<a class="${className}" href="${escapeHtml(href)}"${external}>${escapeHtml(action.label)}</a>`;
+}
+
+function renderStorefrontHero(menu, config = {}, id = '', navigation = '', options = {}) {
+  const eyebrow = config.eyebrow ?? 'Atendimento direto no WhatsApp';
+  const actions = renderHeroAction(config.primaryAction, 'storefront-hero-primary', menu, options) +
+    renderHeroAction(config.secondaryAction, 'storefront-hero-secondary', menu, options);
+  const photo = config.imageUrl && config.imageAlt
+    ? `
+      <figure class="storefront-hero-media">
+        <img src="${escapeHtml(config.imageUrl)}" alt="${escapeHtml(config.imageAlt)}" width="${HERO_IMAGE_WIDTH}" height="${HERO_IMAGE_HEIGHT}" fetchpriority="high" decoding="async">
+      </figure>`
+    : '';
+  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="storefront-hero${photo ? ' has-photo' : ''}" aria-labelledby="storefront-name">
       <div class="storefront-hero-copy">
-        <p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>
-        <h1 id="storefront-name">${escapeHtml(config.headline || menu.name)}</h1>
-        <p id="storefront-subtitle" class="storefront-subtitle">${escapeHtml(config.subtitle || 'Escolha seus itens e envie pelo WhatsApp.')}</p>
-      </div>
+        ${eyebrow ? `<p class="storefront-eyebrow">${escapeHtml(eyebrow)}</p>\n        ` : ''}<h1 id="storefront-name">${escapeHtml(config.headline || menu.name)}</h1>
+        <p id="storefront-subtitle" class="storefront-subtitle">${escapeHtml(config.subtitle || 'Escolha seus itens e envie pelo WhatsApp.')}</p>${actions ? `
+        <div class="storefront-hero-actions">${actions}</div>` : ''}
+      </div>${photo}
       ${navigation}
+    </section>`;
+}
+
+function renderHighlights(config, id) {
+  const items = (config.items ?? []).filter(item => item?.text && HIGHLIGHT_ICON_PATHS[item.icon]);
+  if (items.length < 2) return '';
+  return `<section id="${escapeHtml(id)}" class="storefront-highlights" aria-label="Destaques">
+      <ul class="storefront-highlights-list" data-count="${items.length}">${items.map(item =>
+    `<li class="storefront-highlight">${highlightIconSvg(item.icon)}<span>${escapeHtml(item.text)}</span></li>`
+  ).join('')}</ul>
     </section>`;
 }
 
@@ -831,6 +881,7 @@ function renderStorefrontCatalog({ chipsHtml, sectionsHtml }, id = '', columns) 
 function renderPublicSections(pages, menu, catalog) {
   let catalogRendered = false;
   let mainHeroRendered = false;
+  const hasCatalog = (pages ?? []).some(page => page.sections.some(({ moduleCode }) => catalogModules.has(moduleCode)));
   return (pages ?? []).map(page => {
     const blocks = page.sections.map(({ id, moduleCode, config }) => {
       const section = content => content ? `<section id="${escapeHtml(id)}" class="storefront-module">${content}</section>` : '';
@@ -855,12 +906,14 @@ function renderPublicSections(pages, menu, catalog) {
           ).join('')}` : '');
         case 'links_bio':
           return section(renderNavigation(config.links, 'Links'));
+        case 'highlights':
+          return renderHighlights(config, id);
         case 'custom_sandbox':
           return section(`<iframe class="storefront-widget" title="Componente da vitrine" sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy" data-widget-id="${config.widgetId}" src="https://sandbox.inspira.dev.br/embed/${config.widgetId}?v=${config.bundleHash}"></iframe>`);
         case 'hero':
           if (page.slug === 'home' && !mainHeroRendered) {
             mainHeroRendered = true;
-            return renderStorefrontHero(menu, config, id);
+            return renderStorefrontHero(menu, config, id, '', { hasCatalog });
           }
           return section(config.headline
             ? `<h2>${escapeHtml(config.headline)}</h2><p>${escapeHtml(config.subtitle ?? '')}</p>` : '');

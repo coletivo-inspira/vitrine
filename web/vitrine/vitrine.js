@@ -458,6 +458,9 @@ export async function bootStorefront(deps = {}) {
         if (heroSec) {
           heroSec.hidden = r.stage !== 1;
         }
+        for (const highlights of doc.querySelectorAll?.('.storefront-highlights') ?? []) {
+          highlights.hidden = r.stage !== 1;
+        }
       }
     });
     renderer.metricsCollector = collector;
