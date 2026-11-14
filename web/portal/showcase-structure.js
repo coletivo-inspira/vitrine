@@ -1,5 +1,8 @@
+import { HIGHLIGHT_ICON_LABELS, highlightIconSvg } from '../assets/highlight-icons.mjs';
+
 const modules = {
   hero: ['Cabeçalho', { headline: 'Título', subtitle: 'Subtítulo' }],
+  highlights: ['Destaques', {}],
   catalog_grid: ['Vitrine', {}],
   service_booking: ['Agendamento', {}],
   quote_request: ['Orçamento', {}],
@@ -66,6 +69,295 @@ function iconActionBtn(doc, ariaLabel, symbolId, onClick, extraClass = '') {
   btn.innerHTML = `<svg width="16" height="16" aria-hidden="true"><use href="#${symbolId}"/></svg>`;
   btn.addEventListener('click', onClick);
   return btn;
+}
+
+const DEFAULT_EYEBROW = 'Atendimento direto no WhatsApp';
+const HERO_EXTRA_KEYS = ['eyebrow', 'imageUrl', 'imageAlt', 'primaryAction', 'secondaryAction'];
+
+function fieldHelp(doc, group, element, text) {
+  const help = el(doc, 'p', 'form-help', text);
+  help.id = `${element.id}-help`;
+  group.appendChild(help);
+  element.setAttribute('aria-describedby', help.id);
+  return help;
+}
+
+function fieldError(doc, group, element) {
+  const error = el(doc, 'p', 'form-error-msg structure-field-error');
+  error.id = `${element.id}-error`;
+  error.hidden = true;
+  error.setAttribute('role', 'alert');
+  group.appendChild(error);
+  const describedBy = element.getAttribute('aria-describedby');
+  element.setAttribute('aria-describedby', describedBy ? `${describedBy} ${error.id}` : error.id);
+  return {
+    show(message) {
+      error.textContent = message;
+      error.hidden = false;
+      element.setAttribute('aria-invalid', 'true');
+    },
+    clear() {
+      error.textContent = '';
+      error.hidden = true;
+      element.setAttribute('aria-invalid', 'false');
+    }
+  };
+}
+
+function actionTargetOptions(pages = []) {
+  const options = {
+    '': 'Sem botão',
+    selecao: 'Rolar até os itens da vitrine',
+    whatsapp: 'Abrir conversa no WhatsApp'
+  };
+  for (const page of pages) {
+    if (page.slug && page.slug !== 'home') options[`pagina:${page.slug}`] = `Página: ${page.title || page.slug}`;
+  }
+  const home = pages.find((page) => page.slug === 'home');
+  for (const section of home?.sections ?? []) {
+    if (section.id && modules[section.moduleCode] && section.moduleCode !== 'hero') {
+      options[`#${section.id}`] = `Seção: ${modules[section.moduleCode][0]}`;
+    }
+  }
+  return options;
+}
+
+function renderHeroExtras(doc, grid, config = {}, { pages = [], uploadImage = null } = {}) {
+  const eyebrow = labeledInput(doc, grid, 'Rótulo acima do título', config.eyebrow ?? DEFAULT_EYEBROW);
+  eyebrow.element.maxLength = 40;
+  fieldHelp(doc, eyebrow.group, eyebrow.element, 'Até 40 caracteres. Deixe vazio para não mostrar.');
+
+  const image = labeledInput(doc, grid, 'Foto do cabeçalho (endereço WebP)', config.imageUrl);
+  image.element.inputMode = 'url';
+  image.element.autocomplete = 'off';
+  image.element.placeholder = 'https://…/foto.webp';
+  const imageStatus = fieldHelp(doc, image.group, image.element,
+    'Foto real sua ou do negócio. Convertida para WebP de até 200 KB ao enviar.');
+  if (uploadImage) {
+    const actions = el(doc, 'div', 'structure-image-actions');
+    const file = doc.createElement('input');
+    file.type = 'file';
+    file.accept = 'image/*';
+    file.hidden = true;
+    file.setAttribute('aria-hidden', 'true');
+    file.tabIndex = -1;
+    const send = el(doc, 'button', 'button button-small button-secondary button-pill', 'Enviar foto');
+    send.type = 'button';
+    send.addEventListener('click', () => file.click());
+    const remove = el(doc, 'button', 'button button-small button-secondary button-pill', 'Remover foto');
+    remove.type = 'button';
+    remove.addEventListener('click', () => {
+      image.element.value = '';
+      image.element.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    file.addEventListener('change', async () => {
+      const chosen = file.files?.[0];
+      if (!chosen) return;
+      send.disabled = true;
+      imageStatus.textContent = 'Preparando a foto…';
+      try {
+        const { url, bytes } = await uploadImage(chosen);
+        image.element.value = url;
+        image.element.dispatchEvent(new Event('input', { bubbles: true }));
+        imageStatus.textContent = `Foto enviada (${Math.ceil(bytes / 1024)} KB, WebP).`;
+      } catch (error) {
+        imageStatus.textContent = error.message;
+      } finally {
+        send.disabled = false;
+        file.value = '';
+      }
+    });
+    actions.append(send, remove, file);
+    image.group.appendChild(actions);
+  }
+
+  const alt = labeledInput(doc, grid, 'Descrição da foto (para leitores de tela)', config.imageAlt);
+  alt.element.maxLength = 160;
+  alt.element.placeholder = 'Ex: Laura sorrindo no ateliê, com peças de cerâmica';
+  fieldHelp(doc, alt.group, alt.element, 'Obrigatória quando houver foto. Diga quem ou o que aparece.');
+  const altError = fieldError(doc, alt.group, alt.element);
+
+  const targets = actionTargetOptions(pages);
+  const actionFields = [
+    ['primaryAction', 'Botão principal', 'Ex: Ver turmas'],
+    ['secondaryAction', 'Link secundário', 'Ex: Conversar no WhatsApp']
+  ].map(([key, caption, placeholder]) => {
+    const box = el(doc, 'div', 'structure-hero-action');
+    const label = labeledInput(doc, box, `${caption}: texto`, config[key]?.label);
+    label.element.maxLength = 28;
+    label.element.placeholder = placeholder;
+    fieldHelp(doc, label.group, label.element, 'Até 28 caracteres.');
+    const current = config[key]?.target;
+    const options = current && !targets[current] ? { ...targets, [current]: current } : targets;
+    const target = labeledInput(doc, box, `${caption}: destino`, current ?? '', options);
+    const labelError = fieldError(doc, label.group, label.element);
+    const targetError = fieldError(doc, target.group, target.element);
+    grid.appendChild(box);
+    return { key, label: label.element, target: target.element, labelError, targetError };
+  });
+
+  const preview = el(doc, 'div', 'structure-hero-preview');
+  preview.setAttribute('aria-label', 'Prévia do cabeçalho');
+  preview.setAttribute('role', 'group');
+  const previewCopy = el(doc, 'div', 'structure-hero-preview-copy');
+  const pEyebrow = el(doc, 'span', 'structure-hero-preview-eyebrow');
+  const pTitle = el(doc, 'strong', 'structure-hero-preview-title');
+  const pSubtitle = el(doc, 'span', 'structure-hero-preview-subtitle');
+  const pActions = el(doc, 'span', 'structure-hero-preview-actions');
+  previewCopy.append(pEyebrow, pTitle, pSubtitle, pActions);
+  const pPhoto = doc.createElement('img');
+  pPhoto.className = 'structure-hero-preview-photo';
+  pPhoto.width = 120;
+  pPhoto.height = 150;
+  pPhoto.alt = '';
+  pPhoto.loading = 'lazy';
+  preview.append(previewCopy, pPhoto);
+  grid.appendChild(preview);
+
+  return {
+    preview(headline, subtitle) {
+      pEyebrow.textContent = eyebrow.element.value.trim();
+      pEyebrow.hidden = !pEyebrow.textContent;
+      pTitle.textContent = headline || 'Título da vitrine';
+      pSubtitle.textContent = subtitle || '';
+      pActions.replaceChildren();
+      for (const action of actionFields) {
+        const text = action.label.value.trim();
+        if (!text) continue;
+        pActions.appendChild(el(doc, 'span',
+          action.key === 'primaryAction' ? 'structure-hero-preview-primary' : 'structure-hero-preview-secondary', text));
+      }
+      const url = image.element.value.trim();
+      pPhoto.hidden = !url;
+      if (url) pPhoto.src = url;
+      if (url) preview.classList.add('has-photo');
+      else preview.classList.remove('has-photo');
+    },
+    read() {
+      const values = {};
+      const eyebrowValue = eyebrow.element.value.trim();
+      if (config.eyebrow !== undefined || eyebrowValue !== DEFAULT_EYEBROW) values.eyebrow = eyebrowValue;
+      const url = image.element.value.trim();
+      if (url) {
+        values.imageUrl = url;
+        values.imageAlt = alt.element.value.trim();
+      }
+      for (const action of actionFields) {
+        const label = action.label.value.trim();
+        if (label || action.target.value) values[action.key] = { label, target: action.target.value };
+      }
+      return values;
+    },
+    validate() {
+      let firstInvalid = null;
+      altError.clear();
+      if (image.element.value.trim() && !alt.element.value.trim()) {
+        altError.show('Descreva a foto para publicar o cabeçalho com imagem.');
+        firstInvalid = alt.element;
+      }
+      for (const action of actionFields) {
+        action.labelError.clear();
+        action.targetError.clear();
+        const label = action.label.value.trim();
+        if (label && !action.target.value) {
+          action.targetError.show('Escolha para onde o botão leva.');
+          firstInvalid ??= action.target;
+        } else if (!label && action.target.value) {
+          action.labelError.show('Escreva o texto do botão ou escolha "Sem botão".');
+          firstInvalid ??= action.label;
+        }
+      }
+      firstInvalid?.focus();
+      return !firstInvalid;
+    }
+  };
+}
+
+function renderHighlightsEditor(doc, grid, config = {}) {
+  const box = el(doc, 'div', 'structure-highlights-editor');
+  const list = el(doc, 'div', 'structure-highlights-list');
+  const preview = el(doc, 'ul', 'structure-highlights-preview');
+  preview.setAttribute('aria-label', 'Prévia dos destaques');
+  const status = el(doc, 'p', 'form-help', 'De 2 a 4 destaques, cada um com ícone e uma linha de até 60 caracteres.');
+  status.id = nextFieldId('highlights-help', doc);
+  const error = el(doc, 'p', 'form-error-msg structure-field-error');
+  error.hidden = true;
+  error.setAttribute('role', 'alert');
+  const addBtn = el(doc, 'button', 'button button-small button-secondary button-pill structure-add-btn', '+ Adicionar destaque');
+  addBtn.type = 'button';
+
+  const syncButtons = () => {
+    const rows = [...list.children];
+    addBtn.disabled = rows.length >= 4;
+    for (const row of rows) row.removeBtn.disabled = rows.length <= 2;
+  };
+
+  const updatePreview = () => {
+    preview.replaceChildren();
+    for (const row of list.children) {
+      const text = row.text.value.trim();
+      if (!text) continue;
+      const item = el(doc, 'li', 'structure-highlights-preview-item');
+      const icon = el(doc, 'span', 'structure-highlights-preview-icon');
+      icon.innerHTML = highlightIconSvg(row.icon.value);
+      item.append(icon, el(doc, 'span', '', text));
+      preview.appendChild(item);
+    }
+    preview.hidden = !preview.children.length;
+  };
+
+  function append(entry = {}) {
+    const row = el(doc, 'div', 'structure-highlight-row');
+    const position = list.children.length + 1;
+    const icon = labeledInput(doc, row, `Ícone do destaque ${position}`, entry.icon ?? 'estrela', HIGHLIGHT_ICON_LABELS);
+    const text = labeledInput(doc, row, `Texto do destaque ${position}`, entry.text, null, 'structure-highlight-text');
+    text.element.maxLength = 60;
+    text.element.placeholder = position === 1 ? 'Ex: Ao vivo, sem gravação' : 'Ex: Turmas pequenas';
+    text.element.setAttribute('aria-describedby', status.id);
+    row.icon = icon.element;
+    row.text = text.element;
+    row.removeBtn = iconActionBtn(doc, `Remover destaque ${position}`, 'icon-trash', () => {
+      row.remove();
+      syncButtons();
+      updatePreview();
+    }, 'trash-color-btn');
+    const actions = el(doc, 'div', 'structure-row-actions');
+    actions.appendChild(row.removeBtn);
+    row.appendChild(actions);
+    list.appendChild(row);
+    syncButtons();
+  }
+
+  const initial = config.items?.length ? config.items : [{}, {}];
+  initial.forEach(append);
+  addBtn.addEventListener('click', () => {
+    if (list.children.length < 4) append();
+    list.lastElementChild?.text.focus();
+  });
+  box.addEventListener('input', updatePreview);
+  box.addEventListener('change', updatePreview);
+  box.append(status, list, addBtn, error, preview);
+  grid.appendChild(box);
+  updatePreview();
+
+  return {
+    read() {
+      return [...list.children]
+        .map((row) => ({ icon: row.icon.value, text: row.text.value.trim() }))
+        .filter((item) => item.text);
+    },
+    validate() {
+      const filled = this.read().length;
+      error.hidden = true;
+      error.textContent = '';
+      if (filled === 0 || (filled >= 2 && filled <= 4)) return true;
+      error.textContent = 'Preencha pelo menos 2 destaques ou deixe todos vazios.';
+      error.hidden = false;
+      const empty = [...list.children].find((row) => !row.text.value.trim());
+      empty?.text.focus();
+      return false;
+    }
+  };
 }
 
 function reorderButtons(doc, row, list, label) {
@@ -485,23 +777,50 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
             ).element
           : null;
 
-      if (getters.length > 0 || widgetChoice) {
+      const heroExtras = section.moduleCode === 'hero'
+        ? renderHeroExtras(doc, secFieldsGrid, section.config, { pages: structure.pages, uploadImage: choices?.uploadImage })
+        : null;
+      const highlightsEditor = section.moduleCode === 'highlights'
+        ? renderHighlightsEditor(doc, secFieldsGrid, section.config)
+        : null;
+      if (heroExtras) {
+        const fieldValue = (key) => getters.find(([name]) => name === key)?.[1].value.trim();
+        const refresh = () => heroExtras.preview(fieldValue('headline'), fieldValue('subtitle'));
+        secFieldsGrid.addEventListener('input', refresh);
+        secFieldsGrid.addEventListener('change', refresh);
+        refresh();
+      }
+
+      if (getters.length > 0 || widgetChoice || highlightsEditor) {
         row.appendChild(secFieldsGrid);
       }
+
+      row.validate = () => (heroExtras?.validate() ?? true) && (highlightsEditor?.validate() ?? true);
+
+      const readConfig = () => {
+        if (widgetChoice) {
+          return {
+            widgetId: widgetChoice.value,
+            bundleHash: widgets.find((widget) => widget.id === widgetChoice.value)?.hash
+          };
+        }
+        const config = {
+          ...section.config,
+          ...Object.fromEntries(getters.map(([key, value]) => [key, value.value]))
+        };
+        if (heroExtras) {
+          for (const key of HERO_EXTRA_KEYS) delete config[key];
+          Object.assign(config, heroExtras.read());
+        }
+        if (highlightsEditor) config.items = highlightsEditor.read();
+        return config;
+      };
 
       row.read = () => ({
         id: section.id,
         moduleCode: section.moduleCode,
         active: enabled.checked,
-        config: widgetChoice
-          ? {
-              widgetId: widgetChoice.value,
-              bundleHash: widgets.find((widget) => widget.id === widgetChoice.value)?.hash
-            }
-          : {
-              ...section.config,
-              ...Object.fromEntries(getters.map(([key, value]) => [key, value.value]))
-            }
+        config: readConfig()
       });
 
       sections.appendChild(row);
@@ -552,6 +871,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
     pageBody.appendChild(addSecBar);
 
     detailsCard.appendChild(pageBody);
+    detailsCard.validate = () => [...sections.children].every((row) => row.validate?.() ?? true);
     detailsCard.read = () => ({
       title: title.value,
       slug: slug.value,
@@ -592,6 +912,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (![...pageList.children].every((page) => page.validate?.() ?? true)) return;
     save.disabled = true;
     try {
       await onSave({

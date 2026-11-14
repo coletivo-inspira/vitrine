@@ -2332,6 +2332,11 @@ async function resizeAndConvertToWebP(file) {
   }
 }
 
+async function uploadHeroImage(file) {
+  const blob = await resizeAndConvertToWebP(file);
+  return { url: await uploadImageToSupabaseStorage(blob, 'hero-foto'), bytes: blob.size };
+}
+
 // Server-side authenticated proxy upload (uses HttpOnly session cookie — zero client token exposure)
 async function uploadImageToSupabaseStorage(blob, itemId) {
   const safeId = String(itemId || 'item').replace(/[^a-zA-Z0-9._-]/g, '-');
@@ -3315,7 +3320,7 @@ structurePanel?.addEventListener('toggle', async () => {
       } catch (error) {
         if (site === currentSite) structureStatus.textContent = error.message;
       }
-    }, widgets, null, { templates, selected });
+    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage });
     render(resolved, savedStructure?.templateCode);
   } catch (error) {
     if (site === currentSite) structureStatus.textContent = error.message;
