@@ -106,6 +106,12 @@ recurso `custom_domain` (`resolve_showcase_host`); sem ele, `302` para
 Nada em `sites`, `drafts`, `publications` ou `site_memberships` é apagado. Operação na
 seção 3 de `docs/operations-guide.md`.
 
+O painel tem a tela "Plano e cobrança" (`#plano`, `web/portal/billing-panel.mjs`), que lê
+`GET /api/billing/overview` (faturas direto do Asaas, sem gravar nada), e mostra o plano
+que libera cada recurso travado com `GET /api/sites/:id/entitlements`
+(`web/portal/plan-gate.mjs`). `/planos/` é gerada de `content/plans.json` no build.
+Detalhes na seção 9 de `docs/billing/asaas.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
