@@ -16,7 +16,7 @@ Seção da Auditoria UX ([matriz central](../matriz-central.md), contrato
 | Painel inicial | `#inicio` / `#inicio-section` (jornada de lançamento, cartões "Suas Vitrines", "Pedidos de Customização", "Destaques da Semana") | Sim |
 | Minhas Vitrines | `#vitrines` / `#vitrines-section`, `#sites-list-container` | Sim |
 | Cartões de vitrine | `.site-item` (nome, endereço, selo de papel, "Editar vitrine", "Leilões") | Sim |
-| Seletor rápido no topo | Previsto em `specs/009-modular-admin-platform/spec.md:23` e `tasks.md:49` | Ausente na interface (`UX-64-004`) |
+| Seletor rápido no topo (`#showcase-switcher`) | Entregue na `T009` da spec 009 (PR #45) e depois removido do topo por decisão de produto do Lino no PR #75 (`cd040d0`); a troca de vitrine fica em Minhas Vitrines | Fora do escopo por decisão registrada (`UX-64-004`) |
 | Permissões por papel | `owner`, `admin`, `editor`, `viewer` (`site_memberships.role`) | Interface sim; servidor não verificado |
 | Entrada no editor | `openEditor`, `#editor`, botão "Voltar" | Só a entrada e o retorno (o editor é das `#66`/`#67`) |
 
@@ -59,7 +59,7 @@ leilões respondem vazio ou `404`. As permissões reais (RLS do Supabase e checa
 | `#back-to-dashboard` "Voltar" (editor) | Botão | default | 1280 | Voltar à lista | `#vitrines` | Volta para `#vitrines` | — |
 | `/portal/#editor` sem vitrine selecionada (link direto ou recarga) | Rota | — | 1280 | Abrir o editor | Reabrir a última vitrine ou explicar | Redireciona em silêncio para `#vitrines` (`UX-64-010`) | Nenhum |
 | `#sites-list-container` (vazio / erro) | Lista | vazio, carregando, erro | 375, 1280 | Lista de vitrines | Estado vazio com orientação; erro com nova tentativa | Vazio: "Nenhuma vitrine ativa cadastrada." sem ação no lugar. Erro: "Carregando vitrines..." para sempre (`UX-64-003`, `UX-64-013`) | Banner de 6 s no erro |
-| Seletor rápido de vitrines | Menu | — | — | Trocar de vitrine em qualquer seção | Presente no cabeçalho ou na barra lateral (spec 009) | Não existe; `.top-bar-middle` só tem o selo do modo local (`web/portal/index.html:184-190`) (`UX-64-004`) | — |
+| Seletor rápido de vitrines (`#showcase-switcher`) | Menu | — | — | Trocar de vitrine em qualquer seção | Ausente, por decisão de produto | Ausente, como decidido: removido do topo por decisão de produto do Lino no PR #75 (`cd040d0`); a troca de vitrine fica em Minhas Vitrines (`UX-64-004`) | — |
 
 ## 4. Matriz de cenários
 
@@ -71,13 +71,13 @@ leilões respondem vazio ou `404`. As permissões reais (RLS do Supabase e checa
 | `#vitrines` com 4 papéis e nomes longos | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
 | `#vitrines` vazia, 12 itens, falha `500` | executado (375) | n/a | n/a | n/a | executado (1280) | n/a | n/a | executado | n/a | n/a | n/a |
 | Abrir editor pelo cartão, Voltar, `#editor` direto | n/a | n/a | n/a | n/a | executado (1280) | n/a | n/a | executado | n/a | executado | n/a |
-| Seletor rápido no topo | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado |
+| Seletor rápido no topo (removido por decisão de produto) | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | Permissões aplicadas pelo servidor (RLS, Worker) | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado | bloqueado |
 
-"Bloqueado" no seletor rápido significa que o controle não existe (achado `UX-64-004`), não uma
-falta de ambiente. Resumo para a matriz central (linha `#64`): 360, 390, 768, 1024, 1440,
+"n/a" no seletor rápido significa que o controle foi removido por decisão de produto (`UX-64-004`).
+Não se trata de falta de ambiente nem de lacuna da `T009`. Resumo para a matriz central (linha `#64`): 360, 390, 768, 1024, 1440,
 horizontal, zoom 200%, claro, escuro, teclado e movimento **executados**; seletor rápido
-ausente; permissões no servidor sem verificação (`BLK-UX-64-RBAC`).
+fora do escopo por decisão de produto; permissões no servidor sem verificação (`BLK-UX-64-RBAC`).
 
 Medições que passaram e não geram achado:
 
@@ -94,7 +94,7 @@ Medições que passaram e não geram achado:
 | `UX-64-001` | `#64` | `P1` | `problema_confirmado` | `navegacao` | A lista não distingue editar, visualizar e publicar por papel. O selo é binário (`site.role === 'owner' ? 'Proprietário' : 'Colaborador'`, `web/portal/portal.js:1432` e `:1577`), e o Worker também devolve `collaborator` para papéis desconhecidos (`workers/api.mjs:2504-2505`). "Editar vitrine" aparece para todos (`web/portal/portal.js:1583-1589`), e um `viewer` entra no editor vendo "+ Adicionar item", "Salvar rascunho" e "Publicar vitrine". O editor já tem rótulos por papel (`teamRoleLabels`, `web/portal/editor.js:3201`), mas os cartões não os usam. Capturas `vitrines-papeis-1280-claro.png` e `editor-aberto-por-viewer-1280-claro.png` | O selo mostra "Proprietário", "Administrador", "Editor" ou "Leitor". Para `viewer`, a ação é "Ver vitrine" e o editor abre sem salvar nem publicar. Publicar aparece só para os papéis que o servidor permite | Aberto |
 | `UX-64-002` | `#64` | `P1` | `problema_confirmado` | `navegacao` | No tema claro, os selos de papel (`.site-role-badge`, `web/portal/portal.css:852-861`, e `.hub-list-item span`, `:719-726`) usam laranja `#C74414` sobre damasco `#FBEDE5`: contraste de **4,30:1** em texto de 11 px, abaixo dos 4,5:1 do WCAG 1.4.3. No escuro, 8,06:1. Capturas `vitrines-papeis-375-claro.png` e `inicio-1-vitrine-1280-claro.png` | Contraste dos selos ≥ 4,5:1 nos dois temas (ex.: texto em `#A9360E` ou `--ink` sobre damasco) | Aberto |
 | `UX-64-003` | `#64` | `P1` | `problema_confirmado` | `feedback` | Com `GET /api/sites` → `500`, a lista de `#vitrines` fica em "Carregando vitrines..." para sempre (`web/portal/portal.js:1483-1499`), e o início afirma "Você não possui nenhuma vitrine cadastrada." e "Nenhuma vitrine ativa.", com "Crie sua vitrine" pendente na jornada. O único aviso é um banner que some em 6 s. Isso induz a criar uma vitrine duplicada. Capturas `inicio-erro-500-1280-claro.png` e `vitrines-erro-500-1280-claro.png` | Com falha, o início e a lista mostram "Não foi possível carregar suas vitrines" com botão "Tentar de novo", e nenhum texto afirma que não há vitrines | Aberto |
-| `UX-64-004` | `#64` | `P2` | `problema_confirmado` | `navegacao` | Não existe o seletor rápido de vitrines previsto na spec 009 (história 1, `specs/009-modular-admin-platform/spec.md:23`), embora a tarefa `T009` esteja marcada como concluída (`specs/009-modular-admin-platform/tasks.md:49`). O cabeçalho só tem o selo do modo local, o tema e Sair (`web/portal/index.html:184-198`). Para trocar de vitrine no editor, é preciso voltar a Minhas Vitrines; Insights e Leilões têm seletores próprios e separados (`#insights-site-select`, `#auctions-site-select`) | Com 2 ou mais vitrines, um seletor no cabeçalho ou na barra lateral mostra a vitrine atual e troca o contexto de editor, Insights e Leilões em uma ação, com aviso de alterações não salvas | Aberto |
+| `UX-64-004` | `#64` | — | `decisao_produto` | `navegacao` | **Decisão de produto registrada, não achado.** O seletor rápido `#showcase-switcher` foi entregue na `T009` da spec 009 (PR #45, que concluiu a #39) e depois removido do topo a pedido do Lino no PR #75 (`cd040d0`). A troca de vitrine ficou em Minhas Vitrines. O cabeçalho tem o selo do modo local, o tema e Sair (`web/portal/index.html:184-198`). Insights e Leilões mantêm seletores próprios (`#insights-site-select`, `#auctions-site-select`) | Nada a fazer. Se a decisão for revista, a troca rápida deve mostrar a vitrine atual e avisar sobre alterações não salvas | Decisão registrada |
 | `UX-64-005` | `#64` | `P2` | `critica_ux` | `navegacao` | O cartão "Suas Vitrines" do início lista só as 3 primeiras (`sites.slice(0, 3)`, `web/portal/portal.js:1424`) como texto, sem link para abri-las nem "Ver todas (12)". Para abrir a vitrine é preciso ir à barra de navegação. Captura `inicio-12-vitrines-nomes-longos-375-claro.png` | Cada vitrine do cartão abre o editor (ou a visão por papel) e, com mais de 3, aparece "Ver todas as N vitrines" levando a `#vitrines` | Aberto |
 | `UX-64-006` | `#64` | `P2` | `problema_confirmado` | `navegacao` | Em 360 e 375 px, os botões "Editar vitrine" e "Leilões" ultrapassam a borda direita do cartão, e "Editar vitrine" quebra em duas linhas: `.site-item` é `flex` em linha, sem quebra nem regra para celular (`web/portal/portal.css:829-839`). Em 390 px já cabe. Capturas `vitrines-papeis-375-claro.png` e `vitrines-12-nomes-longos-375-claro.png` (confirma a pista da `#61`) | Em 360 px, ações empilhadas abaixo das informações, dentro do cartão, cada uma em uma linha e com ≥ 44 px | Aberto |
 | `UX-64-007` | `#64` | `P2` | `critica_ux` | `feedback` | O cartão não informa se a vitrine está publicada nem quando foi alterada, e o endereço é texto, não link. A API de lista não devolve a publicação (`workers/api.mjs:2486-2507`). O título "Suas Vitrines Ativas" e o vazio "Nenhuma vitrine ativa cadastrada." sugerem que todas estão no ar | Cada cartão mostra "Publicada" (com link para o endereço público, em nova aba e com aviso) ou "Rascunho", mais a data da última alteração. O título passa a "Suas vitrines" | Aberto |
@@ -107,7 +107,7 @@ Medições que passaram e não geram achado:
 | `UX-64-014` | `#64` | `P3` | `risco_codigo` | `navegacao` | O endereço do cartão é montado com o domínio fixo `vitrine.inspira.dev.br/` (`web/portal/portal.js:1573`), ignorando `PUBLIC_SITE_ORIGIN` lido de `/api/auth/config` (`web/portal/portal.js:754-756`). Em outro ambiente ou domínio próprio, o endereço mostrado fica errado | O endereço usa a origem pública configurada (ou o domínio próprio da vitrine, quando houver) | Aberto |
 | `UX-64-015` | `#64` | `P2` | `nao_verificado` | `navegacao` | As ações exibidas por papel não foram confrontadas com o servidor: não se sabe se `editor` pode publicar nem se `viewer` recebe `403` ao salvar (o mock aceita tudo). A RLS de `site_memberships` aceita `owner`, `admin`, `editor`, `viewer` e `collaborator` (`supabase/migrations/202611120005_multi_tenant_rbac_audit.sql:103`) | Teste de ponta a ponta (PGlite) cobre salvar, publicar e abrir leilões para cada papel, e a interface mostra só o que o servidor aceita | Bloqueado HITL |
 
-Contagem: `P0` 0 · `P1` 3 (`UX-64-001`, `002`, `003`) · `P2` 7 · `P3` 5.
+Contagem: `P0` 0 · `P1` 3 (`UX-64-001`, `002`, `003`) · `P2` 6 · `P3` 5. `UX-64-004` é decisão de produto registrada e fica fora da contagem.
 
 ## 6. Bloqueios e checklist de aceite
 
@@ -115,7 +115,6 @@ Contagem: `P0` 0 · `P1` 3 (`UX-64-001`, `002`, `003`) · `P2` 7 · `P3` 5.
 | --- | --- | --- |
 | `BLK-UX-64-RBAC` | Sem contas reais com papéis `admin`, `editor` e `viewer` numa mesma vitrine; o harness não aplica permissões | [ ] Criar no ambiente de teste (ou em `test/e2e-full-journey.test.mjs`) uma vitrine com quatro membros, um por papel · [ ] Para cada papel, registrar o que `GET /api/sites` devolve, se salvar o rascunho e publicar respondem `200` ou `403` e quais botões o painel mostra (valida `UX-64-001` e `UX-64-015`) |
 | `CHK-UX-61-PROD` (opcional) | Clientes automatizados recebem o desafio de bots da Cloudflare; a versão publicada (`bbafd95`) é a mesma auditada localmente | [ ] Opcional: repetir `#inicio` e `#vitrines` em `painel.inspira.dev.br` com conta real, num navegador real |
-| Seletor rápido | Controle inexistente (não é bloqueio de ambiente) | [ ] Depois de implementar `UX-64-004`, auditar o seletor nas 5 larguras, com teclado (`Enter`, setas, `Esc`) e com alterações não salvas |
 
 ## 7. Recomendações
 
@@ -124,8 +123,8 @@ Contagem: `P0` 0 · `P1` 3 (`UX-64-001`, `002`, `003`) · `P2` 7 · `P3` 5.
    compartilhada com o editor e validada contra o Worker.
 2. **Estados de carregamento e erro** (`UX-64-003`, `013`): separar "carregando", "vazio" e "erro"
    na lista e no resumo do início, com nova tentativa.
-3. **Seleção da vitrine** (`UX-64-004`, `005`, `010`): seletor rápido no cabeçalho (ou no topo da
-   barra lateral), atalhos clicáveis no início e o identificador da vitrine no hash do editor.
+3. **Seleção da vitrine** (`UX-64-005`, `010`): atalhos clicáveis no início e o identificador da
+   vitrine no hash do editor, mantendo a troca em Minhas Vitrines (decisão de produto, `UX-64-004`).
 4. **Cartão da vitrine** (`UX-64-006`, `007`, `014`): empilhar as ações no celular, mostrar
    publicada/rascunho com link público e usar a origem configurada.
 5. **Jornada de lançamento** (`UX-64-008`, `011`, `012`): status vindo do servidor, ação principal
