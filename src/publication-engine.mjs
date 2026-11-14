@@ -21,6 +21,7 @@ import {
   renderShareMetaTags,
   shareMetaFor
 } from './local-seo.mjs';
+import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
 import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
@@ -100,7 +101,8 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'businessHours',
   'publicAddress',
   'canonicalUrl',
-  'localBusiness'
+  'localBusiness',
+  'supportBadge'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -280,6 +282,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
   }
 
   assertPublicSeo(menuArtifact);
+  assertPublicFooter(menuArtifact);
 
   if (menuArtifact.components !== undefined) {
     if (
@@ -710,7 +713,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
     ...(locality ? { locality } : {}),
     ...projectPublicPlace(migrated),
-    ...projectPublicSeo(migrated, baseMenu.slug, limits)
+    ...projectPublicSeo(migrated, baseMenu.slug, limits),
+    ...projectPublicFooter(limits)
   };
 
   for (const item of menu.items) {
@@ -748,11 +752,6 @@ export async function compilePublicStorefront(draftContent, site = {}, options =
     publication
   };
 }
-
-const DIRECT_ORDER_FOOTER_NOTE =
-  'Preços em Reais (BRL). O botão abre uma conversa no WhatsApp para confirmar pedido e disponibilidade.';
-const MILA_RELAY_FOOTER_NOTE =
-  'Preços em Reais (BRL). Os pedidos desta vitrine chegam à Mila, da equipe Vitrine Inspira, que repassa cada um ao negócio pelo WhatsApp.';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -1067,10 +1066,10 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   // A foto do hero é o LCP: sem disputar banda com ~380 KB de fontes pré-carregadas (font-display: swap).
   const heroPhoto = Boolean(hero?.imageUrl && hero?.imageAlt);
   const header = renderStorefrontHeader(menu, structure);
-  const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
   const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
     ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
     : '';
+  const footer = renderStorefrontFooterHtml(menu, { navigation: structure?.navigation.footer, extraLinks: cityLink });
   const placeHtml = renderStorefrontPlaceHtml(menu);
   const modularHtml = structure
     ? (hero ? '' : placeHtml) + renderPublicSections(structure.pages, menu, catalog, placeHtml)
@@ -1080,9 +1079,6 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
   const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
   const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
-  const orderNote = menu.orderRelay?.via === ORDER_RELAY_MILA
-    ? MILA_RELAY_FOOTER_NOTE
-    : DIRECT_ORDER_FOOTER_NOTE;
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
     return baseTemplateHtml
       .replace(
@@ -1104,7 +1100,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         '<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine"></nav>',
         `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`
       )
-      .replace(DIRECT_ORDER_FOOTER_NOTE, orderNote)
+      .replace(/<footer class="storefront-footer"[\s\S]*?<\/footer>/, () => footer)
       .replace('<!--STATIC_STOREFRONT_PLACE-->', placeHtml)
       .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
   }
@@ -1133,22 +1129,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
     ${structure && !hero ? `<h1 id="storefront-name" class="storefront-accessible-title">${escapeHtml(menu.name)}</h1>` : ''}
     ${modularHtml}
   </main>
-  <footer class="storefront-footer">
-    <div class="wrap storefront-footer-inner">
-      ${footerNav}
-      ${cityLink}
-      <a class="brand" href="/" aria-label="Vitrine Inspira — página institucional">
-        <img class="brand-logo brand-logo-light" src="/assets/brand/vitrine.svg" width="150" height="46" alt="vitrine — coletivo inspira">
-        <img class="brand-logo brand-logo-dark" src="/assets/brand/vitrine-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
-      </a>
-      <p class="storefront-footer-note">
-        ${orderNote}
-      </p>
-      <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">
-        Privacidade (LGPD): esta vitrine só conta visitas, de onde elas vieram (como QR Code ou Instagram), cliques e escolhas de itens, em totais por dia, sem identificar quem visita, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais. Ao curtir um item, um cookie funcional e anônimo guarda sua curtida para que ela não seja contada duas vezes. Ao dar um lance em leilão, seu nome e WhatsApp vão só para a vitrine, com sua autorização, e são apagados 90 dias após o encerramento.
-      </p>
-    </div>
-  </footer>
+  ${footer}
   ${interactive ? '<script type="module" src="/vitrine/vitrine.js"></script>' : ''}
 </body>
 </html>`;

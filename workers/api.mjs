@@ -49,6 +49,7 @@ import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-rel
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
 import { applyOriginEntitlement, metricRowKey, withOriginInsights } from '../src/insights-by-origin.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
+import { publicationFooterOptions } from '../src/storefront-footer.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -1786,7 +1787,7 @@ export function clearPublicationsCache() {
   publicationFetchedAtBySlug.clear();
 }
 
-async function hydratePublicationRecord(row) {
+export async function hydratePublicationRecord(row) {
   if (!row || typeof row !== 'object' || !row.menu || typeof row.menu !== 'object') {
     return null;
   }
@@ -1807,6 +1808,10 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
     ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
+    ...(rawMenu.localBusiness ? { localSeo: {
+      businessType: rawMenu.localBusiness.type,
+      ...(rawMenu.localBusiness.areaServed ? { areaServed: rawMenu.localBusiness.areaServed } : {})
+    } } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
@@ -1826,6 +1831,9 @@ async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      ...(rawMenu.supportBadge === false ? { supportBadge: false } : {}),
+      localSeo: Boolean(rawMenu.localBusiness),
+      ...(typeof rawMenu.canonicalUrl === 'string' ? { canonicalUrl: rawMenu.canonicalUrl } : {}),
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -4013,7 +4021,8 @@ export function createApiHandler(deps = {}) {
         const { menu } = await compilePublicStorefront(content, site, {
           revision,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements })
+          ...publicationSeoOptions({ slug: site.slug, entitlements }),
+          ...publicationFooterOptions({ entitlements })
         });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
@@ -5451,7 +5460,8 @@ export function createApiHandler(deps = {}) {
           revision: draft.revision,
           siteId: site.id,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements, domains })
+          ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
+          ...publicationFooterOptions({ entitlements })
         });
 
         if (typeof store.savePublication === 'function') {
