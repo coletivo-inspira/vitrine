@@ -773,6 +773,50 @@ svg {
   font-weight: 700;
 }
 
+.hub-site-link {
+  gap: 12px;
+  min-height: 48px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+
+.hub-site-link strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hub-site-link span {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.hub-site-link-arrow {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  stroke-width: 2;
+  transition: transform .2s var(--ease), color .2s;
+}
+
+.hub-site-link:hover {
+  background: var(--apricot);
+  border-color: var(--orange);
+}
+
+.hub-site-link:hover .hub-site-link-arrow,
+.hub-site-link:focus-visible .hub-site-link-arrow {
+  color: var(--orange);
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-site-link-arrow {
+    transition: none;
+  }
+}
+
 .insights-placeholder {
   display: flex;
   flex-direction: column;
