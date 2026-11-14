@@ -70,6 +70,87 @@ export function normalizeStorefrontCategories(menu) {
   return [];
 }
 
+/**
+ * Disparado no `document` quando o visitante toca em "Sua seleção". Quem cancelar
+ * o evento (`preventDefault`) assume a abertura, por exemplo uma gaveta lateral;
+ * sem ouvinte, o link segue para as etapas da vitrine.
+ */
+export const SELECTION_OPEN_EVENT = 'vitrine:abrir-selecao';
+const HEADER_MOBILE_QUERY = '(max-width: 800px)';
+
+export function formatSelectionLabel(count) {
+  if (!Number.isSafeInteger(count) || count <= 0) return 'Sua seleção';
+  return `Sua seleção, ${count} ${count === 1 ? 'item' : 'itens'}`;
+}
+
+export function setupStorefrontHeader(doc = globalThis.document, win = globalThis) {
+  const header = doc?.querySelector?.('.storefront-topbar') ?? null;
+  const find = (selector) => header?.querySelector?.(selector) ?? null;
+  const selection = find('.storefront-selection');
+  const counter = find('.storefront-selection-count');
+  const status = find('.storefront-selection-status');
+  const toggle = find('.storefront-menu-toggle');
+  const panel = find('.storefront-header-menu');
+  let count = 0;
+  let open = false;
+
+  function setMenuOpen(next, { restoreFocus = false } = {}) {
+    if (!toggle || !header) return;
+    open = next;
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+    header.toggleAttribute('data-menu-open', open);
+    if (!open && restoreFocus) toggle.focus();
+  }
+
+  function setCount(next) {
+    const value = Number.isSafeInteger(next) && next > 0 ? next : 0;
+    if (!selection || value === count) return;
+    count = value;
+    selection.setAttribute('aria-label', formatSelectionLabel(value));
+    if (counter) {
+      counter.textContent = String(value);
+      counter.hidden = value === 0;
+    }
+    if (status) status.textContent = value === 0 ? 'Sua seleção está vazia.' : `${formatSelectionLabel(value)}.`;
+  }
+
+  selection?.addEventListener('click', (event) => {
+    setMenuOpen(false);
+    if (typeof win.CustomEvent !== 'function') return;
+    const request = new win.CustomEvent(SELECTION_OPEN_EVENT, { cancelable: true, detail: { count } });
+    if (!doc.dispatchEvent(request)) event.preventDefault();
+  });
+
+  if (header && toggle && panel) {
+    header.setAttribute('data-menu-ready', '');
+    toggle.hidden = false;
+    toggle.addEventListener('click', () => setMenuOpen(!open));
+    panel.addEventListener('click', (event) => {
+      if (event.target?.closest?.('a')) setMenuOpen(false);
+    });
+    doc.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && open) setMenuOpen(false, { restoreFocus: true });
+    });
+    doc.addEventListener('click', (event) => {
+      if (open && !header.contains(event.target)) setMenuOpen(false);
+    });
+    header.addEventListener('focusout', (event) => {
+      if (open && event.relatedTarget && !header.contains(event.relatedTarget)) setMenuOpen(false);
+    });
+    win.matchMedia?.(HEADER_MOBILE_QUERY)?.addEventListener?.('change', (event) => {
+      if (!event.matches) setMenuOpen(false);
+    });
+  }
+
+  return {
+    setCount,
+    getCount: () => count,
+    isMenuOpen: () => open,
+    setMenuOpen
+  };
+}
+
 function resolveCatalogTagLabel(catalogType) {
   if (catalogType === 'booking') return 'Agendamento Online';
   if (catalogType === 'quote') return 'Solicitação de Orçamento';
@@ -341,16 +422,12 @@ export async function bootStorefront(deps = {}) {
   const statusBanner = doc.getElementById('storefront-status');
   const nameHeading = doc.getElementById('storefront-name');
   const pageTitle = doc.getElementById('storefront-page-title');
-  const slugPill = doc.getElementById('storefront-slug-pill');
-  const templateTag = doc.querySelector('.storefront-template-tag');
+  const headerName = doc.getElementById('storefront-header-name');
+  const header = deps.header ?? setupStorefrontHeader(doc, deps.window ?? globalThis);
   const subtitlePara = doc.getElementById('storefront-subtitle');
   const categoryNav = doc.getElementById('category-nav');
   const catalogContainer = doc.getElementById('storefront-catalog');
   const heroSec = doc.querySelector('.storefront-hero');
-
-  if (slugPill) {
-    slugPill.textContent = `/${slug}`;
-  }
 
   try {
     const response = await fetchImpl(`/data/vitrines/${encodeURIComponent(slug)}/menu.json`, {
@@ -374,8 +451,8 @@ export async function bootStorefront(deps = {}) {
     if (pageTitle) {
       pageTitle.textContent = `${displayName} — ${tagLabel}`;
     }
-    if (templateTag) {
-      templateTag.textContent = tagLabel;
+    if (headerName) {
+      headerName.textContent = menu.name || menu.businessName || displayName;
     }
     if (nameHeading) {
       nameHeading.textContent = displayName;
@@ -454,6 +531,7 @@ export async function bootStorefront(deps = {}) {
       isPublicPage: true,
       likes: likesClient,
       targetWhatsapp: menu.whatsapp,
+      onRender: (r) => header.setCount(r.getCartCount()),
       onUpdate: (r) => {
         if (heroSec) {
           heroSec.hidden = r.stage !== 1;

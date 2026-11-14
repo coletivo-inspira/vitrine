@@ -32,7 +32,15 @@ _Evitar_: negócio para designar o modelo.
 **Cota de apoio**: Parte igual de uma meta (equipamento, projeto ou lote de compra coletiva) reservada pelo visitante pelo WhatsApp. Toda cota garante o mesmo benefício declarado, sem sorteio, prêmio ou retorno financeiro; o pagamento é combinado direto com o proprietário. Ver `specs/014-cotas/research.md`.
 _Evitar_: rifa, sorteio, bilhete, número da sorte.
 
-**Assinatura**: Contratação periódica de benefícios para uma vitrine, como endereço personalizado; não equivale à compra de um domínio.
+**Plano**: Conjunto de limites (vitrines, itens ativos por vitrine, blocos de itens) e recursos com preço mensal fixo: Gratuito/Social, Essencial, Profissional ou Equipe/Multi-Vitrine. A tabela única fica em `content/plans.json` (ADR 0013); nenhum plano passa de 100 itens ativos por vitrine.
+_Evitar_: pacote, plano ilimitado.
+
+**Assinatura**: Contratação periódica de um plano pela organização cliente, uma por cliente, com situação (pendente, ativa, em atraso, em tolerância, suspensa ou cancelada). Só muda com pagamento confirmado pelo operador de pagamento ou por ação auditada de um Operador Inspira; não equivale à compra de um domínio.
+
+**Recurso do plano**: Capacidade paga liberada pelo plano e verificada no servidor, como domínio próprio, `vitrine.json` ou webhook de pré-orçamento. Sem o plano, a vitrine continua no ar com os recursos do Gratuito.
+
+**Tolerância**: Prazo de 7 dias depois do vencimento em que a assinatura não paga mantém os recursos do plano. Ao fim dele, só os recursos pagos são suspensos; a vitrine volta ao endereço básico e nada é apagado.
+_Evitar_: carência, bloqueio da vitrine.
 
 **Vínculo de domínio**: Associação de um endereço verificado à vitrine, sem transferência de propriedade do domínio.
 

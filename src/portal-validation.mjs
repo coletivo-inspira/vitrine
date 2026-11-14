@@ -1656,20 +1656,23 @@ export function validateDraftContent(content, options = {}) {
     }
   }
 
+  const activeItems = allItems.filter(isItemActive);
+  const maxActiveItems = Number.isSafeInteger(options.maxActiveItems) && options.maxActiveItems > 0
+    ? Math.min(options.maxActiveItems, MAX_TOTAL_ITEMS)
+    : MAX_ACTIVE_ITEMS;
+  if (activeItems.length > maxActiveItems) {
+    throw new PortalValidationError(
+      422,
+      'ACTIVE_ITEMS_LIMIT_EXCEEDED',
+      `O plano ${options.planName ?? 'Gratuito/Social'} permite até ${maxActiveItems} itens ativos por vitrine.`
+    );
+  }
+
   if (allItems.length > MAX_TOTAL_ITEMS) {
     throw new PortalValidationError(
       422,
       'TOTAL_ITEMS_LIMIT_EXCEEDED',
       `O rascunho excede o teto técnico de ${MAX_TOTAL_ITEMS} itens totais (ativos e ocultos).`
-    );
-  }
-
-  const activeItems = allItems.filter(isItemActive);
-  if (activeItems.length > MAX_ACTIVE_ITEMS) {
-    throw new PortalValidationError(
-      422,
-      'ACTIVE_ITEMS_LIMIT_EXCEEDED',
-      `O Plano Básico Gratuito permite até ${MAX_ACTIVE_ITEMS} itens ativos por vitrine.`
     );
   }
 
@@ -1729,8 +1732,8 @@ export function validateDraftUpdatePayload(payload, options = {}) {
 
 export const validateDraftPayload = validateDraftUpdatePayload;
 
-export function toPublicMenuDraft(content, site = {}) {
-  const validated = validateDraftContent(content);
+export function toPublicMenuDraft(content, site = {}, limits = {}) {
+  const validated = validateDraftContent(content, limits);
   const slug = (content.slug ?? site.slug ?? '').trim();
   const name = (content.name ?? content.businessName ?? site.name ?? '').trim();
   const items = validated.items.map((item, idx) => ({

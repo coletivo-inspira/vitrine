@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "currency": "BRL",
+  "source": "docs/adr/0013-plans-and-recurring-billing.md",
+  "plans": [
+    {
+      "code": "free",
+      "name": "Gratuito/Social",
+      "monthlyPriceCents": 0,
+      "limits": {
+        "vitrines": 1,
+        "activeItemsPerVitrine": 20,
+        "itemBlocks": 1
+      },
+      "features": []
+    },
+    {
+      "code": "essencial",
+      "name": "Essencial",
+      "monthlyPriceCents": 3900,
+      "limits": {
+        "vitrines": 1,
+        "activeItemsPerVitrine": 100,
+        "itemBlocks": 1
+      },
+      "features": [
+        "custom_domain",
+        "inspira_subdomain",
+        "local_seo",
+        "support_badge_optional"
+      ]
+    },
+    {
+      "code": "profissional",
+      "name": "Profissional",
+      "monthlyPriceCents": 8900,
+      "limits": {
+        "vitrines": 1,
+        "activeItemsPerVitrine": 100,
+        "itemBlocks": 5
+      },
+      "features": [
+        "custom_domain",
+        "inspira_subdomain",
+        "local_seo",
+        "support_badge_optional",
+        "public_json",
+        "quote_webhook",
+        "conversion_reports"
+      ]
+    },
+    {
+      "code": "equipe",
+      "name": "Equipe/Multi-Vitrine",
+      "monthlyPriceCents": 16900,
+      "limits": {
+        "vitrines": 5,
+        "activeItemsPerVitrine": 100,
+        "itemBlocks": 5
+      },
+      "features": [
+        "custom_domain",
+        "inspira_subdomain",
+        "local_seo",
+        "support_badge_optional",
+        "public_json",
+        "quote_webhook",
+        "conversion_reports",
+        "multi_vitrine"
+      ]
+    }
+  ],
+  "services": [
+    {
+      "code": "implantacao",
+      "name": "Implantação Chave na Mão",
+      "billing": "one_time",
+      "minPriceCents": 29000,
+      "maxPriceCents": 49000
+    },
+    {
+      "code": "projeto",
+      "name": "Projeto sob medida",
+      "billing": "one_time",
+      "minPriceCents": 95000,
+      "maxPriceCents": null
+    }
+  ]
+}
