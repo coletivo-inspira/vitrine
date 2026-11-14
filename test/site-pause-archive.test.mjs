@@ -239,3 +239,19 @@ test('Issue #126 — regras puras, diálogos e adaptador REST', async () => {
   await rest.changeSiteLifecycle(siteId, 'delete', { confirmSlug: 'loja' }, { token: 't' });
   assert.deepEqual(JSON.parse(calls.at(-1).body), { target_site: siteId, confirm_slug: 'loja' });
 });
+
+test('Issue #126 — painel usa o diálogo padronizado e o filtro "Arquivadas"', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+  const [html, portal, editor, ui] = await Promise.all([
+    read('web/portal/index.html'), read('web/portal/portal.js'), read('web/portal/editor.js'), read('web/portal/site-lifecycle.js')
+  ]);
+  assert.match(html, /href="\.\/site-lifecycle\.css"/);
+  assert.match(portal, /decorateSiteItem\(site, info, actions/);
+  assert.match(portal, /createSiteViewFilter\(sites, renderSites\)/);
+  assert.match(editor, /await confirmDomainDisconnect\(site, domain\)/);
+  assert.doesNotMatch(editor, /window\.confirm\(`Desvincular/);
+  assert.match(ui, /archived: 'Arquivadas'/);
+  assert.match(ui, /aria-pressed/);
+  assert.doesNotMatch(ui, /cat[aá]logo|card[aá]pio/i);
+});

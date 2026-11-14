@@ -231,7 +231,7 @@ a:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
 <main>
 <p class="eyebrow">Vitrine Inspira</p>
 <h1>Esta vitrine está pausada</h1>
-<p>Quem cuida desta vitrine tirou ela do ar por um tempo. Tente de novo mais tarde.</p>
+<p>Esta vitrine saiu do ar por um tempo. Tente de novo mais tarde.</p>
 <a href="https://${PUBLIC_HOST}/">Conhecer a Vitrine Inspira</a>
 </main>
 </body>
