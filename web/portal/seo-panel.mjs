@@ -23,7 +23,9 @@ function draftItems(content) {
 }
 
 function previewImage(content) {
-  const candidates = [content?.structure?.theme?.logoUrl, ...draftItems(content).map((item) => item.imageUrl)];
+  const home = content?.structure?.pages?.find((page) => page?.slug === 'home');
+  const hero = home?.sections?.find((section) => section?.moduleCode === 'hero' && section.active !== false);
+  const candidates = [hero?.config?.imageUrl, content?.structure?.theme?.logoUrl, ...draftItems(content).map((item) => item.imageUrl)];
   for (const candidate of candidates) {
     if (typeof candidate !== 'string') continue;
     const src = candidate.trim();

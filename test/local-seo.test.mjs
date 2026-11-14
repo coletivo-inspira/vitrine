@@ -194,6 +194,20 @@ test('Issue #117 — endereço canônico e cartão de prévia', async (t) => {
     assert.equal(meta(html, 'description'), 'Pizza no forno a lenha, entrega na Consolação.');
   });
 
+  await t.test('capa (foto do hero) vem antes da foto do item; caminho próprio vira URL absoluta', () => {
+    const hero = { moduleCode: 'hero', config: { imageUrl: '/assets/showcase/capa.webp' } };
+    const menu = {
+      slug: 'pizza-a', name: 'Pizza A',
+      structure: { pages: [{ slug: 'home', sections: [hero] }] },
+      items: [{ id: 'm', name: 'M', priceCents: 1, imageUrl: 'https://example.com/m.webp' }]
+    };
+    assert.equal(shareMetaFor(menu).image, 'https://vitrine.inspira.dev.br/assets/showcase/capa.webp');
+    const inactive = { ...menu, structure: { pages: [{ slug: 'home', sections: [{ ...hero, active: false }] }] } };
+    assert.equal(shareMetaFor(inactive).image, 'https://example.com/m.webp');
+    assert.equal(shareMetaFor({ ...menu, structure: undefined, items: [{ imageUrl: 'http://inseguro.com/a.webp' }] }).image,
+      'https://vitrine.inspira.dev.br/assets/brand/og-vitrine.png');
+  });
+
   await t.test('metadados por item reaproveitáveis pela página do item', async () => {
     const { menu } = await compile(draft(), FREE);
     const item = { name: 'Mussarela', description: 'Molho de tomate e mussarela.', imageUrl: 'https://example.com/m.webp' };

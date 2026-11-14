@@ -131,12 +131,18 @@ function absoluteImage(value) {
   }
 }
 
+function heroImage(structure) {
+  const home = structure?.pages?.find((page) => page?.slug === 'home');
+  return home?.sections?.find((section) => section?.moduleCode === 'hero' && section.active !== false)?.config?.imageUrl;
+}
+
 /**
- * Imagem do cartão: logo ou capa da vitrine, depois a foto do primeiro item e, por
- * fim, a capa geral `og-vitrine.png`. Sempre URL HTTPS absoluta.
+ * Imagem do cartão: capa (foto do hero) ou logo da vitrine, depois a foto do primeiro
+ * item e, por fim, a capa geral `og-vitrine.png`. Sempre URL HTTPS absoluta.
  */
 export function getOgImage(menu) {
   const candidates = [
+    heroImage(menu?.structure),
     menu?.logoUrl,
     menu?.coverUrl,
     menu?.imageUrl,
