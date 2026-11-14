@@ -3,6 +3,7 @@ import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
+import { loadBillingNotice } from './billing-notice.mjs';
 
 // State variables
 let isOnline = false;
@@ -1493,6 +1494,7 @@ async function loadSites(fetchImpl = globalThis.fetch) {
       if (sitesListContainer && globalThis.document) {
         renderSites();
       }
+      void loadBillingNotice(globalThis.document?.getElementById('billing-notice'), fetchImpl);
     } else {
       showFeedback('Erro ao carregar vitrines do servidor.', 'error');
     }
