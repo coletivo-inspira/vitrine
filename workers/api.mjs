@@ -46,6 +46,7 @@ import {
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
+import { applyOriginEntitlement, metricRowKey, withOriginInsights } from '../src/insights-by-origin.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { publicationFooterOptions } from '../src/storefront-footer.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
@@ -1123,17 +1124,19 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       const itemKey = String(row?.itemKey ?? row?.item_key ?? '');
       const metricName = String(row?.metricName ?? row?.metric_name ?? '');
       if (siteId && metricDate && metricName) {
-        const key = `${siteId}:${metricDate}:${metricHour}:${itemKey}:${metricName}`;
-        metricsDaily.set(key, {
+        const seeded = {
           site_id: siteId,
           metric_date: metricDate,
           metric_hour: metricHour,
           item_key: itemKey,
           metric_name: metricName,
+          source: String(row.source ?? ''),
+          campaign: String(row.campaign ?? ''),
           count_value: Number(row.countValue ?? row.count_value ?? 0),
           estimated_cents: Number(row.estimatedCents ?? row.estimated_cents ?? 0),
           updated_at: row.updatedAt ?? row.updated_at ?? new Date().toISOString()
-        });
+        };
+        metricsDaily.set(metricRowKey(seeded), seeded);
       }
     }
   }
@@ -1646,7 +1649,15 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         }
         const itemKey = ev.type === 'item_view' || ev.type === 'item_select' ? ev.itemId : '';
         const cents = ev.type === 'whatsapp_order' ? ev.estimatedCents ?? 0 : 0;
-        const key = `${siteId}:${ev.date}:${ev.hour}:${itemKey}:${ev.type}`;
+        const key = metricRowKey({
+          site_id: siteId,
+          metric_date: ev.date,
+          metric_hour: ev.hour,
+          item_key: itemKey,
+          metric_name: ev.type,
+          source: ev.source,
+          campaign: ev.campaign
+        });
         const existing = metricsDaily.get(key);
         if (existing) {
           existing.count_value += ev.count ?? 1;
@@ -1659,6 +1670,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
             metric_hour: ev.hour,
             item_key: itemKey,
             metric_name: ev.type,
+            source: ev.source ?? '',
+            campaign: ev.campaign ?? '',
             count_value: ev.count ?? 1,
             estimated_cents: cents,
             updated_at: nowDate.toISOString()
@@ -1745,14 +1758,14 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`
       );
 
-      return computeStorefrontInsights({
+      return withOriginInsights(computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
         likeRows,
         catalogSource,
         referenceDate
-      });
+      }), rows, { period: validPeriod, referenceDate });
     }
   };
 }
@@ -3212,7 +3225,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       let rows = [];
       if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
         const metricsRes = await fetchImpl(
-          `${baseUrl}/rest/v1/site_metrics_daily?site_id=eq.${encodeURIComponent(siteId)}&metric_date=gte.${encodeURIComponent(minDateIso)}&select=site_id,metric_date,metric_hour,item_key,metric_name,count_value,estimated_cents&order=metric_date.asc`,
+          `${baseUrl}/rest/v1/site_metrics_daily?site_id=eq.${encodeURIComponent(siteId)}&metric_date=gte.${encodeURIComponent(minDateIso)}&select=site_id,metric_date,metric_hour,item_key,metric_name,source,campaign,count_value,estimated_cents&order=metric_date.asc`,
           {
             method: 'GET',
             headers: authHeaders(token)
@@ -3236,14 +3249,14 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         { token }
       );
 
-      return computeStorefrontInsights({
+      return withOriginInsights(computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
         likeRows,
         catalogSource,
         referenceDate
-      });
+      }), rows, { period: validPeriod, referenceDate });
     }
   };
 }
@@ -4864,7 +4877,8 @@ export function createApiHandler(deps = {}) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
-        return jsonResponse(200, { insights });
+        const entitlements = await loadSiteEntitlements(store, siteId, { token: user.token, env });
+        return jsonResponse(200, { insights: applyOriginEntitlement(insights, entitlements) });
       }
 
       if (pathname === '/api/sites' || pathname === '/api/sites/') {

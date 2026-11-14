@@ -6,6 +6,7 @@ import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './aucti
 import { loadBillingNotice } from './billing-notice.mjs';
 import { loadDemoInvitations } from './linktree-import.js';
 import { activeSites, createSiteViewFilter, decorateSiteItem, emptyViewMessage, sitesForCurrentView } from './site-lifecycle.js';
+import { renderInsightsOrigin } from './insights-origin.mjs';
 
 // State variables
 let isOnline = false;
@@ -2362,6 +2363,7 @@ export function renderInsightsPanel(insights) {
     }
   }
 
+  renderInsightsOrigin(globalThis.document.getElementById('insights-origin-card'), insights);
   renderDaySvgChart(insightsDayChartContainer, insights.byDay);
   renderHourSvgChart(insightsHourChartContainer, insights.byHour);
 

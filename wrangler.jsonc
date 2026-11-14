@@ -10,7 +10,8 @@
     "PUBLIC_SITE_ORIGIN": "https://vitrine.inspira.dev.br",
     "PORTAL_ORIGIN": "https://painel.inspira.dev.br",
     "ASAAS_ENV": "sandbox",
-    "ASAAS_API_BASE": "https://api-sandbox.asaas.com/v3"
+    "ASAAS_API_BASE": "https://api-sandbox.asaas.com/v3",
+    "STRIPE_ENV": "test"
   },
   "assets": {
     "directory": "./dist",

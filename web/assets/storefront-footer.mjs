@@ -149,7 +149,7 @@ export function renderStorefrontFooterHtml(menu, { navigation = [], extraLinks =
       </div>
       <div class="storefront-footer-support">
         <p class="storefront-footer-note">${viaMila ? MILA_RELAY_FOOTER_NOTE : DIRECT_ORDER_FOOTER_NOTE}</p>
-        <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">Privacidade (LGPD): só estatísticas agregadas de visitas e escolhas, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais. Um cookie funcional e anônimo guarda sua curtida; nome e WhatsApp de um lance vão só para a vitrine e são apagados 90 dias após o encerramento. <a href="${PRIVACY_URL}">Privacidade</a></p>
+        <p id="storefront-privacy-notice" class="storefront-footer-note storefront-privacy-notice">Privacidade (LGPD): só estatísticas agregadas de visitas, de onde vieram (como QR Code ou redes sociais) e escolhas, sem identificar quem visita, sem cookies de rastreamento nem coleta de endereço IP ou dados pessoais. Um cookie funcional e anônimo guarda sua curtida; nome e WhatsApp de um lance vão só para a vitrine e são apagados 90 dias após o encerramento. <a href="${PRIVACY_URL}">Privacidade</a></p>
         <div class="storefront-footer-credits">
           <a class="storefront-footer-credit" href="${PROMO_SITE_URL}" aria-label="Vitrine feita com Vitrine Inspira (conhecer a Vitrine Inspira)">
             <span>Vitrine feita com</span>
