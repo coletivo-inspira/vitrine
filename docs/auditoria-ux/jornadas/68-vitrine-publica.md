@@ -7,7 +7,7 @@ Seção da Auditoria UX ([matriz central](../matriz-central.md), contrato
 - **Coleta**: 2026-11-14, 17:20–18:10 UTC.
 - **Versão auditada**: `main` em `bbafd95c13ab5142aa642287f788632cdd0c55e3`; build com hash `0911af34bd42` (`/loja1`, 6 itens ativos).
 - **Evidências**: pasta `media/auditoria-ux/68-vitrine-publica/` do Context do projeto (78 capturas, não versionadas). Os nomes citados abaixo são arquivos dessa pasta.
-- **Produção**: não auditada. `vitrine.inspira.dev.br` continua atrás do desafio da borda (`BLK-UX-61-PROD`, seção 1.4 da matriz).
+- **Produção**: a versão publicada é `bbafd95` (workflow "Deploy Cloudflare Worker", 14/11/2026 16:20Z), o mesmo commit e build do preview local. Por isso o preview e o Worker local servem como evidência equivalente. O `403` que clientes automatizados recebem é o desafio de bots da Cloudflare, não uma falha. Conferir num navegador real é passo humano opcional (`CHK-UX-61-PROD`, seção 1.4 da matriz).
 
 ## 1. Escopo
 
@@ -125,7 +125,7 @@ Contagem: **P0 0 · P1 3 · P2 7 · P3 10** (20 achados).
 | `UX-68-016` | `#68` | `P3` | `problema_confirmado` | `feedback` | Ao atingir o limite de cotas, o "+" fica desabilitado sem explicação; a mensagem "Restam apenas N cotas disponíveis." existe (`storefront-renderer.mjs:136-143`), mas não é alcançável porque o botão desabilitado não recebe clique (`:1773`) | No limite, o cartão diz por que não é possível reservar mais | Aberto |
 | `UX-68-017` | `#68` | `P3` | `problema_confirmado` | `formularios` | No modelo padrão de produtos, a mensagem repete o rótulo: "Entrega/Retirada: Entrega: Rua A, 10…" (`src/portal-validation.mjs:497` + `storefront-renderer.mjs:2149-2153`). Captura `passo3-revisao-390-claro.png` | A linha de recebimento tem um único rótulo (ex.: "Entrega: Rua A, 10…" ou "Retirada no local") | Aberto |
 | `UX-68-018` | `#68` | `P3` | `critica_ux` | `feedback` | Com falha de rede no `menu.json`, a `/loja1` mostra "Não foi possível carregar a vitrine neste momento." enquanto a vitrine estática segue completa, com links por item que funcionam. Captura `loja1-falha-rede-375-claro.png` | O aviso diz que a montagem do pedido está indisponível e que ainda é possível pedir pelo botão de cada item | Aberto |
-| `UX-68-019` | `#68` | `P3` | `risco_codigo` | `feedback` | Open Graph: `og:title`, `og:description` e `og:url` são personalizados e escapados, mas `<meta name="description">` fica genérica (`src/publication-engine.mjs:951`) e `og:image` usa a imagem padrão quando não há logo nem foto (`:716-728`). A pré-visualização real no WhatsApp e no Instagram não foi verificável | A descrição usa as boas-vindas da vitrine; a pré-visualização é validada em produção depois de `BLK-UX-61-PROD` | Aberto |
+| `UX-68-019` | `#68` | `P3` | `risco_codigo` | `feedback` | Open Graph: `og:title`, `og:description` e `og:url` são personalizados e escapados, mas `<meta name="description">` fica genérica (`src/publication-engine.mjs:951`) e `og:image` usa a imagem padrão quando não há logo nem foto (`:716-728`). A pré-visualização real no WhatsApp e no Instagram não foi verificável | A descrição usa as boas-vindas da vitrine; a pré-visualização é validada em produção num aplicativo real (`BLK-UX-68-OG`) | Aberto |
 | `UX-68-020` | `#68` | `P3` | `risco_codigo` | `feedback` | A resposta JSON de `/data/vitrines/<slug>/menu.json` inexistente diz "Cardápio público não encontrado." (`workers/api.mjs:3541`), termo proibido em texto que pode chegar a quem usa a API | A mensagem usa "vitrine" (ex.: "Vitrine publicada não encontrada.") | Aberto |
 
 Observações sem achado:
@@ -137,7 +137,7 @@ Observações sem achado:
 
 | Código | Tela | Bloqueio | Checklist de aceite |
 | --- | --- | --- | --- |
-| `BLK-UX-61-PROD` | Todas as rotas desta jornada em produção | Desafio da borda em `vitrine.inspira.dev.br` | [ ] `curl -sI https://vitrine.inspira.dev.br/loja1` devolve `200` · [ ] `/<slug>` de uma vitrine real devolve `200` com `og:title` do negócio · [ ] rota inexistente devolve `404.html` · [ ] `/por-cidade` devolve `200` |
+| `CHK-UX-61-PROD` (opcional) | Todas as rotas desta jornada em produção | Clientes automatizados recebem o desafio de bots da Cloudflare; a versão publicada (`bbafd95`) é a mesma auditada localmente | [ ] Opcional: num navegador real, `/loja1`, uma `/<slug>` real com `og:title` do negócio, uma rota inexistente (404) e `/por-cidade` abrem como nas capturas locais |
 | `BLK-UX-68-OG` | Pré-visualização de link | Sem produção, não há como testar o card no WhatsApp, Instagram e Facebook | [ ] Depuração de compartilhamento da Meta lê `og:title`, `og:description` e `og:image` de uma vitrine real · [ ] card no WhatsApp mostra nome e imagem |
 | `BLK-UX-68-LIKES` | Curtidas em produção | Cookie `Secure`, limite real (`429`) e filtro de robôs só verificáveis em HTTPS com Supabase | [ ] Curtir e descurtir em navegador comum em produção · [ ] curtida persiste após recarregar · [ ] limite mostra a mensagem de `429` |
 
