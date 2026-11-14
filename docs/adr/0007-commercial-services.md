@@ -3,6 +3,10 @@ status: proposed
 ---
 # Gratuito com identidade personalizada e serviços opcionais
 
+Atualização de 2026-11-14: os preços e a cobrança manual sem gateway foram
+substituídos pelo [ADR 0013](0013-plans-and-recurring-billing.md). Continuam valendo a
+separação entre assinatura e projeto sob medida, o endereço canônico e o portfólio.
+
 O usuário propôs mensalidades para subdomínios/domínios e orçamento para
 customizações, com portfólio editável e contato WhatsApp. Recomendamos manter a
 vitrine básica gratuita e separar assinatura por endereço de projeto sob medida.
