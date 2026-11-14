@@ -45,7 +45,26 @@ export const FORBIDDEN_PUBLIC_KEYS = Object.freeze([
   'active',
   'available',
   'password',
-  'secret'
+  'secret',
+  'plan',
+  'planCode',
+  'plan_code',
+  'subscription',
+  'subscriptionStatus',
+  'subscription_status',
+  'paymentStatus',
+  'payment_status',
+  'billing',
+  'provider',
+  'providerCustomerId',
+  'provider_customer_id',
+  'providerSubscriptionId',
+  'provider_subscription_id',
+  'currentPeriodEnd',
+  'current_period_end',
+  'graceUntil',
+  'grace_until',
+  'entitlements'
 ]);
 
 const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
@@ -339,7 +358,7 @@ export async function computeSha256Hex(input) {
   return hex;
 }
 
-export function projectPublicStorefrontMenu(draftContent, site = {}) {
+export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}) {
   if (!draftContent || typeof draftContent !== 'object' || Array.isArray(draftContent)) {
     throw new PortalValidationError(
       422,
@@ -370,7 +389,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     site
   );
 
-  validateDraftContent(migrated);
+  const planLimits = { maxActiveItems: limits.maxActiveItems, planName: limits.planName };
+  validateDraftContent(migrated, planLimits);
   const relayViaMila = resolveOrderRelayMode(migrated) === ORDER_RELAY_MILA;
 
   let baseMenu;
@@ -378,7 +398,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
     const visibleContent = Array.isArray(migrated.categories)
       ? { ...migrated, categories: migrated.categories.filter(category => category?.active !== false) }
       : migrated;
-    const publicMenuDraft = toPublicMenuDraft(visibleContent, site);
+    const publicMenuDraft = toPublicMenuDraft(visibleContent, site, planLimits);
     if (relayViaMila) {
       publicMenuDraft.whatsapp = MILA_WHATSAPP;
     }
@@ -672,7 +692,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}) {
 }
 
 export async function compilePublicStorefront(draftContent, site = {}, options = {}) {
-  const menu = projectPublicStorefrontMenu(draftContent, site);
+  const menu = projectPublicStorefrontMenu(draftContent, site, options);
   const canonicalJson = JSON.stringify(menu);
   const hash = await computeSha256Hex(canonicalJson);
   const publishedAt = options.publishedAt ?? new Date().toISOString();
