@@ -7,6 +7,7 @@ import {
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
+import { renderStorefrontFooterHtml } from '../assets/storefront-footer.mjs';
 import { QR_SOURCE, bindRouteClickMetric, resolveVisitOrigin } from '../assets/metrics-source.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -484,6 +485,12 @@ export async function bootStorefront(deps = {}) {
     }
     if (statusBanner) {
       statusBanner.hidden = true;
+    }
+
+    const staticFooter = doc.querySelector?.('footer.storefront-footer:not([data-storefront-footer])');
+    if (staticFooter?.insertAdjacentHTML) {
+      staticFooter.insertAdjacentHTML('afterend', renderStorefrontFooterHtml(menu, { navigation: menu.structure?.navigation?.footer }));
+      staticFooter.remove();
     }
 
     const place = mountStorefrontPlace(doc, menu, {
