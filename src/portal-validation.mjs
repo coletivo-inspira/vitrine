@@ -8,6 +8,7 @@ import {
 } from '../web/assets/quota-rules.mjs';
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import { collectPlaceErrors } from './business-hours.mjs';
+import { validateLocalSeo } from '../web/assets/local-seo.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -1431,7 +1432,10 @@ export function validateDraftContent(content, options = {}) {
     validateLocality(content.locality, 422);
   }
 
-  const [placeError, ...morePlaceErrors] = collectPlaceErrors(content);
+  const [placeError, ...morePlaceErrors] = [
+    ...collectPlaceErrors(content),
+    ...validateLocalSeo(content.localSeo).errors
+  ];
   if (placeError) {
     throw new PortalValidationError(422, placeError.code, placeError.message, {
       field: placeError.field,

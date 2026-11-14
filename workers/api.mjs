@@ -45,6 +45,7 @@ import {
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
+import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -3493,7 +3494,7 @@ async function handleCityRequest(request, url, method, store, context) {
   return response;
 }
 
-async function handlePublicStorefrontOrMenuRequest(request, pathname, method, store, assetsFetcher) {
+async function handlePublicStorefrontOrMenuRequest(request, pathname, method, store, assetsFetcher, renderOptions = {}) {
   if (method !== 'GET' && method !== 'HEAD') {
     return null;
   }
@@ -3578,7 +3579,7 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
       (await store.getPublicationBySlug?.(slug)) ??
       (await sharedPublicPublications.getPublicationBySlug(slug));
     if (pub) {
-      const html = renderStorefrontHtml(pub.menu);
+      const html = renderStorefrontHtml(pub.menu, undefined, renderOptions);
       const hasExternalStorageImages = Boolean(
         Array.isArray(pub.menu?.items) &&
           pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())
@@ -3601,7 +3602,7 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
       const menuProbe = await assetsFetcher.fetch(new Request(menuProbeUrl));
       if (menuProbe.ok) {
         const menuData = await menuProbe.json();
-        const html = renderStorefrontHtml(menuData);
+        const html = renderStorefrontHtml(menuData, undefined, renderOptions);
         return new Response(method === 'HEAD' ? null : html, {
           status: 200,
           headers: {
@@ -3866,7 +3867,8 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
   const cached = await cache?.match(key);
   const refresh = async () => {
     const response = await handlePublicStorefrontOrMenuRequest(
-      request, path, 'GET', store, assets
+      request, path, 'GET', store, assets,
+      { canonicalUrl: canonicalUrlFor({ slug, domains: [{ hostname: url.hostname, status: 'active', ssl_status: 'active' }] }) }
     );
     if (response?.ok && cache) {
       const headers = new Headers(response.headers);
@@ -3956,8 +3958,12 @@ export function createApiHandler(deps = {}) {
         const draft = site && await store.getDraft(siteId, user.id, options);
         if (draft?.revision !== revision) return new Response(null, { status: 404, headers });
         const content = await resolveDraftForPublication(store, site, draft, options);
-        const limits = draftLimits(await loadSiteEntitlements(store, siteId, options));
-        const { menu } = await compilePublicStorefront(content, site, { revision, ...limits });
+        const entitlements = await loadSiteEntitlements(store, siteId, options);
+        const { menu } = await compilePublicStorefront(content, site, {
+          revision,
+          ...draftLimits(entitlements),
+          ...publicationSeoOptions({ slug: site.slug, entitlements })
+        });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
         const status = error instanceof PortalValidationError ? 422 : 500;
@@ -5324,10 +5330,14 @@ export function createApiHandler(deps = {}) {
         const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
         const entitlements = await loadSiteEntitlements(store, site.id, { token: user.token, env });
+        const domains = typeof store.listDomains === 'function'
+          ? await store.listDomains(site.id, { token: user.token, env }).catch(() => [])
+          : [];
         const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
           siteId: site.id,
-          ...draftLimits(entitlements)
+          ...draftLimits(entitlements),
+          ...publicationSeoOptions({ slug: site.slug, entitlements, domains })
         });
 
         if (typeof store.savePublication === 'function') {
