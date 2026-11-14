@@ -3,6 +3,7 @@
 // cartão de prévia de `local-seo.mjs`) e troca só o `<main>` e os metadados.
 import { whatsappLink } from './public-menu.mjs';
 import { canonicalUrlOf, renderShareMetaTags, shareMetaFor } from './local-seo.mjs';
+import { renderFaqBlock } from '../web/assets/faq-block.mjs';
 import { PortalValidationError, validateSafePublicHttpsUrl } from './portal-validation.mjs';
 import {
   ITEM_PAGE_FIELD_KEYS,
@@ -259,12 +260,10 @@ function renderLongDescription(item) {
 // FAQ mínima e isolada: trocar pelo componente visual único de perguntas frequentes da #132.
 function renderItemFaq(faq) {
   if (!faq?.length) return '';
-  return `<section class="item-page-section item-page-faq" aria-labelledby="item-page-perguntas">
-      <h2 id="item-page-perguntas">Perguntas frequentes</h2>
-      <div class="item-page-faq-list">${faq.slice(0, ITEM_PAGE_LIMITS.faq).map((entry) =>
-    `<details><summary>${escapeHtml(entry.q)}</summary><p>${escapeHtml(entry.a)}</p></details>`
-  ).join('')}</div>
-    </section>`;
+  return renderFaqBlock({ items: faq.slice(0, ITEM_PAGE_LIMITS.faq) }, {
+    id: 'item-page-perguntas',
+    className: 'item-page-section item-page-faq'
+  });
 }
 
 function relatedPriceText(menu, item) {

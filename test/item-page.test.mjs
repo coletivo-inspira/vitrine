@@ -142,7 +142,8 @@ test('Issue #130 — página do item: um h1, og:image da foto, canonical, sem ca
   assert.equal((html.match(/class="item-page-thumb"/g) ?? []).length, 3, 'foto principal + 2 da galeria');
   assert.match(html, /<dt>Duração<\/dt><dd>3 horas<\/dd>/);
   assert.match(html, /<h2 id="item-page-sobre">Sobre este item<\/h2>[\s\S]*<p>Você aprende a fermentação natural\.<\/p><p>No fim, cada pessoa leva duas pizzas\.<\/p>/);
-  assert.match(html, /<details><summary>Preciso levar algo\?<\/summary><p>Só vontade de aprender\./);
+  assert.match(html, /<details class="storefront-faq-item">\s*<summary><span class="storefront-faq-question">Preciso levar algo\?<\/span>/);
+  assert.match(html, /<div class="storefront-faq-answer"><p>Só vontade de aprender\./);
   assert.equal((html.match(/class="item-page-related-card"/g) ?? []).length, 3, 'até 3 relacionados da mesma categoria');
   assert.match(html, /class="sf-secondary-button item-page-share-button"[^>]*data-share-url="https:\/\/vitrine\.inspira\.dev\.br\/pizza-a\/item\/aula-de-pizza-napolitana"/);
   assert.match(html, /<div id="storefront-catalog" class="item-page-select" data-item-select><a class="whatsapp-order-button" href="https:\/\/wa\.me\/5511987654321/);
