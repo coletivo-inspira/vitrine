@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "template": "booking-v1",
+  "storefrontType": "photo",
+  "catalogType": "booking",
+  "slug": "guavira-fotos",
+  "businessName": "Guavira Fotos",
+  "whatsapp": "5511999999999",
+  "messages": {
+    "heroTitle": "Guavira Fotos",
+    "welcomeText": "Vitrine de demonstração com conteúdo fictício. [a preencher com o conteúdo autorizado]",
+    "ctaLabel": "Confirmar agendamento no WhatsApp",
+    "whatsappTemplate": "Olá! Meu nome é {nome}. Gostaria de agendar:\n{itens}\nData: {data} às {horario}\nTotal estimado: {total}"
+  },
+  "structure": {
+    "pages": [
+      {
+        "slug": "home",
+        "title": "Início",
+        "sections": [
+          { "id": "abertura", "moduleCode": "hero", "config": { "headline": "Fotografia para guardar o que importa", "subtitle": "Demonstração: serviços, pacotes e valores fictícios. [a preencher com o conteúdo autorizado]" } },
+          { "id": "servicos", "moduleCode": "service_booking", "config": { "showDuration": true } },
+          { "id": "sobre", "moduleCode": "about_story", "config": { "bio": "[a preencher com o conteúdo autorizado: apresentação do estúdio e portfólio]" } },
+          { "id": "atendimento", "moduleCode": "hours_location", "config": { "scheduleText": "[a preencher com o conteúdo autorizado: dias e horários]", "addressText": "[a preencher com o conteúdo autorizado: região atendida]" } },
+          { "id": "perguntas", "moduleCode": "faq", "config": { "items": [
+            { "q": "Como recebo as fotos?", "a": "Exemplo fictício: galeria on-line com as fotos tratadas. [a preencher com o conteúdo autorizado]" },
+            { "q": "Posso remarcar o ensaio?", "a": "Exemplo fictício: sim, com aviso prévio. [a preencher com o conteúdo autorizado]" }
+          ] } }
+        ]
+      }
+    ]
+  },
+  "categories": [
+    {
+      "id": "ensaios",
+      "name": "Ensaios",
+      "items": [
+        {
+          "id": "ensaio-individual",
+          "name": "Ensaio individual",
+          "description": "Exemplo fictício: sessão ao ar livre com 20 fotos tratadas. Valor ilustrativo.",
+          "priceCents": 10000,
+          "durationMinutes": 60,
+          "active": true
+        },
+        {
+          "id": "ensaio-familia",
+          "name": "Ensaio em família",
+          "description": "Exemplo fictício: até 5 pessoas, 40 fotos tratadas. Valor ilustrativo.",
+          "priceCents": 20000,
+          "durationMinutes": 90,
+          "active": true
+        },
+        {
+          "id": "retrato-profissional",
+          "name": "Retrato profissional",
+          "description": "Exemplo fictício: fotos para perfil e currículo, 10 fotos tratadas. Valor ilustrativo.",
+          "priceCents": 10000,
+          "durationMinutes": 45,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "pacotes",
+      "name": "Pacotes",
+      "items": [
+        {
+          "id": "pacote-evento-pequeno",
+          "name": "Pacote evento pequeno",
+          "description": "Exemplo fictício: cobertura de aniversário ou batizado, 3 horas. Valor ilustrativo.",
+          "priceCents": 30000,
+          "durationMinutes": 180,
+          "active": true
+        },
+        {
+          "id": "pacote-marca",
+          "name": "Pacote conteúdo para marca",
+          "description": "Exemplo fictício: fotos de produto e bastidores para redes sociais. Valor ilustrativo.",
+          "priceCents": 30000,
+          "durationMinutes": 120,
+          "active": true
+        },
+        {
+          "id": "pacote-em-revisao",
+          "name": "Pacote em revisão (oculto)",
+          "description": "Item oculto de exemplo: não aparece na vitrine publicada.",
+          "priceCents": 10000,
+          "durationMinutes": 60,
+          "active": false
+        }
+      ]
+    }
+  ]
+}

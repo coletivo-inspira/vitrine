@@ -20,6 +20,16 @@ Mudar published para true só após revisar link, descrição e autorização.
 O catálogo fica em repositório público: mesmo entradas não publicadas não podem
 conter informação privada. published controla a exibição no futuro site, não sigilo.
 Para rascunhos privados, usar outro local até existir o painel de operadores.
+Case à espera de autorização leva `"authorization": "pendente: <passo humano>"` e
+`published: false`; `test/guavira-piloto.test.mjs` impede publicar case com
+autorização pendente ou com o marcador `[a preencher com o conteúdo autorizado]`.
+
+# Vitrines de exemplo
+
+`vitrines/*.json` são rascunhos no formato do painel, cobertos pelo orçamento da
+vitrine pública (`test/storefront-budget.test.mjs`). O build publica só `loja1`;
+`rascunho-guavira-fotos.json` é demonstração fictícia da issue #124 e não vai para
+`dist/` (roteiro em `docs/aquisicao/guavira-piloto.md`).
 
 `publishedPortfolio` valida e projeta somente cases publicados, ordenando por order.
 Não busca sites nem gera imagens. `quoteContactLink` precisa do número comercial
