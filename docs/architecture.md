@@ -94,6 +94,19 @@ evento, sem dados pessoais) e as RPCs `billing_attach_checkout` e `billing_apply
 só para `service_role`; o webhook grava o id e muda `public.subscriptions` na mesma
 transação. Configuração, eventos, cotas e testes em `docs/billing/asaas.md`.
 
+## Insights por origem (issue #119)
+
+`public.site_metrics_daily` ganhou `source` e `campaign` (migração
+`20261116000200_metrics_source.sql`) e as métricas `route_click` e `qr_visit`. A lista
+de métricas está em `ALLOWED_METRIC_EVENT_TYPES` (`src/portal-validation.mjs`) e, no
+banco, em `private.site_metric_names()`, usada pelo `check` e pela RPC; um nome novo
+entra recriando essa função numa migração nova. A vitrine lê `utm_source` e
+`utm_campaign` só na carga (`web/assets/metrics-source.mjs`), sem cookie nem
+armazenamento; Worker e banco normalizam de novo (lista fechada, até 32 caracteres,
+desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é descartada).
+Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
+`conversion_reports` (`src/insights-by-origin.mjs`).
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
