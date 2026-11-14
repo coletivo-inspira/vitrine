@@ -16,7 +16,10 @@ Falta saber **de onde** vêm as visitas (Comment-to-Vitrine, QR, bio) e contar r
   derivada só de `utm_source` e `utm_campaign` da URL (lista fechada de até 32
   caracteres por valor, minúsculas; valores desconhecidos viram `outro`).
 - Migração append-only que amplia o `check` de `metric_name` e acrescenta `source`,
-  mantendo a retenção de 13 meses.
+  mantendo a retenção de 13 meses. A lista de métricas fica num só lugar
+  (`src/portal-validation.mjs` e o `check` da migração) para que `notify_click`
+  ("Avise-me", issue {{issue:23}}) e `payment_link_click` (link de pagamento, issue
+  {{issue:24}}) entrem como novos nomes, sem tabela nem rota própria.
 - Vitrine pública: lê os parâmetros UTM só na carga da página, não grava nada no
   navegador e envia a origem junto do evento `visit` no lote atual.
 - Painel Insights: quadro "Visitas por origem" e funil por origem (visitas → cliques

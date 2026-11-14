@@ -1,7 +1,9 @@
 # Backlog do estudo de mercado 2026
 
 Issues derivadas do [estudo de mercado 2026](../../market-study-2026.md) e do
-[ADR 0013](../../adr/0013-plans-and-recurring-billing.md), escritas para serem criadas
+[ADR 0013](../../adr/0013-plans-and-recurring-billing.md) (01 a 17) e da
+[referência laurapires.com](../../referencia-laurapires.md) como padrão de vitrine de
+serviços e produtos (18 a 27), escritas para serem criadas
 no GitHub pelo Lino com:
 
 ```bash
@@ -54,6 +56,23 @@ depende: 02, 07
 | 16 | [Pausar, desconectar domínio e arquivar](16-pausar-desconectar-arquivar.md) | `estudo-mercado`, `painel`, `enhancement` | — |
 | 17 | [Papel de patrocinador (depois)](17-papel-patrocinador.md) | `estudo-mercado`, `painel`, `depois` | 02, 09 |
 
+### Vitrine de serviços e produtos (referência laurapires.com)
+
+Todas levam também `estudo-mercado`, `referencia-laurapires` e `enhancement`.
+
+| N.º | Issue | Rótulo da frente | Depende de |
+| --- | --- | --- | --- |
+| 18 | [Cabeçalho com identidade, menu e "Sua seleção"](18-cabecalho-identidade-e-sua-selecao.md) | `vitrine-publica` | — (`PB-07`, `PB-14`) |
+| 19 | [Gaveta lateral "Sua seleção"](19-gaveta-sua-selecao.md) | `vitrine-publica` | 18, `PB-06`, `PB-09`, `PB-17` (desejável 11) |
+| 20 | [Página própria do item, compartilhável](20-pagina-do-item.md) | `vitrine-publica` | 07, 18, 19 |
+| 21 | [Hero com foto e duas ações, e destaques](21-hero-com-foto-e-destaques.md) | `vitrine-publica` | — |
+| 22 | [Depoimentos e perguntas frequentes](22-depoimentos-e-faq.md) | `vitrine-publica` | — |
+| 23 | [Item "Em breve" com "Avise-me pelo WhatsApp"](23-item-em-breve-avise-me.md) | `vitrine-publica` | 20 (contagem pela 09, `PB-20`) |
+| 24 | [Link de pagamento do próprio negócio](24-link-de-pagamento-do-negocio.md) | `vitrine-publica` | 20 (contagem pela 09, termos pela 01) |
+| 25 | [Rodapé completo da vitrine](25-rodape-completo.md) | `vitrine-publica` | 08, 18, `PB-26` |
+| 26 | [Modelo "Serviços e produtos"](26-modelo-servicos-e-produtos.md) | `vitrine-publica`, `painel` | 18, 21, 22, 25, `PB-12` (recomendado 20) |
+| 27 | [Orçamento de desempenho e acessibilidade](27-orcamento-desempenho-acessibilidade.md) | `vitrine-publica` | — (antes de 18 a 26) |
+
 ## Cobertura existente, fusões e cortes
 
 Antes de escrever, o backlog foi cruzado com os 27 pacotes da auditoria UX
@@ -84,6 +103,23 @@ Antes de escrever, o backlog foi cruzado com os 27 pacotes da auditoria UX
   mesmo campo de horário e endereço.
 - Modelos compartilháveis do Manychat e do BotConversa junto do Comment-to-Vitrine (12).
 
+**Fusões das propostas da referência laurapires.com (18 a 27):** nenhuma das 10
+duplicava uma issue inteira, então todas ficaram, mas as partes repetidas foram
+tiradas delas e apontam para quem já cobre:
+
+| Parte da proposta | Ficou em |
+| --- | --- |
+| Contagem de cliques em "Avise-me" (23) e no link de pagamento (24) | Issue 09, como métricas `notify_click` e `payment_link_click`, sem tabela nem rota própria |
+| Metadados e OG por item (20) | Mesmo gerador da issue 07; JSON-LD de item continua fora |
+| Parágrafo dos termos sobre o link de pagamento (24) | Mesma revisão de `/termos/` da issue 01 |
+| Horário e cidade no rodapé (25) | Campos da issue 08, sem segundo cadastro; acabamento em 768–1440 px de `PB-26` |
+| Instagram no cabeçalho (18) | O mesmo link direto da central de canais (15) |
+| Seletor "Disponível / Em breve / Oculto" (23) | Controle único de visibilidade de `PB-20` (`UX-66-012`) |
+| Componente visual de perguntas frequentes (20 e 22) | Um só, na 22; a página do item reaproveita |
+| Checagem de termos proibidos no orçamento (27) | `PB-18` (`TT-14`); a 27 vigia só os termos em inglês |
+| Foco da gaveta (19), mensagem do WhatsApp completa (19), contraste e alvos do cabeçalho (18) | `PB-09`/`PB-17`, `PB-06`, `PB-07`/`PB-14` |
+| Selo "Apoio Coletivo Me Inspira" do plano Gratuito | Rodapé da 25 (ADR 0013) |
+
 **Usadas como base, sem duplicar:** região de mensagens (`PB-01`), estado de falha
 (`PB-02`), trava de envio (`PB-03`), diálogo padronizado (`PB-12`, `PB-20`), alvos de
 toque (`PB-14`) e contrato de webhook com HMAC do feed
@@ -96,4 +132,5 @@ toque (`PB-14`) e contrato de webhook com HMAC do feed
 | `BLK-ASAAS-01` | Lino | Abrir a conta Asaas do coletivo (sem mensalidade), gerar a chave de sandbox e, depois, a de produção; gravar com `wrangler secret put ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN`; cadastrar a URL do webhook no painel do Asaas. Libera o teste real da 03 e a produção da 03 a 05 |
 | `BLK-GUAVIRA-01` | Lino com a Guavira Fotos | Autorização escrita para publicar o conteúdo e usar como case (14) |
 | `BLK-STRIPE-01` | Lino, só se decidir | Conta Stripe (06) |
-| Rodar o script | Lino | Criar os rótulos e as 17 issues no GitHub |
+| Lista de domínios de pagamento | Lino | Revisar a lista fechada da 24 antes do merge dela |
+| Rodar o script | Lino | Criar os rótulos e as 27 issues no GitHub (as que já existirem são puladas) |
