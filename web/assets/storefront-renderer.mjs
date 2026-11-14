@@ -390,13 +390,121 @@ export class StorefrontRenderer {
     return count;
   }
 
+  getMinQuantity(item) {
+    const components = this.getResolvedComponents();
+    return components.minQuantity && Number.isInteger(item?.minQuantity) && item.minQuantity > 1
+      ? item.minQuantity
+      : 1;
+  }
+
+  getSelectedEntries() {
+    const entries = [];
+    for (const item of this.getAllActiveItems()) {
+      if (!this.cart.has(item.id)) continue;
+      entries.push({ item, qty: this.cart.get(item.id), priceMode: this.getItemPriceMode(item) });
+    }
+    return entries;
+  }
+
+  /**
+   * Resumo da seleção usado pela barra inferior e pela gaveta "Sua seleção":
+   * os mesmos textos de quantidade, total (sem lances) e cotas nos dois lugares.
+   */
+  getSelectionSummary() {
+    const catalogType = this.getCatalogType();
+    const resolvedComponents = this.getResolvedComponents();
+    const count = this.getCartCount();
+    const quotaCount = this.getQuotaCount();
+    const otherCount = count - quotaCount;
+    const countText =
+      catalogType === 'booking'
+        ? count === 1
+          ? '1 serviço selecionado'
+          : `${count} serviços selecionados`
+        : quotaCount > 0
+          ? [
+              otherCount > 0 ? (otherCount === 1 ? '1 item' : `${otherCount} itens`) : '',
+              `${this.formatQuotaCount(quotaCount)} reservada${quotaCount === 1 ? '' : 's'}`
+            ]
+              .filter(Boolean)
+              .join(' e ')
+          : count === 1
+            ? '1 item selecionado'
+            : `${count} itens selecionados`;
+
+    const cartTotal = this.getCartTotal();
+    const quotaTotal = this.getQuotaTotal();
+    let totalText = '';
+    let quotaText = '';
+    let durationText = '';
+    if (
+      resolvedComponents.price &&
+      (cartTotal > 0 || (catalogType !== 'quote' && this.hasSelectedFixedPriceItems()))
+    ) {
+      totalText = this.hasSelectedOffers()
+        ? `${this.formatPrice(cartTotal)} (sem os lances)`
+        : this.formatPrice(cartTotal);
+      if (quotaTotal > 0) quotaText = `+ ${this.formatPrice(quotaTotal)} em cotas`;
+    } else if (quotaTotal > 0) {
+      quotaText = `${this.formatPrice(quotaTotal)} em cotas`;
+    } else if (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0) {
+      durationText = `${this.getCartTotalDuration()} min`;
+    }
+    return { count, countText, totalText, quotaText, durationText };
+  }
+
+  /** Só itemId → quantidade dos itens sem valor digitado (lance e troca ficam na memória). */
+  getPersistableSelection() {
+    const selection = {};
+    for (const { item, qty, priceMode } of this.getSelectedEntries()) {
+      if (priceMode === 'fixed' || priceMode === 'quota' || priceMode === 'donation') {
+        selection[String(item.id)] = qty;
+      }
+    }
+    return selection;
+  }
+
+  /** Restaura uma seleção salva; itens que saíram da vitrine ou mudaram de modalidade são descartados. */
+  restoreSelection(saved) {
+    const result = { restored: 0, discarded: 0 };
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return result;
+    const byId = new Map(this.getAllActiveItems().map((item) => [String(item.id), item]));
+    for (const [id, rawQty] of Object.entries(saved)) {
+      const item = byId.get(id);
+      const qty = Number.isSafeInteger(rawQty) ? rawQty : 0;
+      const priceMode = item ? this.getItemPriceMode(item) : '';
+      let next = 0;
+      if (item && qty > 0) {
+        if (priceMode === 'fixed') next = Math.min(Math.max(qty, this.getMinQuantity(item)), 99);
+        else if (priceMode === 'quota') next = Math.min(qty, this.getQuotaSelectionLimit(item));
+        else if (priceMode === 'donation') next = 1;
+      }
+      if (next > 0) {
+        this.cart.set(item.id, next);
+        result.restored += 1;
+      } else {
+        result.discarded += 1;
+      }
+    }
+    return result;
+  }
+
+  removeItem(item) {
+    if (!item || !this.cart.has(item.id)) return false;
+    this.cart.delete(item.id);
+    this.offers.delete(item.id);
+    this.tradeProposals.delete(item.id);
+    this.itemErrors.delete(item.id);
+    if (typeof this.options.onUpdate === 'function') {
+      this.options.onUpdate(this);
+    }
+    this.render();
+    return true;
+  }
+
   setQuantity(item, delta) {
     if (!item || item.active === false) return;
-    const components = this.getResolvedComponents();
-    const minQty =
-      components.minQuantity && Number.isInteger(item.minQuantity) && item.minQuantity > 1
-        ? item.minQuantity
-        : 1;
+    const minQty = this.getMinQuantity(item);
     const current = this.cart.get(item.id) || 0;
 
     if (current === 0 && delta > 0) {
@@ -441,11 +549,7 @@ export class StorefrontRenderer {
     if (this.cart.has(item.id)) {
       this.cart.delete(item.id);
     } else {
-      const components = this.getResolvedComponents();
-      const minQty =
-        components.minQuantity && Number.isInteger(item.minQuantity) && item.minQuantity > 1
-          ? item.minQuantity
-          : 1;
+      const minQty = this.getMinQuantity(item);
       this.cart.set(item.id, minQty);
       if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
         globalThis.recordStorefrontEvent('item_select', {
@@ -689,54 +793,21 @@ export class StorefrontRenderer {
       const info = document.createElement('div');
       info.className = 'cart-bar-info';
 
-      const quotaCount = this.getQuotaCount();
-      const otherCount = cartCount - quotaCount;
+      const summary = this.getSelectionSummary();
       const countStrong = document.createElement('strong');
-      countStrong.textContent =
-        catalogType === 'booking'
-          ? cartCount === 1
-            ? '1 serviço selecionado'
-            : `${cartCount} serviços selecionados`
-          : quotaCount > 0
-            ? [
-                otherCount > 0 ? (otherCount === 1 ? '1 item' : `${otherCount} itens`) : '',
-                `${this.formatQuotaCount(quotaCount)} reservada${quotaCount === 1 ? '' : 's'}`
-              ]
-                .filter(Boolean)
-                .join(' e ')
-            : cartCount === 1
-              ? '1 item selecionado'
-              : `${cartCount} itens selecionados`;
+      countStrong.textContent = summary.countText;
       info.appendChild(countStrong);
 
-      const cartTotal = this.getCartTotal();
-      const quotaTotal = this.getQuotaTotal();
-      if (
-        resolvedComponents.price &&
-        (cartTotal > 0 || (catalogType !== 'quote' && this.hasSelectedFixedPriceItems()))
-      ) {
-        const totalVal = document.createElement('span');
-        totalVal.className = 'cart-bar-total';
-        totalVal.textContent = this.hasSelectedOffers()
-          ? `${this.formatPrice(cartTotal)} (sem os lances)`
-          : this.formatPrice(cartTotal);
-        info.appendChild(totalVal);
-        if (quotaTotal > 0) {
-          const quotaVal = document.createElement('span');
-          quotaVal.className = 'cart-bar-total sf-cart-quota-total';
-          quotaVal.textContent = `+ ${this.formatPrice(quotaTotal)} em cotas`;
-          info.appendChild(quotaVal);
-        }
-      } else if (quotaTotal > 0) {
-        const quotaVal = document.createElement('span');
-        quotaVal.className = 'cart-bar-total sf-cart-quota-total';
-        quotaVal.textContent = `${this.formatPrice(quotaTotal)} em cotas`;
-        info.appendChild(quotaVal);
-      } else if (resolvedComponents.durationMinutes && this.getCartTotalDuration() > 0) {
-        const durVal = document.createElement('span');
-        durVal.className = 'cart-bar-total';
-        durVal.textContent = `${this.getCartTotalDuration()} min`;
-        info.appendChild(durVal);
+      for (const [text, className] of [
+        [summary.totalText, 'cart-bar-total'],
+        [summary.quotaText, 'cart-bar-total sf-cart-quota-total'],
+        [summary.durationText, 'cart-bar-total']
+      ]) {
+        if (!text) continue;
+        const value = document.createElement('span');
+        value.className = className;
+        value.textContent = text;
+        info.appendChild(value);
       }
 
       const advBtn = document.createElement('button');
