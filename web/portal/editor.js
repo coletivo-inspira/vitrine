@@ -2279,8 +2279,7 @@ async function decodeImageSource(file) {
   });
 }
 
-async function resizeAndConvertToWebP(file) {
-  const maxBytes = 204800; // 200 KiB
+async function resizeAndConvertToWebP(file, maxBytes = 204800) {
   const source = await decodeImageSource(file);
   const srcWidth = source.width;
   const srcHeight = source.height;
@@ -2325,12 +2324,18 @@ async function resizeAndConvertToWebP(file) {
     if (lastBlob && lastBlob.size <= maxBytes) {
       return lastBlob;
     }
-    throw new Error('A imagem excedeu 200 KB mesmo após compressão. Escolha uma imagem menor.');
+    throw new Error(`A imagem excedeu ${Math.round(maxBytes / 1024)} KB mesmo após compressão. Escolha uma imagem menor.`);
   } finally {
     if (source && typeof source.close === 'function') {
       source.close();
     }
   }
+}
+
+async function uploadHeroImage(file) {
+  // A foto do hero é o maior elemento da primeira tela; 100 KB mantém o LCP em até 2,5 s no Slow 4G.
+  const blob = await resizeAndConvertToWebP(file, 102400);
+  return { url: await uploadImageToSupabaseStorage(blob, 'hero-foto'), bytes: blob.size };
 }
 
 // Server-side authenticated proxy upload (uses HttpOnly session cookie — zero client token exposure)
@@ -3316,7 +3321,7 @@ structurePanel?.addEventListener('toggle', async () => {
       } catch (error) {
         if (site === currentSite) structureStatus.textContent = error.message;
       }
-    }, widgets, null, { templates, selected });
+    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage });
     render(resolved, savedStructure?.templateCode);
   } catch (error) {
     if (site === currentSite) structureStatus.textContent = error.message;

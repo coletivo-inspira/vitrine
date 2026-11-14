@@ -7,6 +7,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib';
 import * as engine from '../src/publication-engine.mjs';
 import { ALLOWED_TEMPLATES, createInitialDraftContent } from '../src/portal-validation.mjs';
 import { StorefrontRenderer } from '../web/assets/storefront-renderer.mjs';
+import { heroPhotoDraft } from './fixtures/hero-photo-storefront.mjs';
 
 const { compilePublicStorefront, renderStorefrontHtml } = engine;
 
@@ -499,7 +500,8 @@ async function exampleStorefronts() {
   const candidates = [
     ...examples.map((draft) => asCandidate(`${draft.template} (${draft.slug})`, draft)),
     asCandidate('quote-v1', quote),
-    asCandidate('quote-v1 com seções', modular)
+    asCandidate('quote-v1 com seções', modular),
+    asCandidate('pizzeria-v1 com foto no hero e destaques', await heroPhotoDraft())
   ];
   const servicesExample = examples.some((draft) => draft.template === SERVICES_TEMPLATE);
   if (!servicesExample && ALLOWED_TEMPLATES.includes(SERVICES_TEMPLATE)) {
@@ -620,4 +622,22 @@ test('Orçamento da vitrine pública: o verificador acusa defeitos injetados no 
     const fragment = '<div><img src="/a.webp" alt="Foto" loading="lazy"></div>';
     assert.ok(auditStorefrontHtml(fragment, { fragment: true }).some((v) => /img sem width/.test(v)));
   });
+});
+
+test('Orçamento da vitrine pública: foto do hero é WebP de até 200 KB, com dimensões e prioridade alta', async () => {
+  const draft = await heroPhotoDraft();
+  const { menu } = await compilePublicStorefront(draft, { slug: draft.slug, name: draft.businessName, template: draft.template }, {
+    revision: 1,
+    publishedAt: '2026-11-14T00:00:00.000Z'
+  });
+  const html = renderStorefrontHtml(menu);
+  const [heroImg, ...others] = tagsOf(stripNonContent(html), 'img').filter(({ attrs }) => !/brand-logo/.test(attrs.class ?? ''));
+  assert.ok(heroImg, 'a vitrine de exemplo precisa ter foto no hero');
+  assert.match(heroImg.attrs.src, /\.webp$/);
+  assert.equal(heroImg.attrs.fetchpriority, 'high');
+  assert.ok(!('loading' in heroImg.attrs), 'a foto do hero não pode ser lazy');
+  assert.ok(Number(heroImg.attrs.width) > 0 && Number(heroImg.attrs.height) > 0);
+  for (const img of others) assert.equal(img.attrs.loading, 'lazy', img.raw);
+  const bytes = (await readFile(urlToWebFile(heroImg.attrs.src))).byteLength;
+  assert.ok(bytes <= 200 * 1024, `foto do hero com ${bytes} B (máximo 200 KB, ADR 0011)`);
 });

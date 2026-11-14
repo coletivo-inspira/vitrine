@@ -3602,8 +3602,10 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     if (pub) {
       const html = renderStorefrontHtml(pub.menu);
       const hasExternalStorageImages = Boolean(
-        Array.isArray(pub.menu?.items) &&
-          pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())
+        (Array.isArray(pub.menu?.items) &&
+          pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())) ||
+          pub.menu?.structure?.pages?.some((page) => page.sections?.some((section) =>
+            section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')))
       );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
