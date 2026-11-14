@@ -119,6 +119,17 @@ desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é desc
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
 
+## Item "Em breve" (issue #133)
+
+Estado público `availability: "soon"` (com `availabilityLabel` opcional, até 24
+caracteres) em `web/assets/item-availability.mjs`, usado pela publicação, pela vitrine e
+pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continua sendo
+`active: false` e `available` segue bloqueado em `assertNoPrivateLeakage`. O item
+"Em breve" aparece com selo e "Avise-me pelo WhatsApp" (`wa.me`, número e código da Mila
+no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
+seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
+`20261116000400_metric_notify_click.sql`); nenhum contato é guardado.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

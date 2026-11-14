@@ -206,12 +206,12 @@ test('PGlite: migração 20261116000200 grava origem, rota e QR sem dados pessoa
     await assert.rejects(
       db.query(
         `insert into public.site_metrics_daily (site_id, metric_date, metric_hour, metric_name)
-         values ($1, current_date, 1, 'notify_click')`,
+         values ($1, current_date, 1, 'payment_link_click')`,
         [SITE]
       ),
       /site_metrics_daily_metric_name_check/
     );
-    await assert.rejects(recordAsAnon(db, [{ type: 'notify_click' }]), /INVALID_EVENTS_BATCH/);
+    await assert.rejects(recordAsAnon(db, [{ type: 'payment_link_click' }]), /INVALID_EVENTS_BATCH/);
 
     await db.query(
       `insert into public.site_metrics_daily (site_id, metric_date, metric_hour, metric_name, source, count_value)
@@ -238,7 +238,14 @@ test('resumo por origem: funil visitas → cliques no WhatsApp e contagem de rot
     { metric_date: '2026-11-05', metric_name: 'route_click', source: 'direto', campaign: '', count_value: 1 }
   ];
   const summary = summarizeOriginMetrics(rows, { period: '7d', referenceDate: '2026-11-14' });
-  assert.deepEqual(summary.reach, { routeClicks: 3, previousRouteClicks: 1, qrVisits: 4, previousQrVisits: 0 });
+  assert.deepEqual(summary.reach, {
+    routeClicks: 3,
+    previousRouteClicks: 1,
+    qrVisits: 4,
+    previousQrVisits: 0,
+    notifyClicks: 0,
+    previousNotifyClicks: 0
+  });
   assert.deepEqual(summary.origins.sources.map((s) => [s.source, s.visits, s.orders, s.conversionPercent]), [
     ['ig_comment', 8, 2, 25],
     ['qr', 4, 0, 0]
@@ -295,7 +302,14 @@ test('Worker: Insights mostram rota e QR para todos e a origem só no Profission
   assert.equal(stranger.status, 404);
 
   const free = (await (await insights('token-owner')).json()).insights;
-  assert.deepEqual(free.reach, { routeClicks: 1, previousRouteClicks: 0, qrVisits: 1, previousQrVisits: 0 });
+  assert.deepEqual(free.reach, {
+    routeClicks: 1,
+    previousRouteClicks: 0,
+    qrVisits: 1,
+    previousQrVisits: 0,
+    notifyClicks: 0,
+    previousNotifyClicks: 0
+  });
   assert.equal(free.origins.available, false);
   assert.equal(free.origins.requiredPlan.name, 'Profissional');
   assert.equal(free.origins.sources, undefined, 'plano free não recebe o detalhe por origem');
