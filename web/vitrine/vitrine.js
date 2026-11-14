@@ -7,6 +7,7 @@ import {
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
+import { createItemHref, resolveItemBasePath, setupItemPage } from '../assets/item-page.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
@@ -437,6 +438,9 @@ export async function bootStorefront(deps = {}) {
   const categoryNav = doc.getElementById('category-nav');
   const catalogContainer = doc.getElementById('storefront-catalog');
   const heroSec = doc.querySelector('.storefront-hero');
+  const focusItemId = doc.body?.dataset?.storefrontItem || '';
+  const itemMain = focusItemId ? doc.querySelector('.item-page-main') : null;
+  if (itemMain) setupItemPage(doc, { navigatorObj });
 
   try {
     const response = await fetchImpl(`/data/vitrines/${encodeURIComponent(slug)}/menu.json`, {
@@ -499,7 +503,7 @@ export async function bootStorefront(deps = {}) {
 
     globalThis.recordStorefrontEvent = (type, payload) => collector.record(type, payload);
     collector.record('visit');
-    for (const itemId of validItemIds.slice(0, 12)) {
+    for (const itemId of focusItemId ? [focusItemId] : validItemIds.slice(0, 12)) {
       collector.record('item_view', { itemId });
     }
 
@@ -553,6 +557,8 @@ export async function bootStorefront(deps = {}) {
       isPublicPage: true,
       likes: likesClient,
       targetWhatsapp: menu.whatsapp,
+      focusItemId,
+      itemHref: createItemHref(menu, resolveItemBasePath(slug, deps.pathname ?? globalThis.location?.pathname)),
       onRender: (r) => {
         const count = r.getCartCount();
         if (shownCount === null) {
@@ -568,6 +574,7 @@ export async function bootStorefront(deps = {}) {
         drawer?.refresh();
       },
       onUpdate: (r) => {
+        itemMain?.toggleAttribute?.('data-flow', r.stage !== 1);
         if (heroSec) {
           heroSec.hidden = r.stage !== 1;
         }

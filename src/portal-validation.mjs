@@ -9,6 +9,7 @@ import {
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
+import { itemPageTexts, normalizeItemPageFields } from '../web/assets/item-page-fields.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -210,6 +211,15 @@ const ALLOWED_MESSAGE_KEYS = Object.freeze([
 ]);
 
 const utf8Encoder = new TextEncoder();
+
+/** Campos opcionais da página do item no rascunho; devolve os campos normalizados. */
+function validateItemPageFields(item) {
+  const { fields, error } = normalizeItemPageFields(item);
+  if (error) throw new PortalValidationError(422, error.code, error.message);
+  for (const value of itemPageTexts(fields)) assertNoDangerousTextPayload(value, 422, 'INVALID_ITEM');
+  for (const url of fields.gallery ?? []) validateSafePublicHttpsUrl(url, 422);
+  return fields;
+}
 
 export function validateSafePublicHttpsUrl(rawUrl, errorStatus = 422) {
   if (typeof rawUrl !== 'string' || !rawUrl.trim() || rawUrl.length > 2048) {
@@ -1531,8 +1541,10 @@ export function validateDraftContent(content, options = {}) {
       validateQuotaFields(item);
     }
 
+    const pageFields = validateItemPageFields(item);
+
     const prohibitedTerm = findProhibitedQuotaTerm(
-      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, ...itemPageTexts(pageFields)],
       { quota: itemPriceMode === 'quota' }
     );
     if (prohibitedTerm) {

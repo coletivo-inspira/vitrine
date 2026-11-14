@@ -42,9 +42,13 @@ import {
 import {
   compilePublicStorefront,
   computeSha256Hex,
-  renderStorefrontHtml
+  renderStorefrontHtml,
+  renderStorefrontItemHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import {
+  customDomainPath, customDomainPublicPaths, itemPageUsesStorageImages, matchItemPagePath
+} from '../src/item-page.mjs';
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
@@ -3643,6 +3647,31 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     return renderNotFoundPageResponse(request, method, assetsFetcher);
   }
 
+  // 4. Página do item: /<slug>/item/<item>, só a partir do snapshot publicado (ADR 0008).
+  const itemRoute = matchItemPagePath(pathname);
+  if (itemRoute && !RESERVED_PUBLIC_PATHS.has(itemRoute.slug)) {
+    const pausedResponse = await respondIfShowcasePaused(store, itemRoute.slug, method);
+    if (pausedResponse) return pausedResponse;
+    const pub =
+      (await store.getPublicationBySlug?.(itemRoute.slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(itemRoute.slug));
+    const html = pub
+      ? renderStorefrontItemHtml(pub.menu, itemRoute.itemSlug, { ...renderOptions, bySlugOnly: true })
+      : null;
+    if (!html) return renderNotFoundPageResponse(request, method, assetsFetcher);
+    return new Response(method === 'HEAD' ? null : html, {
+      status: 200,
+      headers: {
+        ...PUBLIC_SECURITY_HEADERS,
+        'content-security-policy': (itemPageUsesStorageImages(pub.menu, itemRoute.itemSlug)
+          ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER) + (pub.menu.structure ? WIDGET_FRAME_CSP : ''),
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': STOREFRONT_CACHE_CONTROL,
+        etag: `"${pub.hash}"`
+      }
+    });
+  }
+
   return null;
 }
 
@@ -3885,8 +3914,8 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
   }
   const slug = await store.resolveDomain(url.hostname);
   if (!isValidSlug(slug)) return new Response(null, { status: 404 });
-  const path = url.pathname === '/' ? `/${slug}` : url.pathname;
-  const publicPaths = new Set([`/${slug}`, `/${slug}/`, `/data/vitrines/${slug}/menu.json`]);
+  const path = customDomainPath(slug, url.pathname);
+  const publicPaths = customDomainPublicPaths(slug, path);
   if (!publicPaths.has(path)) return new Response(null, { status: 404 });
   const cache = globalThis.caches?.default;
   const key = new Request(url.origin + path);
@@ -3894,7 +3923,7 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
   const refresh = async () => {
     const response = await handlePublicStorefrontOrMenuRequest(
       request, path, 'GET', store, assets,
-      { canonicalUrl: canonicalUrlFor({ slug, domains: [{ hostname: url.hostname, status: 'active', ssl_status: 'active' }] }) }
+      { basePath: '', canonicalUrl: canonicalUrlFor({ slug, domains: [{ hostname: url.hostname, status: 'active', ssl_status: 'active' }] }) }
     );
     if (response?.ok && cache) {
       const headers = new Headers(response.headers);
