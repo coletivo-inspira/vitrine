@@ -1,4 +1,4 @@
-import { detectPlatformCms, initializePlatformCms, showPlatformCms } from './platform-cms.js';
+import { detectPlatformCms, hasPlatformAdminAccess, initializePlatformCms, showPlatformCms } from './platform-cms.js';
 import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
@@ -131,7 +131,8 @@ export function getSectionFromHash(hash) {
     '#pedidos': 'pedidos',
     '#wizard': 'wizard',
     '#editor': 'editor',
-    '#profile-gate': 'profile-gate'
+    '#profile-gate': 'profile-gate',
+    '#administracao': 'platform-cms'
   };
   return hashToSection[hash] || 'inicio';
 }
@@ -864,6 +865,7 @@ async function handleLogout() {
 
 // Section Switching with sidebar/bottom-nav integration
 export function showSection(section) {
+  if (section === 'platform-cms' && !hasPlatformAdminAccess()) section = 'inicio';
   // Toggle Auth section
   if (authSection) authSection.hidden = section !== 'auth';
   if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
@@ -2497,4 +2499,6 @@ function renderInsightsLikes(likes) {
 }
 
 
-initializePlatformCms(() => showSection('platform-cms'));
+initializePlatformCms(() => {
+  if (globalThis.window?.location?.hash === '#administracao') handleRouting();
+});
