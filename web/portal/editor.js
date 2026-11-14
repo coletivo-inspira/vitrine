@@ -18,6 +18,7 @@ import {
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
+import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -369,6 +370,8 @@ export async function loadEditor(site, isOnline) {
     historyStatus.textContent = '';
     historyList.replaceChildren();
   }
+
+  void applyPlanGates(site, isOnline);
 
   if (conflictBanner) conflictBanner.hidden = true;
   if (publicationStatusBar) publicationStatusBar.hidden = true;
@@ -3338,7 +3341,12 @@ structurePanel?.addEventListener('toggle', async () => {
       } catch (error) {
         if (site === currentSite) structureStatus.textContent = error.message;
       }
-    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage });
+    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, planGate });
+    const planSummary = await loadSitePlan(site.id);
+    if (site !== currentSite || !structurePanel.open) return;
+    const planGate = planSummary
+      ? { itemBlocks: { max: planSummary.limits.itemBlocks, plan: requiredPlanFor(planSummary, 'item_blocks') } }
+      : null;
     render(resolved, savedStructure?.templateCode);
   } catch (error) {
     if (site === currentSite) structureStatus.textContent = error.message;
@@ -3445,17 +3453,25 @@ function domainAction(text, type = 'button') {
   return button;
 }
 
-function renderDomainForm(site) {
+function renderDomainForm(site, planSummary = null) {
   const form = document.createElement('form');
   const label = document.createElement('label');
   const hostname = document.createElement('input');
-  hostname.placeholder = 'cardapio.exemplo.com.br';
+  hostname.placeholder = 'loja.exemplo.com.br';
   hostname.required = true;
   hostname.maxLength = 253;
   hostname.autocomplete = 'off';
   label.append('Domínio próprio ', hostname);
   const submit = domainAction('Vincular domínio', 'submit');
   form.append(label, submit);
+  const plan = requiredPlanFor(planSummary, 'custom_domain');
+  if (plan) {
+    lockAction(
+      submit,
+      plan,
+      `Domínio próprio faz parte do plano ${plan.name} ou superior e depende de vaga e da configuração do DNS. O botão leva a Plano e cobrança.`
+    );
+  }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
@@ -3476,11 +3492,11 @@ async function refreshDomains() {
   const site = currentSite;
   domainStatus.textContent = 'Consultando domínios…';
   try {
-    const { domains } = await publicationRequest(site, 'domains');
+    const [{ domains }, planSummary] = await Promise.all([publicationRequest(site, 'domains'), loadSitePlan(site.id)]);
     if (site !== currentSite || !domainPanel.open) return;
     domainStatus.textContent = domains.length ? '' : 'Nenhum domínio próprio vinculado.';
     domainList.replaceChildren();
-    renderDomainForm(site);
+    renderDomainForm(site, planSummary);
     for (const domain of domains) {
       const entry = document.createElement('li');
       const name = document.createElement('strong');
@@ -3530,3 +3546,26 @@ async function refreshDomains() {
   }
 }
 domainPanel?.addEventListener('toggle', refreshDomains);
+
+// Selos dos recursos pagos visíveis antes de abrir os painéis (issue #115).
+async function applyPlanGates(site, isOnline) {
+  const domainSummary = globalThis.document?.getElementById('custom-domains-summary');
+  const seoLegend = globalThis.document?.getElementById('editor-seo-legend');
+  const seoHint = globalThis.document?.getElementById('editor-seo-plan-hint');
+  const clear = () => {
+    markPlanRequirement(domainSummary, null);
+    markPlanRequirement(seoLegend, null);
+    if (seoHint) seoHint.hidden = true;
+  };
+  clear();
+  if (!isOnline) return;
+  const summary = await loadSitePlan(site.id);
+  if (site !== currentSite || !summary) return;
+  markPlanRequirement(domainSummary, requiredPlanFor(summary, 'custom_domain'));
+  const seoPlan = requiredPlanFor(summary, 'local_seo');
+  markPlanRequirement(seoLegend, seoPlan);
+  if (seoHint && seoPlan) {
+    seoHint.textContent = `Os dados para o Google entram na vitrine publicada a partir do plano ${seoPlan.name}. Você já pode preencher; eles passam a valer quando o plano estiver ativo.`;
+    seoHint.hidden = false;
+  }
+}
