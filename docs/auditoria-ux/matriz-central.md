@@ -35,24 +35,31 @@ acrescentar as seções 3.x e 4.x dentro deste arquivo.
 | `environment_id` | `prod_vitrine` | `prod_painel` | `local_preview` |
 | URL base | `https://vitrine.inspira.dev.br` | `https://painel.inspira.dev.br` | `http://127.0.0.1:4173` (padrão de `npm run preview`; esta coleta usou `PORT=4181`) |
 | DNS | Resolve para IPs da Cloudflare; zona `inspira.dev.br` com NS `lars`/`rosalyn.ns.cloudflare.com` | Igual ao da vitrine | Loopback |
-| Resposta HTTP | `403` em todas as rotas testadas (`/`, `/loja1`, `/privacidade/`) com `cf-mitigated: challenge` e página "Just a moment..." | `403` em `/` com `cf-mitigated: challenge` | `200` nas rotas estáticas (ver seção 2) |
-| Versão publicada | **Não identificável**: o desafio da borda impede ler o conteúdo servido | **Não identificável** | `main` em `bbafd95c13ab5142aa642287f788632cdd0c55e3`; build com hash `0911af34bd42` (`/loja1`, 6 itens ativos, 0 casos publicados, contato configurado) |
-| Migrações | Não verificável remotamente | Não verificável remotamente | 15 arquivos, de `202611070001_site_access.sql` a `20261112194217_auction_bids.sql`, aplicados em PGlite pela suíte `npm test` |
-| Worker | `wrangler.jsonc` aponta `PUBLIC_SITE_ORIGIN` e `PORTAL_ORIGIN` para estes domínios; deploy remoto **não confirmado** | Igual | `npm run preview` serve só o `dist/` estático (`scripts/serve.mjs`); não executa `workers/api.mjs` |
-| `availability_status` | `bloqueado_dns_deploy` (desafio da borda) | `bloqueado_dns_deploy` (desafio da borda) | `verificado_local` |
+| Resposta HTTP a clientes automatizados | `403` com `cf-mitigated: challenge` ("Just a moment...") para o IP de nuvem da auditoria: é o desafio de bots da Cloudflare, comportamento esperado, não falha | Igual | `200` nas rotas estáticas (ver seção 2) |
+| Versão publicada | `main` em `bbafd95c13ab5142aa642287f788632cdd0c55e3`, segundo o workflow "Deploy Cloudflare Worker" (`deploy.yml`), [execução 43614967851](https://github.com/coletivo-inspira/vitrine/actions/runs/43614967851), concluída com sucesso em 14/11/2026 às 16:20Z: "Uploaded vitrine-inspira", "Deployed vitrine-inspira triggers", Current Version ID `54e83cab-2f95-4d10-a51f-2a69ed14e9b2` | Igual (mesmo Worker `vitrine-inspira`) | `main` em `bbafd95c13ab5142aa642287f788632cdd0c55e3`; build com hash `0911af34bd42` (`/loja1`, 6 itens ativos, 0 casos publicados, contato configurado) |
+| Migrações | Mesma execução, job `migrate`: "Remote database is up to date" (as 15 migrações de `main` aplicadas) | Igual | 15 arquivos, de `202611070001_site_access.sql` a `20261112194217_auction_bids.sql`, aplicados em PGlite pela suíte `npm test` |
+| Worker | Worker `vitrine-inspira` com Static Assets publicado pelo CI; `wrangler.jsonc` aponta `PUBLIC_SITE_ORIGIN` e `PORTAL_ORIGIN` para estes domínios | Igual | `npm run preview` serve só o `dist/` estático (`scripts/serve.mjs`); não executa `workers/api.mjs` |
+| `availability_status` | `equivalente_local` (evidências pelo preview do mesmo commit) | `equivalente_local` | `verificado_local` |
+
+**Equivalência de evidências.** Produção e preview local saem do mesmo commit
+`bbafd95` e do mesmo `npm run build`. Por isso as capturas e verificações das
+jornadas usam o preview local como evidência equivalente da versão publicada.
+As diferenças que restam vêm só do ambiente: rotas servidas pelo Worker
+(`/api/*`, `/por-cidade/`, `/__preview/:siteId`), sessão Google real e dados do
+Supabase remoto. Essas diferenças estão nos bloqueios da seção 1.4.
 
 Outros endereços consultados: `https://inspira.dev.br` também responde `403` com
-desafio; `https://sandbox.inspira.dev.br` não tem registro DNS (o `curl` termina
-com código 6). Não houve deploy nesta auditoria e nada aqui afirma que o Worker
-está publicado nesses domínios.
+o mesmo desafio de bots. `https://sandbox.inspira.dev.br` não tem registro DNS
+(o `curl` termina com código 6; ver `BLK-CLOUD-01`). Esta auditoria não fez
+deploy.
 
 ### 1.2 Papéis
 
 | Papel | Origem | Como testar localmente | Como testar em produção |
 | --- | --- | --- | --- |
-| `visitante` | Sem sessão | Rotas públicas do preview | Bloqueado pelo desafio da borda |
-| `owner` | `site_members.role` (dono da vitrine) | Painel com `/api/*` simulado (seção 1.3), `role: owner` | Login Google real (bloqueado) |
-| `admin`, `editor`, `viewer` | `site_members.role` (`collaborator` também existe na restrição) | Harness com `role` trocado; a interface só mostra os selos "Proprietário" e "Colaborador" | Convite real (bloqueado) |
+| `visitante` | Sem sessão | Rotas públicas do preview | Navegador real (opcional, `CHK-UX-61-PROD`); clientes automatizados recebem o desafio de bots |
+| `owner` | `site_members.role` (dono da vitrine) | Painel com `/api/*` simulado (seção 1.3), `role: owner` | Login Google real num navegador (passo humano) |
+| `admin`, `editor`, `viewer` | `site_members.role` (`collaborator` também existe na restrição) | Harness com `role` trocado; a interface só mostra os selos "Proprietário" e "Colaborador" | Convite real num navegador (passo humano) |
 | `platform_admin` | `public.platform_operators.role` (`support_operator` também existe) | Harness responde `403` em `/api/admin/*` por padrão; para ver a visão de operador é preciso estender o harness | `BLK-HITL-72` |
 
 ### 1.3 Modo local do painel
@@ -90,17 +97,18 @@ está publicado nesses domínios.
 
 | Código | Issue | Bloqueio | Checklist de aceite (ação humana) |
 | --- | --- | --- | --- |
-| `BLK-UX-61-PROD` | `#61` | Desafio da borda (`cf-mitigated: challenge`) em `vitrine`, `painel` e na raiz `inspira.dev.br` | [ ] Lino libera as rotas públicas no painel da Cloudflare (regra WAF/Bot Fight Mode) ou confirma que o desafio é intencional · [ ] `curl -sI https://vitrine.inspira.dev.br/` devolve `200` · [ ] o hash do build publicado coincide com o de `main` |
+| `CHK-UX-61-PROD` (opcional, não bloqueia) | `#61` | O desafio de bots da Cloudflare impede capturas automatizadas a partir de IPs de nuvem; a versão publicada já está identificada pelo workflow de deploy (`bbafd95`) | [ ] Opcional: Lino abre `https://vitrine.inspira.dev.br/`, `/loja1` e `https://painel.inspira.dev.br/` num navegador real, em 1280 e 375 px, e confirma que a aparência coincide com as capturas locais |
 | `BLK-CLOUD-01` | `#44` | `sandbox.inspira.dev.br` sem DNS; Cloudflare for SaaS e segredos `CF_SAAS_*` / `PREVIEW_HMAC_SECRET` ausentes | Conforme `data-model.md` §3.5 |
 | `BLK-HITL-72` | `#72` | Sem conta de teste em `public.platform_operators` | Conforme `data-model.md` §3.5 |
-| `BLK-UX-61-AUTH` | `#63` | Login Google real indisponível localmente (sem `SUPABASE_ANON_KEY` no preview) | [ ] Login, cancelamento e sessão expirada validados contra o Worker remoto depois de `BLK-UX-61-PROD` |
+| `BLK-UX-61-AUTH` | `#63` | Login Google real indisponível localmente (sem `SUPABASE_ANON_KEY` no preview) | [ ] Login, cancelamento e sessão expirada validados contra o Worker remoto, num navegador real |
 
 ---
 
 ## 2. Inventário de telas e rotas
 
-Status HTTP medido no preview local (`PORT=4181`). Produção: todas as rotas
-retornam `403` com desafio (seção 1.1).
+Status HTTP medido no preview local (`PORT=4181`), que é o mesmo build de
+`bbafd95` publicado em produção (seção 1.1). Clientes automatizados recebem
+o desafio de bots da Cloudflare em produção.
 
 ### 2.1 Rotas públicas
 
