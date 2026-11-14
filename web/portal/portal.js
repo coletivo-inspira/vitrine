@@ -3,6 +3,7 @@ import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
+import { loadDemoInvitations } from './linktree-import.js';
 
 // State variables
 let isOnline = false;
@@ -1492,6 +1493,7 @@ async function loadSites(fetchImpl = globalThis.fetch) {
       sites = data.sites || [];
       if (sitesListContainer && globalThis.document) {
         renderSites();
+        void loadDemoInvitations(() => loadSites(fetchImpl));
       }
     } else {
       showFeedback('Erro ao carregar vitrines do servidor.', 'error');

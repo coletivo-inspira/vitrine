@@ -6210,3 +6210,209 @@ textarea {
   border-radius: 12px;
   font-size: 15px;
 }
+
+.linktree-console .linktree-console-form,
+.linktree-console .linktree-console-status,
+.linktree-console .linktree-result {
+  max-width: 720px;
+}
+
+.linktree-console-form {
+  margin-top: 12px;
+  gap: 20px;
+}
+
+.linktree-console-form .form-group {
+  margin-bottom: 0;
+}
+
+.linktree-console-form .form-help {
+  margin: 0;
+}
+
+.linktree-console-submit {
+  align-self: flex-start;
+}
+
+.linktree-input-prefix {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.linktree-input-prefix:focus-within {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+.linktree-input-prefix span {
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 14px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.admin-platform .linktree-console .linktree-input-prefix input.item-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 14px 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 15px;
+}
+
+.admin-platform .linktree-console .linktree-input-prefix input.item-input:focus {
+  outline: none;
+}
+
+.admin-platform .linktree-console input.item-input {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+:root[data-theme="dark"] .linktree-input-prefix {
+  background: #202a23;
+}
+
+.linktree-console-status:not(:empty) {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.linktree-result {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(var(--glass) / .4);
+  display: grid;
+  gap: 12px;
+}
+
+.linktree-result-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.linktree-result-header h3 {
+  font-size: 20px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.linktree-result-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.linktree-result-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.linktree-result-facts {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.linktree-result-facts dt {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.linktree-result-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.linktree-result-subtitle {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.linktree-result-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.linktree-result-links li:not(.admin-empty) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.linktree-result-links li span {
+  color: var(--ink-soft);
+}
+
+.linktree-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.linktree-invite .form-group {
+  width: 100%;
+}
+
+.linktree-invitations {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.linktree-invitation h2 {
+  font-size: 20px;
+  margin: 4px 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.linktree-invitation .section-desc {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 520px) {
+  .linktree-result {
+    padding: 16px;
+  }
+  .linktree-result-facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .linktree-result-facts dd {
+    margin-bottom: 8px;
+  }
+  .linktree-console-submit,
+  .linktree-invite .button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

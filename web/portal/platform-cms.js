@@ -1,6 +1,7 @@
 import { renderStructureFields } from './showcase-structure.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { buildMilaForwardMessage, normalizeMilaRelayCode } from '../assets/mila-relay.mjs';
+import { resetLinktreeImport } from './linktree-import.js';
 const section = globalThis.document?.getElementById('platform-cms-section');
 const open = globalThis.document?.getElementById('platform-cms-open');
 const navItems = [...(globalThis.document?.querySelectorAll('.nav-admin-item') ?? [])];
@@ -496,6 +497,7 @@ export async function detectPlatformCms(authenticated) {
   templateFields.replaceChildren();
   templateStatus.textContent = '';
   resetMilaConsole();
+  resetLinktreeImport();
   selectTab(tabs[0]);
   if (!authenticated) return;
   try {
@@ -520,6 +522,8 @@ const storefrontTypes = { food: 'Alimentação', art: 'Arte & design', photo: 'F
 const auditActions = {
   publish: 'Publicação', status_changed: 'Etapa alterada', template_created: 'Modelo criado',
   template_updated: 'Modelo atualizado', mila_relay_lookup: 'Código da Mila consultado',
+  linktree_imported: 'Importação do Linktree', linktree_demo_invited: 'Dono convidado para a demonstração',
+  linktree_demo_accepted: 'Demonstração aceita pelo dono',
   insert: 'Criação', update: 'Alteração', delete: 'Remoção'
 };
 const auditEntities = {
