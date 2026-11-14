@@ -1,4 +1,4 @@
--- Migração 20261115000700_linktree_demo.sql
+-- Migração 20261115000900_linktree_demo.sql
 -- Demonstrações importadas do Linktree (issue #123): vitrine sem dono, só rascunho,
 -- nunca publicada antes do aceite do dono e apagada após 30 dias sem aceite.
 -- Migração append-only: nunca modifique migrações anteriores.
@@ -12,6 +12,9 @@ alter table public.sites
   add column if not exists demo_invited_user_id uuid null references auth.users(id) on delete set null;
 
 -- Toda vitrine sem dono é uma demonstração com prazo; nenhuma demonstração tem dono.
+alter table public.sites
+  drop constraint if exists sites_owner_or_demo;
+
 alter table public.sites
   add constraint sites_owner_or_demo check (
     (owner_user_id is null) = (demo_expires_at is not null)
