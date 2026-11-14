@@ -1,9 +1,20 @@
 import {
   assertNoDangerousTextPayload, PortalValidationError, validateSafePublicHttpsUrl
 } from './portal-validation.mjs';
+import { HIGHLIGHT_ICON_PATHS } from '../web/assets/highlight-icons.mjs';
+
+export const HIGHLIGHT_ICONS = Object.freeze(Object.keys(HIGHLIGHT_ICON_PATHS));
+export const HERO_LIMITS = Object.freeze({ eyebrow: 40, actionLabel: 28, imageAlt: 160, highlightText: 60 });
+const heroAction = { label: `text:${HERO_LIMITS.actionLabel}`, target: 'target' };
+const actionTarget = /^(?:selecao|whatsapp|pagina:[a-z0-9][a-z0-9_-]{0,39}|#[a-z0-9][a-z0-9_-]{0,63})$/;
 
 const moduleFields = {
-  hero: { headline: 'text', subtitle: 'text' },
+  hero: {
+    headline: 'text', subtitle: 'text', eyebrow: `text:${HERO_LIMITS.eyebrow}`,
+    imageUrl: 'webp', imageAlt: `text:${HERO_LIMITS.imageAlt}`,
+    primaryAction: heroAction, secondaryAction: heroAction
+  },
+  highlights: { items: [{ icon: 'icon', text: `text:${HERO_LIMITS.highlightText}` }] },
   catalog_grid: { columns: 'columns' },
   service_booking: { showDuration: 'boolean' },
   quote_request: { allowNotes: 'boolean' },
@@ -38,9 +49,18 @@ function validateValue(value, type) {
   if (type === 'boolean' && typeof value === 'boolean') return value;
   if (type === 'columns' && [1, 2, 3].includes(value)) return value;
   if (typeof value !== 'string' || value.length > 1000) throw invalid();
-  if (type === 'text') {
+  if (type === 'text' || type.startsWith('text:')) {
     assertNoDangerousTextPayload(value);
+    const max = type === 'text' ? 1000 : Number(type.slice(5));
+    if (value.trim().length > max) throw invalid();
     return value.trim();
+  }
+  if (type === 'icon' && HIGHLIGHT_ICONS.includes(value)) return value;
+  if (type === 'target' && actionTarget.test(value)) return value;
+  if (type === 'webp') {
+    if (/^\/(?!.*\.\.)[a-z0-9][a-z0-9/_.-]*\.webp$/i.test(value)) return value;
+    const url = validateSafePublicHttpsUrl(value);
+    if (/\.webp$/i.test(new URL(url).pathname)) return url;
   }
   if (type === 'uuid' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)) return value;
   if (type === 'hash' && /^[a-f0-9]{64}$/.test(value)) return value;
@@ -57,6 +77,27 @@ function validateValue(value, type) {
     return validateSafePublicHttpsUrl(value);
   }
   throw invalid();
+}
+
+function assertHeroConfig(config, sectionId) {
+  if (config.imageUrl && !config.imageAlt) {
+    throw new PortalValidationError(422, 'HERO_IMAGE_ALT_REQUIRED',
+      'Descreva a foto do cabeçalho no campo "Descrição da foto" para publicar com imagem.',
+      { missingFields: [`${sectionId}.imageAlt`] });
+  }
+  if (!config.imageUrl) delete config.imageAlt;
+  for (const key of ['primaryAction', 'secondaryAction']) {
+    if (config[key] && (!config[key].label || !config[key].target)) throw invalid();
+  }
+}
+
+function assertHighlightsConfig(config) {
+  const items = config.items ?? [];
+  if (items.length === 0) return;
+  if (items.length < 2 || items.length > 4 || items.some(item => !item.icon || !item.text)) {
+    throw new PortalValidationError(422, 'INVALID_HIGHLIGHTS',
+      'Os destaques precisam de 2 a 4 itens, cada um com ícone e texto de até 60 caracteres.');
+  }
 }
 
 function validateSections(sections, moduleDefaults, inheritedSections = []) {
@@ -76,6 +117,8 @@ function validateSections(sections, moduleDefaults, inheritedSections = []) {
       ...validateValue(section.config ?? {}, fields)
     };
     if (section.moduleCode === 'custom_sandbox' && (!config.widgetId || !config.bundleHash)) throw invalid();
+    if (section.moduleCode === 'hero') assertHeroConfig(config, section.id);
+    if (section.moduleCode === 'highlights') assertHighlightsConfig(config);
     return { id: section.id, moduleCode: section.moduleCode, config, active: section.active !== false };
   });
 }
