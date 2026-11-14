@@ -890,6 +890,13 @@ export function showSection(section) {
       const matches = link.getAttribute('data-section') === section;
       link.classList.toggle('active', matches);
     });
+    const topBarProfile = globalThis.document?.getElementById('top-bar-profile');
+    if (topBarProfile) {
+      const profileOpen = section === 'perfil';
+      topBarProfile.classList.toggle('active', profileOpen);
+      if (profileOpen) topBarProfile.setAttribute('aria-current', 'page');
+      else topBarProfile.removeAttribute('aria-current');
+    }
 
     if (section === 'insights') {
       syncInsightsSiteSelector();
@@ -1031,6 +1038,12 @@ export function prefillProfileWithGoogleCredentials(userOverride = currentUser, 
     globalThis.document?.getElementById('profile-avatar'),
     globalThis.document?.getElementById('profile-avatar-placeholder'),
     globalThis.document?.getElementById('profile-email')
+  );
+
+  updateAccountCard(
+    globalThis.document?.getElementById('top-bar-avatar'),
+    globalThis.document?.getElementById('top-bar-avatar-placeholder'),
+    null
   );
 }
 

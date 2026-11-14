@@ -93,8 +93,10 @@
   <!-- Auth / Login Section (Unauthenticated screen) -->
   <section id="auth-section" class="portal-card select-none">
     <div class="auth-header">
-      <img class="brand-logo brand-logo-light auth-logo" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
-      <img class="brand-logo brand-logo-dark auth-logo" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+      <a id="auth-brand-link" class="auth-brand-link" href="https://vitrine.inspira.dev.br/" aria-label="Vitrine Inspira — site principal">
+        <img class="brand-logo brand-logo-light auth-logo" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="">
+        <img class="brand-logo brand-logo-dark auth-logo" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="">
+      </a>
     </div>
     <h2>Entrar no Painel</h2>
     <p>Gerencie suas vitrines, edite itens e acompanhe as novidades da plataforma.</p>
@@ -124,7 +126,7 @@
     <!-- Glass Sidebar on Desktop -->
     <aside class="app-sidebar">
       <div class="sidebar-brand">
-        <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+        <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
           <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="150" height="46" alt="vitrine — coletivo inspira">
           <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
         </a>
@@ -156,12 +158,6 @@
             </a>
           </li>
           <li>
-            <a href="#perfil" class="nav-link" data-section="perfil">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Perfil e Interesses
-            </a>
-          </li>
-          <li>
             <a href="#pedidos" class="nav-link" data-section="pedidos">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Customizações
@@ -182,7 +178,7 @@
       <header class="app-top-bar">
         <!-- Compact brand for mobile only -->
         <div class="mobile-brand">
-          <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+          <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
             <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="120" height="37" alt="vitrine">
             <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="120" height="37" alt="vitrine">
           </a>
@@ -201,6 +197,11 @@
             <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
             <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
           </button>
+          <a id="top-bar-profile" href="#perfil" class="top-bar-profile" data-section="perfil" aria-label="Perfil e interesses">
+            <img id="top-bar-avatar" class="top-bar-avatar" src="" alt="" width="28" height="28" hidden>
+            <span id="top-bar-avatar-placeholder" class="top-bar-avatar top-bar-avatar-placeholder" aria-hidden="true">U</span>
+            <span class="top-bar-profile-label">Perfil</span>
+          </a>
           <button id="logout-button" class="button button-small button-secondary button-pill" type="button">Sair</button>
         </div>
       </header>
@@ -1510,12 +1511,6 @@
           <a href="#insights" class="nav-link" data-section="insights">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <span>Insights</span>
-          </a>
-        </li>
-        <li>
-          <a href="#perfil" class="nav-link" data-section="perfil">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>Perfil</span>
           </a>
         </li>
         <li>
