@@ -486,8 +486,12 @@ async function exampleStorefronts() {
           { id: 'abertura', moduleCode: 'hero', config: { headline: 'Ateliê Orçamento', subtitle: 'Peças feitas à mão.' } },
           { id: 'itens', moduleCode: 'catalog_grid', config: { columns: 2 } },
           { id: 'sobre', moduleCode: 'about_story', config: { bio: 'Cerâmica desde 2010.' } },
-          { id: 'depoimentos', moduleCode: 'testimonials', config: { items: [{ quote: 'Peça linda.', name: 'Ana' }] } },
-          { id: 'perguntas', moduleCode: 'faq', config: { items: [{ q: 'Qual o prazo?', a: 'Até 20 dias.' }] } }
+          { id: 'depoimentos', moduleCode: 'testimonials', config: { items: [
+            { quote: 'Peça linda.', name: 'Ana', consent: true },
+            // Foto decorativa com alt="" explícito: o verificador exige o atributo, não um texto.
+            { quote: 'Chegou no prazo.', name: 'Bia', context: 'Vaso sob encomenda', photoUrl: '/assets/pizza-demo.webp', consent: true }
+          ] } },
+          { id: 'perguntas', moduleCode: 'faq', config: { title: 'Dúvidas comuns', items: [{ q: 'Qual o prazo?', a: 'Até 20 dias.' }] } }
         ]
       }]
     }

@@ -1,16 +1,17 @@
-// Interface de provedor de cobrança (ADR 0013). O Asaas é o primeiro provedor; o
-// Stripe (issue #116) implementa os mesmos métodos e reaproveita as rotas, a
-// gravação de eventos e o mapeamento de evento para assinatura deste módulo.
+// Interface de provedor de cobrança (ADR 0013). O Asaas é o provedor padrão; o
+// Stripe (src/billing/stripe.mjs, issue #116) implementa os mesmos métodos e
+// reaproveita as rotas, a gravação de eventos e o mapeamento deste módulo.
 //
 // Um provedor é um objeto com:
 //   name: 'asaas' | 'stripe' (o mesmo valor de public.subscriptions.provider)
 //   createCustomer({ name, cpfCnpj, email, reference }) -> { customerId }
-//   createSubscription({ customerId, plan, reference }) -> { subscriptionId, checkoutUrl }
-//   getSubscription(subscriptionId) -> { subscriptionId, status, nextDueDate }
-//   cancelSubscription(subscriptionId) -> { canceled: true }
-//   verifyWebhook(request) -> Promise<boolean>
+//   createSubscription({ customerId, plan, reference, successUrl, cancelUrl }) -> { subscriptionId, checkoutUrl }
+//   getSubscription(subscriptionId, { customerId }) -> { subscriptionId, status, nextDueDate }
+//   cancelSubscription(subscriptionId, { customerId }) -> { canceled: true }
+//   verifyWebhook(request, rawBody?) -> Promise<boolean>
 //   parseWebhookEvent(payload) -> NormalizedEvent | null
-//   listPayments(subscriptionId) -> Payment[] (opcional; histórico do painel, issue #115)
+// Opcional: createPortalSession({ customerId, returnUrl }) -> { portalUrl } (Stripe).
+// Opcional: listPayments(subscriptionId) -> Payment[] (histórico do painel, issue #115).
 //
 // Payment: { id, dueDate, paidDate, valueCents, state, invoiceUrl, receiptUrl }, com
 // `state` em pending, paid, overdue, refunded ou other e links só do provedor.
@@ -178,14 +179,16 @@ export function normalizeTaxId(value) {
 
 const EMAIL_PATTERN = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 
-// Dados de cobrança do checkout. Vão só para o provedor; nunca para o banco.
-export function validateBillingDetails(input) {
+// Dados de cobrança do checkout. Vão só para o provedor; nunca para o banco. Com
+// requireTaxId false (Stripe, cliente do exterior), o CPF ou CNPJ é descartado.
+export function validateBillingDetails(input, { requireTaxId = true } = {}) {
   const errors = [];
   const name = typeof input?.name === 'string' ? input.name.trim().replace(/\s+/g, ' ') : '';
   if (name.length < 2 || name.length > 100) errors.push('name');
-  const cpfCnpj = normalizeTaxId(input?.cpfCnpj);
-  if (!cpfCnpj) errors.push('cpfCnpj');
+  const cpfCnpj = requireTaxId ? normalizeTaxId(input?.cpfCnpj) : null;
+  if (requireTaxId && !cpfCnpj) errors.push('cpfCnpj');
   const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
   if (email.length > 254 || !EMAIL_PATTERN.test(email)) errors.push('email');
-  return errors.length ? { ok: false, fields: errors } : { ok: true, value: { name, cpfCnpj, email } };
+  if (errors.length) return { ok: false, fields: errors };
+  return { ok: true, value: requireTaxId ? { name, cpfCnpj, email } : { name, email } };
 }

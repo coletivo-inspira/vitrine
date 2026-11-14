@@ -2294,12 +2294,11 @@ async function decodeImageSource(file) {
   });
 }
 
-async function resizeAndConvertToWebP(file, maxBytes = 204800) {
+async function resizeAndConvertToWebP(file, maxBytes = 204800, dimensionSteps = [800, 640, 480]) {
   const source = await decodeImageSource(file);
   const srcWidth = source.width;
   const srcHeight = source.height;
 
-  const dimensionSteps = [800, 640, 480];
   const qualitySteps = [0.82, 0.68, 0.52, 0.38];
 
   try {
@@ -2351,6 +2350,12 @@ async function uploadHeroImage(file) {
   // A foto do hero é o maior elemento da primeira tela; 100 KB mantém o LCP em até 2,5 s no Slow 4G.
   const blob = await resizeAndConvertToWebP(file, 102400);
   return { url: await uploadImageToSupabaseStorage(blob, 'hero-foto'), bytes: blob.size };
+}
+
+async function uploadTestimonialPhoto(file) {
+  // Aparece em 48 px: 160 px cobre telas de densidade 3 sem pesar na vitrine.
+  const blob = await resizeAndConvertToWebP(file, 20480, [160, 128]);
+  return { url: await uploadImageToSupabaseStorage(blob, 'depoimento-foto'), bytes: blob.size };
 }
 
 // Server-side authenticated proxy upload (uses HttpOnly session cookie — zero client token exposure)
@@ -3325,7 +3330,10 @@ structurePanel?.addEventListener('toggle', async () => {
           body: JSON.stringify({ expectedRevision, ...structure })
         });
         const data = await saved.json();
-        if (!saved.ok) throw new Error(data.error?.message ?? 'Não foi possível salvar a estrutura.');
+        if (!saved.ok) {
+          throw Object.assign(new Error(data.error?.message ?? 'Não foi possível salvar a estrutura.'),
+            { missingFields: data.error?.missingFields });
+        }
         if (site !== currentSite) return;
         expectedRevision = data.draft.revision;
         currentDraft.revision = expectedRevision;
@@ -3339,9 +3347,11 @@ structurePanel?.addEventListener('toggle', async () => {
         if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${expectedRevision}`;
         structureStatus.textContent = 'Estrutura salva. Abra a prévia para conferir.';
       } catch (error) {
-        if (site === currentSite) structureStatus.textContent = error.message;
+        if (site !== currentSite) return;
+        structureStatus.textContent = error.message;
+        structureFields.querySelector('form')?.showFieldErrors?.(error.missingFields);
       }
-    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, planGate });
+    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, uploadTestimonialPhoto, planGate });
     const planSummary = await loadSitePlan(site.id);
     if (site !== currentSite || !structurePanel.open) return;
     const planGate = planSummary

@@ -176,6 +176,21 @@ test('overview sem ASAAS_API_KEY mostra cobrança indisponível sem quebrar; fal
   assert.deepEqual([noStore.billing.available, noStore.organizations], [false, []]);
 });
 
+test('overview com assinatura do Stripe: cancela pelo Stripe só quando ele está configurado e não lista faturas do Asaas', async () => {
+  const providerCalls = [];
+  const stripeRow = row('active', { provider: 'stripe', provider_subscription_id: 'sub_stripe_1' });
+  const handler = () => overviewHandler(overviewStore({ rows: [stripeRow] }), { providerCalls });
+  const without = await (await getOverview(handler(), { ASAAS_API_KEY: FAKE_KEY })).json();
+  assert.equal(without.organizations[0].canCancel, false);
+  assert.equal(without.organizations[0].invoices.status, 'none');
+  const withStripe = await (await getOverview(handler(), {
+    ASAAS_API_KEY: FAKE_KEY, STRIPE_SECRET_KEY: 'sk_test_CHAVE_FICTICIA_DE_TESTE_000'
+  })).json();
+  assert.equal(withStripe.organizations[0].canCancel, true);
+  assert.equal(withStripe.organizations[0].canCheckout, false);
+  assert.deepEqual(providerCalls, [], 'nenhuma chamada ao provedor só para abrir a tela');
+});
+
 test('selos de plano: free mostra Essencial no domínio e no SEO e Profissional nos blocos', async () => {
   const free = planGateSummary(FREE_ENTITLEMENTS);
   assert.deepEqual(free.plan, { code: 'free', name: 'Gratuito/Social' });

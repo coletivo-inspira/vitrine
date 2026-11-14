@@ -1,4 +1,5 @@
 import { HIGHLIGHT_ICON_LABELS, highlightIconSvg } from '../assets/highlight-icons.mjs';
+import { FAQ_DEFAULT_TITLE, FAQ_SERVICE_SUGGESTIONS } from '../assets/faq-block.mjs';
 import { lockAction, unlockAction } from './plan-gate.mjs';
 
 const modules = {
@@ -357,6 +358,295 @@ function renderHighlightsEditor(doc, grid, config = {}) {
       const empty = [...list.children].find((row) => !row.text.value.trim());
       empty?.text.focus();
       return false;
+    }
+  };
+}
+
+function labeledTextarea(doc, parent, caption, value) {
+  const group = el(doc, 'div', 'form-group structure-field-group');
+  const id = nextFieldId('field', doc);
+  const label = el(doc, 'label', 'structure-field-label', caption);
+  label.setAttribute('for', id);
+  const element = doc.createElement('textarea');
+  element.id = id;
+  element.className = 'item-input textarea-styled';
+  element.rows = 3;
+  element.value = value ?? '';
+  group.append(label, element);
+  parent.appendChild(group);
+  return { group, label, element };
+}
+
+function repeatableRow(doc, list, legendText, removeLabel, onRemove) {
+  const row = el(doc, 'fieldset', 'structure-repeat-row');
+  const legend = el(doc, 'legend', 'structure-repeat-legend', legendText);
+  row.appendChild(legend);
+  row.legend = legend;
+  row.removeBtn = iconActionBtn(doc, removeLabel, 'icon-trash', () => {
+    row.remove();
+    onRemove();
+  }, 'trash-color-btn');
+  row.actions = el(doc, 'div', 'structure-row-actions');
+  row.actions.appendChild(row.removeBtn);
+  list.appendChild(row);
+  return row;
+}
+
+function renumberRows(list, noun) {
+  [...list.children].forEach((row, index) => {
+    row.legend.textContent = `${noun} ${index + 1}`;
+    row.removeBtn.setAttribute('aria-label', `Remover ${noun.toLowerCase()} ${index + 1}`);
+    row.removeBtn.title = `Remover ${noun.toLowerCase()} ${index + 1}`;
+  });
+}
+
+function renderPhotoField(doc, row, value, uploadPhoto) {
+  const photo = labeledInput(doc, row, 'Foto (endereço WebP, opcional)', value);
+  photo.element.inputMode = 'url';
+  photo.element.autocomplete = 'off';
+  photo.element.placeholder = 'https://…/foto.webp';
+  const status = fieldHelp(doc, photo.group, photo.element,
+    'Pequena e quadrada. Sem descrição para leitores de tela: o nome já está no texto.');
+  if (!uploadPhoto) return photo.element;
+  const actions = el(doc, 'div', 'structure-image-actions');
+  const file = doc.createElement('input');
+  file.type = 'file';
+  file.accept = 'image/*';
+  file.hidden = true;
+  file.setAttribute('aria-hidden', 'true');
+  file.tabIndex = -1;
+  const send = el(doc, 'button', 'button button-small button-secondary button-pill', 'Enviar foto');
+  send.type = 'button';
+  send.addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    const chosen = file.files?.[0];
+    if (!chosen) return;
+    send.disabled = true;
+    status.textContent = 'Preparando a foto…';
+    try {
+      const { url, bytes } = await uploadPhoto(chosen);
+      photo.element.value = url;
+      status.textContent = `Foto enviada (${Math.ceil(bytes / 1024)} KB, WebP).`;
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      send.disabled = false;
+      file.value = '';
+    }
+  });
+  actions.append(send, file);
+  photo.group.appendChild(actions);
+  return photo.element;
+}
+
+export const TESTIMONIAL_CONSENT_LABEL = 'Tenho autorização desta pessoa para publicar o depoimento';
+const MAX_TESTIMONIALS = 12;
+const MAX_FAQ = 12;
+
+function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null } = {}) {
+  const box = el(doc, 'div', 'structure-repeat-editor');
+  const status = el(doc, 'p', 'form-help',
+    `Até ${MAX_TESTIMONIALS} depoimentos, com nome, texto e o serviço ou a turma. Só publique com autorização de quem escreveu.`);
+  const list = el(doc, 'div', 'structure-repeat-list');
+  const addBtn = el(doc, 'button', 'button button-small button-secondary button-pill structure-add-btn', '+ Adicionar depoimento');
+  addBtn.type = 'button';
+
+  const sync = () => {
+    renumberRows(list, 'Depoimento');
+    addBtn.disabled = list.children.length >= MAX_TESTIMONIALS;
+  };
+
+  function append(entry = {}) {
+    const row = repeatableRow(doc, list, '', '', sync);
+    const name = labeledInput(doc, row, 'Nome de quem escreveu', entry.name);
+    name.element.maxLength = 80;
+    name.element.placeholder = 'Ex: Marina Souza';
+    const quote = labeledTextarea(doc, row, 'Texto do depoimento', entry.quote);
+    quote.element.maxLength = 600;
+    const context = labeledInput(doc, row, 'Serviço ou turma', entry.context);
+    context.element.maxLength = 60;
+    context.element.placeholder = 'Ex: Turma de cerâmica de sábado';
+    fieldHelp(doc, context.group, context.element, 'Até 60 caracteres. Aparece abaixo do nome.');
+    const photo = renderPhotoField(doc, row, entry.photoUrl, uploadPhoto);
+
+    const consentGroup = el(doc, 'div', 'form-group structure-field-group structure-consent');
+    const consentLabel = el(doc, 'label', 'toggle-container-forms structure-consent-label');
+    const consent = doc.createElement('input');
+    consent.type = 'checkbox';
+    consent.id = nextFieldId('consent', doc);
+    consent.checked = entry.consent === true;
+    consentLabel.setAttribute('for', consent.id);
+    consentLabel.append(consent, el(doc, 'span', '', TESTIMONIAL_CONSENT_LABEL));
+    consentGroup.appendChild(consentLabel);
+    row.appendChild(consentGroup);
+
+    // `fieldset.name` é propriedade nativa: os campos ficam em `row.fields`.
+    row.fields = { name: name.element, quote: quote.element, context: context.element, photo, consent };
+    row.nameError = fieldError(doc, name.group, name.element);
+    row.quoteError = fieldError(doc, quote.group, quote.element);
+    row.consentError = fieldError(doc, consentGroup, consent);
+    consent.addEventListener('change', () => { if (consent.checked) row.consentError.clear(); });
+    row.appendChild(row.actions);
+    sync();
+    return row;
+  }
+
+  const filledRows = () => [...list.children].filter((row) =>
+    [row.fields.name, row.fields.quote, row.fields.context, row.fields.photo].some((field) => field.value.trim()));
+
+  (config.items?.length ? config.items : [{}]).forEach(append);
+  addBtn.addEventListener('click', () => {
+    if (list.children.length < MAX_TESTIMONIALS) append().fields.name.focus();
+  });
+  box.append(status, list, addBtn);
+  grid.appendChild(box);
+
+  return {
+    read() {
+      return filledRows().map((row) => {
+        const item = { name: row.fields.name.value.trim(), quote: row.fields.quote.value.trim() };
+        const context = row.fields.context.value.trim();
+        const photoUrl = row.fields.photo.value.trim();
+        if (context) item.context = context;
+        if (photoUrl) item.photoUrl = photoUrl;
+        item.consent = row.fields.consent.checked;
+        return item;
+      });
+    },
+    validate() {
+      let firstInvalid = null;
+      for (const row of list.children) {
+        row.nameError.clear();
+        row.quoteError.clear();
+        row.consentError.clear();
+      }
+      for (const row of filledRows()) {
+        if (!row.fields.name.value.trim()) {
+          row.nameError.show('Escreva o nome de quem deu o depoimento.');
+          firstInvalid ??= row.fields.name;
+        }
+        if (!row.fields.quote.value.trim()) {
+          row.quoteError.show('Escreva o texto do depoimento.');
+          firstInvalid ??= row.fields.quote;
+        }
+        if (!row.fields.consent.checked) {
+          row.consentError.show('Confirme a autorização para publicar este depoimento.');
+          firstInvalid ??= row.fields.consent;
+        }
+      }
+      firstInvalid?.focus();
+      return !firstInvalid;
+    },
+    showConsentError(index) {
+      const row = filledRows()[index];
+      if (!row) return false;
+      row.consentError.show('Confirme a autorização para publicar este depoimento.');
+      row.fields.consent.focus();
+      return true;
+    }
+  };
+}
+
+function renderFaqEditor(doc, grid, config = {}) {
+  const box = el(doc, 'div', 'structure-repeat-editor');
+  const title = labeledInput(doc, box, 'Título da seção', config.title ?? '');
+  title.element.maxLength = 80;
+  title.element.placeholder = FAQ_DEFAULT_TITLE;
+  fieldHelp(doc, title.group, title.element, `Até 80 caracteres. Vazio mostra "${FAQ_DEFAULT_TITLE}".`);
+
+  const status = el(doc, 'p', 'form-help',
+    `Até ${MAX_FAQ} perguntas. Responda dúvidas reais: pagamento, faltas, remarcação, garantia.`);
+  const suggestions = el(doc, 'div', 'structure-faq-suggestions');
+  suggestions.setAttribute('role', 'group');
+  const suggestionsTitle = el(doc, 'p', 'structure-faq-suggestions-title', 'Sugestões para serviços (você escreve a resposta)');
+  suggestionsTitle.id = nextFieldId('faq-suggestions', doc);
+  suggestions.setAttribute('aria-labelledby', suggestionsTitle.id);
+  const list = el(doc, 'div', 'structure-repeat-list');
+  const addBtn = el(doc, 'button', 'button button-small button-secondary button-pill structure-add-btn', '+ Adicionar pergunta');
+  addBtn.type = 'button';
+
+  const questions = () => new Set([...list.children].map((row) => row.question.value.trim()));
+  const sync = () => {
+    renumberRows(list, 'Pergunta');
+    const full = list.children.length >= MAX_FAQ;
+    addBtn.disabled = full;
+    const used = questions();
+    for (const button of suggestions.children) {
+      button.hidden = used.has(button.getAttribute('data-question'));
+      button.disabled = full;
+    }
+    suggestionsTitle.hidden = [...suggestions.children].every((button) => button.hidden);
+  };
+
+  function append(entry = {}) {
+    const row = repeatableRow(doc, list, '', '', sync);
+    const question = labeledTextarea(doc, row, 'Pergunta', entry.q);
+    question.element.rows = 2;
+    question.element.maxLength = 200;
+    question.element.classList.add('structure-faq-question');
+    const answer = labeledTextarea(doc, row, 'Resposta', entry.a);
+    answer.element.maxLength = 1000;
+    row.question = question.element;
+    row.answer = answer.element;
+    row.questionError = fieldError(doc, question.group, question.element);
+    row.answerError = fieldError(doc, answer.group, answer.element);
+    question.element.addEventListener('input', sync);
+    row.appendChild(row.actions);
+    sync();
+    return row;
+  }
+
+  for (const text of FAQ_SERVICE_SUGGESTIONS) {
+    const button = el(doc, 'button', 'button button-small button-secondary button-pill structure-faq-suggestion', `+ ${text}`);
+    button.type = 'button';
+    button.setAttribute('data-question', text);
+    button.addEventListener('click', () => {
+      if (list.children.length >= MAX_FAQ) return;
+      const empty = [...list.children].find((row) => !row.question.value.trim() && !row.answer.value.trim());
+      const row = empty ?? append();
+      row.question.value = text;
+      sync();
+      row.answer.focus();
+    });
+    suggestions.appendChild(button);
+  }
+
+  (config.items?.length ? config.items : [{}]).forEach(append);
+  addBtn.addEventListener('click', () => {
+    if (list.children.length < MAX_FAQ) append().question.focus();
+  });
+  box.append(status, suggestionsTitle, suggestions, list, addBtn);
+  grid.appendChild(box);
+  sync();
+
+  const filledRows = () => [...list.children].filter((row) => row.question.value.trim() || row.answer.value.trim());
+  return {
+    read() {
+      const values = {
+        items: filledRows().map((row) => ({ q: row.question.value.trim(), a: row.answer.value.trim() }))
+      };
+      const text = title.element.value.trim();
+      if (text && text !== FAQ_DEFAULT_TITLE) values.title = text;
+      return values;
+    },
+    validate() {
+      let firstInvalid = null;
+      for (const row of list.children) {
+        row.questionError.clear();
+        row.answerError.clear();
+      }
+      for (const row of filledRows()) {
+        if (!row.question.value.trim()) {
+          row.questionError.show('Escreva a pergunta.');
+          firstInvalid ??= row.question;
+        }
+        if (!row.answer.value.trim()) {
+          row.answerError.show('Escreva a resposta para publicar esta pergunta.');
+          firstInvalid ??= row.answer;
+        }
+      }
+      firstInvalid?.focus();
+      return !firstInvalid;
     }
   };
 }
@@ -796,6 +1086,12 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
       const highlightsEditor = section.moduleCode === 'highlights'
         ? renderHighlightsEditor(doc, secFieldsGrid, section.config)
         : null;
+      const testimonialsEditor = section.moduleCode === 'testimonials'
+        ? renderTestimonialsEditor(doc, secFieldsGrid, section.config, { uploadPhoto: choices?.uploadTestimonialPhoto })
+        : null;
+      const faqEditor = section.moduleCode === 'faq'
+        ? renderFaqEditor(doc, secFieldsGrid, section.config)
+        : null;
       if (heroExtras) {
         const fieldValue = (key) => getters.find(([name]) => name === key)?.[1].value.trim();
         const refresh = () => heroExtras.preview(fieldValue('headline'), fieldValue('subtitle'));
@@ -804,11 +1100,16 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
         refresh();
       }
 
-      if (getters.length > 0 || widgetChoice || highlightsEditor) {
+      if (getters.length > 0 || widgetChoice || highlightsEditor || testimonialsEditor || faqEditor) {
         row.appendChild(secFieldsGrid);
       }
 
-      row.validate = () => (heroExtras?.validate() ?? true) && (highlightsEditor?.validate() ?? true);
+      row.validate = () => [heroExtras, highlightsEditor, testimonialsEditor, faqEditor]
+        .every((editor) => editor?.validate() ?? true);
+      row.showFieldError = (path) => {
+        const match = /^(.+)\.items\.(\d+)\.consent$/.exec(path);
+        return Boolean(match && match[1] === section.id && testimonialsEditor?.showConsentError(Number(match[2])));
+      };
 
       const readConfig = () => {
         if (widgetChoice) {
@@ -826,6 +1127,11 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
           Object.assign(config, heroExtras.read());
         }
         if (highlightsEditor) config.items = highlightsEditor.read();
+        if (testimonialsEditor) config.items = testimonialsEditor.read();
+        if (faqEditor) {
+          delete config.title;
+          Object.assign(config, faqEditor.read());
+        }
         return config;
       };
 
@@ -902,6 +1208,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
 
     detailsCard.appendChild(pageBody);
     detailsCard.validate = () => [...sections.children].every((row) => row.validate?.() ?? true);
+    detailsCard.showFieldError = (path) => [...sections.children].some((row) => row.showFieldError?.(path));
     detailsCard.read = () => ({
       title: title.value,
       slug: slug.value,
@@ -939,6 +1246,10 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
   );
   save.type = 'submit';
   form.appendChild(save);
+  // Erros do servidor (`missingFields`) voltam ao campo; percorre de trás para frente para o foco ficar no primeiro.
+  form.showFieldErrors = (paths = []) => [...paths].reverse()
+    .map((path) => [...pageList.children].some((page) => page.showFieldError?.(path)))
+    .some(Boolean);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

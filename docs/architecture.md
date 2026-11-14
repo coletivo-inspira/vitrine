@@ -83,6 +83,12 @@ próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
 pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
 `loadSiteEntitlements` sem sessão.
 
+Selo de apoio do plano Gratuito (issue #135): `src/storefront-footer.mjs` traduz o
+recurso `support_badge_optional` em `supportBadge: false` no snapshot, decidido na
+publicação como o SEO local. Snapshot sem o campo mostra o selo. O rodapé lê
+`instagramUrl` e `publicEmail` quando o snapshot os tiver; nenhum dos dois é
+projetado ainda (central de canais, #125).
+
 ## Cobrança pelo Asaas (ADR 0013, issue #113)
 
 `src/billing/provider.mjs` define a interface de provedor (a mesma que o Stripe usará);
@@ -111,6 +117,19 @@ O painel tem a tela "Plano e cobrança" (`#plano`, `web/portal/billing-panel.mjs
 que libera cada recurso travado com `GET /api/sites/:id/entitlements`
 (`web/portal/plan-gate.mjs`). `/planos/` é gerada de `content/plans.json` no build.
 Detalhes na seção 9 de `docs/billing/asaas.md`.
+
+## Insights por origem (issue #119)
+
+`public.site_metrics_daily` ganhou `source` e `campaign` (migração
+`20261116000200_metrics_source.sql`) e as métricas `route_click` e `qr_visit`. A lista
+de métricas está em `ALLOWED_METRIC_EVENT_TYPES` (`src/portal-validation.mjs`) e, no
+banco, em `private.site_metric_names()`, usada pelo `check` e pela RPC; um nome novo
+entra recriando essa função numa migração nova. A vitrine lê `utm_source` e
+`utm_campaign` só na carga (`web/assets/metrics-source.mjs`), sem cookie nem
+armazenamento; Worker e banco normalizam de novo (lista fechada, até 32 caracteres,
+desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é descartada).
+Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
+`conversion_reports` (`src/insights-by-origin.mjs`).
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 

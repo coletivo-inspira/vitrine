@@ -9,6 +9,11 @@ import {
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
+import {
+  UNRECORDED_SOURCE,
+  normalizeMetricCampaign,
+  normalizeMetricSource
+} from '../web/assets/metrics-source.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -151,12 +156,19 @@ export const ALLOWED_WHATSAPP_VARIABLES = Object.freeze([
 export const CATALOG_IMAGES_BUCKET = 'catalog-images';
 export const MAX_CATALOG_IMAGE_BYTES = 262144;
 
+// Única lista de métricas no código; o banco espelha em private.site_metric_names()
+// e private.site_item_metric_names() (migração 20261116000200_metrics_source.sql).
+// Um novo nome entra aqui e numa migração que recria essas duas funções.
 export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'visit',
   'item_view',
   'item_select',
-  'whatsapp_order'
+  'whatsapp_order',
+  'route_click',
+  'qr_visit'
 ]);
+// Métricas por item exigem itemId e não carregam origem.
+export const ITEM_METRIC_EVENT_TYPES = Object.freeze(['item_view', 'item_select']);
 export const ALLOWED_INSIGHTS_PERIODS = Object.freeze(['7d', '30d', '90d']);
 export const MAX_EVENTS_BATCH_SIZE = 25;
 export const MAX_EVENTS_BATCH_BYTES = 16384;
@@ -1797,6 +1809,14 @@ export function validateInsightsPeriod(rawPeriod = '7d', errorStatus = 400) {
   return normalized;
 }
 
+function normalizeEventOrigin(type, rawEvent) {
+  if (ITEM_METRIC_EVENT_TYPES.includes(type) || rawEvent.source === undefined || rawEvent.source === null) {
+    return { source: UNRECORDED_SOURCE, campaign: '' };
+  }
+  const source = normalizeMetricSource(rawEvent.source);
+  return { source, campaign: normalizeMetricCampaign(rawEvent.campaign, source) };
+}
+
 export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = new Date() } = {}) {
   if (rawByteLength > MAX_EVENTS_BATCH_BYTES) {
     throw new PortalValidationError(
@@ -1894,7 +1914,7 @@ export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = n
     }
 
     let itemId = '';
-    if (type === 'item_view' || type === 'item_select') {
+    if (ITEM_METRIC_EVENT_TYPES.includes(type)) {
       if (typeof rawEvent.itemId !== 'string' || !rawEvent.itemId.trim() || rawEvent.itemId.trim().length > 64) {
         throw new PortalValidationError(
           422,
@@ -1928,7 +1948,8 @@ export function validateEventsBatchPayload(payload, { rawByteLength = 0, now = n
       hour,
       date: dateStr,
       count,
-      estimatedCents
+      estimatedCents,
+      ...normalizeEventOrigin(type, rawEvent)
     });
   }
 

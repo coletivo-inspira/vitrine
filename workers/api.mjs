@@ -1,5 +1,5 @@
 import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
-import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
+import { assertPublishableSocialProof, resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
@@ -48,7 +48,9 @@ import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-rel
 import {
   assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, planGateSummary, requirePlanFeature
 } from '../src/entitlements.mjs';
+import { applyOriginEntitlement, metricRowKey, withOriginInsights } from '../src/insights-by-origin.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
+import { publicationFooterOptions } from '../src/storefront-footer.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -1124,17 +1126,19 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       const itemKey = String(row?.itemKey ?? row?.item_key ?? '');
       const metricName = String(row?.metricName ?? row?.metric_name ?? '');
       if (siteId && metricDate && metricName) {
-        const key = `${siteId}:${metricDate}:${metricHour}:${itemKey}:${metricName}`;
-        metricsDaily.set(key, {
+        const seeded = {
           site_id: siteId,
           metric_date: metricDate,
           metric_hour: metricHour,
           item_key: itemKey,
           metric_name: metricName,
+          source: String(row.source ?? ''),
+          campaign: String(row.campaign ?? ''),
           count_value: Number(row.countValue ?? row.count_value ?? 0),
           estimated_cents: Number(row.estimatedCents ?? row.estimated_cents ?? 0),
           updated_at: row.updatedAt ?? row.updated_at ?? new Date().toISOString()
-        });
+        };
+        metricsDaily.set(metricRowKey(seeded), seeded);
       }
     }
   }
@@ -1647,7 +1651,15 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         }
         const itemKey = ev.type === 'item_view' || ev.type === 'item_select' ? ev.itemId : '';
         const cents = ev.type === 'whatsapp_order' ? ev.estimatedCents ?? 0 : 0;
-        const key = `${siteId}:${ev.date}:${ev.hour}:${itemKey}:${ev.type}`;
+        const key = metricRowKey({
+          site_id: siteId,
+          metric_date: ev.date,
+          metric_hour: ev.hour,
+          item_key: itemKey,
+          metric_name: ev.type,
+          source: ev.source,
+          campaign: ev.campaign
+        });
         const existing = metricsDaily.get(key);
         if (existing) {
           existing.count_value += ev.count ?? 1;
@@ -1660,6 +1672,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
             metric_hour: ev.hour,
             item_key: itemKey,
             metric_name: ev.type,
+            source: ev.source ?? '',
+            campaign: ev.campaign ?? '',
             count_value: ev.count ?? 1,
             estimated_cents: cents,
             updated_at: nowDate.toISOString()
@@ -1746,14 +1760,14 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         `${resolveInsightsPeriodStart(validPeriod, referenceDate)}T00:00:00.000Z`
       );
 
-      return computeStorefrontInsights({
+      return withOriginInsights(computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
         likeRows,
         catalogSource,
         referenceDate
-      });
+      }), rows, { period: validPeriod, referenceDate });
     }
   };
 }
@@ -1774,7 +1788,7 @@ export function clearPublicationsCache() {
   publicationFetchedAtBySlug.clear();
 }
 
-async function hydratePublicationRecord(row) {
+export async function hydratePublicationRecord(row) {
   if (!row || typeof row !== 'object' || !row.menu || typeof row.menu !== 'object') {
     return null;
   }
@@ -1795,6 +1809,10 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
     ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
+    ...(rawMenu.localBusiness ? { localSeo: {
+      businessType: rawMenu.localBusiness.type,
+      ...(rawMenu.localBusiness.areaServed ? { areaServed: rawMenu.localBusiness.areaServed } : {})
+    } } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
@@ -1814,6 +1832,9 @@ async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      ...(rawMenu.supportBadge === false ? { supportBadge: false } : {}),
+      localSeo: Boolean(rawMenu.localBusiness),
+      ...(typeof rawMenu.canonicalUrl === 'string' ? { canonicalUrl: rawMenu.canonicalUrl } : {}),
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -3212,7 +3233,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       let rows = [];
       if (baseUrl && supabaseAnonKey && typeof fetchImpl === 'function') {
         const metricsRes = await fetchImpl(
-          `${baseUrl}/rest/v1/site_metrics_daily?site_id=eq.${encodeURIComponent(siteId)}&metric_date=gte.${encodeURIComponent(minDateIso)}&select=site_id,metric_date,metric_hour,item_key,metric_name,count_value,estimated_cents&order=metric_date.asc`,
+          `${baseUrl}/rest/v1/site_metrics_daily?site_id=eq.${encodeURIComponent(siteId)}&metric_date=gte.${encodeURIComponent(minDateIso)}&select=site_id,metric_date,metric_hour,item_key,metric_name,source,campaign,count_value,estimated_cents&order=metric_date.asc`,
           {
             method: 'GET',
             headers: authHeaders(token)
@@ -3236,14 +3257,14 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         { token }
       );
 
-      return computeStorefrontInsights({
+      return withOriginInsights(computeStorefrontInsights({
         siteId,
         period: validPeriod,
         rows,
         likeRows,
         catalogSource,
         referenceDate
-      });
+      }), rows, { period: validPeriod, referenceDate });
     }
   };
 }
@@ -3617,7 +3638,9 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
         (Array.isArray(pub.menu?.items) &&
           pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())) ||
           pub.menu?.structure?.pages?.some((page) => page.sections?.some((section) =>
-            section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')))
+            (section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')) ||
+            (section.moduleCode === 'testimonials' &&
+              section.config?.items?.some((item) => /^https:/.test(item?.photoUrl ?? '')))))
       );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
@@ -3999,7 +4022,8 @@ export function createApiHandler(deps = {}) {
         const { menu } = await compilePublicStorefront(content, site, {
           revision,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements })
+          ...publicationSeoOptions({ slug: site.slug, entitlements }),
+          ...publicationFooterOptions({ entitlements })
         });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
@@ -4861,7 +4885,8 @@ export function createApiHandler(deps = {}) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
 
-        return jsonResponse(200, { insights });
+        const entitlements = await loadSiteEntitlements(store, siteId, { token: user.token, env });
+        return jsonResponse(200, { insights: applyOriginEntitlement(insights, entitlements) });
       }
 
       if (pathname === '/api/sites' || pathname === '/api/sites/') {
@@ -5090,6 +5115,7 @@ export function createApiHandler(deps = {}) {
           edits = extractShowcaseOverrides(beforeSwitch, previous?.template, {}, previous?.modules);
         }
         const resolved = resolveShowcaseManifest(edits, defaults?.template, {}, defaults?.modules);
+        assertPublishableSocialProof(resolved.pages);
         await assertApprovedWidgets(store, siteId, resolved.pages, options);
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         if (code !== undefined) structure.templateCode = code;
@@ -5427,7 +5453,8 @@ export function createApiHandler(deps = {}) {
           revision: draft.revision,
           siteId: site.id,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements, domains })
+          ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
+          ...publicationFooterOptions({ entitlements })
         });
 
         if (typeof store.savePublication === 'function') {

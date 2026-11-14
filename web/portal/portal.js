@@ -7,6 +7,7 @@ import { loadBillingNotice } from './billing-notice.mjs';
 import { initBillingPanel, loadBillingPanel } from './billing-panel.mjs';
 import { loadDemoInvitations } from './linktree-import.js';
 import { activeSites, createSiteViewFilter, decorateSiteItem, emptyViewMessage, sitesForCurrentView } from './site-lifecycle.js';
+import { renderInsightsOrigin } from './insights-origin.mjs';
 
 // State variables
 let isOnline = false;
@@ -1424,6 +1425,35 @@ function updateOnboardingChecklist() {
 }
 
 // Update Home Dashboard (Início) Summary Cards
+export function createHubSiteLink(site, doc, onOpen) {
+  const item = doc.createElement('button');
+  item.type = 'button';
+  item.className = 'hub-list-item hub-site-link';
+  item.setAttribute('aria-label', `Abrir a vitrine ${site.name}`);
+
+  const title = doc.createElement('strong');
+  title.textContent = site.name;
+
+  const badge = doc.createElement('span');
+  badge.textContent = site.role === 'owner' ? 'Proprietário' : 'Colaborador';
+
+  const arrow = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  arrow.setAttribute('class', 'hub-site-link-arrow');
+  arrow.setAttribute('viewBox', '0 0 24 24');
+  arrow.setAttribute('width', '18');
+  arrow.setAttribute('height', '18');
+  arrow.setAttribute('aria-hidden', 'true');
+  const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'm9 6 6 6-6 6');
+  arrow.appendChild(path);
+
+  item.appendChild(title);
+  item.appendChild(badge);
+  item.appendChild(arrow);
+  item.addEventListener('click', () => onOpen(site));
+  return item;
+}
+
 function updateHubSummary() {
   // Update onboarding checklist
   updateOnboardingChecklist();
@@ -1440,7 +1470,8 @@ function updateHubSummary() {
     }
   }
   if (hubVitrinesList) {
-    if (sites.length === 0) {
+    const hubSites = activeSites(sites);
+    if (hubSites.length === 0) {
       hubVitrinesList.replaceChildren();
       const emptyP = document.createElement('p');
       emptyP.className = 'soft-text';
@@ -1448,19 +1479,8 @@ function updateHubSummary() {
       hubVitrinesList.appendChild(emptyP);
     } else {
       hubVitrinesList.replaceChildren();
-      sites.slice(0, 3).forEach(site => {
-        const item = document.createElement('div');
-        item.className = 'hub-list-item';
-        
-        const title = document.createElement('strong');
-        title.textContent = site.name;
-        
-        const badge = document.createElement('span');
-        badge.textContent = site.role === 'owner' ? 'Proprietário' : 'Colaborador';
-
-        item.appendChild(title);
-        item.appendChild(badge);
-        hubVitrinesList.appendChild(item);
+      hubSites.slice(0, 3).forEach(site => {
+        hubVitrinesList.appendChild(createHubSiteLink(site, document, openEditor));
       });
     }
   }
@@ -2351,6 +2371,7 @@ export function renderInsightsPanel(insights) {
     }
   }
 
+  renderInsightsOrigin(globalThis.document.getElementById('insights-origin-card'), insights);
   renderDaySvgChart(insightsDayChartContainer, insights.byDay);
   renderHourSvgChart(insightsHourChartContainer, insights.byHour);
 

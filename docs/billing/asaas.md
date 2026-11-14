@@ -164,13 +164,14 @@ No sandbox, depois de `BLK-ASAAS-01` (conta Asaas do coletivo e chave de sandbox
 Pendente de `BLK-ASAAS-01`. Ao executar, registre aqui a data, quem executou, os ids
 de evento (não os dados da pessoa) e o resultado de cada passo acima.
 
-## 7. Reaproveitamento pelo Stripe (issue #116)
+## 7. Stripe como complemento (issue #116)
 
 `src/billing/provider.mjs` define a interface (`createCustomer`, `createSubscription`,
 `getSubscription`, `cancelSubscription`, `verifyWebhook`, `parseWebhookEvent`), o
-evento normalizado e `subscriptionChangeFor`. `private.billing_events` e as RPCs já
-aceitam `provider = 'stripe'`. O Stripe precisa do seu arquivo em `src/billing/` e de
-uma rota de webhook própria em `src/billing/routes.mjs`.
+evento normalizado e `subscriptionChangeFor`. O Stripe implementa a mesma interface em
+`src/billing/stripe.mjs`, com `POST /api/billing/stripe/webhook` e o portal do
+cliente; o checkout continua no Asaas por padrão e só usa o Stripe com
+`"provider": "stripe"`. Detalhes em [`stripe.md`](stripe.md).
 
 ## 8. Ciclo da assinatura (issue #114)
 
