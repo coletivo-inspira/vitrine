@@ -5288,6 +5288,107 @@ textarea {
   justify-self: end;
 }
 
+/* Depoimentos e perguntas frequentes: uma coluna em qualquer largura, sem cortar rótulos. */
+.structure-repeat-editor,
+.structure-repeat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.structure-repeat-editor > .structure-add-btn {
+  align-self: flex-start;
+}
+
+.structure-editor-form .structure-repeat-editor > .form-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.structure-repeat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.structure-repeat-legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.structure-repeat-row > .structure-row-actions {
+  justify-self: end;
+}
+
+.structure-repeat-row .textarea-styled {
+  min-height: 88px;
+  line-height: 1.5;
+}
+
+.structure-repeat-row .structure-faq-question {
+  min-height: 64px;
+}
+
+.structure-consent-label {
+  align-items: flex-start;
+  min-height: 44px;
+  padding-block: 10px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.structure-consent-label input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--orange);
+}
+
+.structure-consent input[aria-invalid="true"] {
+  outline: 2px solid #B42318;
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] .structure-consent input[aria-invalid="true"] {
+  outline-color: #FFA39E;
+}
+
+.structure-editor-form .structure-faq-suggestions-title {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.structure-faq-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.structure-faq-suggestion {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.structure-faq-suggestion[hidden] {
+  display: none;
+}
+
 .structure-highlights-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
