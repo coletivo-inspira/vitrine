@@ -1,9 +1,11 @@
 // Rotas de cobrança (issue #113): POST /api/billing/checkout (dono do tenant) e
 // POST /api/billing/asaas/webhook (público, autenticado pelo token do Asaas).
+// Issue #114: GET /api/billing/notice (aviso do Início) e POST /api/billing/cancel.
 // workers/api.mjs só encaminha; tudo de cobrança fica aqui e em src/billing/.
 import planTableSource from '../../content/plans.json' with { type: 'json' };
 import { planByCode, validatePlanTable } from '../plans.mjs';
 import { createAsaasProvider, resolveAsaasConfig } from './asaas.mjs';
+import { pickSubscriptionNotice } from './lifecycle.mjs';
 import {
   BillingProviderError,
   assertBillingProvider,
@@ -13,6 +15,8 @@ import {
 
 export const BILLING_CHECKOUT_PATH = '/api/billing/checkout';
 export const ASAAS_WEBHOOK_PATH = '/api/billing/asaas/webhook';
+export const BILLING_NOTICE_PATH = '/api/billing/notice';
+export const BILLING_CANCEL_PATH = '/api/billing/cancel';
 export const BILLING_NOT_CONFIGURED = 'BILLING_NOT_CONFIGURED';
 
 const PLAN_TABLE = validatePlanTable(planTableSource);
@@ -21,9 +25,10 @@ const MAX_WEBHOOK_BYTES = 64 * 1024;
 const MAX_CHECKOUT_BYTES = 8 * 1024;
 const ACTIVE_STATUSES = new Set(['active', 'past_due', 'grace']);
 
+const BILLING_PATHS = new Set([BILLING_CHECKOUT_PATH, ASAAS_WEBHOOK_PATH, BILLING_NOTICE_PATH, BILLING_CANCEL_PATH]);
+
 export function isBillingRoute(pathname) {
-  return pathname.replace(/\/+$/, '') === BILLING_CHECKOUT_PATH ||
-    pathname.replace(/\/+$/, '') === ASAAS_WEBHOOK_PATH;
+  return BILLING_PATHS.has(pathname.replace(/\/+$/, ''));
 }
 
 export class BillingStoreError extends Error {
@@ -53,7 +58,7 @@ export function createSupabaseBillingStore({ supabaseUrl, anonKey, serviceRoleKe
     });
     if (response.ok) return response.json();
     const body = await response.json().catch(() => null);
-    const known = /^(SUBSCRIPTION_ALREADY_ACTIVE|BILLING_TENANT_FORBIDDEN|BILLING_PLAN_INVALID)$/.exec(body?.message ?? '');
+    const known = /^(SUBSCRIPTION_ALREADY_ACTIVE|SUBSCRIPTION_NOT_CANCELABLE|BILLING_TENANT_FORBIDDEN|BILLING_PLAN_INVALID)$/.exec(body?.message ?? '');
     throw new BillingStoreError(known ? known[1] : 'BILLING_STORE_FAILED');
   }
 
@@ -70,7 +75,9 @@ export function createSupabaseBillingStore({ supabaseUrl, anonKey, serviceRoleKe
 
     async getSubscription(tenantId) {
       const query = new URLSearchParams({
-        tenant_id: `eq.${tenantId}`, select: 'plan_code,status,provider,provider_subscription_id', limit: '1'
+        tenant_id: `eq.${tenantId}`,
+        select: 'plan_code,status,provider,provider_subscription_id,current_period_end',
+        limit: '1'
       });
       const response = await fetchImpl(`${baseUrl}/rest/v1/subscriptions?${query}`, {
         headers: { apikey: serviceRoleKey, authorization: `Bearer ${serviceRoleKey}` }
@@ -90,6 +97,23 @@ export function createSupabaseBillingStore({ supabaseUrl, anonKey, serviceRoleKe
         target_subscription: subscriptionId
       });
       return { previousSubscriptionId: typeof previous === 'string' ? previous : null };
+    },
+
+    // Com o token da pessoa: a função só devolve organizações de que ela é dona.
+    async readNotices({ token }) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_subscription_notices`, {
+        method: 'POST',
+        headers: { apikey: anonKey, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: '{}'
+      });
+      if (response.status === 404) return [];
+      if (!response.ok) throw new BillingStoreError('BILLING_STORE_FAILED');
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows : [];
+    },
+
+    async cancelByOwner({ tenantId, userId }) {
+      return rpc('billing_cancel_by_owner', { target_tenant: tenantId, target_user: userId });
     },
 
     async applyEvent({ provider, event, change }) {
@@ -246,6 +270,87 @@ async function handleCheckout(request, env, ctx, helpers) {
   }, { 'cache-control': 'no-store' });
 }
 
+// Aviso do Início para a pessoa dona: { notice: null | { kind, dueDate, graceUntil, ... } }.
+async function handleNotice(request, env, helpers) {
+  const { deps, errorResponse, jsonResponse } = helpers;
+  const user = await helpers.resolveUser();
+  if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+  const store = resolveBillingStore(env, deps);
+  if (!store || typeof store.readNotices !== 'function') {
+    return jsonResponse(200, { notice: null }, { 'cache-control': 'no-store' });
+  }
+  let rows;
+  try {
+    rows = await store.readNotices({ token: user.token, userId: user.id, env });
+  } catch {
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Não foi possível consultar a assinatura. Tente de novo.');
+  }
+  const now = typeof deps.now === 'function' ? deps.now() : new Date();
+  return jsonResponse(200, { notice: pickSubscriptionNotice(rows, now) }, { 'cache-control': 'no-store' });
+}
+
+// Cancelamento a pedido do dono: cancela no provedor e marca 'canceled'. O plano vale
+// até current_period_end (decisão da issue #114). Se a gravação falhar depois do
+// cancelamento no provedor, o webhook SUBSCRIPTION_DELETED marca 'canceled' do mesmo jeito.
+async function handleCancel(request, env, helpers) {
+  const { deps, errorResponse, jsonResponse } = helpers;
+  const guard = helpers.guard();
+  if (guard) return guard;
+  const user = await helpers.resolveUser();
+  if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+  const text = await readBoundedText(request, MAX_CHECKOUT_BYTES);
+  const body = text === null ? undefined : parseJson(text);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return errorResponse(400, 'INVALID_JSON', 'O corpo da requisição não contém JSON válido.');
+  }
+  if (typeof body.tenantId !== 'string' || !UUID_PATTERN.test(body.tenantId)) {
+    return errorResponse(400, 'INVALID_TENANT', 'Informe a organização da assinatura.');
+  }
+  const store = resolveBillingStore(env, deps);
+  const provider = resolveAsaasProvider(env, deps);
+  if (!store || provider.configured === false) return notConfigured(errorResponse);
+
+  const tenantId = body.tenantId.toLowerCase();
+  let owner;
+  let current;
+  try {
+    owner = await store.getTenantOwner(tenantId, { token: user.token, env });
+    current = owner === user.id ? await store.getSubscription(tenantId) : null;
+  } catch {
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Não foi possível consultar a assinatura. Tente de novo.');
+  }
+  if (!owner || owner !== user.id) {
+    return errorResponse(403, 'FORBIDDEN_TENANT_OWNER', 'Só a pessoa dona da organização pode cancelar o plano.');
+  }
+  if (!current || current.status === 'canceled' || current.provider !== provider.name || !current.provider_subscription_id) {
+    return errorResponse(409, 'SUBSCRIPTION_NOT_CANCELABLE', 'Não há assinatura para cancelar por aqui. Fale com a equipe da Vitrine.');
+  }
+
+  try {
+    await provider.cancelSubscription(current.provider_subscription_id);
+  } catch (error) {
+    return providerFailure(error, errorResponse);
+  }
+  let row;
+  try {
+    row = await store.cancelByOwner({ tenantId, userId: user.id });
+  } catch (error) {
+    if (error instanceof BillingStoreError && error.code === 'SUBSCRIPTION_NOT_CANCELABLE') {
+      return errorResponse(409, 'SUBSCRIPTION_NOT_CANCELABLE', 'Esta assinatura já foi cancelada.');
+    }
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'O cancelamento foi pedido ao provedor; a situação será atualizada em instantes.');
+  }
+  const accessUntil = row?.current_period_end ?? current.current_period_end ?? null;
+  const now = typeof deps.now === 'function' ? deps.now() : new Date();
+  return jsonResponse(200, {
+    subscription: {
+      planCode: current.plan_code,
+      status: 'canceled',
+      accessUntil: accessUntil && Date.parse(accessUntil) > now.getTime() ? accessUntil : null
+    }
+  }, { 'cache-control': 'no-store' });
+}
+
 // Responde rápido: um único RPC por evento. Erro do banco devolve 503 para o Asaas
 // reenviar; como o id só é gravado junto com a mudança, o reenvio é seguro.
 async function handleAsaasWebhook(request, env, helpers) {
@@ -277,9 +382,14 @@ export async function handleBillingRoute(request, env = {}, ctx = {}, helpers) {
   const path = url.pathname.replace(/\/+$/, '');
   const method = (request.method || 'GET').toUpperCase();
   const safeHelpers = { ...helpers, deps: helpers.deps ?? {} };
+  if (path === BILLING_NOTICE_PATH) {
+    if (method !== 'GET') return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET nesta rota de cobrança.');
+    return handleNotice(request, env, safeHelpers);
+  }
   if (method !== 'POST') {
     return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use POST nesta rota de cobrança.');
   }
   if (path === ASAAS_WEBHOOK_PATH) return handleAsaasWebhook(request, env, safeHelpers);
+  if (path === BILLING_CANCEL_PATH) return handleCancel(request, env, safeHelpers);
   return handleCheckout(request, env, ctx, safeHelpers);
 }

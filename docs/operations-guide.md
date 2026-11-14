@@ -61,59 +61,94 @@ Cada consulta fica registrada na auditoria da vitrine (`mila_relay_lookup`). Nad
 
 ---
 
-## 3. Operação Comercial, Conciliação Manual e Ciclo de 7 Dias de Tolerância (ADR 0007 e `002-US4`)
+## 3. Planos, Cobrança Recorrente e Ciclo de 7 Dias de Tolerância (ADR 0013, issue #114)
 
-Durante o piloto, não há gateway de pagamento, checkout automático ou captura de cartão. Toda contratação de assinatura opcional de endereço personalizado ou projeto de **Customização** sob orçamento é conduzida manualmente por um **Operador Inspira**.
+O ADR 0013 substituiu a cobrança manual do ADR 0007: os planos estão em
+`content/plans.json` (`free`, `essencial`, `profissional`, `equipe`), a cobrança é feita
+pelo Asaas (em sandbox até o passo humano `BLK-ASAAS-01`) e o ciclo da assinatura é
+automático. A política do ADR 0007 continua: aviso, 7 dias de tolerância, suspensão só
+dos recursos pagos e nada apagado. Configuração e eventos do Asaas em
+[`docs/billing/asaas.md`](billing/asaas.md).
 
-### 3.1 Modalidades Comerciais Disponíveis
+- O `free` mantém 1 **Vitrine**, até **20 itens ativos** (teto técnico de 100 itens
+  totais) e o endereço canônico `https://vitrine.inspira.dev.br/<slug>`.
+- Histórico: o ADR 0007 previa R$ 10/mês (endereço Inspira) e R$ 15/mês (domínio
+  próprio), com conciliação manual pelo **Operador Inspira**. Esses preços e o processo
+  manual foram substituídos pelo ADR 0013.
 
-1. **Plano Básico Gratuito (`free_basic` — R$ 0/mês)**:
-   - Inclui 1 **Vitrine** no modelo `pizzeria-v1`, até **20 itens ativos** (teto técnico de 100 itens totais), botão de pedido via `https://wa.me/...` e endereço público canônico por caminho: `https://vitrine.inspira.dev.br/<slug>`.
-2. **Assinatura de Endereço Inspira (`inspira_subdomain` — R$ 10/mês sugerido)**:
-   - Direito de uso de subdomínio sob o domínio do coletivo (ex.: `https://<slug>.inspira.dev.br`), sujeito à disponibilidade no inventário DNS (`docs/dns-review.md`).
-3. **Assinatura de Vínculo de Domínio Próprio (`custom_domain` — R$ 15/mês sugerido)**:
-   - Configuração, verificação técnica de DNS/TLS (dentro das cotas gratuitas da Cloudflare) e manutenção do **Vínculo de domínio** para um endereço próprio do cliente (ex.: `https://cardapio.pizzariadojoao.com.br`).
-   - **Regra comercial explícita (`002-US1` / FR-002)**: O registro e a renovação anual do domínio próprio (como `.com.br` no Registro.br) são adquiridos e pagos à parte pelo **Proprietário** diretamente ao registrador e **não estão incluídos** na mensalidade de R$ 15/mês.
+### 3.1 Quem altera uma assinatura
 
-### 3.2 Fronteira de Autorização Comercial
+- O webhook do Asaas verificado (`POST /api/billing/asaas/webhook`), pela RPC
+  `billing_apply_event`.
+- O Cron do Worker (`scheduled()`), pela RPC `billing_lifecycle_tick`.
+- A pessoa dona da organização, só para contratar (`POST /api/billing/checkout`) e
+  cancelar (`POST /api/billing/cancel`); o plano só muda quando o Asaas confirma.
+- O `platform_admin`, pela RPC auditada `set_tenant_subscription` (casos manuais,
+  reembolso proporcional ou troca de plano no meio do ciclo).
 
-- Nenhum **Proprietário** ou **Membro** da **Equipe da vitrine** possui permissão para criar, aprovar, renovar ou alterar o próprio plano comercial, status de pagamento ou **Vínculo de domínio** (`002-US4`, Cenário 1).
-- As alterações de vigência (`paid_until`, `grace_until`, `status`) e de verificação de hostname (`verification_status`, `is_canonical`) são executadas exclusivamente por **Operador Inspira**.
+Toda mudança grava `audit_logs` (`entity_type = 'subscription'`) com valores antigo e
+novo e `summary.source` em `service_role` (webhook), `lifecycle` (Cron),
+`owner_cancel` (cancelamento pelo dono) ou `platform_admin`.
 
-### 3.3 Máquina de Estados de Vigência, Tolerância de 7 Dias e Reversão Segura (`002-US4`)
+### 3.2 Máquina de estados de `public.subscriptions`
 
 ```
-[free_basic / active]
-   │  Canônico: https://vitrine.inspira.dev.br/<slug>
-   ▼  (Confirmação manual de pagamento + DNS/TLS verificado pelo Operador Inspira)
-[inspira_subdomain | custom_domain : status = 'active']
-   │  Vigência: now <= paid_until
-   │  Canônico: https://<hostname-personalizado> (caminho /<slug> redireciona para o hostname)
-   ▼  (Vencimento atingido: paid_until < now <= paid_until + 7 dias)
-[status = 'grace_period' (Janela de Tolerância de 7 Dias)]
-   │  Tolerância: 7 dias corridos após paid_until
-   │  Canônico: https://<hostname-personalizado> permanece ativo sem interrupção
-   │  Ação: Operador Inspira notifica o Proprietário sobre a renovação pendente
-   ▼  (Expiração após o 7º dia sem renovação: now > paid_until + 7 dias)
-[status = 'suspended' -> Reversão Automática ao Endereço Gratuito]
-      Canônico revertido: https://vitrine.inspira.dev.br/<slug>
-      Hostname personalizado: desativado (is_canonical = false) e posto em quarentena
-      Dados preservados: 100% de sites, site_memberships, drafts (ativos + ocultos) e publicações intactos
+pending ──(Asaas confirma o pagamento)──▶ active
+active ──(PAYMENT_OVERDUE)──▶ past_due
+active | past_due ──(Cron: vencimento passou)──▶ grace   grace_until = vencimento + 7 dias
+grace ──(Cron: grace_until passou)──▶ suspended
+qualquer estado, exceto canceled ──(PAYMENT_CONFIRMED / PAYMENT_RECEIVED)──▶ active
+qualquer estado ──(pedido do dono ou SUBSCRIPTION_DELETED)──▶ canceled
 ```
 
-### 3.4 Procedimento Operacional de Reversão Segura (Pós-7 Dias de Vencimento)
+- "Vencimento" é `current_period_end` (data da próxima cobrança, meia-noite de Brasília).
+- Os direitos seguem as datas, não o Cron: `past_due` e `grace` valem até `grace_until`
+  (ou vencimento + 7 dias) mesmo que o Cron atrase; `suspended` vale `free`.
+- **Cancelada** mantém o plano até o fim do período já pago (`current_period_end`) e
+  depois vale `free`. Uma nova contratação gera outro identificador no Asaas.
 
-Quando uma **Assinatura** de endereço personalizado ultrapassa `paid_until` + **7 dias corridos de tolerância** (`grace_until`) sem confirmação de pagamento:
+### 3.3 Verificação do Cron
 
-1. **Verificação de Vencimento**: O **Operador Inspira** confirma que a data atual ultrapassou o 7º dia após `paid_until` e que não há comprovante de conciliação pendente.
-2. **Suspensão do Vínculo de Domínio**:
-   - Atualizar o status da assinatura para `suspended` e o **Vínculo de domínio** para `verification_status = 'suspended'`, `is_canonical = false`, definindo `quarantined_until` (quarentena contra reatribuição imediata a terceiros).
-3. **Restauração Imediata do Endereço Gratuito**:
-   - A **Vitrine** volta imediatamente a responder de forma canônica em `https://vitrine.inspira.dev.br/<slug>`.
-4. **Garantia Absoluta de Preservação de Dados**:
-   - **Proibido excluir** registros em `public.sites`, `public.site_memberships` ou `public.drafts`.
-   - O **Rascunho** (incluindo sua `revision`, categorias, itens ativos e itens inativos/ocultos) e a **Publicação** ativa permanecem 100% íntegros.
-   - Caso o **Proprietário** regularize a assinatura posteriormente, basta ao **Operador Inspira** registrar o novo `paid_until` (`+ 7 dias` em `grace_until`) e reativar `is_canonical = true`.
+O Worker já tem o Cron `17 * * * *` (de hora em hora; a verificação é idempotente, então
+cumpre a rotina diária). Em cada execução, `runSubscriptionLifecycle` em
+`src/billing/lifecycle.mjs` faz **uma única chamada** a `billing_lifecycle_tick`, que move
+até 200 assinaturas por vez e devolve `{ grace, suspended, hasMore }`; o restante fica
+para a próxima hora. Assim o Cron nunca passa do limite de subrequests do Workers Free
+(50 por execução), qualquer que seja o número de assinaturas. A renovação de
+certificados de domínio roda em paralelo e a falha de uma tarefa não impede a outra.
+Sem `SUPABASE_URL` ou `SUPABASE_SERVICE_ROLE_KEY`, a verificação é pulada.
+
+### 3.4 Efeitos da suspensão (e da cancelada depois do período)
+
+1. **Domínio próprio deixa de ser canônico.** `public.resolve_showcase_host` só devolve
+   `canonical = true` enquanto a vitrine tem o recurso `custom_domain`. Sem ele, o
+   domínio próprio responde `302` (sem cache) para `https://vitrine.inspira.dev.br/<endereço>`.
+   O registro em `custom_domains` e o hostname na Cloudflare continuam; a vaga da trava
+   de 95 domínios segue ocupada. Liberar a vaga de uma vitrine suspensa há muito tempo é
+   uma decisão manual do operador.
+2. **`vitrine.json` (#120) e webhook de pré-orçamento (#121) param.** Ainda não existem;
+   quando existirem, chamam `requirePlanFeature` com `public_json` e `quote_webhook` e,
+   sem o recurso, respondem `paidFeatureGoneResponse()` (`404`, `cache-control:
+   public, max-age=60`).
+3. **A publicação atual continua no ar**, sem alteração. Novas publicações seguem os
+   limites do `free` (20 itens ativos e 1 bloco de itens), no Worker e no banco.
+4. **Nada é apagado** em `sites`, `drafts`, `publications`, `site_memberships` ou
+   `custom_domains` (teste em `test/database/subscription-lifecycle.test.mjs`).
+5. **Reativação automática**: quando o Asaas confirma o pagamento, a assinatura volta a
+   `active`, `grace_until` é limpo e o domínio próprio volta a responder direto.
+
+### 3.5 Aviso ao dono
+
+- A faixa no Início do painel (`GET /api/billing/notice`) aparece 3 dias antes do
+  vencimento, durante a tolerância e na suspensão, só para a pessoa dona da organização.
+- O e-mail de cobrança é o do próprio Asaas; a Vitrine não contrata SMTP (ADR 0005).
+- O operador não precisa avisar manualmente. Ele confere o painel de webhooks do Asaas
+  quando um dono disser que pagou e a faixa continuar (seção 3 de `docs/billing/asaas.md`).
+
+### 3.6 Registro e renovação de domínio
+
+O registro e a renovação anual do domínio próprio continuam fora de qualquer plano e são
+pagos pelo dono diretamente ao registrador (ADR 0006 e 0007).
 
 ---
 
