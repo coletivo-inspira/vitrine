@@ -527,10 +527,12 @@ const auditActions = {
   template_updated: 'Modelo atualizado', mila_relay_lookup: 'Código da Mila consultado',
   linktree_imported: 'Importação do Linktree', linktree_demo_invited: 'Dono convidado para a demonstração',
   linktree_demo_accepted: 'Demonstração aceita pelo dono',
+  sponsor_granted: 'Acesso ao Impacto dado', sponsor_revoked: 'Acesso ao Impacto retirado',
   insert: 'Criação', update: 'Alteração', delete: 'Remoção'
 };
 const auditEntities = {
   platform_cms: 'página institucional', customization_request: 'pedido de customização',
+  platform_operator: 'patrocinador',
   template: 'modelo de vitrine', site: 'vitrine', draft: 'rascunho da vitrine', publication: 'publicação da vitrine'
 };
 

@@ -119,6 +119,25 @@ desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é desc
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
 
+## Patrocinador e tela Impacto (issue #127)
+
+Migração `20261116000800_sponsor_role.sql`, `src/sponsor-impact.mjs` e, no painel,
+`web/portal/sponsor-impact.mjs` (tela "Impacto") e `web/portal/sponsor-admin.mjs` (aba
+"Patrocinadores" da administração). `public.platform_operators` aceita o papel `sponsor`;
+só o `platform_admin` o atribui ou retira (`grant_sponsor_role`, `revoke_sponsor_role`,
+`list_sponsors`), com registro em `audit_logs`. O patrocinador não ganha política de leitura
+nenhuma: `sites`, `drafts`, `profiles` e `site_metrics_daily` continuam vazios para ele, e
+`private.is_platform_admin()` segue exigindo `platform_admin`, então nenhuma rota
+`/api/admin/*` abre. A única leitura é `public.read_sponsor_impact()` (security definer,
+`GET /api/sponsor/impact`): vitrines com plano `free` em `private.site_entitlements` e
+`archived_at is null`, `visit` e `whatsapp_order` somados por mês (12 meses) e por cidade. A
+cidade vem do endereço público ou da localidade da publicação e, sem elas, da cidade do perfil
+do dono. Cidade com menos de 5 vitrines, ou vitrine sem cidade, entra em "Outras cidades"; se
+esse grupo ficaria com 1 a 4 vitrines, a menor cidade visível entra junto até chegar a 5, para
+que total menos cidades não revele um grupo pequeno. Com menos de 5 vitrines no total, a
+resposta vem suprimida. O Worker ainda projeta só os campos agregados e descarta grupos < 5.
+O plano considerado é o de hoje, não o de cada mês passado.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

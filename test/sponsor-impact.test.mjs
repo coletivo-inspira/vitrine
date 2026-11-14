@@ -82,6 +82,12 @@ test('tela Impacto: indicadores, linhas por cidade no período e meses em portug
   assert.equal(validateSponsorUserInput(` ${SPONSOR} `), '');
 });
 
+test('auditoria da administração descreve atribuir e retirar o papel', async () => {
+  const { describeAudit } = await import('../web/portal/platform-cms.js');
+  assert.equal(describeAudit({ action: 'sponsor_granted', entity_type: 'platform_operator' }), 'Acesso ao Impacto dado · patrocinador');
+  assert.equal(describeAudit({ action: 'sponsor_revoked', entity_type: 'platform_operator' }), 'Acesso ao Impacto retirado · patrocinador');
+});
+
 test('portal: "Impacto" e "Patrocinadores" ficam ocultos até o servidor confirmar; sem "catálogo" nem "cardápio"', async () => {
   const html = await readFile(resolve(root, 'web/portal/index.html'), 'utf8');
   assert.equal((html.match(/<li class="nav-sponsor-item" hidden>/g) ?? []).length, 2);
