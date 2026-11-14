@@ -1,11 +1,11 @@
-import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
-import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import {
   SELECTION_ADDED_MESSAGE,
   createSelectionDrawer,
   createSelectionStore,
   formatDiscardNotice
 } from '../assets/selection-drawer.mjs';
+import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
+import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
