@@ -4,6 +4,7 @@ import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapt
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
+import { handleLinktreeRoute, matchLinktreeRoute, purgeExpiredLinktreeDemos, resolveLinktreeRepository } from '../src/linktree-import.mjs';
 import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
@@ -65,6 +66,17 @@ import {
   renderCityPageHtml,
   renderCityUnavailableHtml
 } from '../src/city-page.mjs';
+import {
+  SITE_LIFECYCLE_PATH,
+  assertSiteAcceptsPublication,
+  createMemorySiteLifecycle,
+  createRestSiteLifecycle,
+  handleSiteLifecycleRequest,
+  hostnameQuarantinedError,
+  recordDomainDisconnect,
+  respondIfShowcasePaused,
+  siteLifecycleFields
+} from '../src/site-lifecycle.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1180,7 +1192,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         site.storefrontType ?? site.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
       template: site.template ?? DEFAULT_TEMPLATE,
       role,
-      updatedAt: site.updatedAt ?? site.updated_at ?? site.createdAt ?? site.created_at
+      updatedAt: site.updatedAt ?? site.updated_at ?? site.createdAt ?? site.created_at,
+      ...siteLifecycleFields(site)
     };
   }
 
@@ -1194,6 +1207,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     publicationsByHash,
     metricsDaily,
     itemLikes,
+    ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -1935,6 +1949,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
   }
 
   return {
+    ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
+
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
         fetchImpl(
@@ -2290,7 +2306,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       if (response.status === 409) {
         throw new PortalValidationError(409, 'HOSTNAME_TAKEN', 'Este endereço já está vinculado.');
       }
-      if (!response.ok) throw new Error('Falha ao cadastrar o domínio.');
+      if (!response.ok) throw await hostnameQuarantinedError(response) ?? new Error('Falha ao cadastrar o domínio.');
       return (await response.json())[0];
     },
 
@@ -2508,7 +2524,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async listSites(userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)&order=created_at.asc`,
+        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)&order=created_at.asc`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -2526,13 +2542,14 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' :
           row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
-        updatedAt: row.updated_at ?? row.created_at
+        updatedAt: row.updated_at ?? row.created_at,
+        ...siteLifecycleFields(row)
       }));
     },
 
     async getSite(siteId, userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)`,
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -2554,7 +2571,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' :
           row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
-        updatedAt: row.updated_at ?? row.created_at
+        updatedAt: row.updated_at ?? row.created_at,
+        ...siteLifecycleFields(row)
       };
     },
 
@@ -3500,6 +3518,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
   const releaseMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/releases\/([a-f0-9]{64})\.json$/);
   if (releaseMatch) {
     const [, slug, hash] = releaseMatch;
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method, { json: true });
+    if (pausedResponse) return pausedResponse;
     const pub =
       (await store.getPublicationByHash?.(slug, hash)) ??
       (await sharedPublicPublications.getPublicationByHash(slug, hash));
@@ -3534,6 +3554,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
   const menuMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/menu\.json$/);
   if (menuMatch) {
     const slug = menuMatch[1];
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method, { json: true });
+    if (pausedResponse) return pausedResponse;
     const pub =
       (await store.getPublicationBySlug?.(slug)) ??
       (await sharedPublicPublications.getPublicationBySlug(slug));
@@ -3571,6 +3593,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     if (RESERVED_PUBLIC_PATHS.has(slug) || !isValidSlug(slug)) {
       return null;
     }
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method);
+    if (pausedResponse) return pausedResponse;
 
     const pub =
       (await store.getPublicationBySlug?.(slug)) ??
@@ -3578,8 +3602,10 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     if (pub) {
       const html = renderStorefrontHtml(pub.menu);
       const hasExternalStorageImages = Boolean(
-        Array.isArray(pub.menu?.items) &&
-          pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())
+        (Array.isArray(pub.menu?.items) &&
+          pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())) ||
+          pub.menu?.structure?.pages?.some((page) => page.sections?.some((section) =>
+            section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')))
       );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
@@ -3871,6 +3897,8 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
       headers.set('cache-control', STOREFRONT_CACHE_CONTROL);
       headers.set('x-vitrine-cached-at', String(Date.now()));
       await cache.put(key, new Response(response.clone().body, { headers }));
+    } else if (cache) {
+      await cache.delete(key).catch(() => false);
     }
     return response ?? new Response(null, { status: 404 });
   };
@@ -4224,6 +4252,27 @@ export function createApiHandler(deps = {}) {
           ? await store.lookupMilaRelay(code, options)
           : [];
         return jsonResponse(200, { code, matches }, { 'cache-control': 'no-store' });
+      }
+
+      const linktreeRoute = matchLinktreeRoute(pathname);
+      if (linktreeRoute) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (linktreeRoute.admin && !await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method === 'POST') {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+          if (guardError) return guardError;
+        }
+        const payload = method === 'POST' ? (await parseJsonRequest(request)).parsed : undefined;
+        const { status, body } = await handleLinktreeRoute(linktreeRoute, method, payload, {
+          repository: resolveLinktreeRepository(store, env, deps.fetch),
+          options,
+          fetch: deps.linktreeFetch ?? globalThis.fetch
+        });
+        return jsonResponse(status, body, { 'cache-control': 'no-store' });
       }
 
       if (pathname === '/api/admin/templates') {
@@ -4881,6 +4930,23 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/sites.');
       }
 
+      const lifecycleMatch = pathname.match(SITE_LIFECYCLE_PATH);
+      if (lifecycleMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        return await handleSiteLifecycleRequest({
+          request, url, method, store, user, env, siteId: lifecycleMatch[1],
+          respond: jsonResponse,
+          guardMutation: validateMutationOriginAndJson,
+          readJson: parseJsonRequest,
+          publicOrigins: [resolvePublicOrigins(env, deps).publicSiteOrigin],
+          evictPublication: (slug) => {
+            publicationFetchedAtBySlug.delete(slug);
+            sharedPublicPublications.publicationsBySlug.delete(slug);
+          }
+        });
+      }
+
       const domainMatch = pathname.match(/^\/api\/sites\/([^/]+)\/domains(?:\/([^/]+)(\/verify)?)?\/?$/);
       if (domainMatch) {
         const user = await resolveSessionUser(request, env, deps);
@@ -4934,6 +5000,7 @@ export function createApiHandler(deps = {}) {
           if (isDelete) {
             if (remote && remote.id === domain.cf_hostname_id) await provider.remove(remote.id);
             await store.changeDomain(claimed, null, { env, remove: true });
+            await recordDomainDisconnect(store, siteId, domain.hostname, options);
             return new Response(null, { status: 204 });
           }
           remote ??= await provider.create(domain.hostname);
@@ -5086,6 +5153,7 @@ export function createApiHandler(deps = {}) {
           if (guardError) return guardError;
           const { parsed } = await parseJsonRequest(request);
           const revision = validateRevision(parsed?.targetRevision);
+          assertSiteAcceptsPublication(site);
           const publication = await store.rollbackRelease(siteId, revision, user.id, options);
           if (!publication) return errorResponse(404, 'RELEASE_NOT_FOUND', 'Versão indisponível para restauração.');
           publicationFetchedAtBySlug.set(publication.slug, Date.now());
@@ -5318,6 +5386,7 @@ export function createApiHandler(deps = {}) {
         if (!site || (site.role && !TEAM_ROLES.includes(site.role))) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
+        assertSiteAcceptsPublication(site);
 
         const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
@@ -5586,6 +5655,10 @@ export default {
     return defaultApiHandler(request, env, ctx);
   },
   async scheduled(_event, env) {
-    await refreshPendingDomainCertificates(env);
+    try {
+      await refreshPendingDomainCertificates(env);
+    } finally {
+      await purgeExpiredLinktreeDemos(env).catch(() => {});
+    }
   }
 };

@@ -28,6 +28,11 @@
 - fonts/dm-sans.ttf: Google Fonts, DM Sans variável, distribuição original com OFL em dm-sans-OFL.txt.
 - pizza-demo.webp: foto gerada pelo ImageGen em 2026-11-07 para negócio fictício;
   conversão WebP de 1200×800. Prompt exato no sidecar pizza-demo.webp.json.
+- pizza-demo-hero.webp: pizza-demo.webp passada pelo mesmo caminho do painel
+  para a foto do hero (lado maior de 800 px, WebP qualidade 0,82, 97,5 KB).
+  Usada na vitrine de exemplo com foto no hero (issue 131); detalhes no sidecar.
+- highlight-icons.mjs: ícones de traço 24×24 desenhados para o módulo Destaques
+  (lista fechada), sem arquivo externo nem fonte de ícones.
 
 Não há screenshots de clientes, fotos de clientes ou logo gerado por IA no site.
 As pequenas prévias de portfólio/serviços são interfaces ilustrativas em HTML/CSS.

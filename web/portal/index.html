@@ -11,6 +11,7 @@
   <link rel="preload" href="../assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
   <script src="../theme.js"></script>
   <link rel="stylesheet" href="./portal.css">
+  <link rel="stylesheet" href="./site-lifecycle.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo-portal">Pular para o conteúdo</a>
@@ -92,8 +93,10 @@
   <!-- Auth / Login Section (Unauthenticated screen) -->
   <section id="auth-section" class="portal-card select-none">
     <div class="auth-header">
-      <img class="brand-logo brand-logo-light auth-logo" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="vitrine — coletivo inspira">
-      <img class="brand-logo brand-logo-dark auth-logo" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="vitrine — coletivo inspira">
+      <a id="auth-brand-link" class="auth-brand-link" href="https://vitrine.inspira.dev.br/" aria-label="Vitrine Inspira — site principal">
+        <img class="brand-logo brand-logo-light auth-logo" src="../assets/brand/vitrine-animated.svg" width="188" height="58" alt="">
+        <img class="brand-logo brand-logo-dark auth-logo" src="../assets/brand/vitrine-animated-inverse.svg" width="188" height="58" alt="">
+      </a>
     </div>
     <h2>Entrar no Painel</h2>
     <p>Gerencie suas vitrines, edite itens e acompanhe as novidades da plataforma.</p>
@@ -123,7 +126,7 @@
     <!-- Glass Sidebar on Desktop -->
     <aside class="app-sidebar">
       <div class="sidebar-brand">
-        <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+        <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
           <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="150" height="46" alt="vitrine — coletivo inspira">
           <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
         </a>
@@ -155,12 +158,6 @@
             </a>
           </li>
           <li>
-            <a href="#perfil" class="nav-link" data-section="perfil">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Perfil e Interesses
-            </a>
-          </li>
-          <li>
             <a href="#pedidos" class="nav-link" data-section="pedidos">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Customizações
@@ -181,7 +178,7 @@
       <header class="app-top-bar">
         <!-- Compact brand for mobile only -->
         <div class="mobile-brand">
-          <a class="brand" href="./" aria-label="Vitrine Inspira — início">
+          <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
             <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="120" height="37" alt="vitrine">
             <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="120" height="37" alt="vitrine">
           </a>
@@ -200,6 +197,11 @@
             <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
             <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
           </button>
+          <a id="top-bar-profile" href="#perfil" class="top-bar-profile" data-section="perfil" aria-label="Perfil e interesses">
+            <img id="top-bar-avatar" class="top-bar-avatar" src="" alt="" width="28" height="28" hidden>
+            <span id="top-bar-avatar-placeholder" class="top-bar-avatar top-bar-avatar-placeholder" aria-hidden="true">U</span>
+            <span class="top-bar-profile-label">Perfil</span>
+          </a>
           <button id="logout-button" class="button button-small button-secondary button-pill" type="button">Sair</button>
         </div>
       </header>
@@ -334,8 +336,10 @@
             <button id="wizard-open-btn" class="button button-small button-pill wizard-open-flex-btn" type="button">+ Nova Vitrine</button>
           </div>
           
+          <div id="linktree-invitations" class="linktree-invitations" hidden></div>
+
           <div class="portal-card portal-card-padded">
-            <h2>Suas Vitrines Ativas</h2>
+            <h2>Suas vitrines</h2>
             <div id="sites-list-container" class="sites-list">
               <p class="loading-msg">Carregando vitrines...</p>
             </div>
@@ -359,6 +363,7 @@
           <div class="admin-tabs" role="tablist" aria-label="Áreas da administração">
             <button type="button" role="tab" id="platform-tab-overview" class="admin-tab" aria-controls="platform-operations" aria-selected="true">Visão geral</button>
             <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1">Pedidos pela Mila</button>
+            <button type="button" role="tab" id="platform-tab-linktree" class="admin-tab" aria-controls="platform-linktree" aria-selected="false" tabindex="-1">Importar do Linktree</button>
             <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1">Modelos de vitrine</button>
             <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1">Site institucional</button>
           </div>
@@ -393,6 +398,31 @@
               </form>
               <p id="platform-mila-status" class="form-help" role="status"></p>
               <ul id="platform-mila-results" class="mila-console-results"></ul>
+            </article>
+          </div>
+
+          <div id="platform-linktree" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-linktree" tabindex="0" hidden>
+            <article class="portal-card admin-card linktree-console">
+              <h2>Importar do Linktree</h2>
+              <p class="admin-card-desc">Monta um rascunho de demonstração a partir da página pública do Linktree. A vitrine fica sem dono, nunca é publicada por aqui e é apagada em 30 dias se ninguém aceitar o convite. A foto não é copiada.</p>
+              <form id="platform-linktree-form" class="form-flex-col linktree-console-form" novalidate>
+                <div class="form-group">
+                  <label for="platform-linktree-username">Nome de usuário no Linktree</label>
+                  <div class="linktree-input-prefix">
+                    <span aria-hidden="true">linktr.ee/</span>
+                    <input type="text" id="platform-linktree-username" class="item-input input-styled-height" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="30" pattern="[A-Za-z0-9_.]{1,30}" required aria-describedby="platform-linktree-username-help">
+                  </div>
+                  <p id="platform-linktree-username-help" class="form-help">Só o nome, sem barra nem arroba: letras, números, ponto ou sublinhado.</p>
+                </div>
+                <div class="form-group">
+                  <label for="platform-linktree-slug">Endereço da demonstração (opcional)</label>
+                  <input type="text" id="platform-linktree-slug" class="item-input input-styled-height" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" pattern="[a-z0-9]+(-[a-z0-9]+)*" aria-describedby="platform-linktree-slug-help">
+                  <p id="platform-linktree-slug-help" class="form-help">Em branco, usamos o nome de usuário. Ex.: ana-doces.</p>
+                </div>
+                <button type="submit" class="button button-pill linktree-console-submit">Importar do Linktree</button>
+              </form>
+              <p id="platform-linktree-status" class="form-help linktree-console-status" role="status"></p>
+              <div id="platform-linktree-result" class="linktree-result" hidden></div>
             </article>
           </div>
 
@@ -1481,12 +1511,6 @@
           <a href="#insights" class="nav-link" data-section="insights">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <span>Insights</span>
-          </a>
-        </li>
-        <li>
-          <a href="#perfil" class="nav-link" data-section="perfil">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>Perfil</span>
           </a>
         </li>
         <li>
