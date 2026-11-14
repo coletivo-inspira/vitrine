@@ -28,7 +28,7 @@ const INVOICE_LABELS = Object.freeze({
 });
 
 export function formatPrice(cents) {
-  if (!Number.isFinite(cents) || cents <= 0) return 'Gratuito';
+  if (!Number.isFinite(cents) || cents <= 0) return 'Sem mensalidade';
   const value = new Intl.NumberFormat('pt-BR', {
     style: 'currency', currency: 'BRL', minimumFractionDigits: cents % 100 ? 2 : 0
   }).format(cents / 100);
@@ -163,10 +163,6 @@ function plansByCode() {
   return new Map((panel.data?.plans ?? []).map((plan) => [plan.code, plan]));
 }
 
-function ownedActiveSites() {
-  return panel.getSites().filter((site) => site?.role === 'owner' && !site.archivedAt);
-}
-
 function renderInvoices(org) {
   const box = el('div', 'billing-invoices');
   box.append(el('h3', 'billing-subtitle', 'Histórico de faturas'));
@@ -235,9 +231,9 @@ function renderOrganization(org) {
 
   const limits = plansByCode().get(org.plan.code)?.limits;
   if (limits) {
-    const used = ownedActiveSites().length;
-    const usage = el('p', 'billing-usage', `Vitrines no plano: ${Math.min(used, 99)} de ${limits.vitrines}. Até ${limits.activeItemsPerVitrine} itens ativos e ${limits.itemBlocks === 1 ? '1 bloco' : `${limits.itemBlocks} blocos`} de itens por vitrine.`);
-    if (used >= limits.vitrines) usage.append(' Arquivar uma vitrine libera a vaga.');
+    const vitrines = limits.vitrines === 1 ? '1 vitrine' : `até ${limits.vitrines} vitrines`;
+    const blocks = limits.itemBlocks === 1 ? '1 bloco' : `${limits.itemBlocks} blocos`;
+    const usage = el('p', 'billing-usage', `Limite do plano: ${vitrines}, até ${limits.activeItemsPerVitrine} itens ativos e ${blocks} de itens por vitrine. Vitrines arquivadas não contam; arquivar uma libera a vaga.`);
     card.append(usage);
   }
 

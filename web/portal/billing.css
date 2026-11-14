@@ -34,7 +34,8 @@
   margin-left: 0;
 }
 
-.plan-gate-hint {
+.plan-gate-hint,
+.portal-card .plan-gate-hint {
   margin: 6px 0 0;
   max-width: 60ch;
   color: var(--ink-soft);
