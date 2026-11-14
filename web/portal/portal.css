@@ -5246,7 +5246,11 @@ textarea {
 
 .structure-repeat-row .textarea-styled {
   min-height: 88px;
-  font: inherit;
+  line-height: 1.5;
+}
+
+.structure-repeat-row .structure-faq-question {
+  min-height: 64px;
 }
 
 .structure-consent-label {
@@ -5272,6 +5276,14 @@ textarea {
 
 [data-theme="dark"] .structure-consent input[aria-invalid="true"] {
   outline-color: #FFA39E;
+}
+
+.structure-editor-form .structure-faq-suggestions-title {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
 }
 
 .structure-faq-suggestions {

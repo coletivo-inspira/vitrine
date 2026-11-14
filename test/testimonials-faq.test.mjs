@@ -193,6 +193,11 @@ class Node {
     this.text = '';
     this.hidden = false;
     this.checked = false;
+    if (this.tagName === 'FIELDSET') {
+      // Como no navegador, `fieldset.name` converte o valor em texto.
+      let name = '';
+      Object.defineProperty(this, 'name', { get: () => name, set: (value) => { name = String(value); } });
+    }
   }
   set className(value) { this.classes = new Set(String(value).split(/\s+/).filter(Boolean)); }
   get className() { return [...this.classes].join(' '); }

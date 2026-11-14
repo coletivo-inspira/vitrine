@@ -479,11 +479,8 @@ function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null }
     consentGroup.appendChild(consentLabel);
     row.appendChild(consentGroup);
 
-    row.name = name.element;
-    row.quote = quote.element;
-    row.context = context.element;
-    row.photo = photo;
-    row.consent = consent;
+    // `fieldset.name` é propriedade nativa: os campos ficam em `row.fields`.
+    row.fields = { name: name.element, quote: quote.element, context: context.element, photo, consent };
     row.nameError = fieldError(doc, name.group, name.element);
     row.quoteError = fieldError(doc, quote.group, quote.element);
     row.consentError = fieldError(doc, consentGroup, consent);
@@ -494,11 +491,11 @@ function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null }
   }
 
   const filledRows = () => [...list.children].filter((row) =>
-    [row.name, row.quote, row.context, row.photo].some((field) => field.value.trim()));
+    [row.fields.name, row.fields.quote, row.fields.context, row.fields.photo].some((field) => field.value.trim()));
 
   (config.items?.length ? config.items : [{}]).forEach(append);
   addBtn.addEventListener('click', () => {
-    if (list.children.length < MAX_TESTIMONIALS) append().name.focus();
+    if (list.children.length < MAX_TESTIMONIALS) append().fields.name.focus();
   });
   box.append(status, list, addBtn);
   grid.appendChild(box);
@@ -506,12 +503,12 @@ function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null }
   return {
     read() {
       return filledRows().map((row) => {
-        const item = { name: row.name.value.trim(), quote: row.quote.value.trim() };
-        const context = row.context.value.trim();
-        const photoUrl = row.photo.value.trim();
+        const item = { name: row.fields.name.value.trim(), quote: row.fields.quote.value.trim() };
+        const context = row.fields.context.value.trim();
+        const photoUrl = row.fields.photo.value.trim();
         if (context) item.context = context;
         if (photoUrl) item.photoUrl = photoUrl;
-        item.consent = row.consent.checked;
+        item.consent = row.fields.consent.checked;
         return item;
       });
     },
@@ -523,17 +520,17 @@ function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null }
         row.consentError.clear();
       }
       for (const row of filledRows()) {
-        if (!row.name.value.trim()) {
+        if (!row.fields.name.value.trim()) {
           row.nameError.show('Escreva o nome de quem deu o depoimento.');
-          firstInvalid ??= row.name;
+          firstInvalid ??= row.fields.name;
         }
-        if (!row.quote.value.trim()) {
+        if (!row.fields.quote.value.trim()) {
           row.quoteError.show('Escreva o texto do depoimento.');
-          firstInvalid ??= row.quote;
+          firstInvalid ??= row.fields.quote;
         }
-        if (!row.consent.checked) {
+        if (!row.fields.consent.checked) {
           row.consentError.show('Confirme a autorização para publicar este depoimento.');
-          firstInvalid ??= row.consent;
+          firstInvalid ??= row.fields.consent;
         }
       }
       firstInvalid?.focus();
@@ -543,7 +540,7 @@ function renderTestimonialsEditor(doc, grid, config = {}, { uploadPhoto = null }
       const row = filledRows()[index];
       if (!row) return false;
       row.consentError.show('Confirme a autorização para publicar este depoimento.');
-      row.consent.focus();
+      row.fields.consent.focus();
       return true;
     }
   };
@@ -560,7 +557,7 @@ function renderFaqEditor(doc, grid, config = {}) {
     `Até ${MAX_FAQ} perguntas. Responda dúvidas reais: pagamento, faltas, remarcação, garantia.`);
   const suggestions = el(doc, 'div', 'structure-faq-suggestions');
   suggestions.setAttribute('role', 'group');
-  const suggestionsTitle = el(doc, 'p', 'structure-field-label', 'Sugestões para serviços (você escreve a resposta)');
+  const suggestionsTitle = el(doc, 'p', 'structure-faq-suggestions-title', 'Sugestões para serviços (você escreve a resposta)');
   suggestionsTitle.id = nextFieldId('faq-suggestions', doc);
   suggestions.setAttribute('aria-labelledby', suggestionsTitle.id);
   const list = el(doc, 'div', 'structure-repeat-list');
@@ -582,8 +579,10 @@ function renderFaqEditor(doc, grid, config = {}) {
 
   function append(entry = {}) {
     const row = repeatableRow(doc, list, '', '', sync);
-    const question = labeledInput(doc, row, 'Pergunta', entry.q);
+    const question = labeledTextarea(doc, row, 'Pergunta', entry.q);
+    question.element.rows = 2;
     question.element.maxLength = 200;
+    question.element.classList.add('structure-faq-question');
     const answer = labeledTextarea(doc, row, 'Resposta', entry.a);
     answer.element.maxLength = 1000;
     row.question = question.element;
