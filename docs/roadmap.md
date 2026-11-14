@@ -18,7 +18,7 @@
 
 Novo escopo solicitado: oferta gratuita com endereço básico, assinaturas opcionais
 de endereço e customizações sob orçamento; portfólio mantido pela equipe Inspira.
-Ver docs/commercial-offer.md e ADR 0007 (preços ainda propostos). Conteúdo inicial
+Ver docs/commercial-offer.md e ADR 0013 (planos adotados em 2026-11-14; substitui os preços do ADR 0007). Conteúdo inicial
 editável em content/portfolio.json; interface administrativa ainda será criada.
 
 1. Auth + criar vitrine + rascunho persistido. Aceite: usuário A não lê/escreve dados de B, inclusive por requisição direta; associação e papel protegidos; logout/revogação testados.
@@ -49,3 +49,27 @@ Wrangler dry-run passou; autenticação Cloudflare não configurada, sem deploy 
    - **Fase 3 (L)**: Motor de templates (`templates`), módulos de seção (`modules`, `pages`, `sections`, `navigation_menus`) e herança em cascata por vertical de negócio.
    - **Fase 4 (M)**: Gestão de ativos WebP (`<= 200 KB`) com cache imutável na borda (`SupabaseStorageProvider` padrão sem cartão + `R2StorageProvider` plugável) e sandboxing em origem opaca (`sandbox.inspira.dev.br`).
    - **Fase 5 (L)**: Domínios personalizados (`custom_domains`), verificação DNS/SSL, roteamento por `Host` com SWR na borda e trava de 95 domínios gratuitos.
+
+## Estudo de mercado 2026 (ADR 0013)
+
+Decisões do Lino em 2026-11-14: **1.a** manter a arquitetura atual (Worker único,
+Supabase e snapshots imutáveis; sem repositório `vtr-*`, Astro ou Cloudflare Pages) e
+**2.b** adotar os planos do estudo com cobrança recorrente pelo Asaas desde já
+(Stripe depois). Estudo em `docs/market-study-2026.md`; decisão em
+`docs/adr/0013-plans-and-recurring-billing.md`; 17 issues prontas em
+`docs/backlog/estudo-mercado/`, criadas pelo Lino com
+`scripts/criar-issues-estudo-mercado.sh`.
+
+1. **Planos e cobrança:** tabela de planos → direitos por plano no banco → Asaas em
+   sandbox → ciclo da assinatura → tela "Plano e cobrança" e página de preços. Stripe
+   fica para depois. Produção depende do passo humano `BLK-ASAAS-01`.
+2. **Vitrine pública e conversão:** SEO local e cartão de prévia → UTM e Insights por
+   origem; "Aberto agora", "Traçar rota" e QR Code; `vitrine.json`; pré-orçamento com
+   webhook assinado.
+3. **Aquisição:** kit Comment-to-Vitrine (só documentação), importador do Linktree
+   para rascunho e vitrine piloto Guavira Fotos.
+4. **Painel:** central de canais e pausar, desconectar domínio e arquivar. Papel de
+   patrocinador fica para depois.
+
+As correções de UX da auditoria (`docs/auditoria-ux/`, pacotes `PB-01` a `PB-27`)
+continuam valendo e vêm antes das telas novas que dependem delas.
