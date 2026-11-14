@@ -107,8 +107,8 @@ function fieldError(doc, group, element) {
 function actionTargetOptions(pages = []) {
   const options = {
     '': 'Sem botão',
-    selecao: 'Rolar até os itens da vitrine',
-    whatsapp: 'Abrir conversa no WhatsApp'
+    selecao: 'Rolar até os itens',
+    whatsapp: 'Conversa no WhatsApp'
   };
   for (const page of pages) {
     if (page.slug && page.slug !== 'home') options[`pagina:${page.slug}`] = `Página: ${page.title || page.slug}`;
@@ -132,7 +132,7 @@ function renderHeroExtras(doc, grid, config = {}, { pages = [], uploadImage = nu
   image.element.autocomplete = 'off';
   image.element.placeholder = 'https://…/foto.webp';
   const imageStatus = fieldHelp(doc, image.group, image.element,
-    'Foto real sua ou do negócio. Convertida para WebP de até 200 KB ao enviar.');
+    'Foto real sua ou do negócio. Convertida para WebP de até 100 KB ao enviar, para abrir rápido no celular.');
   if (uploadImage) {
     const actions = el(doc, 'div', 'structure-image-actions');
     const file = doc.createElement('input');
