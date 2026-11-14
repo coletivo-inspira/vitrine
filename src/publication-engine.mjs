@@ -13,6 +13,14 @@ import { projectPublicPlace } from './business-hours.mjs';
 import { renderStorefrontPlaceHtml } from '../web/assets/storefront-place.mjs';
 import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
 import {
+  DEFAULT_SHARE_DESCRIPTION,
+  assertPublicSeo,
+  projectPublicSeo,
+  renderLocalBusinessJsonLd,
+  renderShareMetaTags,
+  shareMetaFor
+} from './local-seo.mjs';
+import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
@@ -89,7 +97,9 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'structure',
   'locality',
   'businessHours',
-  'publicAddress'
+  'publicAddress',
+  'canonicalUrl',
+  'localBusiness'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -267,6 +277,8 @@ export function assertNoPrivateLeakage(menuArtifact) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Horário ou endereço público inválido.');
     }
   }
+
+  assertPublicSeo(menuArtifact);
 
   if (menuArtifact.components !== undefined) {
     if (
@@ -695,7 +707,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     categories: projectedCategories,
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
     ...(locality ? { locality } : {}),
-    ...projectPublicPlace(migrated)
+    ...projectPublicPlace(migrated),
+    ...projectPublicSeo(migrated, baseMenu.slug, limits)
   };
 
   for (const item of menu.items) {
@@ -746,26 +759,6 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function getOgImage(menu) {
-  let ogImage = menu.logoUrl || menu.coverUrl || menu.imageUrl;
-  if (!ogImage && menu.structure?.theme?.logoUrl) {
-    ogImage = menu.structure.theme.logoUrl;
-  }
-  if (!ogImage) {
-    const firstItemWithImage = menu.items?.find(item => typeof item.imageUrl === 'string' && item.imageUrl.trim());
-    if (firstItemWithImage) {
-      ogImage = firstItemWithImage.imageUrl.trim();
-    }
-  }
-  if (!ogImage) {
-    ogImage = 'https://vitrine.inspira.dev.br/assets/brand/og-vitrine.png';
-  }
-  if (ogImage.startsWith('/')) {
-    ogImage = `https://vitrine.inspira.dev.br${ogImage}`;
-  }
-  return ogImage;
 }
 
 export function formatPublicPriceBRL(priceCents) {
@@ -1037,7 +1030,15 @@ function renderPublicSections(pages, menu, catalog, placeHtml = '') {
   }).join('');
 }
 
-export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = true } = {}) {
+/**
+ * HTML da vitrine publicada. `canonicalUrl` substitui o endereço gravado no snapshot
+ * (ex.: pedido atendido pelo domínio próprio).
+ */
+export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = true, canonicalUrl } = {}) {
+  const share = shareMetaFor(menu, { canonicalUrl });
+  const descriptionTag = `<meta name="description" content="${escapeHtml(share.description)}">`;
+  const shareTags = renderShareMetaTags(share);
+  const jsonLd = renderLocalBusinessJsonLd(menu, { canonicalUrl: share.url });
   const catalog = renderStorefrontCatalogMarkup(menu);
   const { chipsHtml, sectionsHtml } = catalog;
   const structure = menu.structure ? projectShowcaseManifest({
@@ -1065,33 +1066,17 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
     ? MILA_RELAY_FOOTER_NOTE
     : DIRECT_ORDER_FOOTER_NOTE;
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
-    const welcome = menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.';
-    const ogImg = getOgImage(menu);
     return baseTemplateHtml
       .replace(
         '<title id="storefront-page-title">Cardápio Digital — Vitrine Inspira</title>',
-        `<title id="storefront-page-title">${escapeHtml(menu.name)} — Vitrine</title>`
+        () => `<title id="storefront-page-title">${escapeHtml(menu.name)} — Vitrine</title>`
       )
       .replace(
-        '<meta property="og:title" id="og-title" content="Vitrine Inspira">',
-        `<meta property="og:title" id="og-title" content="${escapeHtml(menu.name)} — Vitrine">`
+        `<meta name="description" content="${DEFAULT_SHARE_DESCRIPTION}">`,
+        () => descriptionTag
       )
-      .replace(
-        '<meta property="og:description" id="og-description" content="Vitrine oficial: faça seu pedido direto no WhatsApp.">',
-        `<meta property="og:description" id="og-description" content="${escapeHtml(welcome)}">`
-      )
-      .replace(
-        '<meta property="og:url" id="og-url" content="https://inspira.dev.br/">',
-        `<meta property="og:url" id="og-url" content="https://vitrine.inspira.dev.br/${escapeHtml(menu.slug)}">`
-      )
-      .replace(
-        '<meta property="og:image" id="og-image" content="https://inspira.dev.br/assets/brand/og-vitrine.png">',
-        `<meta property="og:image" id="og-image" content="${escapeHtml(ogImg)}">`
-      )
-      .replace(
-        '<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial">',
-        `<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial de ${escapeHtml(menu.name)}">`
-      )
+      .replace(/<meta property="og:type"[\s\S]*?<meta name="twitter:card"[^>]*>/, () => shareTags)
+      .replace('</head>', () => `${jsonLd ? `  ${jsonLd}\n` : ''}</head>`)
       .replace(/<header class="storefront-topbar">[\s\S]*?<\/header>/, () => header)
       .replace(
         '<h1 id="storefront-name">Carregando vitrine...</h1>',
@@ -1112,24 +1097,15 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#F7F7F4">
-  <meta name="description" content="Vitrine oficial: faça seu pedido direto no WhatsApp.">
+  ${descriptionTag}
   <title id="storefront-page-title">${escapeHtml(menu.name)} — Vitrine</title>
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Vitrine Inspira">
-  <meta property="og:title" content="${escapeHtml(menu.name)} — Vitrine">
-  <meta property="og:description" content="${escapeHtml(menu.messages?.welcomeText || 'Vitrine oficial: faça seu pedido direto no WhatsApp.')}">
-  <meta property="og:url" content="https://vitrine.inspira.dev.br/${escapeHtml(menu.slug)}">
-  <meta property="og:image" content="${escapeHtml(getOgImage(menu))}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Vitrine oficial de ${escapeHtml(menu.name)}">
-  <meta property="og:locale" content="pt_BR">
-  <meta name="twitter:card" content="summary_large_image">
+  ${shareTags}
   <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
   ${heroPhoto ? '' : `<link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
   `}<script src="/theme.js"></script>
   <link rel="stylesheet" href="/vitrine/vitrine.css">
+  ${jsonLd}
 </head>
 <body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>
   <a class="skip-link" href="#vitrine-principal">Pular para os itens</a>
