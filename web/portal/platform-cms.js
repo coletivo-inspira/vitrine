@@ -2,6 +2,7 @@ import { renderStructureFields } from './showcase-structure.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { buildMilaForwardMessage, normalizeMilaRelayCode } from '../assets/mila-relay.mjs';
 import { resetLinktreeImport } from './linktree-import.js';
+import { loadSponsorAdmin, resetSponsorAdmin } from './sponsor-admin.mjs';
 const section = globalThis.document?.getElementById('platform-cms-section');
 const open = globalThis.document?.getElementById('platform-cms-open');
 const navItems = [...(globalThis.document?.querySelectorAll('.nav-admin-item') ?? [])];
@@ -136,6 +137,7 @@ function selectTab(tab, focus = false) {
   }
   if (focus) tab.focus();
   if (tab.getAttribute('aria-controls') === 'platform-templates') void loadTemplates();
+  if (tab.getAttribute('aria-controls') === 'platform-sponsors') loadSponsorAdmin({ confirm: confirmAction });
 }
 
 tabs.forEach((tab, index) => {
@@ -498,6 +500,7 @@ export async function detectPlatformCms(authenticated) {
   templateStatus.textContent = '';
   resetMilaConsole();
   resetLinktreeImport();
+  resetSponsorAdmin();
   selectTab(tabs[0]);
   if (!authenticated) return;
   try {
