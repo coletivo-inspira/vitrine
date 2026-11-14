@@ -8,6 +8,7 @@ import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-rend
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
 import { createItemHref, resolveItemBasePath, setupItemPage } from '../assets/item-page.mjs';
+import { QR_SOURCE, bindRouteClickMetric, resolveVisitOrigin } from '../assets/metrics-source.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
@@ -172,9 +173,13 @@ export function createStorefrontMetricsCollector({
   validItemIds = [],
   navigatorObj = globalThis.navigator,
   fetchImpl = globalThis.fetch,
-  nowFn = () => new Date()
+  nowFn = () => new Date(),
+  origin = null
 } = {}) {
   const allowedItems = new Set(validItemIds);
+  const originFields = origin?.source
+    ? { source: origin.source, ...(origin.campaign ? { campaign: origin.campaign } : {}) }
+    : {};
   const viewedItems = new Set();
   let visitQueued = false;
   let queue = [];
@@ -229,7 +234,8 @@ export function createStorefrontMetricsCollector({
     if (type === 'visit') {
       if (visitQueued) return false;
       visitQueued = true;
-      queue.push({ type: 'visit', hour });
+      queue.push({ type: 'visit', hour, ...originFields });
+      if (originFields.source === QR_SOURCE) queue.push({ type: 'qr_visit', hour, ...originFields });
     } else if (type === 'item_view') {
       const itemId = typeof payload.itemId === 'string' ? payload.itemId.trim() : '';
       if (!itemId || (allowedItems.size > 0 && !allowedItems.has(itemId))) return false;
@@ -249,7 +255,11 @@ export function createStorefrontMetricsCollector({
         Number.isSafeInteger(payload.estimatedCents) && payload.estimatedCents >= 0
           ? payload.estimatedCents
           : 0;
-      queue.push({ type: 'whatsapp_order', estimatedCents, hour });
+      queue.push({ type: 'whatsapp_order', estimatedCents, hour, ...originFields });
+      flush();
+      return true;
+    } else if (type === 'route_click') {
+      queue.push({ type: 'route_click', hour, ...originFields });
       flush();
       return true;
     } else {
@@ -498,11 +508,13 @@ export async function bootStorefront(deps = {}) {
       slug,
       validItemIds,
       navigatorObj,
-      fetchImpl
+      fetchImpl,
+      origin: resolveVisitOrigin(deps.search ?? globalThis.location?.search)
     });
 
     globalThis.recordStorefrontEvent = (type, payload) => collector.record(type, payload);
     collector.record('visit');
+    bindRouteClickMetric(doc, (type) => collector.record(type));
     for (const itemId of focusItemId ? [focusItemId] : validItemIds.slice(0, 12)) {
       collector.record('item_view', { itemId });
     }
