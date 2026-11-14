@@ -113,14 +113,14 @@ function renderFaq(item, id, onChange, rebuild) {
     const n = index + 1;
     const row = el('li', 'item-page-editor-faq-entry');
     const qGroup = fieldGroup(`Pergunta ${n}`, `item-faq-q-${id}-${index}`);
-    const q = el('input', 'item-input input-styled-height');
-    q.type = 'text';
+    const q = el('textarea', 'item-input textarea-styled item-page-editor-question');
+    q.rows = 2;
     q.id = `item-faq-q-${id}-${index}`;
     q.maxLength = ITEM_PAGE_LIMITS.faqQuestion;
     q.value = entry?.q || '';
     q.placeholder = 'Ex.: Preciso levar algo?';
     q.addEventListener('input', () => {
-      entry.q = q.value;
+      entry.q = q.value.replace(/\s*\n\s*/g, ' ');
       onChange();
     });
     qGroup.appendChild(q);

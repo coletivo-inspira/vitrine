@@ -115,6 +115,13 @@
 .item-page-editor-gallery .button {
   justify-self: start;
   min-height: 44px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.item-page-editor-question {
+  min-height: 0;
+  resize: vertical;
 }
 
 .item-page-editor-gallery-list {

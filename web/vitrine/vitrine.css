@@ -1538,6 +1538,16 @@ html:has(.selection-drawer[open]) {
   border-top: 0;
 }
 
+/* O preço já aparece logo abaixo do nome do item. */
+.item-page-select .menu-item-footer > .menu-item-price,
+.item-page-select .menu-item-footer > .sf-quote-tag {
+  display: none;
+}
+
+.item-page-select .menu-item-footer:not(.sf-footer-stacked) {
+  justify-content: flex-start;
+}
+
 .item-page-share {
   display: flex;
   flex-wrap: wrap;
