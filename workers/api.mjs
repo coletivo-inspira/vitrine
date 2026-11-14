@@ -48,6 +48,9 @@ import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlan
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
+  fetchShowcaseRoute, nonCanonicalDomainResponse, resolveShowcaseRoute, runSubscriptionLifecycle
+} from '../src/billing/lifecycle.mjs';
+import {
   CITY_PAGE_SIZE,
   cityFromSummaryRow,
   finalizeCityListingPage,
@@ -2339,6 +2342,10 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return response.json();
     },
 
+    async resolveDomainRoute(hostname) {
+      return fetchShowcaseRoute({ baseUrl, headers: anonHeaders(), fetch: fetchImpl }, hostname);
+    },
+
     async listAssets(siteId, { token }) {
       const response = await fetchImpl(
         `${baseUrl}/rest/v1/assets?site_id=eq.${encodeURIComponent(siteId)}&upload_state=eq.ready&order=created_at.desc`,
@@ -3851,14 +3858,14 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
     if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
     return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
   }
-  if (!['GET', 'HEAD'].includes(request.method) || typeof store.resolveDomain !== 'function') {
-    return new Response(null, { status: 404 });
-  }
-  const slug = await store.resolveDomain(url.hostname);
+  if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 404 });
+  const route = await resolveShowcaseRoute(store, url.hostname);
+  const slug = route?.slug;
   if (!isValidSlug(slug)) return new Response(null, { status: 404 });
   const path = url.pathname === '/' ? `/${slug}` : url.pathname;
   const publicPaths = new Set([`/${slug}`, `/${slug}/`, `/data/vitrines/${slug}/menu.json`]);
   if (!publicPaths.has(path)) return new Response(null, { status: 404 });
+  if (!route.canonical) return nonCanonicalDomainResponse(resolvePublicOrigins(env, deps).publicSiteOrigin, path);
   const cache = globalThis.caches?.default;
   const key = new Request(url.origin + path);
   const cached = await cache?.match(key);
@@ -5586,6 +5593,11 @@ export default {
     return defaultApiHandler(request, env, ctx);
   },
   async scheduled(_event, env) {
-    await refreshPendingDomainCertificates(env);
+    const results = await Promise.allSettled([
+      refreshPendingDomainCertificates(env),
+      runSubscriptionLifecycle(env)
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
   }
 };
