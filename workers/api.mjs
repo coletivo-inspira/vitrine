@@ -46,6 +46,7 @@ import {
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
 import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
+import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
   CITY_PAGE_SIZE,
   cityFromSummaryRow,
@@ -4149,6 +4150,16 @@ export function createApiHandler(deps = {}) {
     }
 
     try {
+      if (isBillingRoute(pathname)) {
+        return await handleBillingRoute(request, env, _ctx, {
+          deps,
+          resolveUser: () => resolveSessionUser(request, env, deps),
+          guard: () => validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true }),
+          jsonResponse,
+          errorResponse
+        });
+      }
+
       if (pathname === '/api/public/platform-cms' && method === 'GET') {
         const cache = globalThis.caches?.default;
         const key = new Request(url.origin + pathname);
