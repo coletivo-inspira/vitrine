@@ -18,6 +18,7 @@ import {
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
+import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -1102,6 +1103,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   mountSeoPanel({
     getContent: () => currentDraft?.content,
     getSlug: () => currentSite?.slug,
+    onChange: () => updateDraftAndPreview()
+  });
+  void mountQuoteWebhookPanel({
+    site: currentSite,
+    isOnline: currentIsOnline,
+    getContent: () => currentDraft?.content,
     onChange: () => updateDraftAndPreview()
   });
 
