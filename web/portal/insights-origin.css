@@ -1,0 +1,144 @@
+.insights-origin-card {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.origin-reach {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.origin-reach-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: rgb(var(--glass) / .35);
+}
+
+.origin-reach-label,
+.origin-reach-previous {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.origin-reach-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.origin-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.origin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.origin-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.origin-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.origin-row-label {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.origin-row-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.origin-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgb(var(--glass) / .45);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.origin-bar-visits {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink-soft) 55%, transparent);
+  overflow: hidden;
+}
+
+.origin-bar-orders {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--orange);
+}
+
+.origin-row-funnel {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.origin-subtitle {
+  font-size: 15px;
+  margin: 10px 0 0;
+}
+
+.origin-locked {
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  background: var(--apricot);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.origin-locked-title {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.origin-locked-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+@media (max-width: 720px) {
+  .insights-origin-card {
+    padding: 22px 18px;
+  }
+
+  .origin-reach {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,10 +1,13 @@
 // Rotas de cobrança (issue #113): POST /api/billing/checkout (dono do tenant) e
 // POST /api/billing/asaas/webhook (público, autenticado pelo token do Asaas).
 // Issue #114: GET /api/billing/notice (aviso do Início) e POST /api/billing/cancel.
+// Issue #116: POST /api/billing/stripe/webhook (Stripe-Signature) e
+// POST /api/billing/stripe/portal (portal do cliente do Stripe, dono do tenant).
 // workers/api.mjs só encaminha; tudo de cobrança fica aqui e em src/billing/.
 import planTableSource from '../../content/plans.json' with { type: 'json' };
 import { planByCode, validatePlanTable } from '../plans.mjs';
 import { createAsaasProvider, resolveAsaasConfig } from './asaas.mjs';
+import { createStripeProvider, resolveStripeConfig } from './stripe.mjs';
 import { pickSubscriptionNotice } from './lifecycle.mjs';
 import {
   BillingProviderError,
@@ -17,7 +20,12 @@ export const BILLING_CHECKOUT_PATH = '/api/billing/checkout';
 export const ASAAS_WEBHOOK_PATH = '/api/billing/asaas/webhook';
 export const BILLING_NOTICE_PATH = '/api/billing/notice';
 export const BILLING_CANCEL_PATH = '/api/billing/cancel';
+export const STRIPE_WEBHOOK_PATH = '/api/billing/stripe/webhook';
+export const STRIPE_PORTAL_PATH = '/api/billing/stripe/portal';
 export const BILLING_NOT_CONFIGURED = 'BILLING_NOT_CONFIGURED';
+export const BILLING_PROVIDERS = Object.freeze(['asaas', 'stripe']);
+export const DEFAULT_BILLING_PROVIDER = 'asaas';
+const DEFAULT_PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
 
 const PLAN_TABLE = validatePlanTable(planTableSource);
 const UUID_PATTERN = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -25,7 +33,10 @@ const MAX_WEBHOOK_BYTES = 64 * 1024;
 const MAX_CHECKOUT_BYTES = 8 * 1024;
 const ACTIVE_STATUSES = new Set(['active', 'past_due', 'grace']);
 
-const BILLING_PATHS = new Set([BILLING_CHECKOUT_PATH, ASAAS_WEBHOOK_PATH, BILLING_NOTICE_PATH, BILLING_CANCEL_PATH]);
+const BILLING_PATHS = new Set([
+  BILLING_CHECKOUT_PATH, ASAAS_WEBHOOK_PATH, BILLING_NOTICE_PATH, BILLING_CANCEL_PATH,
+  STRIPE_WEBHOOK_PATH, STRIPE_PORTAL_PATH
+]);
 
 export function isBillingRoute(pathname) {
   return BILLING_PATHS.has(pathname.replace(/\/+$/, ''));
@@ -76,7 +87,7 @@ export function createSupabaseBillingStore({ supabaseUrl, anonKey, serviceRoleKe
     async getSubscription(tenantId) {
       const query = new URLSearchParams({
         tenant_id: `eq.${tenantId}`,
-        select: 'plan_code,status,provider,provider_subscription_id,current_period_end',
+        select: 'plan_code,status,provider,provider_customer_id,provider_subscription_id,current_period_end',
         limit: '1'
       });
       const response = await fetchImpl(`${baseUrl}/rest/v1/subscriptions?${query}`, {
@@ -152,6 +163,37 @@ function resolveAsaasProvider(env, deps) {
   });
 }
 
+// Stripe em modo de teste por padrão; live só com STRIPE_ENV=live e chave live.
+function resolveStripeProvider(env, deps) {
+  if (deps.stripeProvider) return assertBillingProvider(deps.stripeProvider);
+  return createStripeProvider(resolveStripeConfig(env), {
+    fetch: deps.fetch,
+    sleep: deps.billingSleep,
+    now: deps.now,
+    webhookSecret: typeof env.STRIPE_WEBHOOK_SECRET === 'string' ? env.STRIPE_WEBHOOK_SECRET.trim() : ''
+  });
+}
+
+function resolveProvider(name, env, deps) {
+  return name === 'stripe' ? resolveStripeProvider(env, deps) : resolveAsaasProvider(env, deps);
+}
+
+// Retorno do Checkout e do portal do Stripe: sempre o painel (PORTAL_ORIGIN, https).
+function portalReturnUrls(env, deps) {
+  let origin = DEFAULT_PORTAL_ORIGIN;
+  try {
+    const parsed = new URL(env.PORTAL_ORIGIN ?? deps.portalOrigin ?? DEFAULT_PORTAL_ORIGIN);
+    if (parsed.protocol === 'https:') origin = parsed.origin;
+  } catch {
+    origin = DEFAULT_PORTAL_ORIGIN;
+  }
+  return {
+    successUrl: `${origin}/?cobranca=concluida#inicio`,
+    cancelUrl: `${origin}/?cobranca=cancelada#inicio`,
+    returnUrl: `${origin}/#inicio`
+  };
+}
+
 async function readBoundedText(request, maxBytes) {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
@@ -168,12 +210,17 @@ function parseJson(text) {
   }
 }
 
-function notConfigured(errorResponse) {
+function notConfigured(errorResponse, providerName = DEFAULT_BILLING_PROVIDER) {
+  if (providerName === 'stripe') {
+    return errorResponse(503, BILLING_NOT_CONFIGURED, 'A cobrança pelo Stripe ainda não está configurada nesta plataforma.', {
+      provider: 'stripe'
+    });
+  }
   return errorResponse(503, BILLING_NOT_CONFIGURED, 'A cobrança ainda não está configurada nesta plataforma.');
 }
 
-function providerFailure(error, errorResponse) {
-  if (error instanceof BillingProviderError && error.kind === 'not_configured') return notConfigured(errorResponse);
+function providerFailure(error, errorResponse, providerName) {
+  if (error instanceof BillingProviderError && error.kind === 'not_configured') return notConfigured(errorResponse, providerName);
   if (error instanceof BillingProviderError && error.status >= 400 && error.status < 500 && error.status !== 429) {
     return errorResponse(422, 'BILLING_DATA_REJECTED', 'O provedor de cobrança recusou os dados informados. Confira e tente de novo.', {
       providerCode: error.providerCode
@@ -201,7 +248,11 @@ async function handleCheckout(request, env, ctx, helpers) {
   if (typeof body.tenantId !== 'string' || !UUID_PATTERN.test(body.tenantId)) {
     return errorResponse(400, 'INVALID_TENANT', 'Informe a organização que vai assinar o plano.');
   }
-  const details = validateBillingDetails(body.billing);
+  const providerName = body.provider ?? DEFAULT_BILLING_PROVIDER;
+  if (!BILLING_PROVIDERS.includes(providerName)) {
+    return errorResponse(400, 'INVALID_PROVIDER', 'Escolha o meio de cobrança: asaas (padrão) ou stripe.');
+  }
+  const details = validateBillingDetails(body.billing, { requireTaxId: providerName !== 'stripe' });
   if (!details.ok) {
     return errorResponse(422, 'INVALID_BILLING_DETAILS', 'Confira nome, CPF ou CNPJ e e-mail de cobrança.', {
       fields: details.fields
@@ -209,8 +260,8 @@ async function handleCheckout(request, env, ctx, helpers) {
   }
 
   const store = resolveBillingStore(env, deps);
-  const provider = resolveAsaasProvider(env, deps);
-  if (!store || provider.configured === false) return notConfigured(errorResponse);
+  const provider = resolveProvider(providerName, env, deps);
+  if (!store || provider.configured === false) return notConfigured(errorResponse, providerName);
 
   const tenantId = body.tenantId.toLowerCase();
   let owner;
@@ -231,10 +282,12 @@ async function handleCheckout(request, env, ctx, helpers) {
   let created;
   try {
     const { customerId } = await provider.createCustomer({ ...details.value, reference: tenantId });
-    const subscription = await provider.createSubscription({ customerId, plan, reference: tenantId });
+    const subscription = await provider.createSubscription({
+      customerId, plan, reference: tenantId, ...portalReturnUrls(env, deps)
+    });
     created = { customerId, ...subscription };
   } catch (error) {
-    return providerFailure(error, errorResponse);
+    return providerFailure(error, errorResponse, providerName);
   }
 
   let previousSubscriptionId = null;
@@ -248,7 +301,7 @@ async function handleCheckout(request, env, ctx, helpers) {
       subscriptionId: created.subscriptionId
     }));
   } catch (error) {
-    await provider.cancelSubscription(created.subscriptionId).catch(() => {});
+    await provider.cancelSubscription(created.subscriptionId, { customerId: created.customerId }).catch(() => {});
     if (error instanceof BillingStoreError && error.code === 'SUBSCRIPTION_ALREADY_ACTIVE') {
       return errorResponse(409, 'SUBSCRIPTION_ALREADY_ACTIVE', 'Esta organização já tem uma assinatura em vigor.');
     }
@@ -258,8 +311,21 @@ async function handleCheckout(request, env, ctx, helpers) {
     return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Não foi possível registrar a contratação. Tente de novo.');
   }
 
+  // A anterior não cancelada (pendente ou suspensa) é cancelada no provedor dela, que
+  // pode ser outro: billing_attach_checkout só devolve a do mesmo provedor.
+  let stale = null;
   if (previousSubscriptionId) {
-    const cancel = provider.cancelSubscription(previousSubscriptionId).catch(() => {});
+    stale = { provider, subscriptionId: previousSubscriptionId, customerId: current?.provider_customer_id };
+  } else if (current && current.status !== 'canceled' && current.provider !== provider.name
+    && BILLING_PROVIDERS.includes(current.provider) && current.provider_subscription_id) {
+    stale = {
+      provider: resolveProvider(current.provider, env, deps),
+      subscriptionId: current.provider_subscription_id,
+      customerId: current.provider_customer_id
+    };
+  }
+  if (stale) {
+    const cancel = stale.provider.cancelSubscription(stale.subscriptionId, { customerId: stale.customerId }).catch(() => {});
     if (typeof ctx?.waitUntil === 'function') ctx.waitUntil(cancel);
     else await cancel;
   }
@@ -307,8 +373,7 @@ async function handleCancel(request, env, helpers) {
     return errorResponse(400, 'INVALID_TENANT', 'Informe a organização da assinatura.');
   }
   const store = resolveBillingStore(env, deps);
-  const provider = resolveAsaasProvider(env, deps);
-  if (!store || provider.configured === false) return notConfigured(errorResponse);
+  if (!store) return notConfigured(errorResponse);
 
   const tenantId = body.tenantId.toLowerCase();
   let owner;
@@ -322,14 +387,16 @@ async function handleCancel(request, env, helpers) {
   if (!owner || owner !== user.id) {
     return errorResponse(403, 'FORBIDDEN_TENANT_OWNER', 'Só a pessoa dona da organização pode cancelar o plano.');
   }
-  if (!current || current.status === 'canceled' || current.provider !== provider.name || !current.provider_subscription_id) {
+  if (!current || current.status === 'canceled' || !BILLING_PROVIDERS.includes(current.provider) || !current.provider_subscription_id) {
     return errorResponse(409, 'SUBSCRIPTION_NOT_CANCELABLE', 'Não há assinatura para cancelar por aqui. Fale com a equipe da Vitrine.');
   }
+  const provider = resolveProvider(current.provider, env, deps);
+  if (provider.configured === false) return notConfigured(errorResponse, current.provider);
 
   try {
-    await provider.cancelSubscription(current.provider_subscription_id);
+    await provider.cancelSubscription(current.provider_subscription_id, { customerId: current.provider_customer_id });
   } catch (error) {
-    return providerFailure(error, errorResponse);
+    return providerFailure(error, errorResponse, current.provider);
   }
   let row;
   try {
@@ -376,6 +443,83 @@ async function handleAsaasWebhook(request, env, helpers) {
   return jsonResponse(200, { received: true, outcome }, { 'cache-control': 'no-store' });
 }
 
+// A assinatura do Stripe cobre o corpo bruto, então o corpo é lido antes de conferir.
+// Assinatura ausente, errada, fora da tolerância de 5 minutos ou segredo ausente:
+// 400 e nada muda. Evento live com STRIPE_ENV diferente de live (ou o inverso) também
+// não muda nada. Idempotência por event.id em private.billing_events (provider stripe).
+async function handleStripeWebhook(request, env, helpers) {
+  const { deps, errorResponse, jsonResponse } = helpers;
+  const provider = resolveStripeProvider(env, deps);
+  const text = await readBoundedText(request, MAX_WEBHOOK_BYTES);
+  if (text === null) return errorResponse(413, 'PAYLOAD_TOO_LARGE', 'Evento grande demais.');
+  if (!await provider.verifyWebhook(request, text)) {
+    return errorResponse(400, 'INVALID_WEBHOOK_SIGNATURE', 'Assinatura do webhook ausente ou inválida.');
+  }
+  const store = resolveBillingStore(env, deps);
+  if (!store) return notConfigured(errorResponse, 'stripe');
+
+  const event = provider.parseWebhookEvent(parseJson(text));
+  if (!event) return errorResponse(400, 'INVALID_WEBHOOK_EVENT', 'Evento sem id ou tipo.');
+  if (event.livemode !== (provider.mode === 'live')) {
+    return errorResponse(400, 'STRIPE_MODE_MISMATCH', 'Evento de outro modo do Stripe (teste ou live).');
+  }
+
+  let outcome;
+  try {
+    outcome = await store.applyEvent({ provider: provider.name, event, change: subscriptionChangeFor(event) });
+  } catch {
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Evento não registrado; reenvie.');
+  }
+  return jsonResponse(200, { received: true, outcome }, { 'cache-control': 'no-store' });
+}
+
+// Portal do cliente do Stripe (cartão, faturas, cancelamento), só para o dono de uma
+// assinatura do Stripe. A assinatura do Asaas não tem portal: 409.
+async function handleStripePortal(request, env, helpers) {
+  const { deps, errorResponse, jsonResponse } = helpers;
+  const guard = helpers.guard();
+  if (guard) return guard;
+  const user = await helpers.resolveUser();
+  if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+  const text = await readBoundedText(request, MAX_CHECKOUT_BYTES);
+  const body = text === null ? undefined : parseJson(text);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return errorResponse(400, 'INVALID_JSON', 'O corpo da requisição não contém JSON válido.');
+  }
+  if (typeof body.tenantId !== 'string' || !UUID_PATTERN.test(body.tenantId)) {
+    return errorResponse(400, 'INVALID_TENANT', 'Informe a organização da assinatura.');
+  }
+  const store = resolveBillingStore(env, deps);
+  const provider = resolveStripeProvider(env, deps);
+  if (!store || provider.configured === false) return notConfigured(errorResponse, 'stripe');
+
+  const tenantId = body.tenantId.toLowerCase();
+  let owner;
+  let current;
+  try {
+    owner = await store.getTenantOwner(tenantId, { token: user.token, env });
+    current = owner === user.id ? await store.getSubscription(tenantId) : null;
+  } catch {
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Não foi possível consultar a assinatura. Tente de novo.');
+  }
+  if (!owner || owner !== user.id) {
+    return errorResponse(403, 'FORBIDDEN_TENANT_OWNER', 'Só a pessoa dona da organização pode abrir o portal de cobrança.');
+  }
+  if (!current || current.provider !== 'stripe' || !current.provider_customer_id) {
+    return errorResponse(409, 'STRIPE_PORTAL_UNAVAILABLE', 'Esta organização não tem assinatura pelo Stripe.');
+  }
+  let portal;
+  try {
+    portal = await provider.createPortalSession({
+      customerId: current.provider_customer_id,
+      returnUrl: portalReturnUrls(env, deps).returnUrl
+    });
+  } catch (error) {
+    return providerFailure(error, errorResponse, 'stripe');
+  }
+  return jsonResponse(200, { portalUrl: portal.portalUrl }, { 'cache-control': 'no-store' });
+}
+
 // helpers: { deps, resolveUser(), guard(), jsonResponse, errorResponse }
 export async function handleBillingRoute(request, env = {}, ctx = {}, helpers) {
   const url = new URL(request.url);
@@ -390,6 +534,8 @@ export async function handleBillingRoute(request, env = {}, ctx = {}, helpers) {
     return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use POST nesta rota de cobrança.');
   }
   if (path === ASAAS_WEBHOOK_PATH) return handleAsaasWebhook(request, env, safeHelpers);
+  if (path === STRIPE_WEBHOOK_PATH) return handleStripeWebhook(request, env, safeHelpers);
+  if (path === STRIPE_PORTAL_PATH) return handleStripePortal(request, env, safeHelpers);
   if (path === BILLING_CANCEL_PATH) return handleCancel(request, env, safeHelpers);
   return handleCheckout(request, env, ctx, safeHelpers);
 }
