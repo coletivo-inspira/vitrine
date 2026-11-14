@@ -83,6 +83,17 @@ próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
 pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
 `loadSiteEntitlements` sem sessão.
 
+## Cobrança pelo Asaas (ADR 0013, issue #113)
+
+`src/billing/provider.mjs` define a interface de provedor (a mesma que o Stripe usará);
+`src/billing/asaas.mjs` implementa o Asaas, em sandbox salvo `ASAAS_ENV=production`;
+`src/billing/routes.mjs` atende `POST /api/billing/checkout` (dono do tenant) e
+`POST /api/billing/asaas/webhook` (token `asaas-access-token` em tempo constante). A
+migração `20261115000200_billing_events.sql` cria `private.billing_events` (ids de
+evento, sem dados pessoais) e as RPCs `billing_attach_checkout` e `billing_apply_event`,
+só para `service_role`; o webhook grava o id e muda `public.subscriptions` na mesma
+transação. Configuração, eventos, cotas e testes em `docs/billing/asaas.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
