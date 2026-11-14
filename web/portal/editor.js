@@ -15,6 +15,7 @@ import {
   toggleVariableInTemplate
 } from './order-message-tools.mjs';
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
+import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -1091,6 +1092,11 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   if (editorLocalityCity) editorLocalityCity.value = locality.city || '';
   if (editorLocalityUf) editorLocalityUf.value = locality.uf || '';
   renderLocalityState();
+  mountPlacePanel({
+    getContent: () => currentDraft?.content,
+    getSlug: () => currentSite?.slug,
+    onChange: () => updateDraftAndPreview()
+  });
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;
@@ -2739,6 +2745,7 @@ function updateDraftAndPreview({ skipAutosave = false } = {}) {
         } else {
           const errData = await res.json().catch(() => null);
           const errCode = errData?.error?.code;
+          showPlaceServerErrors(errData?.error, { focus: false });
           if (indicator) {
             indicator.textContent =
               errCode === 'ACTIVE_ITEMS_LIMIT_EXCEEDED'
@@ -2976,6 +2983,7 @@ async function handleSaveDraft() {
         const data = await res.json().catch(() => ({}));
         if (generation !== editorLoadGeneration) return;
         showFeedback(data.error?.message || 'Erro ao salvar rascunho.', 'error');
+        showPlaceServerErrors(data.error, { reveal: () => setActiveTab('settings') });
       }
     } catch {
       if (generation !== editorLoadGeneration) return;
