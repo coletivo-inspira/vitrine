@@ -164,7 +164,7 @@ export const MAX_CATALOG_IMAGE_BYTES = 262144;
 
 // Única lista de métricas no código; o banco espelha em private.site_metric_names()
 // e private.site_item_metric_names() (migrações 20261116000200_metrics_source.sql e
-// 20261116000400_metric_notify_click.sql).
+// 20261116001200_metric_notify_click.sql).
 // Um novo nome entra aqui e numa migração que recria essas duas funções.
 export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'visit',

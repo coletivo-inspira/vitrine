@@ -134,7 +134,7 @@ pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continu
 "Em breve" aparece com selo e "Avise-me pelo WhatsApp" (`wa.me`, número e código da Mila
 no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
 seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
-`20261116000400_metric_notify_click.sql`); nenhum contato é guardado.
+`20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
