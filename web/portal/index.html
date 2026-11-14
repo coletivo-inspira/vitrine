@@ -1261,6 +1261,73 @@
                     <span class="form-help">Vale a partir da próxima publicação. <a id="editor-locality-link" class="text-link" href="/por-cidade" target="_blank" rel="noopener noreferrer">Ver página por cidade</a></span>
                   </fieldset>
 
+                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-hours-group" aria-describedby="editor-hours-help">
+                    <legend class="locality-legend">Horário de funcionamento</legend>
+                    <span id="editor-hours-help" class="form-help">Horário de Brasília (São Paulo), até 2 faixas por dia. Com horário, a vitrine mostra o selo "Aberto agora" ou "Fechado · abre às 18h". Para faixas que passam da meia-noite (18:00 às 02:00), marque "Termina no dia seguinte".</span>
+                    <div id="editor-hours-days" class="hours-days"></div>
+                    <div class="hours-closed">
+                      <span class="label-spaced">Dias fechados (exceções)</span>
+                      <div class="hours-closed-actions">
+                        <button type="button" id="editor-hours-close-today" class="button button-small button-secondary button-pill" aria-pressed="false">Fechado hoje</button>
+                        <label class="hours-date-label" for="editor-hours-closed-date">Outra data</label>
+                        <input type="date" id="editor-hours-closed-date" class="item-input input-styled-height hours-date-input">
+                        <button type="button" id="editor-hours-closed-add" class="button button-small button-secondary button-pill">Fechar esta data</button>
+                      </div>
+                      <ul id="editor-hours-closed-list" class="hours-closed-list" aria-label="Datas fechadas"></ul>
+                      <span id="editor-hours-closed-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <p id="editor-hours-status" class="form-help hours-status" aria-live="polite"></p>
+                  </fieldset>
+
+                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-address-group">
+                    <legend class="locality-legend">Endereço público (opcional)</legend>
+                    <span class="form-help">Com endereço, a vitrine mostra o endereço e o botão "Traçar rota", que abre o Google Maps. Sem endereço, o botão não aparece. Vale a partir da próxima publicação.</span>
+                    <div class="locality-field">
+                      <label for="editor-address-street">Rua e número</label>
+                      <input type="text" id="editor-address-street" data-address-field="street" maxlength="120" autocomplete="address-line1" placeholder="Ex.: Rua Augusta, 1500" class="item-input input-styled-height" aria-describedby="editor-address-street-error">
+                      <span id="editor-address-street-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <div class="locality-field">
+                      <label for="editor-address-district">Bairro (opcional)</label>
+                      <input type="text" id="editor-address-district" data-address-field="district" maxlength="60" autocomplete="address-level3" placeholder="Ex.: Consolação" class="item-input input-styled-height" aria-describedby="editor-address-district-error">
+                      <span id="editor-address-district-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <div class="locality-fields-row">
+                      <div class="locality-field">
+                        <label for="editor-address-city">Cidade</label>
+                        <input type="text" id="editor-address-city" data-address-field="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: São Paulo" class="item-input input-styled-height" aria-describedby="editor-address-city-error">
+                        <span id="editor-address-city-error" class="form-error-msg" hidden></span>
+                      </div>
+                      <div class="locality-field">
+                        <label for="editor-address-uf">Estado</label>
+                        <select id="editor-address-uf" data-address-field="uf" class="select-styled input-styled-height" aria-describedby="editor-address-uf-error"></select>
+                        <span id="editor-address-uf-error" class="form-error-msg" hidden></span>
+                      </div>
+                    </div>
+                    <div class="locality-field address-postal-field">
+                      <label for="editor-address-postalCode">CEP (opcional)</label>
+                      <input type="text" id="editor-address-postalCode" data-address-field="postalCode" inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="01310-100" class="item-input input-styled-height" aria-describedby="editor-address-postalCode-error">
+                      <span id="editor-address-postalCode-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <a id="editor-address-route-link" class="text-link" href="#" target="_blank" rel="noopener" hidden>Testar o botão "Traçar rota"</a>
+                  </fieldset>
+
+                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-qr-group">
+                    <legend class="locality-legend">QR Code da vitrine</legend>
+                    <span class="form-help">Para imprimir no balcão, na mesa, em cartazes ou na embalagem. Abre a vitrine com a marcação de origem "qr" no endereço.</span>
+                    <div class="qr-panel">
+                      <div id="editor-qr-preview" class="qr-preview"></div>
+                      <div class="qr-panel-info">
+                        <span class="form-help">Endereço do QR Code:</span>
+                        <code id="editor-qr-url" class="qr-url"></code>
+                        <div class="qr-actions">
+                          <button type="button" id="editor-qr-png" class="button button-small button-pill">Baixar PNG</button>
+                          <button type="button" id="editor-qr-svg" class="button button-small button-secondary button-pill">Baixar SVG</button>
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+
                   <div class="form-group">
                     <span class="label-spaced">Componentes Visíveis do Item</span>
                     <span class="form-help help-block-spaced">Ligue ou desligue cada componente exibido nos cartões de item:</span>

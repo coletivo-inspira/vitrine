@@ -1,5 +1,6 @@
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
+import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
@@ -467,6 +468,12 @@ export async function bootStorefront(deps = {}) {
       statusBanner.hidden = true;
     }
 
+    const place = mountStorefrontPlace(doc, menu, {
+      anchor: heroSec,
+      ...(deps.now ? { now: deps.now } : {}),
+      ...(deps.setInterval ? { setIntervalImpl: deps.setInterval } : {})
+    });
+
     const categories = catalogContainer ? normalizeStorefrontCategories(menu) : [];
     const validItemIds = [];
     for (const cat of categories) {
@@ -535,6 +542,9 @@ export async function bootStorefront(deps = {}) {
       onUpdate: (r) => {
         if (heroSec) {
           heroSec.hidden = r.stage !== 1;
+        }
+        if (place?.section) {
+          place.section.hidden = r.stage !== 1;
         }
         for (const highlights of doc.querySelectorAll?.('.storefront-highlights') ?? []) {
           highlights.hidden = r.stage !== 1;

@@ -9,6 +9,8 @@ import {
   resolveOrderRelayMode,
   withMilaRelayPrefix
 } from '../web/assets/mila-relay.mjs';
+import { projectPublicPlace } from './business-hours.mjs';
+import { renderStorefrontPlaceHtml } from '../web/assets/storefront-place.mjs';
 import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
 import {
   DEFAULT_TEMPLATE,
@@ -85,7 +87,9 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'items',
   'categories',
   'structure',
-  'locality'
+  'locality',
+  'businessHours',
+  'publicAddress'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -253,6 +257,14 @@ export function assertNoPrivateLeakage(menuArtifact) {
       locality.citySlug !== slugifyCity(locality.city, locality.uf)
     ) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Bloco locality inválido.');
+    }
+  }
+
+  if (menuArtifact.businessHours !== undefined || menuArtifact.publicAddress !== undefined) {
+    const { businessHours, publicAddress } = menuArtifact;
+    if (JSON.stringify(projectPublicPlace({ businessHours, publicAddress })) !==
+        JSON.stringify({ ...(businessHours ? { businessHours } : {}), ...(publicAddress ? { publicAddress } : {}) })) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Horário ou endereço público inválido.');
     }
   }
 
@@ -682,7 +694,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     items: projectedItems,
     categories: projectedCategories,
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
-    ...(locality ? { locality } : {})
+    ...(locality ? { locality } : {}),
+    ...projectPublicPlace(migrated)
   };
 
   for (const item of menu.items) {
@@ -975,7 +988,7 @@ function renderStorefrontCatalog({ chipsHtml, sectionsHtml }, id = '', columns) 
     </section>`;
 }
 
-function renderPublicSections(pages, menu, catalog) {
+function renderPublicSections(pages, menu, catalog, placeHtml = '') {
   let catalogRendered = false;
   let mainHeroRendered = false;
   const hasCatalog = (pages ?? []).some(page => page.sections.some(({ moduleCode }) => catalogModules.has(moduleCode)));
@@ -1010,7 +1023,7 @@ function renderPublicSections(pages, menu, catalog) {
         case 'hero':
           if (page.slug === 'home' && !mainHeroRendered) {
             mainHeroRendered = true;
-            return renderStorefrontHero(menu, config, id, '', { hasCatalog });
+            return renderStorefrontHero(menu, config, id, '', { hasCatalog }) + placeHtml;
           }
           return section(config.headline
             ? `<h2>${escapeHtml(config.headline)}</h2><p>${escapeHtml(config.subtitle ?? '')}</p>` : '');
@@ -1039,9 +1052,10 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
     ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
     : '';
+  const placeHtml = renderStorefrontPlaceHtml(menu);
   const modularHtml = structure
-    ? renderPublicSections(structure.pages, menu, catalog)
-    : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) +
+    ? (hero ? '' : placeHtml) + renderPublicSections(structure.pages, menu, catalog, placeHtml)
+    : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) + placeHtml +
       `<div id="storefront-catalog" class="storefront-catalog">${sectionsHtml}</div>`;
   const theme = structure?.theme;
   const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
@@ -1088,6 +1102,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`
       )
       .replace(DIRECT_ORDER_FOOTER_NOTE, orderNote)
+      .replace('<!--STATIC_STOREFRONT_PLACE-->', placeHtml)
       .replace('<!--STATIC_STOREFRONT_CATALOG-->', sectionsHtml);
   }
 

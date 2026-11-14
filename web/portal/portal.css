@@ -6535,6 +6535,211 @@ textarea {
   font-size: 15px;
 }
 
+/* Horário, endereço público e QR Code da vitrine (issue #118) */
+.place-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hours-days {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.hours-day {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.hours-day:has(.hours-range) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hours-day:has(.hours-range) .hours-ranges {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.hours-day-label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hours-ranges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hours-day-closed {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.hours-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.hours-range {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(var(--glass, 255 255 255) / .45);
+}
+
+.hours-range input[type="time"] {
+  width: 112px;
+  min-height: 44px;
+}
+
+.hours-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hours-time {
+  min-width: 36px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hours-overnight {
+  font-size: 13px;
+}
+
+.hours-range-error {
+  flex-basis: 100%;
+}
+
+.place-fieldset [aria-invalid="true"] {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 1px #dc3545;
+}
+
+.hours-add,
+.hours-remove {
+  min-height: 44px;
+}
+
+.hours-closed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hours-closed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hours-date-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hours-date-input {
+  width: auto;
+  min-height: 44px;
+}
+
+.hours-closed-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hours-closed-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.hours-status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.address-postal-field {
+  max-width: 180px;
+}
+
+.qr-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.qr-preview {
+  flex: 0 0 auto;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.qr-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  stroke: none;
+}
+
+.qr-panel-info {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.qr-url {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .hours-day {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 4px 8px;
+  }
+}
+
 .linktree-console .linktree-console-form,
 .linktree-console .linktree-console-status,
 .linktree-console .linktree-result {
