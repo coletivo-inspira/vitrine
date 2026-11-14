@@ -1785,7 +1785,7 @@ export function clearPublicationsCache() {
   publicationFetchedAtBySlug.clear();
 }
 
-async function hydratePublicationRecord(row) {
+export async function hydratePublicationRecord(row) {
   if (!row || typeof row !== 'object' || !row.menu || typeof row.menu !== 'object') {
     return null;
   }
@@ -1806,6 +1806,10 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
     ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
+    ...(rawMenu.localBusiness ? { localSeo: {
+      businessType: rawMenu.localBusiness.type,
+      ...(rawMenu.localBusiness.areaServed ? { areaServed: rawMenu.localBusiness.areaServed } : {})
+    } } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
@@ -1825,6 +1829,8 @@ async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      localSeo: Boolean(rawMenu.localBusiness),
+      ...(typeof rawMenu.canonicalUrl === 'string' ? { canonicalUrl: rawMenu.canonicalUrl } : {}),
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
