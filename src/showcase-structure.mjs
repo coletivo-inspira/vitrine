@@ -5,6 +5,7 @@ import { HIGHLIGHT_ICON_PATHS } from '../web/assets/highlight-icons.mjs';
 
 export const HIGHLIGHT_ICONS = Object.freeze(Object.keys(HIGHLIGHT_ICON_PATHS));
 export const HERO_LIMITS = Object.freeze({ eyebrow: 40, actionLabel: 28, imageAlt: 160, highlightText: 60 });
+export const SOCIAL_PROOF_LIMITS = Object.freeze({ testimonials: 12, testimonialContext: 60, faq: 12, faqTitle: 80 });
 const heroAction = { label: `text:${HERO_LIMITS.actionLabel}`, target: 'target' };
 const actionTarget = /^(?:selecao|whatsapp|pagina:[a-z0-9][a-z0-9_-]{0,39}|#[a-z0-9][a-z0-9_-]{0,63})$/;
 
@@ -19,8 +20,13 @@ const moduleFields = {
   service_booking: { showDuration: 'boolean' },
   quote_request: { allowNotes: 'boolean' },
   about_story: { bio: 'text' },
-  testimonials: { items: [{ name: 'text', quote: 'text' }] },
-  faq: { items: [{ q: 'text', a: 'text' }] },
+  testimonials: {
+    items: [{
+      name: 'text', quote: 'text', context: `text:${SOCIAL_PROOF_LIMITS.testimonialContext}`,
+      photoUrl: 'webp', consent: 'boolean'
+    }]
+  },
+  faq: { title: `text:${SOCIAL_PROOF_LIMITS.faqTitle}`, items: [{ q: 'text', a: 'text' }] },
   hours_location: { scheduleText: 'text', addressText: 'text' },
   links_bio: { links: [{ label: 'text', href: 'link' }] },
   custom_sandbox: { widgetId: 'uuid', bundleHash: 'hash' }
@@ -98,6 +104,43 @@ function assertHighlightsConfig(config) {
     throw new PortalValidationError(422, 'INVALID_HIGHLIGHTS',
       'Os destaques precisam de 2 a 4 itens, cada um com ícone e texto de até 60 caracteres.');
   }
+}
+
+/**
+ * Regras de publicação dos depoimentos e das perguntas frequentes. Ficam fora de
+ * `resolveShowcaseManifest` porque a projeção pública também passa por lá: vitrines
+ * publicadas antes do consentimento continuam abrindo, mas não são salvas nem
+ * republicadas sem ele.
+ */
+export function assertPublishableSocialProof(pages = []) {
+  for (const page of pages ?? []) {
+    for (const section of page?.sections ?? []) {
+      const items = section?.config?.items ?? [];
+      if (section?.moduleCode === 'testimonials') {
+        if (items.length > SOCIAL_PROOF_LIMITS.testimonials || items.some(item => !item?.name?.trim() || !item?.quote?.trim())) {
+          throw new PortalValidationError(422, 'INVALID_TESTIMONIALS',
+            `Cada depoimento precisa de nome e texto, até ${SOCIAL_PROOF_LIMITS.testimonials} por seção.`);
+        }
+        const missingFields = items.flatMap((item, index) =>
+          item.consent === true ? [] : [`${section.id}.items.${index}.consent`]);
+        if (missingFields.length) {
+          throw new PortalValidationError(422, 'TESTIMONIAL_CONSENT_REQUIRED',
+            'Marque "Tenho autorização desta pessoa para publicar o depoimento" em cada depoimento.',
+            { missingFields });
+        }
+      }
+      if (section?.moduleCode === 'faq' &&
+          (items.length > SOCIAL_PROOF_LIMITS.faq || items.some(item => !item?.q?.trim() || !item?.a?.trim()))) {
+        throw new PortalValidationError(422, 'INVALID_FAQ',
+          `Cada pergunta precisa de resposta, até ${SOCIAL_PROOF_LIMITS.faq} por seção.`);
+      }
+    }
+  }
+}
+
+function publicConfig(moduleCode, config) {
+  if (moduleCode !== 'testimonials' || !config.items) return config;
+  return { ...config, items: config.items.map(({ consent, ...item }) => item) };
 }
 
 function validateSections(sections, moduleDefaults, inheritedSections = []) {
@@ -181,7 +224,8 @@ export function projectShowcaseManifest(structure) {
     theme, navigation,
     pages: pages.filter(page => page.active).map(({ slug, title, sections }) => ({
       slug, title,
-      sections: sections.filter(section => section.active).map(({ id, moduleCode, config }) => ({ id, moduleCode, config }))
+      sections: sections.filter(section => section.active)
+        .map(({ id, moduleCode, config }) => ({ id, moduleCode, config: publicConfig(moduleCode, config) }))
     }))
   };
 }

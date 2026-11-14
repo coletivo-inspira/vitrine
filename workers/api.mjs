@@ -1,5 +1,5 @@
 import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
-import { resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
+import { assertPublishableSocialProof, resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
@@ -3615,7 +3615,9 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
         (Array.isArray(pub.menu?.items) &&
           pub.menu.items.some((item) => typeof item?.imageUrl === 'string' && item.imageUrl.trim())) ||
           pub.menu?.structure?.pages?.some((page) => page.sections?.some((section) =>
-            section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')))
+            (section.moduleCode === 'hero' && /^https:/.test(section.config?.imageUrl ?? '')) ||
+            (section.moduleCode === 'testimonials' &&
+              section.config?.items?.some((item) => /^https:/.test(item?.photoUrl ?? '')))))
       );
       return new Response(method === 'HEAD' ? null : html, {
         status: 200,
@@ -5076,6 +5078,7 @@ export function createApiHandler(deps = {}) {
           edits = extractShowcaseOverrides(beforeSwitch, previous?.template, {}, previous?.modules);
         }
         const resolved = resolveShowcaseManifest(edits, defaults?.template, {}, defaults?.modules);
+        assertPublishableSocialProof(resolved.pages);
         await assertApprovedWidgets(store, siteId, resolved.pages, options);
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         if (code !== undefined) structure.templateCode = code;
