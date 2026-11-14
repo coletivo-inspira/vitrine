@@ -57,6 +57,7 @@ label_meta() {
     aquisicao) echo "fbca04|Aquisição de novos negócios" ;;
     painel) echo "c5def5|Painel administrativo" ;;
     depois) echo "bfdadc|Planejada para depois" ;;
+    referencia-laurapires) echo "d4c5f9|Padrão de vitrine de serviços e produtos (docs/referencia-laurapires.md)" ;;
     *) echo "ededed|" ;;
   esac
 }

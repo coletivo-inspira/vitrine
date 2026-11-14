@@ -70,6 +70,11 @@ Supabase e snapshots imutáveis; sem repositório `vtr-*`, Astro ou Cloudflare P
    para rascunho e vitrine piloto Guavira Fotos.
 4. **Painel:** central de canais e pausar, desconectar domínio e arquivar. Papel de
    patrocinador fica para depois.
+5. **Vitrine de serviços e produtos** (referência laurapires.com,
+   `docs/referencia-laurapires.md`): orçamento de desempenho primeiro (27), depois
+   cabeçalho com "Sua seleção", gaveta, página do item, hero com foto, depoimentos,
+   "Em breve", link de pagamento do próprio negócio, rodapé e o modelo
+   `servicos-produtos-v1` (issues 18 a 26).
 
 As correções de UX da auditoria (`docs/auditoria-ux/`, pacotes `PB-01` a `PB-27`)
 continuam valendo e vêm antes das telas novas que dependem delas.
