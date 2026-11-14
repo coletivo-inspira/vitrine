@@ -79,7 +79,7 @@ function createDomMock() {
     'storefront-status',
     'storefront-name',
     'storefront-page-title',
-    'storefront-slug-pill',
+    'storefront-header-name',
     'storefront-subtitle',
     'category-nav',
     'storefront-catalog'
@@ -92,15 +92,12 @@ function createDomMock() {
 
   const hero = makeEl('section');
   hero.className = 'storefront-hero';
-  const templateTag = makeEl('span');
-  templateTag.className = 'storefront-template-tag';
 
   const documentMock = {
     createElement: (tag) => makeEl(tag),
     getElementById: (id) => byId.get(id) || null,
     querySelector: (selector) => {
       if (selector === '.storefront-hero') return hero;
-      if (selector === '.storefront-template-tag') return templateTag;
       return null;
     }
   };
@@ -190,7 +187,7 @@ test('storefront-staged-flow - a página pública renderiza os itens do menu com
   assert.ok(renderer, 'bootStorefront deve devolver o renderizador compartilhado');
   assert.equal(byId.get('storefront-status').hidden, true);
   assert.equal(byId.get('storefront-name').textContent, menu.messages.heroTitle);
-  assert.equal(byId.get('storefront-slug-pill').textContent, '/loja1');
+  assert.equal(byId.get('storefront-header-name').textContent, menu.name);
   assert.equal(hero.hidden, false);
 
   const catalog = byId.get('storefront-catalog');
