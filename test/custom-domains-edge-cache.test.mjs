@@ -143,6 +143,10 @@ test('Worker avança DNS para TLS ativo e desvincula somente o ID registrado', a
     headers: { origin, authorization: 'Bearer ' + token, 'content-type': 'application/json' }
   }), env);
   assert.equal((await send('', 'POST', { hostname }, 'token-member')).status, 404);
+  const free = await send('', 'POST', { hostname });
+  assert.equal(free.status, 403);
+  assert.equal((await free.json()).error.requiredPlan.code, 'essencial');
+  store.getSiteEntitlements = async () => ({ plan_code: 'essencial', features: ['custom_domain'] });
   assert.equal((await send('', 'POST', { hostname })).status, 201);
   assert.equal((await send(`/${domainId}/verify`, 'POST')).status, 409);
   dnsReady = true;

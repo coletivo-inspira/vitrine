@@ -1,4 +1,5 @@
 import { renderStructureFields } from './showcase-structure.js';
+import { confirmDomainDisconnect } from './site-lifecycle.js';
 import { showFeedback } from './portal.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
@@ -3480,9 +3481,9 @@ async function refreshDomains() {
           verify.disabled = false;
         }
       });
-      const remove = domainAction('Desvincular');
+      const remove = domainAction('Desconectar');
       remove.addEventListener('click', async () => {
-        if (!window.confirm(`Desvincular ${domain.hostname}?`)) return;
+        if (!await confirmDomainDisconnect(site, domain)) return;
         remove.disabled = true;
         try {
           const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/domains/${domain.id}`, {

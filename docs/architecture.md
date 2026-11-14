@@ -55,6 +55,45 @@ comercial e fluxo de orçamento em docs/commercial-offer.md; preços não public
 A página de divulgação foi implementada em web/; não é o portal autenticado.
 Configuração estática Cloudflare validada sem deploy; ver docs/marketing-launch.md.
 
+## Direitos por plano (ADR 0013)
+
+Implementado na migração `20261115000100_plans_subscriptions.sql` e em
+`src/entitlements.mjs`. `public.plans` é semeada a partir de `content/plans.json`;
+`public.subscriptions` guarda uma assinatura por tenant. `private.site_entitlements(site_id)`
+devolve plano, limites e recursos; vitrine sem tenant ou sem assinatura que valha
+(`active`, ou `past_due`/`grace` dentro da tolerância) recebe `free`. O Worker lê pela
+RPC `read_site_entitlements` (equipe da vitrine, com o token do usuário) ou
+`service_site_entitlements` (só `service_role`, para rotas sem sessão). Só o
+`platform_admin` (RPC `set_tenant_subscription`) e o `service_role` escrevem; toda
+mudança vai para `audit_logs`. A publicação também é barrada no banco acima dos itens
+ativos do plano.
+
+Checagens reutilizáveis em `src/entitlements.mjs`:
+
+- `loadSiteEntitlements(store, siteId, { token, env })`: sem `token`, usa o
+  `SUPABASE_SERVICE_ROLE_KEY`; qualquer falta de dado vale `free`.
+- `requirePlanFeature(entitlements, feature)`: lança `403 PLAN_FEATURE_REQUIRED` com
+  `feature` e `requiredPlan` (`{ code, name }` do plano mais barato que libera). O
+  tratamento de erros do Worker já responde o JSON.
+- `assertItemBlocksAllowed` e `draftLimits` cobrem blocos de itens e itens ativos.
+
+Já aplicados: itens ativos (rascunho, prévia e publicação), blocos de itens e domínio
+próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
+`vitrine.json` chama `requirePlanFeature(entitlements, 'public_json')` e o webhook de
+pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
+`loadSiteEntitlements` sem sessão.
+
+## Cobrança pelo Asaas (ADR 0013, issue #113)
+
+`src/billing/provider.mjs` define a interface de provedor (a mesma que o Stripe usará);
+`src/billing/asaas.mjs` implementa o Asaas, em sandbox salvo `ASAAS_ENV=production`;
+`src/billing/routes.mjs` atende `POST /api/billing/checkout` (dono do tenant) e
+`POST /api/billing/asaas/webhook` (token `asaas-access-token` em tempo constante). A
+migração `20261115000200_billing_events.sql` cria `private.billing_events` (ids de
+evento, sem dados pessoais) e as RPCs `billing_attach_checkout` e `billing_apply_event`,
+só para `service_role`; o webhook grava o id e muda `public.subscriptions` na mesma
+transação. Configuração, eventos, cotas e testes em `docs/billing/asaas.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

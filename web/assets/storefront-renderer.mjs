@@ -539,6 +539,9 @@ export class StorefrontRenderer {
     }
 
     this.container.appendChild(wrap);
+    if (typeof this.options.onRender === 'function') {
+      this.options.onRender(this);
+    }
   }
 
   renderStage1(parent) {
@@ -1340,6 +1343,8 @@ export class StorefrontRenderer {
       const img = document.createElement('img');
       img.src = item.imageUrl.trim();
       img.alt = item.name || 'Foto do item';
+      img.width = 640;
+      img.height = 360;
       img.loading = 'lazy';
       img.className = 'menu-item-photo';
       body.appendChild(img);

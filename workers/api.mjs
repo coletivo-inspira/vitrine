@@ -45,6 +45,9 @@ import {
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
+import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
+import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
   CITY_PAGE_SIZE,
   cityFromSummaryRow,
@@ -63,6 +66,17 @@ import {
   renderCityPageHtml,
   renderCityUnavailableHtml
 } from '../src/city-page.mjs';
+import {
+  SITE_LIFECYCLE_PATH,
+  assertSiteAcceptsPublication,
+  createMemorySiteLifecycle,
+  createRestSiteLifecycle,
+  handleSiteLifecycleRequest,
+  hostnameQuarantinedError,
+  recordDomainDisconnect,
+  respondIfShowcasePaused,
+  siteLifecycleFields
+} from '../src/site-lifecycle.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1178,7 +1192,8 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
         site.storefrontType ?? site.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
       template: site.template ?? DEFAULT_TEMPLATE,
       role,
-      updatedAt: site.updatedAt ?? site.updated_at ?? site.createdAt ?? site.created_at
+      updatedAt: site.updatedAt ?? site.updated_at ?? site.createdAt ?? site.created_at,
+      ...siteLifecycleFields(site)
     };
   }
 
@@ -1192,6 +1207,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     publicationsByHash,
     metricsDaily,
     itemLikes,
+    ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -1789,6 +1805,7 @@ async function hydratePublicationRecord(row) {
     },
     {
       siteId: row.site_id ?? undefined,
+      maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -1932,6 +1949,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
   }
 
   return {
+    ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
+
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
         fetchImpl(
@@ -2248,6 +2267,25 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       return response.json();
     },
 
+    async getSiteEntitlements(siteId, { token, env } = {}) {
+      // Sem sessão (rotas públicas), só o service_role lê os direitos da vitrine.
+      const serviceKey = !token && env?.SUPABASE_SERVICE_ROLE_KEY;
+      if (!token && !serviceKey) return null;
+      const rpc = serviceKey ? 'service_site_entitlements' : 'read_site_entitlements';
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/${rpc}`, {
+        method: 'POST',
+        headers: serviceKey
+          ? { apikey: serviceKey, authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json' }
+          : authHeaders(token),
+        body: JSON.stringify({ target_site: siteId })
+      });
+      // 404: função ainda não migrada; vale o plano free, que é o mais restritivo.
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Falha ao consultar os recursos do plano.');
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+
     async listDomains(siteId, { token }) {
       const response = await fetchImpl(
         `${baseUrl}/rest/v1/custom_domains?site_id=eq.${encodeURIComponent(siteId)}&order=created_at.desc`,
@@ -2268,7 +2306,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       if (response.status === 409) {
         throw new PortalValidationError(409, 'HOSTNAME_TAKEN', 'Este endereço já está vinculado.');
       }
-      if (!response.ok) throw new Error('Falha ao cadastrar o domínio.');
+      if (!response.ok) throw await hostnameQuarantinedError(response) ?? new Error('Falha ao cadastrar o domínio.');
       return (await response.json())[0];
     },
 
@@ -2486,7 +2524,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async listSites(userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)&order=created_at.asc`,
+        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)&order=created_at.asc`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -2504,13 +2542,14 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' :
           row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
-        updatedAt: row.updated_at ?? row.created_at
+        updatedAt: row.updated_at ?? row.created_at,
+        ...siteLifecycleFields(row)
       }));
     },
 
     async getSite(siteId, userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,site_memberships(user_id,role)`,
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -2532,7 +2571,8 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         template: row.template ?? DEFAULT_TEMPLATE,
         role: row.owner_user_id === userId ? 'owner' :
           row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
-        updatedAt: row.updated_at ?? row.created_at
+        updatedAt: row.updated_at ?? row.created_at,
+        ...siteLifecycleFields(row)
       };
     },
 
@@ -3478,6 +3518,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
   const releaseMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/releases\/([a-f0-9]{64})\.json$/);
   if (releaseMatch) {
     const [, slug, hash] = releaseMatch;
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method, { json: true });
+    if (pausedResponse) return pausedResponse;
     const pub =
       (await store.getPublicationByHash?.(slug, hash)) ??
       (await sharedPublicPublications.getPublicationByHash(slug, hash));
@@ -3512,6 +3554,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
   const menuMatch = pathname.match(/^\/data\/vitrines\/([a-z0-9]+(?:-[a-z0-9]+)*)\/menu\.json$/);
   if (menuMatch) {
     const slug = menuMatch[1];
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method, { json: true });
+    if (pausedResponse) return pausedResponse;
     const pub =
       (await store.getPublicationBySlug?.(slug)) ??
       (await sharedPublicPublications.getPublicationBySlug(slug));
@@ -3549,6 +3593,8 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     if (RESERVED_PUBLIC_PATHS.has(slug) || !isValidSlug(slug)) {
       return null;
     }
+    const pausedResponse = await respondIfShowcasePaused(store, slug, method);
+    if (pausedResponse) return pausedResponse;
 
     const pub =
       (await store.getPublicationBySlug?.(slug)) ??
@@ -3849,6 +3895,8 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
       headers.set('cache-control', STOREFRONT_CACHE_CONTROL);
       headers.set('x-vitrine-cached-at', String(Date.now()));
       await cache.put(key, new Response(response.clone().body, { headers }));
+    } else if (cache) {
+      await cache.delete(key).catch(() => false);
     }
     return response ?? new Response(null, { status: 404 });
   };
@@ -3932,7 +3980,8 @@ export function createApiHandler(deps = {}) {
         const draft = site && await store.getDraft(siteId, user.id, options);
         if (draft?.revision !== revision) return new Response(null, { status: 404, headers });
         const content = await resolveDraftForPublication(store, site, draft, options);
-        const { menu } = await compilePublicStorefront(content, site, { revision });
+        const limits = draftLimits(await loadSiteEntitlements(store, siteId, options));
+        const { menu } = await compilePublicStorefront(content, site, { revision, ...limits });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
         const status = error instanceof PortalValidationError ? 422 : 500;
@@ -4125,6 +4174,16 @@ export function createApiHandler(deps = {}) {
     }
 
     try {
+      if (isBillingRoute(pathname)) {
+        return await handleBillingRoute(request, env, _ctx, {
+          deps,
+          resolveUser: () => resolveSessionUser(request, env, deps),
+          guard: () => validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true }),
+          jsonResponse,
+          errorResponse
+        });
+      }
+
       if (pathname === '/api/public/platform-cms' && method === 'GET') {
         const cache = globalThis.caches?.default;
         const key = new Request(url.origin + pathname);
@@ -4869,6 +4928,23 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/sites.');
       }
 
+      const lifecycleMatch = pathname.match(SITE_LIFECYCLE_PATH);
+      if (lifecycleMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        return await handleSiteLifecycleRequest({
+          request, url, method, store, user, env, siteId: lifecycleMatch[1],
+          respond: jsonResponse,
+          guardMutation: validateMutationOriginAndJson,
+          readJson: parseJsonRequest,
+          publicOrigins: [resolvePublicOrigins(env, deps).publicSiteOrigin],
+          evictPublication: (slug) => {
+            publicationFetchedAtBySlug.delete(slug);
+            sharedPublicPublications.publicationsBySlug.delete(slug);
+          }
+        });
+      }
+
       const domainMatch = pathname.match(/^\/api\/sites\/([^/]+)\/domains(?:\/([^/]+)(\/verify)?)?\/?$/);
       if (domainMatch) {
         const user = await resolveSessionUser(request, env, deps);
@@ -4892,6 +4968,7 @@ export function createApiHandler(deps = {}) {
         }
         const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
         if (guardError) return guardError;
+        if (!isDelete) requirePlanFeature(await loadSiteEntitlements(store, siteId, options), 'custom_domain');
         if (!env.CF_SAAS_CNAME_TARGET || !env.CF_SAAS_ZONE_ID || !env.CF_SAAS_API_TOKEN || !env.SUPABASE_SERVICE_ROLE_KEY) {
           return errorResponse(503, 'DOMAINS_UNAVAILABLE', 'A integração de domínios ainda não foi configurada.');
         }
@@ -4921,6 +4998,7 @@ export function createApiHandler(deps = {}) {
           if (isDelete) {
             if (remote && remote.id === domain.cf_hostname_id) await provider.remove(remote.id);
             await store.changeDomain(claimed, null, { env, remove: true });
+            await recordDomainDisconnect(store, siteId, domain.hostname, options);
             return new Response(null, { status: 204 });
           }
           remote ??= await provider.create(domain.hostname);
@@ -4985,7 +5063,9 @@ export function createApiHandler(deps = {}) {
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         if (code !== undefined) structure.templateCode = code;
         const content = { ...draft.content, structure };
-        validateDraftContent(content);
+        const entitlements = await loadSiteEntitlements(store, siteId, options);
+        assertItemBlocksAllowed(entitlements, resolved.pages, draft.content.structure?.pages);
+        validateDraftContent(content, draftLimits(entitlements));
         const updated = await store.updateDraft({ siteId, userId: user.id, revision, content }, options);
         if (updated.status === 'conflict') {
           return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
@@ -5037,7 +5117,9 @@ export function createApiHandler(deps = {}) {
           content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
           if (code !== undefined) content.structure.templateCode = code;
         }
-        validateDraftContent(content);
+        const entitlements = await loadSiteEntitlements(store, siteId, options);
+        if (resolved) assertItemBlocksAllowed(entitlements, resolved.pages, draft.content.structure?.pages);
+        validateDraftContent(content, draftLimits(entitlements));
         const updated = await store.updateDraft({ siteId, userId: user.id, revision: draft.revision, content }, options);
         if (updated.status === 'conflict') {
           return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
@@ -5069,6 +5151,7 @@ export function createApiHandler(deps = {}) {
           if (guardError) return guardError;
           const { parsed } = await parseJsonRequest(request);
           const revision = validateRevision(parsed?.targetRevision);
+          assertSiteAcceptsPublication(site);
           const publication = await store.rollbackRelease(siteId, revision, user.id, options);
           if (!publication) return errorResponse(404, 'RELEASE_NOT_FOUND', 'Versão indisponível para restauração.');
           publicationFetchedAtBySlug.set(publication.slug, Date.now());
@@ -5209,7 +5292,10 @@ export function createApiHandler(deps = {}) {
           }
 
           const revision = validateRevision(parsed.revision);
+          const entitlements = await loadSiteEntitlements(store, siteId, { token: user.token, env });
+          assertItemBlocksAllowed(entitlements, parsed.content?.structure?.pages, existingDraft.content?.structure?.pages);
           validateDraftContent(parsed.content, {
+            ...draftLimits(entitlements),
             defaultWhatsapp:
               existingDraft.revision !== revision ? existingDraft.content?.whatsapp : undefined
           });
@@ -5298,12 +5384,15 @@ export function createApiHandler(deps = {}) {
         if (!site || (site.role && !TEAM_ROLES.includes(site.role))) {
           return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         }
+        assertSiteAcceptsPublication(site);
 
         const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
+        const entitlements = await loadSiteEntitlements(store, site.id, { token: user.token, env });
         const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
-          siteId: site.id
+          siteId: site.id,
+          ...draftLimits(entitlements)
         });
 
         if (typeof store.savePublication === 'function') {

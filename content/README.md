@@ -26,3 +26,10 @@ Não busca sites nem gera imagens. `quoteContactLink` precisa do número comerci
 da equipe em formato internacional, sem símbolos; sem ele retorna null.
 A exibição de cases publicados está integrada à divulgação. A edição continua pelo
 catálogo no repositório; ainda não há painel de edição.
+
+# Tabela de planos
+
+`plans.json` é a fonte única dos planos e serviços avulsos do ADR 0013: preço
+mensal em centavos, limites e recursos de uma lista fechada. `src/plans.mjs`
+valida a tabela, e `test/plans.test.mjs` falha se o ADR 0013 ou
+`docs/commercial-offer.md` divergirem dela. Mudar um preço exige mudar os três.

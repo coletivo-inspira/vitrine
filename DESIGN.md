@@ -200,6 +200,16 @@ Possibilidades têm miniatura ilustrada acima da legenda, sem uma caixa pesada e
 
 Marca oficial à esquerda, links de 14px semibold e ação pequena à direita. Hover torna links laranja. Em até 800px, o menu é vertical; quando JavaScript está ativo, um controle de 44px abre e fecha os links. Sem JavaScript, a navegação permanece visível. Não há estilo de seção ativa documentado no CSS.
 
+### Cabeçalho da vitrine pública
+
+`web/vitrine/` usa cabeçalho fixo e fino (64 px) com o logo ou o nome do negócio
+(Syne 19 px, 17 px no celular) ligado ao topo. Acima de 800 px: até 5 links de
+`navigation.header`, Instagram quando informado, tema e a sacola "Sua seleção".
+Até 800 px: só a sacola e o menu à direita, ambos 44×44; o menu abre um painel com
+os links e o tema. A sacola mostra contador em laranja e tem nome acessível
+dinâmico ("Sua seleção, 2 itens"); sem JavaScript, leva às etapas e os links
+ficam visíveis como lista. Sem selo "Vitrine" nem endereço no cabeçalho.
+
 ### Status and Tags
 
 O estado “Em preparação” combina superfície damasco, indicador laranja, texto de 12px semibold e raio curto. Tags das possibilidades são texto auxiliar de 11px, sem aparência de filtro ou botão.

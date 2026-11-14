@@ -8,7 +8,9 @@
   "vars": {
     "SUPABASE_URL": "https://qawlpsrfewosxsfgmmpm.supabase.co",
     "PUBLIC_SITE_ORIGIN": "https://vitrine.inspira.dev.br",
-    "PORTAL_ORIGIN": "https://painel.inspira.dev.br"
+    "PORTAL_ORIGIN": "https://painel.inspira.dev.br",
+    "ASAAS_ENV": "sandbox",
+    "ASAAS_API_BASE": "https://api-sandbox.asaas.com/v3"
   },
   "assets": {
     "directory": "./dist",
