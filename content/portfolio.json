@@ -1,4 +1,17 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "id": "guavira-fotos",
+      "title": "Guavira Fotos",
+      "url": "https://vitrine.inspira.dev.br/guavira-fotos",
+      "summary": "[a preencher com o conteúdo autorizado]",
+      "category": "Fotografia & mídia",
+      "tags": ["Agendamento", "WhatsApp"],
+      "order": 1,
+      "featured": true,
+      "published": false,
+      "authorization": "pendente: BLK-GUAVIRA-01"
+    }
+  ]
 }

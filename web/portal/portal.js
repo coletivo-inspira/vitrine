@@ -4,6 +4,8 @@ import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phon
 import { createInterestsMultiSelect } from './multi-select.mjs';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 import { loadBillingNotice } from './billing-notice.mjs';
+import { loadDemoInvitations } from './linktree-import.js';
+import { activeSites, createSiteViewFilter, decorateSiteItem, emptyViewMessage, sitesForCurrentView } from './site-lifecycle.js';
 
 // State variables
 let isOnline = false;
@@ -889,6 +891,13 @@ export function showSection(section) {
       const matches = link.getAttribute('data-section') === section;
       link.classList.toggle('active', matches);
     });
+    const topBarProfile = globalThis.document?.getElementById('top-bar-profile');
+    if (topBarProfile) {
+      const profileOpen = section === 'perfil';
+      topBarProfile.classList.toggle('active', profileOpen);
+      if (profileOpen) topBarProfile.setAttribute('aria-current', 'page');
+      else topBarProfile.removeAttribute('aria-current');
+    }
 
     if (section === 'insights') {
       syncInsightsSiteSelector();
@@ -1030,6 +1039,12 @@ export function prefillProfileWithGoogleCredentials(userOverride = currentUser, 
     globalThis.document?.getElementById('profile-avatar'),
     globalThis.document?.getElementById('profile-avatar-placeholder'),
     globalThis.document?.getElementById('profile-email')
+  );
+
+  updateAccountCard(
+    globalThis.document?.getElementById('top-bar-avatar'),
+    globalThis.document?.getElementById('top-bar-avatar-placeholder'),
+    null
   );
 }
 
@@ -1406,13 +1421,14 @@ function updateHubSummary() {
   updateOnboardingChecklist();
 
   // 1. Vitrines list summary
+  const listedSiteCount = activeSites(sites).length;
   if (vitrinesSummaryText) {
-    if (sites.length === 0) {
+    if (listedSiteCount === 0) {
       vitrinesSummaryText.textContent = 'Você não possui nenhuma vitrine cadastrada.';
-    } else if (sites.length === 1) {
+    } else if (listedSiteCount === 1) {
       vitrinesSummaryText.textContent = 'Você possui 1 vitrine cadastrada.';
     } else {
-      vitrinesSummaryText.textContent = `Você possui ${sites.length} vitrines cadastradas.`;
+      vitrinesSummaryText.textContent = `Você possui ${listedSiteCount} vitrines cadastradas.`;
     }
   }
   if (hubVitrinesList) {
@@ -1493,6 +1509,7 @@ async function loadSites(fetchImpl = globalThis.fetch) {
       sites = data.sites || [];
       if (sitesListContainer && globalThis.document) {
         renderSites();
+        void loadDemoInvitations(() => loadSites(fetchImpl));
       }
       void loadBillingNotice(globalThis.document?.getElementById('billing-notice'), fetchImpl);
     } else {
@@ -1557,13 +1574,17 @@ function loadLocalSites() {
 function renderSites() {
   if (!sitesListContainer) return;
 
-  if (sites.length === 0) {
-    sitesListContainer.innerHTML = '<p class="empty-msg">Nenhuma vitrine ativa cadastrada.</p>';
+  sitesListContainer.replaceChildren(createSiteViewFilter(sites, renderSites));
+  const listedSites = sitesForCurrentView(sites);
+  if (listedSites.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = emptyViewMessage();
+    sitesListContainer.appendChild(empty);
     return;
   }
 
-  sitesListContainer.innerHTML = '';
-  sites.forEach(site => {
+  listedSites.forEach(site => {
     const item = document.createElement('div');
     item.className = 'site-item';
 
@@ -1606,6 +1627,7 @@ function renderSites() {
       });
       actions.appendChild(auctionsBtn);
     }
+    decorateSiteItem(site, info, actions, { online: isOnline, notify: showFeedback, onChanged: loadSites });
 
     item.appendChild(info);
     item.appendChild(actions);

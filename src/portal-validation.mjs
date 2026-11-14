@@ -7,6 +7,7 @@ import {
   findProhibitedQuotaTerm
 } from '../web/assets/quota-rules.mjs';
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
+import { collectPlaceErrors } from './business-hours.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -282,6 +283,12 @@ export class PortalValidationError extends Error {
     }
     if (Array.isArray(this.missingFields)) {
       error.missingFields = this.missingFields;
+    }
+    if (typeof this.field === 'string') {
+      error.field = this.field;
+    }
+    if (Array.isArray(this.fieldErrors)) {
+      error.fieldErrors = this.fieldErrors;
     }
     return { error };
   }
@@ -1422,6 +1429,14 @@ export function validateDraftContent(content, options = {}) {
 
   if (content.locality !== undefined) {
     validateLocality(content.locality, 422);
+  }
+
+  const [placeError, ...morePlaceErrors] = collectPlaceErrors(content);
+  if (placeError) {
+    throw new PortalValidationError(422, placeError.code, placeError.message, {
+      field: placeError.field,
+      fieldErrors: [placeError, ...morePlaceErrors]
+    });
   }
 
   const allowZeroPrice =

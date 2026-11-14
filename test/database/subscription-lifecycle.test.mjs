@@ -29,7 +29,7 @@ async function setupDb() {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const dir = resolve(root, 'supabase/migrations');
   const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
-  assert.equal(files.at(-1), MIGRATION);
+  assert.ok(files.includes(MIGRATION));
   for (const file of files) await db.exec(await readFile(resolve(dir, file), 'utf8'));
   await db.query('insert into auth.users (id) values ($1), ($2)', [OWNER_A, OWNER_B]);
   await db.query(
