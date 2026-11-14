@@ -1340,6 +1340,8 @@ export class StorefrontRenderer {
       const img = document.createElement('img');
       img.src = item.imageUrl.trim();
       img.alt = item.name || 'Foto do item';
+      img.width = 640;
+      img.height = 360;
       img.loading = 'lazy';
       img.className = 'menu-item-photo';
       body.appendChild(img);
