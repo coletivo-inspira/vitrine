@@ -1772,6 +1772,8 @@ async function hydratePublicationRecord(row) {
     ...(rawMenu.orderFields ? { orderFields: rawMenu.orderFields } : {}),
     ...(rawMenu.messages ? { messages: rawMenu.messages } : {}),
     ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
+    ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
+    ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
     ...(rawMenu.structure ? { structure: {
       themeOverrides: rawMenu.structure.theme, navigationMenus: rawMenu.structure.navigation, pages: rawMenu.structure.pages
     } } : {}),
