@@ -44,6 +44,8 @@ import {
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import { assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, requirePlanFeature } from '../src/entitlements.mjs';
+import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import {
   CITY_PAGE_SIZE,
   cityFromSummaryRow,
@@ -1788,6 +1790,7 @@ async function hydratePublicationRecord(row) {
     },
     {
       siteId: row.site_id ?? undefined,
+      maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -2245,6 +2248,25 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/read_sandbox_bundle?${query}`, { headers: anonHeaders() });
       if (!response.ok) throw new Error('Falha ao carregar o componente.');
       return response.json();
+    },
+
+    async getSiteEntitlements(siteId, { token, env } = {}) {
+      // Sem sessão (rotas públicas), só o service_role lê os direitos da vitrine.
+      const serviceKey = !token && env?.SUPABASE_SERVICE_ROLE_KEY;
+      if (!token && !serviceKey) return null;
+      const rpc = serviceKey ? 'service_site_entitlements' : 'read_site_entitlements';
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/${rpc}`, {
+        method: 'POST',
+        headers: serviceKey
+          ? { apikey: serviceKey, authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json' }
+          : authHeaders(token),
+        body: JSON.stringify({ target_site: siteId })
+      });
+      // 404: função ainda não migrada; vale o plano free, que é o mais restritivo.
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Falha ao consultar os recursos do plano.');
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows[0] ?? null : null;
     },
 
     async listDomains(siteId, { token }) {
@@ -3931,7 +3953,8 @@ export function createApiHandler(deps = {}) {
         const draft = site && await store.getDraft(siteId, user.id, options);
         if (draft?.revision !== revision) return new Response(null, { status: 404, headers });
         const content = await resolveDraftForPublication(store, site, draft, options);
-        const { menu } = await compilePublicStorefront(content, site, { revision });
+        const limits = draftLimits(await loadSiteEntitlements(store, siteId, options));
+        const { menu } = await compilePublicStorefront(content, site, { revision, ...limits });
         return new Response(renderStorefrontHtml(menu, undefined, { interactive: false }), { headers });
       } catch (error) {
         const status = error instanceof PortalValidationError ? 422 : 500;
@@ -4870,6 +4893,7 @@ export function createApiHandler(deps = {}) {
         }
         const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
         if (guardError) return guardError;
+        if (!isDelete) requirePlanFeature(await loadSiteEntitlements(store, siteId, options), 'custom_domain');
         if (!env.CF_SAAS_CNAME_TARGET || !env.CF_SAAS_ZONE_ID || !env.CF_SAAS_API_TOKEN || !env.SUPABASE_SERVICE_ROLE_KEY) {
           return errorResponse(503, 'DOMAINS_UNAVAILABLE', 'A integração de domínios ainda não foi configurada.');
         }
@@ -4963,7 +4987,9 @@ export function createApiHandler(deps = {}) {
         const structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
         if (code !== undefined) structure.templateCode = code;
         const content = { ...draft.content, structure };
-        validateDraftContent(content);
+        const entitlements = await loadSiteEntitlements(store, siteId, options);
+        assertItemBlocksAllowed(entitlements, resolved.pages, draft.content.structure?.pages);
+        validateDraftContent(content, draftLimits(entitlements));
         const updated = await store.updateDraft({ siteId, userId: user.id, revision, content }, options);
         if (updated.status === 'conflict') {
           return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
@@ -5015,7 +5041,9 @@ export function createApiHandler(deps = {}) {
           content.structure = extractShowcaseOverrides(resolved, defaults?.template, {}, defaults?.modules);
           if (code !== undefined) content.structure.templateCode = code;
         }
-        validateDraftContent(content);
+        const entitlements = await loadSiteEntitlements(store, siteId, options);
+        if (resolved) assertItemBlocksAllowed(entitlements, resolved.pages, draft.content.structure?.pages);
+        validateDraftContent(content, draftLimits(entitlements));
         const updated = await store.updateDraft({ siteId, userId: user.id, revision: draft.revision, content }, options);
         if (updated.status === 'conflict') {
           return errorResponse(409, 'REVISION_CONFLICT', 'O rascunho foi alterado. Recarregue e tente novamente.');
@@ -5187,7 +5215,10 @@ export function createApiHandler(deps = {}) {
           }
 
           const revision = validateRevision(parsed.revision);
+          const entitlements = await loadSiteEntitlements(store, siteId, { token: user.token, env });
+          assertItemBlocksAllowed(entitlements, parsed.content?.structure?.pages, existingDraft.content?.structure?.pages);
           validateDraftContent(parsed.content, {
+            ...draftLimits(entitlements),
             defaultWhatsapp:
               existingDraft.revision !== revision ? existingDraft.content?.whatsapp : undefined
           });
@@ -5279,9 +5310,11 @@ export function createApiHandler(deps = {}) {
 
         const content = await resolveDraftForPublication(store, site, draft, { token: user.token, env });
         // Atomic compilation: if compilePublicStorefront throws, previous publication in store remains untouched.
+        const entitlements = await loadSiteEntitlements(store, site.id, { token: user.token, env });
         const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
-          siteId: site.id
+          siteId: site.id,
+          ...draftLimits(entitlements)
         });
 
         if (typeof store.savePublication === 'function') {
