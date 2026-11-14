@@ -1,4 +1,4 @@
--- Migração 20261115000300_subscription_lifecycle.sql
+-- Migração 20261116000100_subscription_lifecycle.sql
 -- Ciclo da assinatura (issue #114, ADR 0013 Cobrança item 6): tolerância de 7 dias,
 -- suspensão só dos recursos pagos, reativação pelo webhook e aviso ao dono. Nada em
 -- sites, drafts, publications ou site_memberships é apagado ou alterado aqui.

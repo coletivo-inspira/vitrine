@@ -11,7 +11,7 @@ const TENANT_A = '94000000-0000-0000-0000-00000000000a';
 const TENANT_B = '94000000-0000-0000-0000-00000000000b';
 const SITE_A = '95000000-0000-0000-0000-00000000000a';
 const HOST = 'loja.exemplo.com.br';
-const MIGRATION = '20261115000300_subscription_lifecycle.sql';
+const MIGRATION = '20261116000100_subscription_lifecycle.sql';
 
 async function setupDb() {
   const db = new PGlite();

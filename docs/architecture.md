@@ -96,7 +96,7 @@ transação. Configuração, eventos, cotas e testes em `docs/billing/asaas.md`.
 
 ## Ciclo da assinatura (ADR 0013, issue #114)
 
-`src/billing/lifecycle.mjs` e a migração `20261115000300_subscription_lifecycle.sql`.
+`src/billing/lifecycle.mjs` e a migração `20261116000100_subscription_lifecycle.sql`.
 O Cron existente chama `billing_lifecycle_tick` uma vez por execução (`active`/`past_due`
 vencida → `grace` até vencimento + 7 dias → `suspended`); o webhook reativa. Os direitos
 seguem as datas em `private.site_entitlements`, que agora também mantém o plano de uma

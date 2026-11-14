@@ -175,7 +175,7 @@ uma rota de webhook própria em `src/billing/routes.mjs`.
 ## 8. Ciclo da assinatura (issue #114)
 
 Detalhes de operação em [`docs/operations-guide.md`](../operations-guide.md), seção 3.
-Lógica em `src/billing/lifecycle.mjs`; migração `20261115000300_subscription_lifecycle.sql`.
+Lógica em `src/billing/lifecycle.mjs`; migração `20261116000100_subscription_lifecycle.sql`.
 
 - **Cron**: `billing_lifecycle_tick` (só `service_role`) move `active`/`past_due`
   vencidas para `grace` (`grace_until` = vencimento + 7 dias) e `grace` vencida para
