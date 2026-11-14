@@ -539,6 +539,9 @@ export class StorefrontRenderer {
     }
 
     this.container.appendChild(wrap);
+    if (typeof this.options.onRender === 'function') {
+      this.options.onRender(this);
+    }
   }
 
   renderStage1(parent) {

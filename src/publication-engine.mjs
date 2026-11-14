@@ -804,6 +804,83 @@ function renderNavigation(links, label) {
 
 const catalogModules = new Set(['catalog_grid', 'service_booking', 'quote_request']);
 
+const HEADER_LINK_LIMIT = 5;
+const INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
+
+function publicLogoSrc(value) {
+  if (typeof value !== 'string') return '';
+  const src = value.trim();
+  if (/^\/[a-z0-9][a-z0-9/_.-]*$/i.test(src)) return src;
+  try {
+    return new URL(src).protocol === 'https:' ? src : '';
+  } catch {
+    return '';
+  }
+}
+
+function publicInstagramHref(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && INSTAGRAM_HOSTS.has(url.hostname) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function hasSelectableItems(menu, structure) {
+  if (!menu?.items?.length) return false;
+  if (!structure) return true;
+  return structure.pages.some(page => page.sections.some(section => catalogModules.has(section.moduleCode)));
+}
+
+/**
+ * Cabeçalho da vitrine pública: identidade do negócio, menu (links de
+ * `navigation.header`, Instagram e tema) e o ícone "Sua seleção". Sem JavaScript o
+ * menu fica visível como lista e o ícone é só um link para as etapas.
+ */
+export function renderStorefrontHeader(menu, structure = null) {
+  const name = String(menu?.name ?? '').trim() || 'Vitrine';
+  const logo = publicLogoSrc(menu?.logoUrl);
+  const identity = logo
+    ? `<img class="storefront-identity-logo" src="${escapeHtml(logo)}" width="160" height="40" alt="${escapeHtml(name)}">`
+    : `<span id="storefront-header-name" class="storefront-identity-name">${escapeHtml(name)}</span>`;
+  const links = (structure?.navigation?.header ?? []).slice(0, HEADER_LINK_LIMIT)
+    .map(link => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`);
+  const instagram = publicInstagramHref(menu?.instagramUrl);
+  if (instagram) {
+    links.push(`<li><a class="storefront-header-instagram" href="${escapeHtml(instagram)}" target="_blank" rel="noopener noreferrer" aria-label="Instagram de ${escapeHtml(name)}">Instagram</a></li>`);
+  }
+  const selection = hasSelectableItems(menu, structure)
+    ? `<a class="storefront-selection" href="#storefront-catalog" aria-label="Sua seleção">
+        <svg class="storefront-selection-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/></svg>
+        <span class="storefront-selection-count" aria-hidden="true" hidden>0</span>
+      </a>
+      <span class="storefront-selection-status" aria-live="polite"></span>`
+    : '';
+  return `<header class="storefront-topbar">
+    <div class="wrap storefront-topbar-inner">
+      <a class="storefront-identity" href="#vitrine-principal">${identity}</a>
+      <nav id="storefront-header-menu" class="storefront-header-menu" aria-label="Menu da vitrine">
+        ${links.length ? `<ul class="storefront-header-links">${links.join('')}</ul>` : ''}
+        <div class="storefront-header-theme">
+          <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
+            <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+            <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+          </button>
+        </div>
+      </nav>
+      <div class="storefront-header-actions">
+        ${selection}
+        <button class="storefront-menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="storefront-header-menu" hidden>
+          <svg class="storefront-menu-open-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <svg class="storefront-menu-close-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>`;
+}
+
 function renderStorefrontHero(menu, config = {}, id = '', navigation = '') {
   return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="storefront-hero" aria-labelledby="storefront-name">
       <div class="storefront-hero-copy">
@@ -882,7 +959,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   }) : null;
   const home = structure?.pages.find(page => page.slug === 'home');
   const hero = home?.sections.find(section => section.moduleCode === 'hero')?.config;
-  const topNav = renderNavigation(structure?.navigation.header, 'Navegação da vitrine');
+  const header = renderStorefrontHeader(menu, structure);
   const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
   const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
     ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
@@ -926,10 +1003,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
         '<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial">',
         `<meta property="og:image:alt" id="og-image-alt" content="Vitrine oficial de ${escapeHtml(menu.name)}">`
       )
-      .replace(
-        '<span id="storefront-slug-pill" class="storefront-slug-pill">/loja1</span>',
-        `<span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>`
-      )
+      .replace(/<header class="storefront-topbar">[\s\S]*?<\/header>/, () => header)
       .replace(
         '<h1 id="storefront-name">Carregando vitrine...</h1>',
         `<h1 id="storefront-name">${escapeHtml(hero?.headline || menu.name)}</h1>`
@@ -969,19 +1043,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
 </head>
 <body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>
   <a class="skip-link" href="#vitrine-principal">Pular para os itens</a>
-  <header class="storefront-topbar wrap">
-    <div class="storefront-brand-meta">
-      <span class="storefront-template-tag">Vitrine</span>
-      <span id="storefront-slug-pill" class="storefront-slug-pill">/${escapeHtml(menu.slug)}</span>
-    </div>
-    ${topNav}
-    <div class="storefront-header-actions">
-      <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
-        <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
-        <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
-      </button>
-    </div>
-  </header>
+  ${header}
   <main id="vitrine-principal" class="wrap storefront-main">
     <div id="storefront-status" class="storefront-status" role="status" aria-live="polite" hidden></div>
     ${structure && !hero ? `<h1 id="storefront-name" class="storefront-accessible-title">${escapeHtml(menu.name)}</h1>` : ''}
