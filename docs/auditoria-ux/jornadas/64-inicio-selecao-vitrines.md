@@ -114,7 +114,7 @@ Contagem: `P0` 0 · `P1` 3 (`UX-64-001`, `002`, `003`) · `P2` 7 · `P3` 5.
 | Código | Bloqueio | Checklist de aceite |
 | --- | --- | --- |
 | `BLK-UX-64-RBAC` | Sem contas reais com papéis `admin`, `editor` e `viewer` numa mesma vitrine; o harness não aplica permissões | [ ] Criar no ambiente de teste (ou em `test/e2e-full-journey.test.mjs`) uma vitrine com quatro membros, um por papel · [ ] Para cada papel, registrar o que `GET /api/sites` devolve, se salvar o rascunho e publicar respondem `200` ou `403` e quais botões o painel mostra (valida `UX-64-001` e `UX-64-015`) |
-| `BLK-UX-61-PROD` | Produção atrás do desafio da borda | [ ] Repetir `#inicio` e `#vitrines` em `painel.inspira.dev.br` com conta real depois da liberação |
+| `CHK-UX-61-PROD` (opcional) | Clientes automatizados recebem o desafio de bots da Cloudflare; a versão publicada (`bbafd95`) é a mesma auditada localmente | [ ] Opcional: repetir `#inicio` e `#vitrines` em `painel.inspira.dev.br` com conta real, num navegador real |
 | Seletor rápido | Controle inexistente (não é bloqueio de ambiente) | [ ] Depois de implementar `UX-64-004`, auditar o seletor nas 5 larguras, com teclado (`Enter`, setas, `Esc`) e com alterações não salvas |
 
 ## 7. Recomendações

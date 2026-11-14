@@ -137,7 +137,7 @@ Contagem: `P0` 0 · `P1` 6 (`UX-63-001`, `002`, `003`, `004`, `005`, `008`) · `
 
 | Código | Bloqueio | Checklist de aceite (ação humana) |
 | --- | --- | --- |
-| `BLK-UX-61-AUTH` | Login Google real indisponível localmente (sem chave publicável do Supabase no preview; produção atrás do desafio da borda `BLK-UX-61-PROD`) | [ ] Entrar com Google em `painel.inspira.dev.br` com conta de teste e voltar ao painel · [ ] Cancelar o consentimento no Google e registrar URL de retorno e mensagem (valida `UX-63-015`) · [ ] Deixar a sessão expirar (≥ 1 h) e tentar salvar o perfil (valida `UX-63-003`) · [ ] Repetir Sair e entrar com outra conta no mesmo navegador (valida `UX-63-004`) |
+| `BLK-UX-61-AUTH` | Login Google real indisponível localmente (sem chave publicável do Supabase no preview; em produção, versão `bbafd95`, o login exige navegador real porque clientes automatizados recebem o desafio de bots da Cloudflare) | [ ] Entrar com Google em `painel.inspira.dev.br` com conta de teste e voltar ao painel · [ ] Cancelar o consentimento no Google e registrar URL de retorno e mensagem (valida `UX-63-015`) · [ ] Deixar a sessão expirar (≥ 1 h) e tentar salvar o perfil (valida `UX-63-003`) · [ ] Repetir Sair e entrar com outra conta no mesmo navegador (valida `UX-63-004`) |
 | `BLK-UX-63-AT` | Sem leitor de tela nem dispositivo iOS no ambiente da auditoria | [ ] Com VoiceOver (iOS) ou NVDA, confirmar o anúncio de erros e sucessos (`UX-63-016`) e da seção atual (`UX-63-011`) · [ ] Em iPhone, confirmar a ampliação ao focar campos de 12 px (`UX-63-009`) |
 
 ## 7. Recomendações
