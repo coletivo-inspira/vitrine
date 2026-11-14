@@ -252,3 +252,19 @@ test('Issue #117 — fluxo pela API: plano e domínio decididos na publicação;
   assert.equal(menu.plan, undefined);
   assert.equal(menu.planCode, undefined);
 });
+
+test('Issue #117 — painel: campos "Google e WhatsApp", prévia simulada e ajuda', async () => {
+  const html = await readFile(new URL('../web/portal/index.html', import.meta.url), 'utf8');
+  const start = html.indexOf('id="editor-seo-group"');
+  const group = html.slice(start, html.indexOf('</fieldset>', start));
+  assert.ok(start > 0);
+  assert.match(group, /<label for="editor-seo-type">Tipo de negócio<\/label>/);
+  assert.match(group, /<label for="editor-seo-area">Área atendida \(opcional\)<\/label>/);
+  assert.match(group, /id="editor-share-preview"/);
+  assert.match(group, /<summary class="seo-help-summary">O que aparece no Google e no WhatsApp<\/summary>/);
+  assert.doesNotMatch(group, /catálogo|cardápio/i);
+  assert.doesNotMatch(group, /\son[a-z]+=/i);
+  const editor = await readFile(new URL('../web/portal/editor.js', import.meta.url), 'utf8');
+  assert.match(editor, /mountSeoPanel\(/);
+  assert.match(editor, /showSeoServerErrors\(/);
+});

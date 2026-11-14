@@ -1282,6 +1282,47 @@
                     <a id="editor-address-route-link" class="text-link" href="#" target="_blank" rel="noopener" hidden>Testar o botão "Traçar rota"</a>
                   </fieldset>
 
+                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-seo-group" aria-describedby="editor-seo-help">
+                    <legend class="locality-legend">Google e WhatsApp</legend>
+                    <span id="editor-seo-help" class="form-help">O tipo de negócio e a área atendida completam os dados que o Google lê, junto com o endereço e o horário acima. Os dados para o Google fazem parte do plano Essencial ou superior; o cartão do link vale para todas as vitrines. Vale a partir da próxima publicação.</span>
+                    <div class="locality-field">
+                      <label for="editor-seo-type">Tipo de negócio</label>
+                      <select id="editor-seo-type" class="select-styled input-styled-height" aria-describedby="editor-seo-type-error"></select>
+                      <span id="editor-seo-type-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <div class="locality-field">
+                      <label for="editor-seo-area">Área atendida (opcional)</label>
+                      <input type="text" id="editor-seo-area" maxlength="120" placeholder="Ex.: Zona Sul de Porto Alegre" class="item-input input-styled-height" aria-describedby="editor-seo-area-help editor-seo-area-error">
+                      <span id="editor-seo-area-help" class="form-help">Bairros ou cidades onde você entrega ou atende.</span>
+                      <span id="editor-seo-area-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <div class="share-preview-block">
+                      <span class="label-spaced" id="editor-share-preview-label">Prévia do link (simulação)</span>
+                      <figure id="editor-share-preview" class="share-preview" aria-labelledby="editor-share-preview-label">
+                        <img id="editor-share-preview-image" class="share-preview-image" src="/assets/brand/og-vitrine.png" width="1200" height="630" alt="" loading="lazy">
+                        <figcaption class="share-preview-text">
+                          <span id="editor-share-preview-host" class="share-preview-host">vitrine.inspira.dev.br</span>
+                          <strong id="editor-share-preview-title" class="share-preview-title">Sua vitrine — Vitrine</strong>
+                          <span id="editor-share-preview-description" class="share-preview-description">Vitrine oficial: faça seu pedido direto no WhatsApp.</span>
+                        </figcaption>
+                      </figure>
+                    </div>
+                    <details id="editor-seo-help-page" class="seo-help">
+                      <summary class="seo-help-summary">O que aparece no Google e no WhatsApp</summary>
+                      <div class="seo-help-body">
+                        <h3>No WhatsApp, Instagram e Facebook</h3>
+                        <p>Ao colar o link da vitrine, aparece um cartão com imagem, nome do negócio e a frase de boas-vindas. A imagem é o logo da vitrine ou a foto do primeiro item; sem foto, entra a capa da Vitrine Inspira. Vale para todos os planos. Com domínio próprio ativo, o link mostra o seu domínio.</p>
+                        <h3>No Google</h3>
+                        <p>No plano Essencial ou superior, a vitrine publicada leva dados de negócio local no padrão Schema.org: nome, tipo de negócio, endereço público, horário, área atendida e o WhatsApp do negócio. O Google decide se e quando mostra essas informações; não há garantia de posição na busca.</p>
+                        <h3>O que nunca aparece</h3>
+                        <p>E-mail, plano, dados de acesso ao painel e o seu número pessoal quando os pedidos passam pela Mila.</p>
+                        <h3>Depois de mudar</h3>
+                        <p>Publique de novo. O WhatsApp guarda a prévia antiga por algum tempo, então o cartão novo pode levar algumas horas para aparecer. O cadastro no Perfil da Empresa no Google é separado e faz parte da Implantação Chave na Mão.</p>
+                        <p>Para conferir os dados do Google, cole o endereço da vitrine no <a class="text-link" href="https://validator.schema.org/" target="_blank" rel="noopener noreferrer">validador do Schema.org</a>.</p>
+                      </div>
+                    </details>
+                  </fieldset>
+
                   <fieldset class="form-group locality-fieldset place-fieldset" id="editor-qr-group">
                     <legend class="locality-legend">QR Code da vitrine</legend>
                     <span class="form-help">Para imprimir no balcão, na mesa, em cartazes ou na embalagem. Abre a vitrine com a marcação de origem "qr" no endereço.</span>
