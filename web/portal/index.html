@@ -166,6 +166,12 @@
               Customizações
             </a>
           </li>
+          <li class="nav-admin-item" hidden>
+            <a id="platform-cms-open" href="#administracao" class="nav-link" data-section="platform-cms">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              Administração
+            </a>
+          </li>
         </ul>
       </nav>
     </aside>
@@ -254,7 +260,6 @@
 
         <!-- Section 1: Início (Home Dashboard) -->
         <section id="inicio-section" class="shell-section">
-          <button id="platform-cms-open" class="button button-small button-secondary button-pill" type="button" hidden>Administração da plataforma</button>
           <div class="section-header">
             <h1 class="display-title">Painel Inicial</h1>
             <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe suas vitrines, métricas e solicitações.</p>
@@ -337,45 +342,105 @@
           </div>
         </section>
 
-        <!-- Section 2B: Insights Panel -->
-        <section id="platform-cms-section" class="shell-section" hidden>
-          <h1>Administração da plataforma</h1>
-          <details id="platform-operations" class="portal-card">
-            <summary>Indicadores, solicitações e auditoria</summary>
-            <p id="platform-operations-status" role="status"></p>
-            <ul id="platform-overview"></ul>
-            <h2>Pedidos de customização</h2>
-            <ul id="platform-requests"></ul>
-            <h2>Atividade recente</h2>
-            <ul id="platform-audit"></ul>
-          </details>
-          <details id="platform-mila" class="portal-card mila-console">
-            <summary>Pedidos pela Mila</summary>
-            <p class="form-help">Cole a mensagem que chegou no WhatsApp da Mila, ou só o código (#VI-XXXXXX-XXXX). O painel localiza a vitrine e monta o repasse para o dono. Nada do que você cola aqui é salvo.</p>
-            <form id="platform-mila-form" class="form-flex-col mila-console-form" novalidate>
-              <div class="form-group">
-                <label for="platform-mila-message">Mensagem do cliente</label>
-                <textarea id="platform-mila-message" class="textarea-goal" rows="6" maxlength="4000" placeholder="#VI-PIZZAR-7F3K · Pedido para Pizzaria do Zé&#10;&#10;Olá! Tenho interesse nestes itens..."></textarea>
+        <!-- Section 2B: Administração da plataforma (somente platform_admin) -->
+        <section id="platform-cms-section" class="shell-section admin-platform" aria-labelledby="platform-admin-title" hidden>
+          <div class="section-header">
+            <div class="card-eyebrow">Somente operadores</div>
+            <h1 id="platform-admin-title" class="display-title" tabindex="-1">Administração da plataforma</h1>
+            <p class="section-desc">Acompanhe a operação, repasse pedidos que chegam pela Mila, ajuste os modelos de vitrine e publique o site institucional.</p>
+          </div>
+
+          <ul id="platform-overview" class="admin-kpi-grid" aria-label="Indicadores da plataforma"></ul>
+          <div class="admin-status-row">
+            <p id="platform-operations-status" class="admin-status" role="status"></p>
+            <button id="platform-operations-retry" class="button button-small button-secondary button-pill" type="button" hidden>Tentar novamente</button>
+          </div>
+
+          <div class="admin-tabs" role="tablist" aria-label="Áreas da administração">
+            <button type="button" role="tab" id="platform-tab-overview" class="admin-tab" aria-controls="platform-operations" aria-selected="true">Visão geral</button>
+            <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1">Pedidos pela Mila</button>
+            <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1">Modelos de vitrine</button>
+            <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1">Site institucional</button>
+          </div>
+
+          <div id="platform-operations" class="admin-panel admin-overview-grid" role="tabpanel" aria-labelledby="platform-tab-overview" tabindex="0">
+            <article class="portal-card admin-card">
+              <h2>Pedidos de customização</h2>
+              <p class="admin-card-desc">Avance cada pedido de etapa conforme o atendimento acontece.</p>
+              <ul id="platform-requests" class="admin-list"></ul>
+            </article>
+            <article class="portal-card admin-card">
+              <h2>Atividade recente</h2>
+              <p class="admin-card-desc">Últimas ações registradas na auditoria da plataforma.</p>
+              <ul id="platform-audit" class="admin-list admin-list-compact"></ul>
+            </article>
+          </div>
+
+          <div id="platform-mila" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-mila" tabindex="0" hidden>
+            <article class="portal-card admin-card mila-console">
+              <h2>Pedidos pela Mila</h2>
+              <p class="admin-card-desc">Cole a mensagem que chegou no WhatsApp da Mila, ou só o código (#VI-XXXXXX-XXXX). O painel localiza a vitrine e monta o repasse para o dono. Nada do que você cola aqui é salvo.</p>
+              <form id="platform-mila-form" class="form-flex-col mila-console-form" novalidate>
+                <div class="form-group">
+                  <label for="platform-mila-message">Mensagem do cliente</label>
+                  <textarea id="platform-mila-message" class="textarea-goal" rows="6" maxlength="4000" placeholder="#VI-PIZZAR-7F3K · Pedido para Pizzaria do Zé&#10;&#10;Olá! Tenho interesse nestes itens..."></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="platform-mila-customer">WhatsApp do cliente (opcional)</label>
+                  <input type="text" id="platform-mila-customer" inputmode="tel" autocomplete="off" maxlength="20" placeholder="+55 (31) 99999-9999" class="item-input input-styled-height">
+                </div>
+                <button type="submit" class="button button-pill mila-console-submit">Localizar vitrine</button>
+              </form>
+              <p id="platform-mila-status" class="form-help" role="status"></p>
+              <ul id="platform-mila-results" class="mila-console-results"></ul>
+            </article>
+          </div>
+
+          <div id="platform-templates" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-templates" tabindex="0" hidden>
+            <article class="portal-card admin-card">
+              <h2>Modelos de vitrine</h2>
+              <p class="admin-card-desc">Os padrões salvos aqui valem para a próxima prévia ou publicação de cada vitrine que usa o modelo.</p>
+              <div class="admin-template-toolbar">
+                <div class="form-group">
+                  <label for="platform-template-select">Modelo</label>
+                  <select id="platform-template-select" class="select-styled"></select>
+                </div>
+                <button id="platform-template-copy" type="button" class="button button-small button-secondary button-pill">Criar a partir deste modelo</button>
               </div>
-              <div class="form-group">
-                <label for="platform-mila-customer">WhatsApp do cliente (opcional)</label>
-                <input type="text" id="platform-mila-customer" inputmode="tel" autocomplete="off" maxlength="20" placeholder="+55 (31) 99999-9999" class="item-input input-styled-height">
+              <p id="platform-templates-status" class="admin-status" role="status"></p>
+              <div id="platform-template-fields" class="admin-template-fields"></div>
+            </article>
+          </div>
+
+          <div id="platform-site" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-site" tabindex="0" hidden>
+            <div class="admin-cms-layout">
+              <nav class="portal-card admin-card admin-cms-nav" aria-labelledby="platform-cms-list-title">
+                <h2 id="platform-cms-list-title">Seções da página</h2>
+                <p class="admin-card-desc">Escolha uma seção para editar. A ordem define a posição na página institucional.</p>
+                <ul id="platform-cms-list" class="admin-cms-list"></ul>
+              </nav>
+              <div id="platform-cms-fields" class="portal-card admin-card admin-cms-editor"></div>
+            </div>
+            <div class="admin-publish-bar">
+              <p id="platform-cms-status" class="admin-publish-status" role="status"></p>
+              <div class="admin-publish-actions">
+                <button id="platform-cms-reload" class="button button-small button-secondary button-pill" type="button" hidden>Atualizar rascunho</button>
+                <button id="platform-cms-publish" class="button button-pill" type="button">Publicar página institucional</button>
               </div>
-              <button type="submit" class="button button-pill mila-console-submit">Localizar vitrine</button>
-            </form>
-            <p id="platform-mila-status" class="form-help" role="status"></p>
-            <ul id="platform-mila-results" class="mila-console-results"></ul>
-          </details>
-          <details id="platform-templates" class="portal-card">
-            <summary>Modelos de vitrine</summary>
-            <p id="platform-templates-status" role="status"></p>
-            <label>Modelo <select id="platform-template-select"></select></label>
-            <button id="platform-template-copy" type="button" class="button button-small button-secondary button-pill">Criar a partir deste modelo</button>
-            <div id="platform-template-fields"></div>
-          </details>
-          <p id="platform-cms-status" role="status"></p>
-          <div id="platform-cms-fields"></div>
-          <button id="platform-cms-publish" class="button button-pill" type="button">Publicar página institucional</button>
+            </div>
+          </div>
+
+          <dialog id="platform-confirm" class="portal-dialog admin-confirm" aria-labelledby="platform-confirm-title" aria-describedby="platform-confirm-message">
+            <div class="portal-dialog-body">
+              <h2 id="platform-confirm-title" class="portal-dialog-title"></h2>
+              <p id="platform-confirm-message" class="portal-dialog-desc"></p>
+              <ul id="platform-confirm-list" class="admin-confirm-list" hidden></ul>
+              <div class="portal-dialog-actions">
+                <button id="platform-confirm-cancel" class="button button-small button-secondary button-pill" type="button">Cancelar</button>
+                <button id="platform-confirm-accept" class="button button-small button-pill" type="button">Confirmar</button>
+              </div>
+            </div>
+          </dialog>
         </section>
 
         <section id="insights-section" class="shell-section" hidden>
@@ -1428,6 +1493,12 @@
           <a href="#pedidos" class="nav-link" data-section="pedidos">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>Pedidos</span>
+          </a>
+        </li>
+        <li class="nav-admin-item" hidden>
+          <a href="#administracao" class="nav-link" data-section="platform-cms">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Admin</span>
           </a>
         </li>
       </ul>
