@@ -106,14 +106,17 @@ export function renderInsightsOrigin(container, insights, doc = globalThis.docum
   title.id = 'insights-origin-title';
   heading.append(title);
   header.append(heading);
-  const legend = el(doc, 'div', 'insights-chart-legend');
-  legend.setAttribute('aria-hidden', 'true');
-  for (const [swatch, label] of [['swatch-visits', 'Visitas'], ['swatch-orders', 'Cliques no WhatsApp']]) {
-    const item = el(doc, 'span', 'legend-item');
-    item.append(el(doc, 'span', `legend-swatch ${swatch}`), doc.createTextNode(` ${label}`));
-    legend.append(item);
+  const origins = insights?.origins;
+  if (origins?.available) {
+    const legend = el(doc, 'div', 'insights-chart-legend');
+    legend.setAttribute('aria-hidden', 'true');
+    for (const [swatch, label] of [['swatch-visits', 'Visitas'], ['swatch-orders', 'Cliques no WhatsApp']]) {
+      const item = el(doc, 'span', 'legend-item');
+      item.append(el(doc, 'span', `legend-swatch ${swatch}`), doc.createTextNode(` ${label}`));
+      legend.append(item);
+    }
+    header.append(legend);
   }
-  header.append(legend);
   container.append(header);
 
   const reach = insights?.reach ?? {};
@@ -123,7 +126,6 @@ export function renderInsightsOrigin(container, insights, doc = globalThis.docum
   container.append(reachRow);
 
   const body = el(doc, 'div', 'origin-body');
-  const origins = insights?.origins;
   if (origins?.available) renderAvailable(doc, body, origins);
   else renderLocked(doc, body, origins ?? {});
   container.append(body);
