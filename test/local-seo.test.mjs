@@ -18,7 +18,7 @@ import {
   compilePublicStorefront,
   renderStorefrontHtml
 } from '../src/publication-engine.mjs';
-import { createApiHandler, createMemoryStore } from '../workers/api.mjs';
+import { createApiHandler, createMemoryStore, hydratePublicationRecord } from '../workers/api.mjs';
 
 const OWNER = '10000000-0000-0000-0000-000000000001';
 const ESSENCIAL = normalizeEntitlements({ plan_code: 'essencial' });
@@ -281,4 +281,20 @@ test('Issue #117 — painel: campos "Google e WhatsApp", prévia simulada e ajud
   const editor = await readFile(new URL('../web/portal/editor.js', import.meta.url), 'utf8');
   assert.match(editor, /mountSeoPanel\(/);
   assert.match(editor, /showSeoServerErrors\(/);
+});
+
+test('Issue #117 — reidratar a publicação lida do Supabase preserva SEO local, canônico e hash', async () => {
+  const content = draft({ localSeo: { businessType: 'Restaurant', areaServed: 'Centro de São Paulo' }, publicAddress: ADDRESS, businessHours: { week: WEEK } });
+  const { publication } = await compile(content, ESSENCIAL, [ACTIVE_DOMAIN]);
+  assert.equal(publication.menu.canonicalUrl, 'https://pizzariadoze.com.br/');
+  assert.equal(publication.menu.localBusiness.type, 'Restaurant');
+  const hydrated = await hydratePublicationRecord({
+    slug: 'pizza-a',
+    menu: publication.menu,
+    revision: publication.revision,
+    published_at: publication.publishedAt
+  });
+  assert.deepEqual(hydrated.menu.localBusiness, publication.menu.localBusiness);
+  assert.equal(hydrated.menu.canonicalUrl, publication.menu.canonicalUrl);
+  assert.equal(hydrated.hash, publication.hash);
 });

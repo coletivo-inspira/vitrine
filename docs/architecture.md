@@ -83,6 +83,12 @@ próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
 pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
 `loadSiteEntitlements` sem sessão.
 
+Selo de apoio do plano Gratuito (issue #135): `src/storefront-footer.mjs` traduz o
+recurso `support_badge_optional` em `supportBadge: false` no snapshot, decidido na
+publicação como o SEO local. Snapshot sem o campo mostra o selo. O rodapé lê
+`instagramUrl` e `publicEmail` quando o snapshot os tiver; nenhum dos dois é
+projetado ainda (central de canais, #125).
+
 ## Cobrança pelo Asaas (ADR 0013, issue #113)
 
 `src/billing/provider.mjs` define a interface de provedor (a mesma que o Stripe usará);

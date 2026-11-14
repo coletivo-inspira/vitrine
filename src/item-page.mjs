@@ -357,7 +357,7 @@ export function renderItemPageDocument(storefrontHtml, menu, itemRef, { basePath
     .replace(/<body data-storefront-slug="([^"]*)"/, (match) => `${match} data-storefront-item="${escapeHtml(item.id)}"`)
     .replace('>Pular para os itens<', '>Pular para o conteúdo<')
     .replace(/<header class="storefront-topbar">[\s\S]*?<\/header>/, (header) => rewriteLocalAnchors(header, home))
-    .replace(/<footer class="storefront-footer">[\s\S]*?<\/footer>/, (footer) => rewriteLocalAnchors(footer, home))
+    .replace(/<footer class="storefront-footer"[^>]*>[\s\S]*?<\/footer>/, (footer) => rewriteLocalAnchors(footer, home))
     .replace(/<main id="vitrine-principal"[\s\S]*<\/main>/, () => main);
 }
 
