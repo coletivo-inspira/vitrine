@@ -9,7 +9,7 @@ Dono entra no painel → seleciona sua vitrine → conecta e autoriza o Instagra
 ## Receita de configuração e implementação futura
 
 1. Confirmar que @ganjastudio.br usa conta profissional (Empresa ou Criador), identificar responsável pelo app Meta e uma conta de teste. (Ver [Configuração Meta](instagram/configuracao-meta.md))
-2. No console Meta, configurar o app com a **Configuração da API com login unificado** (a de login empresarial no Instagram está obsoleta), com a permissão única de leitura `instagram_basic`. Registrar responsáveis, nunca IDs reais, tokens ou segredos. (Ver [Configuração Meta](instagram/configuracao-meta.md))
+2. No console Meta, configurar o app com a **Configuração da API com login unificado** (a de login empresarial no Instagram está obsoleta), com a permissão única de leitura `instagram_basic`. Registrar responsáveis; o ID público do app pode ser citado, nunca chaves secretas, `config_id`, tokens ou segredos. (Ver [Configuração Meta](instagram/configuracao-meta.md))
 3. Cadastrar retorno HTTPS do OAuth e páginas de privacidade/exclusão; mapear revogação e desconexão. Confirmar revisão, acesso para contas externas e verificações exigidas no console antes de liberar clientes. (Ver [Configuração Meta](instagram/configuracao-meta.md))
 4. Integrar “Conectar Instagram” à vitrine selecionada no painel. A sessão do painel identifica o dono; o consentimento Instagram autoriza a leitura. Validar acesso no servidor e proteger o retorno OAuth contra troca de conta/vitrine. (Ver [Conectar por Vitrine](instagram/conectar-por-vitrine.md))
 5. Definir executor/agendamento sobre a arquitetura Cloudflare/Supabase já escolhida. Confirmar infraestrutura operacional, cotas, frequência e proteção/renovação dos tokens. Não contratar planos nem fazer upgrade automático. (Ver [Sincronização periódica](instagram/sincronizacao.md))
@@ -56,7 +56,7 @@ Aceite futuro: consentimento/cancelamento; duas vitrines isoladas; importação 
 
 O planejamento completo desta integração está distribuído em documentos dedicados a cada aspecto técnico da solução:
 
-- **Configuração Meta**: [Mapeamento e configuração do aplicativo Meta](instagram/configuracao-meta.md) (associado à issue #48, aberta aguardando confirmações humanas).
+- **Configuração Meta**: [Mapeamento e configuração do aplicativo Meta](instagram/configuracao-meta.md) (issue #48: checklist documentado, com as ações humanas restantes no console Meta marcadas como pendentes e com responsável).
 - **Conexão no Painel**: [Fluxo de conexão e gerenciamento do ciclo de vida da conta Instagram](instagram/conectar-por-vitrine.md) (associado à issue #49).
 - **Sincronização periódica**: [Mecanismo de sincronização do feed e perfil na infraestrutura gratuita](instagram/sincronizacao.md) (associado à issue #50).
 - **Interface Pública e Webhook**: [Contrato da API de leitura e notificação por webhook para sites conectados](instagram/interface-publica-feed.md) (associado à issue #51).
