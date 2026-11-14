@@ -119,7 +119,7 @@ conversa no WhatsApp (link opcional em cada cartão) são ações separadas.
 
 | Código | Bloqueio | Checklist de aceite |
 | --- | --- | --- |
-| `BLK-UX-61-AUTH` / `BLK-UX-61-PROD` | Sem sessão real nem Worker publicado; respostas do `POST` simuladas | [ ] Enviar um pedido numa conta de teste real e conferir a linha em `customization_requests` (status `novo`) · [ ] Enviar com 11 links e confirmar que a interface mostra o erro do servidor · [ ] Com a sessão expirada, o envio pede novo login e não limpa o formulário |
+| `BLK-UX-61-AUTH` | Sem sessão real no ambiente de auditoria (login Google exige navegador real); respostas do `POST` simuladas | [ ] Enviar um pedido numa conta de teste real e conferir a linha em `customization_requests` (status `novo`) · [ ] Enviar com 11 links e confirmar que a interface mostra o erro do servidor · [ ] Com a sessão expirada, o envio pede novo login e não limpa o formulário |
 | `BLK-HITL-72` | Sem conta em `platform_operators` | [ ] Operador muda o status de um pedido de teste; a pessoa vê o novo selo ao recarregar (UX-70-011) |
 | WhatsApp | Nenhuma conversa aberta por regra da auditoria | [ ] Depois de corrigir UX-70-002, conferir num aparelho que o link abre a conversa com o número da equipe, sem enviar |
 
