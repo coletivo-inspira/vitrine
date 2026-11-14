@@ -110,10 +110,8 @@ function renderDays() {
         });
         overnight.checked = range.overnight === true;
         return el('div', { className: 'hours-range', role: 'group', 'aria-label': `${label}, faixa ${index + 1}` }, [
-          el('label', { className: 'hours-time', for: opens.id }, [el('span', { text: 'Abre' })]),
-          opens,
-          el('label', { className: 'hours-time', for: closes.id }, [el('span', { text: 'Fecha' })]),
-          closes,
+          el('span', { className: 'hours-field' }, [el('label', { className: 'hours-time', for: opens.id, text: 'Abre' }), opens]),
+          el('span', { className: 'hours-field' }, [el('label', { className: 'hours-time', for: closes.id, text: 'Fecha' }), closes]),
           el('label', { className: 'checkbox-label-styled hours-overnight', for: overnight.id }, [overnight, doc().createTextNode(' Termina no dia seguinte')]),
           el('button', {
             type: 'button', className: 'text-link-btn hours-remove', 'data-action': 'remove-range', 'data-day': day, 'data-index': index,

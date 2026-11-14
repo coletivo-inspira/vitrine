@@ -1351,11 +1351,30 @@ html[data-theme="dark"] .storefront-open-badge[data-state="open"]::before {
 .storefront-hours summary {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 44px;
   color: var(--ink);
   font-size: 14px;
   font-weight: 600;
+  list-style: none;
   cursor: pointer;
+}
+
+.storefront-hours summary::-webkit-details-marker {
+  display: none;
+}
+
+.storefront-hours summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.storefront-hours[open] summary::after {
+  transform: translateY(2px) rotate(225deg);
 }
 
 .storefront-hours ul {

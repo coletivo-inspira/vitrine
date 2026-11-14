@@ -6226,11 +6226,20 @@ textarea {
 
 .hours-day {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr) auto;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
   align-items: start;
-  gap: 8px 12px;
-  padding: 10px 0;
+  gap: 4px 12px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.hours-day:has(.hours-range) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hours-day:has(.hours-range) .hours-ranges {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 .hours-day-label {
@@ -6263,12 +6272,25 @@ textarea {
   gap: 6px 8px;
 }
 
+.hours-range {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(var(--glass, 255 255 255) / .45);
+}
+
 .hours-range input[type="time"] {
-  width: 118px;
+  width: 112px;
   min-height: 44px;
 }
 
+.hours-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .hours-time {
+  min-width: 36px;
   font-size: 13px;
   font-weight: 600;
 }
@@ -6279,6 +6301,11 @@ textarea {
 
 .hours-range-error {
   flex-basis: 100%;
+}
+
+.place-fieldset [aria-invalid="true"] {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 1px #dc3545;
 }
 
 .hours-add,
@@ -6360,6 +6387,7 @@ textarea {
   display: block;
   width: 100%;
   height: 100%;
+  stroke: none;
 }
 
 .qr-panel-info {
@@ -6383,11 +6411,7 @@ textarea {
 
 @media (max-width: 560px) {
   .hours-day {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .hours-ranges {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 4px 8px;
   }
 }
