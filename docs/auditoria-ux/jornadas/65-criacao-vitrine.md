@@ -112,7 +112,7 @@ convenções da [matriz central](../matriz-central.md) (seção 4) e o
 
 | Código | Bloqueio | Checklist de aceite |
 | --- | --- | --- |
-| `BLK-UX-61-PROD` | Produção protegida por desafio da borda; não é possível criar vitrine real em `painel.inspira.dev.br` | [ ] Rotas liberadas · [ ] Criar uma vitrine de teste real (`auditoria-65-<data>`) do passo 1 ao 3 · [ ] Repetir com endereço já usado e confirmar `409 SLUG_TAKEN` · [ ] Excluir a vitrine de teste |
+| `BLK-UX-61-AUTH` | Sem sessão Google real na auditoria (a produção é `bbafd95`, o mesmo build; clientes automatizados recebem o desafio de bots da Cloudflare, então o teste exige navegador real) | [ ] Entrar num navegador real · [ ] Criar uma vitrine de teste real (`auditoria-65-<data>`) do passo 1 ao 3 · [ ] Repetir com endereço já usado e confirmar `409 SLUG_TAKEN` · [ ] Excluir a vitrine de teste |
 | `BLK-UX-61-AUTH` | Login Google real indisponível localmente | [ ] Sessão real criada · [ ] `POST /api/sites` real com perfil completo responde `201` e com perfil incompleto responde `409 PROFILE_INCOMPLETE` levando ao formulário de perfil |
 
 ## 6. Recomendações

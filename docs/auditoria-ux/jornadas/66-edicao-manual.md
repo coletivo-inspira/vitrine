@@ -133,7 +133,7 @@ Pontos positivos verificados:
 
 | Código | Bloqueio | Checklist de aceite |
 | --- | --- | --- |
-| `BLK-UX-61-AUTH` / `BLK-UX-61-PROD` | Sem sessão real nem Worker publicado: upload de foto, estrutura visual (`GET/PUT /structure`) e validação real do rascunho (`validateDraftContent`) não executáveis | [ ] Sessão real com papel `owner` · [ ] Enviar foto JPEG de 3 MB e conferir WebP ≤ 200 KB no armazenamento · [ ] Abrir "Identidade, menus e páginas" e salvar uma cor · [ ] Salvar item de venda sem preço e conferir a mensagem do Worker no indicador · [ ] Repetir com papéis `editor` e `viewer` (convite real) |
+| `BLK-UX-61-AUTH` | Sem sessão real no ambiente de auditoria (Worker publicado em `bbafd95`, mas o login exige navegador real): upload de foto, estrutura visual (`GET/PUT /structure`) e validação real do rascunho (`validateDraftContent`) não executáveis | [ ] Sessão real com papel `owner` · [ ] Enviar foto JPEG de 3 MB e conferir WebP ≤ 200 KB no armazenamento · [ ] Abrir "Identidade, menus e páginas" e salvar uma cor · [ ] Salvar item de venda sem preço e conferir a mensagem do Worker no indicador · [ ] Repetir com papéis `editor` e `viewer` (convite real) |
 
 ## 6. Recomendações
 
