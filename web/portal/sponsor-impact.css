@@ -187,6 +187,12 @@
   .impact-table td {
     padding: 9px 4px;
   }
+  .impact-table thead .impact-cell-number {
+    white-space: normal;
+  }
+  .impact-table tr > :first-child {
+    width: 40%;
+  }
   .impact-card-head .form-group-inline {
     width: 100%;
   }
