@@ -78,9 +78,11 @@ Checagens reutilizáveis em `src/entitlements.mjs`:
 - `assertItemBlocksAllowed` e `draftLimits` cobrem blocos de itens e itens ativos.
 
 Já aplicados: itens ativos (rascunho, prévia e publicação), blocos de itens e domínio
-próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
-`vitrine.json` chama `requirePlanFeature(entitlements, 'public_json')` e o webhook de
-pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
+próprio (`custom_domain`) e `vitrine.json` (`public_json`, issue #120): o direito é
+gravado no snapshot como `features.publicJson` na publicação e a suspensão é conferida
+pela RPC anônima `public_json_enabled(slug)`, só em falta no cache da borda (contrato em
+[`docs/vitrine-json.md`](vitrine-json.md)). Pronto para a rota que ainda não existe: o
+webhook de pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')` com
 `loadSiteEntitlements` sem sessão.
 
 ## Cobrança pelo Asaas (ADR 0013, issue #113)
