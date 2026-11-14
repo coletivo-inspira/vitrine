@@ -182,21 +182,25 @@ confirmar, registra o achado com ID próprio.
 
 ## 3. Índice das jornadas
 
-| Issue | Onda | Tipo | Superfícies | Arquivo de seção (criado pela issue) | Status |
+Todas as jornadas foram executadas e estão em `main`. A consolidação, com
+cobertura, contagens, P0/P1 pendentes, backlog e bloqueios, está no
+[relatório consolidado](relatorio-consolidado.md).
+
+| Issue | Onda | Tipo | Superfícies | Arquivo de seção | Status |
 | --- | --- | --- | --- | --- | --- |
-| `#61` | Preparação | AFK | Ambientes, rotas, papéis | Este arquivo | Aberto neste PR |
-| `#62` | 1ª | AFK | `/`, `/como-funciona/`, `/possibilidades/`, `/planos/`, `/orcamento/`, `/privacidade/`, `/termos/`, bolinha fixa (`inspira-orb`) | `docs/auditoria-ux/jornadas/62-descoberta-site.md` | A executar |
-| `#63` | 1ª | AFK | Login, cabeçalho, barra lateral e inferior, tema, `#perfil`, perfil obrigatório, sair | `docs/auditoria-ux/jornadas/63-entrada-conta.md` | A executar |
-| `#64` | 1ª | AFK | `#inicio`, `#vitrines`, cartões e permissões | `docs/auditoria-ux/jornadas/64-inicio-selecao-vitrines.md` | A executar |
-| `#65` | 1ª | AFK | `#wizard` (área, modelo, nome e endereço, conflito) | `docs/auditoria-ux/jornadas/65-criacao-vitrine.md` | A executar |
-| `#66` | 1ª | AFK | `#editor` (configurações, categorias, itens, estrutura, modalidades), `#leiloes` | `docs/auditoria-ux/jornadas/66-edicao-manual.md` | A executar |
-| `#67` | 1ª | AFK | `#editor` (rascunho, conflito 409, prévia, publicar, versões), `/__preview/:siteId` | `docs/auditoria-ux/jornadas/67-previa-publicacao.md` | A executar |
-| `#68` | 1ª | AFK | `/loja1`, `/<slug>`, `/404.html`, `/por-cidade/`, link `wa.me` | `docs/auditoria-ux/jornadas/68-vitrine-publica.md` | A executar |
-| `#69` | 2ª | AFK | `#editor` com CSV (`csv-catalog.js`, modelos CSV) | `docs/auditoria-ux/jornadas/69-importacao-csv.md` | A executar |
-| `#70` | 2ª | AFK | `#pedidos` (customizações) | `docs/auditoria-ux/jornadas/70-customizacoes.md` | A executar |
-| `#71` | 2ª | AFK | `#insights` (7d/30d/90d) | `docs/auditoria-ux/jornadas/71-insights.md` | A executar |
-| `#72` | 2ª | HITL/AFK | `#platform-cms-section`, `#platform-operations`, `#platform-mila`, `#platform-templates` | `docs/auditoria-ux/jornadas/72-administracao-plataforma.md` | A executar (sessão real em `BLK-HITL-72`) |
-| `#73` | Fechamento | AFK | Consolidação de `#61`–`#72` | `docs/auditoria-ux/relatorio-consolidado.md` | Aguarda `#62`–`#72` |
+| `#61` | Preparação | AFK | Ambientes, rotas, papéis | Este arquivo | Concluída ([#100](https://github.com/coletivo-inspira/vitrine/pull/100)) |
+| `#62` | 1ª | AFK | `/`, `/como-funciona/`, `/possibilidades/`, `/planos/`, `/orcamento/`, `/privacidade/`, `/termos/`, bolinha fixa (`inspira-orb`) | [`jornadas/62-descoberta-site.md`](jornadas/62-descoberta-site.md) | Executada ([#102](https://github.com/coletivo-inspira/vitrine/pull/102)): 23 achados (`P1` 2) |
+| `#63` | 1ª | AFK | Login, cabeçalho, barra lateral e inferior, tema, `#perfil`, perfil obrigatório, sair | [`jornadas/63-entrada-conta.md`](jornadas/63-entrada-conta.md) | Executada ([#105](https://github.com/coletivo-inspira/vitrine/pull/105)): 21 achados (`P1` 6); login real em `BLK-UX-61-AUTH` |
+| `#64` | 1ª | AFK | `#inicio`, `#vitrines`, cartões e permissões | [`jornadas/64-inicio-selecao-vitrines.md`](jornadas/64-inicio-selecao-vitrines.md) | Executada ([#105](https://github.com/coletivo-inspira/vitrine/pull/105)): 14 achados (`P1` 3) e a decisão de produto `UX-64-004` |
+| `#65` | 1ª | AFK | `#wizard` (área, modelo, nome e endereço, conflito) | [`jornadas/65-criacao-vitrine.md`](jornadas/65-criacao-vitrine.md) | Executada ([#106](https://github.com/coletivo-inspira/vitrine/pull/106)): 17 achados (`P1` 2) |
+| `#66` | 1ª | AFK | `#editor` (configurações, categorias, itens, estrutura, modalidades), `#leiloes` | [`jornadas/66-edicao-manual.md`](jornadas/66-edicao-manual.md) | Executada ([#106](https://github.com/coletivo-inspira/vitrine/pull/106)): 12 achados (`P1` 2) |
+| `#67` | 1ª | AFK | `#editor` (rascunho, conflito 409, prévia, publicar, versões), `/__preview/:siteId` | [`jornadas/67-previa-publicacao.md`](jornadas/67-previa-publicacao.md) | Executada ([#106](https://github.com/coletivo-inspira/vitrine/pull/106)): 18 achados (`P1` 4); prévia assinada real em `BLK-CLOUD-01` |
+| `#68` | 1ª | AFK | `/loja1`, `/<slug>`, `/404.html`, `/por-cidade/`, link `wa.me` | [`jornadas/68-vitrine-publica.md`](jornadas/68-vitrine-publica.md) | Executada ([#101](https://github.com/coletivo-inspira/vitrine/pull/101)): 20 achados (`P1` 3) |
+| `#69` | 2ª | AFK | `#editor` com CSV (`csv-catalog.js`, modelos CSV) | [`jornadas/69-importacao-csv.md`](jornadas/69-importacao-csv.md) | Executada ([#103](https://github.com/coletivo-inspira/vitrine/pull/103)): 20 achados (`P1` 3) |
+| `#70` | 2ª | AFK | `#pedidos` (customizações) | [`jornadas/70-customizacoes.md`](jornadas/70-customizacoes.md) | Executada ([#103](https://github.com/coletivo-inspira/vitrine/pull/103)): 11 achados (`P1` 2) |
+| `#71` | 2ª | AFK | `#insights` (7d/30d/90d) | [`jornadas/71-insights.md`](jornadas/71-insights.md) | Executada ([#104](https://github.com/coletivo-inspira/vitrine/pull/104)): 20 achados (`P1` 5) |
+| `#72` | 2ª | HITL/AFK | `#platform-cms-section`, `#platform-operations`, `#platform-mila`, `#platform-templates` | [`jornadas/72-administracao-plataforma.md`](jornadas/72-administracao-plataforma.md) | Parte AFK executada ([#104](https://github.com/coletivo-inspira/vitrine/pull/104)): 15 achados (`P1` 3); sessão real em `BLK-HITL-72` |
+| `#73` | Fechamento | AFK | Consolidação de `#61`–`#72` | [`relatorio-consolidado.md`](relatorio-consolidado.md) | Concluída: 191 achados (`P0` 0 · `P1` 35 · `P2` 92 · `P3` 64) e backlog em 3 ondas |
 
 ---
 
@@ -265,26 +269,29 @@ confirmar, registra o achado com ID próprio.
 
 ## 5. Matriz de cenários (alto nível)
 
-Cada célula é preenchida pela jornada com `executado`, `parcial`, `bloqueado` ou
-`n/a`. "Teclado" inclui foco e contraste; "Movimento" inclui movimento e
-transparência reduzidos.
+Cada célula foi preenchida conforme a matriz da jornada, com `executado`,
+`parcial`, `bloqueado` ou `n/a`. "Teclado" inclui foco e contraste; "Movimento"
+inclui movimento e transparência reduzidos.
 
 | Jornada | 360 | 390 | 768 | 1024 | 1440 | Horizontal | Zoom 200% | Claro | Escuro | Teclado | Movimento |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `#62` Descoberta | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#63` Entrada e conta | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#64` Início e vitrines | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#65` Criação | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#66` Edição manual | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#67` Prévia e publicação | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#68` Vitrine pública | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#69` Importação CSV | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#70` Customizações | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#71` Insights | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
-| `#72` Administração | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar | a executar |
+| `#62` Descoberta | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#63` Entrada e conta | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#64` Início e vitrines | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#65` Criação | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#66` Edição manual | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | parcial |
+| `#67` Prévia e publicação | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#68` Vitrine pública | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#69` Importação CSV | executado | executado | executado | executado | executado | executado | executado | executado | executado | parcial | parcial |
+| `#70` Customizações | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | parcial |
+| `#71` Insights | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado | executado |
+| `#72` Administração | executado | executado | executado | executado | executado | executado | executado | executado | executado | parcial | executado |
 
-Total aplicável inicial: 11 jornadas × 11 colunas = 121 cenários; `#73` recalcula
-o total descontando as células `n/a`.
+Total recalculado pela `#73`: 11 jornadas × 11 colunas = 121 cenários aplicáveis
+(nenhum `n/a`), com 116 executados, 5 parciais e 0 bloqueados. Os motivos das
+células parciais e os subcenários que dependem de ambiente real (login Google,
+prévia assinada, conta de operador, permissões no servidor) estão no
+[relatório consolidado, seção 2](relatorio-consolidado.md#2-cobertura-por-jornada-e-modo).
 
 ---
 
