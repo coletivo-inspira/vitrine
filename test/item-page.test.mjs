@@ -149,7 +149,7 @@ test('Issue #130 — página do item: um h1, og:image da foto, canonical, sem ca
   assert.match(html, /<div id="storefront-catalog" class="item-page-select" data-item-select><a class="whatsapp-order-button" href="https:\/\/wa\.me\/5511987654321/);
   assert.match(html, /<body data-storefront-slug="pizza-a" data-storefront-item="aula-pizza"/);
   assert.match(html, /<header class="storefront-topbar">/, 'mesmo cabeçalho da vitrine');
-  assert.match(html, /<footer class="storefront-footer">/, 'mesmo rodapé da vitrine');
+  assert.match(html, /<footer class="storefront-footer"[^>]*>/, 'mesmo rodapé da vitrine');
   assert.match(html, /class="storefront-identity" href="\/pizza-a"/);
 
   for (const secret of ['custo 40 reais', 'dono@example.com', 'internalNotes', 'ownerEmail']) {

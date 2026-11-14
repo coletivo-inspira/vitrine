@@ -210,6 +210,19 @@ os links e o tema. A sacola mostra contador em laranja e tem nome acessível
 dinâmico ("Sua seleção, 2 itens"); sem JavaScript, leva às etapas e os links
 ficam visíveis como lista. Sem selo "Vitrine" nem endereço no cabeçalho.
 
+### Rodapé da vitrine pública
+
+`web/assets/storefront-footer.mjs`, superfície de oferta e divisória fina. Duas
+colunas a partir de 768 px (negócio 1.4fr, links 1fr), uma no celular. Negócio:
+nome em Syne 22 px, frase curta opcional (boas-vindas escritas pelo negócio, até
+160 caracteres), botão "Conversar no WhatsApp" (44 px; "pela Mila" no modo Mila),
+Horário resumido por grupos de dias e Cidade em lista de definição, Instagram e
+e-mail quando o snapshot os tiver. Links de `navigation.footer` e a página por
+cidade na segunda coluna. Linha de apoio abaixo: nota de preços, privacidade
+resumida com link "Privacidade", crédito "Vitrine feita com" e logo (104×32) e,
+no plano Gratuito, a pílula "Apoio Coletivo Me Inspira" com ponto lima. Campo
+vazio não deixa rótulo. A barra de seleção é fixa só dentro dos itens.
+
 ### Gaveta "Sua seleção"
 
 `web/assets/selection-drawer.mjs`: `<dialog>` modal da direita, até 420 px e 90% da
