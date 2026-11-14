@@ -1054,6 +1054,305 @@ html[data-theme="dark"] .brand .brand-logo-dark {
   color: var(--primary);
 }
 
+/* Gaveta "Sua seleção" */
+.selection-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(420px, 90%);
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-subtle);
+  overflow: hidden;
+}
+
+.selection-drawer[open] {
+  animation: selection-drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.selection-drawer::backdrop {
+  background: rgb(23 30 26 / 0.55);
+}
+
+@keyframes selection-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+html:has(.selection-drawer[open]) {
+  overflow: hidden;
+}
+
+.selection-drawer-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.selection-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.selection-drawer-title {
+  margin: 0;
+  font-family: "Syne", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.selection-drawer-title:focus {
+  outline: none;
+}
+
+.selection-drawer-title:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.selection-drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.selection-drawer-close:hover {
+  background-color: var(--apricot);
+  color: var(--primary);
+}
+
+.selection-drawer-close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.selection-drawer-notice {
+  margin: 12px 20px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--apricot);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.selection-drawer-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.selection-drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 20px;
+}
+
+.selection-drawer-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selection-drawer-item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.selection-drawer-item:has(.selection-drawer-photo) {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.selection-drawer-photo {
+  grid-row: span 2;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--offer-surface);
+}
+
+.selection-drawer-info {
+  min-width: 0;
+}
+
+.selection-drawer-name {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.selection-drawer-meta {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.selection-drawer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.selection-drawer-line-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.selection-drawer-remove {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+
+.selection-drawer-remove:hover {
+  color: var(--primary);
+}
+
+.selection-drawer-empty {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding-block: 32px;
+}
+
+.selection-drawer-empty-title {
+  margin: 0;
+  font-family: "Syne", sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.selection-drawer-foot:empty {
+  display: none;
+}
+
+.selection-drawer-foot {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.selection-drawer-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.selection-drawer-summary p {
+  margin: 0;
+}
+
+.selection-drawer-count {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.selection-drawer-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.selection-drawer-total strong {
+  font-family: "Syne", sans-serif;
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.selection-drawer-quota {
+  font-weight: 700;
+  text-align: right;
+}
+
+.selection-drawer-note {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.selection-drawer-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.selection-drawer-actions .whatsapp-order-button,
+.selection-drawer-actions .sf-secondary-button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.selection-toast {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 45;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-drawer[open] {
+    animation: none;
+  }
+}
+
 .sf-stage-card {
   background: var(--surface);
   border: 1px solid var(--line);

@@ -210,6 +210,20 @@ os links e o tema. A sacola mostra contador em laranja e tem nome acessível
 dinâmico ("Sua seleção, 2 itens"); sem JavaScript, leva às etapas e os links
 ficam visíveis como lista. Sem selo "Vitrine" nem endereço no cabeçalho.
 
+### Gaveta "Sua seleção"
+
+`web/assets/selection-drawer.mjs`: `<dialog>` modal da direita, até 420 px e 90% da
+largura no celular, fundo `rgb(23 30 26 / .55)`, superfície sólida e divisória à
+esquerda. Título Syne 22 px ("Seu pré-orçamento" no modo `quote`), itens com foto de
+64 px quando a vitrine mostra fotos, nome, preço ou modalidade, quantidade (44×44) e
+"Remover" sublinhado; rodapé fixo com o mesmo resumo da barra inferior
+(`getSelectionSummary`), "Continuar" (ação principal, largura total) e "Continuar
+escolhendo" (secundário). Vazia: "Sua seleção está vazia" e o link "Ver itens da
+vitrine". Adicionar um item não abre a gaveta: aviso fixo "Adicionado à sua seleção"
+abaixo do cabeçalho por 2,6 s, anunciado pela região viva do cabeçalho. Desliza em
+280 ms; sem movimento com `prefers-reduced-motion`. A seleção fica em `sessionStorage`
+(`vitrine-selecao:<endereço>`), só identificadores e quantidades.
+
 ### Status and Tags
 
 O estado “Em preparação” combina superfície damasco, indicador laranja, texto de 12px semibold e raio curto. Tags das possibilidades são texto auxiliar de 11px, sem aparência de filtro ou botão.

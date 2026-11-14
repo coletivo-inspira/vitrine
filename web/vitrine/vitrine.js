@@ -1,3 +1,9 @@
+import {
+  SELECTION_ADDED_MESSAGE,
+  createSelectionDrawer,
+  createSelectionStore,
+  formatDiscardNotice
+} from '../assets/selection-drawer.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
@@ -104,16 +110,18 @@ export function setupStorefrontHeader(doc = globalThis.document, win = globalThi
     if (!open && restoreFocus) toggle.focus();
   }
 
-  function setCount(next) {
+  function setCount(next, { message = '', silent = false } = {}) {
     const value = Number.isSafeInteger(next) && next > 0 ? next : 0;
-    if (!selection || value === count) return;
+    if (!selection || (value === count && !message)) return;
     count = value;
     selection.setAttribute('aria-label', formatSelectionLabel(value));
     if (counter) {
       counter.textContent = String(value);
       counter.hidden = value === 0;
     }
-    if (status) status.textContent = value === 0 ? 'Sua seleção está vazia.' : `${formatSelectionLabel(value)}.`;
+    if (!status || silent) return;
+    const label = value === 0 ? 'Sua seleção está vazia.' : `${formatSelectionLabel(value)}.`;
+    status.textContent = message ? `${message} ${label}` : label;
   }
 
   selection?.addEventListener('click', (event) => {
@@ -534,11 +542,31 @@ export async function bootStorefront(deps = {}) {
     if (!catalogContainer) return null;
 
     const likesClient = createStorefrontLikesClient({ slug, fetchImpl });
+    const selectionStore = createSelectionStore({
+      slug,
+      storage: deps.storage,
+      version: response.headers?.get?.('etag') ?? ''
+    });
+    let drawer = null;
+    let shownCount = null;
     const renderer = new StorefrontRenderer(catalogContainer, menu, {
       isPublicPage: true,
       likes: likesClient,
       targetWhatsapp: menu.whatsapp,
-      onRender: (r) => header.setCount(r.getCartCount()),
+      onRender: (r) => {
+        const count = r.getCartCount();
+        if (shownCount === null) {
+          header.setCount(count, { silent: true });
+        } else if (count > shownCount && !drawer?.isOpen()) {
+          header.setCount(count, { message: `${SELECTION_ADDED_MESSAGE}.` });
+          drawer?.showToast(SELECTION_ADDED_MESSAGE);
+        } else {
+          header.setCount(count);
+        }
+        shownCount = count;
+        selectionStore.save(r.getPersistableSelection());
+        drawer?.refresh();
+      },
       onUpdate: (r) => {
         if (heroSec) {
           heroSec.hidden = r.stage !== 1;
@@ -552,6 +580,19 @@ export async function bootStorefront(deps = {}) {
       }
     });
     renderer.metricsCollector = collector;
+    const { discarded } = renderer.restoreSelection(selectionStore.load()?.itens);
+    drawer = createSelectionDrawer({
+      doc,
+      win: deps.window ?? globalThis,
+      renderer,
+      openEvent: SELECTION_OPEN_EVENT
+    });
+    const announceDiscarded = () => {
+      const notice = formatDiscardNotice(discarded);
+      if (!notice) return;
+      drawer?.setNotice(notice);
+      header.setCount(renderer.getCartCount(), { message: notice });
+    };
 
     const hasAuctions = categories.some((category) => (category.items ?? []).some(isAuctionItem));
     if (hasAuctions) {
@@ -572,11 +613,13 @@ export async function bootStorefront(deps = {}) {
         doc.addEventListener('visibilitychange', refreshWhenVisible);
       }
       renderer.render();
+      announceDiscarded();
       await auctionClient.loadBoard();
       return renderer;
     }
 
     renderer.render();
+    announceDiscarded();
     likesClient.load();
     return renderer;
   } catch {

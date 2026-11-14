@@ -17,6 +17,12 @@ Migrações:
 - `migrations/20261112193000_city_listings.sql` (Spec 012): listagem pública por cidade (`public.city_listings`) derivada do manifesto ativo pelo trigger `private.refresh_city_listings()` em `public.publications` (só itens `offer`, `donation` e `trade` de vitrines com `locality` autorizada), view agregada `public.city_listing_cities`, leitura `anon` por coluna sem `site_id`, escrita apenas pelo trigger e reserva do endereço `por-cidade` em `public.sites` (`not valid`).
 - `migrations/20261112194217_auction_bids.sql`: leilão de itens no modo lance (Spec 013) — `public.auction_lots`, `public.auction_bids`, `public.auction_blocks` com RLS de leitura só para `owner`/`admin` da vitrine (sem `visitor_key` nos grants e sem escrita direta), `private.auction_settings` com o SHA-256 do segredo do canal, `public.read_auction_board()` (quadro público sem dados pessoais), `public.place_auction_bid()` (exige o cabeçalho `x-vitrine-bid-key`; limites por visitante, prorrogação de 3 min até +60 min, termos congelados no primeiro lance e limpeza de dados pessoais 90 dias após o encerramento) e `public.void_auction_bid()` (desconsidera com motivo, bloqueia o contato e grava em `audit_logs`).
 
+Nome de migração nova: `AAAAMMDDHHMMSS_descricao.sql`, com versão maior que a última
+migração da `main` no momento do merge. O deploy roda `supabase db push`, que recusa
+arquivo com versão anterior à última aplicada no remoto. `npm test` confere versões
+únicas e ordenadas, e o CI de PR roda `node scripts/check-migration-order.mjs origin/main`.
+Se a `main` ganhar migração mais nova antes do merge, renomeie a sua para depois dela.
+
 Não aplicadas remotamente. O administrador da migração deve poder criar funções
 e contornar RLS; em Supabase, usar o fluxo de migração do projeto, nunca uma
 chamada pública de usuário.
