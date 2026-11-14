@@ -162,7 +162,7 @@ o roteiro abaixo e anexa o resultado a esta seção (ou a um comentário na `#73
 
 ### 7.1 Preparação (Lino)
 
-- [ ] Produção acessível (`BLK-UX-61-PROD`): `curl -sI https://painel.inspira.dev.br/` devolve `200`.
+- [ ] Abrir `https://painel.inspira.dev.br/` num navegador real (o desafio de bots da Cloudflare só afeta clientes automatizados; versão publicada `bbafd95`).
 - [ ] Criar ou escolher uma conta Google de teste e entrar uma vez no painel para gerar o `user_id`.
 - [ ] No SQL Editor do Supabase: `insert into public.platform_operators (user_id, role) values ('<uuid>', 'platform_admin');` — sem colar tokens ou senhas em issues e capturas.
 - [ ] Ter uma segunda conta comum (dona de uma vitrine de teste) para o contraste de papéis.

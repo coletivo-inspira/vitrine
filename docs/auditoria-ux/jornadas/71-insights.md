@@ -37,7 +37,8 @@ confirmado**.
   `lento` (3,5 s para `30d`/`90d`), 0, 1 ou 2 vitrines e papéis `owner` e `viewer`.
 - O que **não** foi verificado: dados reais de `site_metrics_daily` no Supabase,
   a gravação de eventos pela vitrine publicada (Worker) e o comportamento em
-  produção, bloqueado pelo desafio da borda (`BLK-UX-61-PROD`).
+  produção com sessão real (a versão publicada é `bbafd95`, a mesma auditada;
+  conferir num navegador real é o passo humano opcional `CHK-UX-61-PROD`).
 
 ## 3. Inventário de controles
 
@@ -139,7 +140,7 @@ validação com dados reais:
 
 | Código | Bloqueio | Checklist de aceite (ação humana ou ambiente) |
 | --- | --- | --- |
-| `BLK-UX-61-PROD` (herdado) | Produção atrás do desafio da borda; sem acesso a `site_metrics_daily` real | [ ] Abrir `/portal/#insights` em produção com uma vitrine publicada há mais de 7 dias · [ ] Conferir que visitas, cliques no WhatsApp e curtidas batem com uma visita de teste feita no dia (sem enviar mensagem real: só o toque, com a conversa cancelada) · [ ] Repetir `UX-71-001` desligando a rede no navegador · [ ] Conferir `UX-71-018` com uma visita depois das 21h |
+| `CHK-UX-61-PROD` (herdado, opcional) | Clientes automatizados recebem o desafio de bots da Cloudflare; a auditoria não teve sessão real nem acesso a `site_metrics_daily` real | [ ] Abrir `/portal/#insights` em produção com uma vitrine publicada há mais de 7 dias · [ ] Conferir que visitas, cliques no WhatsApp e curtidas batem com uma visita de teste feita no dia (sem enviar mensagem real: só o toque, com a conversa cancelada) · [ ] Repetir `UX-71-001` desligando a rede no navegador · [ ] Conferir `UX-71-018` com uma visita depois das 21h |
 
 ## 7. Recomendações
 
