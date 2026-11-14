@@ -4,6 +4,7 @@ import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapt
 import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
+import { handleLinktreeRoute, matchLinktreeRoute, purgeExpiredLinktreeDemos, resolveLinktreeRepository } from '../src/linktree-import.mjs';
 import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
@@ -4251,6 +4252,27 @@ export function createApiHandler(deps = {}) {
         return jsonResponse(200, { code, matches }, { 'cache-control': 'no-store' });
       }
 
+      const linktreeRoute = matchLinktreeRoute(pathname);
+      if (linktreeRoute) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (linktreeRoute.admin && !await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (method === 'POST') {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+          if (guardError) return guardError;
+        }
+        const payload = method === 'POST' ? (await parseJsonRequest(request)).parsed : undefined;
+        const { status, body } = await handleLinktreeRoute(linktreeRoute, method, payload, {
+          repository: resolveLinktreeRepository(store, env, deps.fetch),
+          options,
+          fetch: deps.linktreeFetch ?? globalThis.fetch
+        });
+        return jsonResponse(status, body, { 'cache-control': 'no-store' });
+      }
+
       if (pathname === '/api/admin/templates') {
         const user = await resolveSessionUser(request, env, deps);
         if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
@@ -5631,6 +5653,10 @@ export default {
     return defaultApiHandler(request, env, ctx);
   },
   async scheduled(_event, env) {
-    await refreshPendingDomainCertificates(env);
+    try {
+      await refreshPendingDomainCertificates(env);
+    } finally {
+      await purgeExpiredLinktreeDemos(env).catch(() => {});
+    }
   }
 };
