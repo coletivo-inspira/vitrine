@@ -56,7 +56,8 @@ CPU 4×. Sem navegador no CI, a medição é local e anotada no PR. Em 2026-11-1
 `/loja1` no `npm run preview` (sem compressão), Chrome 157: mediana 1,71 s em 5
 rodadas, elemento `h1#storefront-name`. Com foto no hero (issue #131, exemplo
 `test/fixtures/hero-photo-storefront.mjs`, foto WebP de 97,5 KB): mediana 2,37 s
-em 5 rodadas, elemento a foto. Com foto no hero, a página não pré-carrega as
+em 5 rodadas, elemento a foto; com o cabeçalho novo da vitrine (#128), 2,39 s
+(`/loja1`: 1,86 s). Com foto no hero, a página não pré-carrega as
 fontes (elas chegam pelo `@font-face` com `font-display: swap`) e o painel
 comprime a foto do hero para até 100 KB; com as fontes pré-carregadas a mesma
 página ficava em 3,6 s, e com a foto de 197 KB em 5,2 s.
