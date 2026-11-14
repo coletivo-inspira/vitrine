@@ -935,6 +935,8 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   }) : null;
   const home = structure?.pages.find(page => page.slug === 'home');
   const hero = home?.sections.find(section => section.moduleCode === 'hero')?.config;
+  // A foto do hero é o LCP: sem disputar banda com ~380 KB de fontes pré-carregadas (font-display: swap).
+  const heroPhoto = Boolean(hero?.imageUrl && hero?.imageAlt);
   const topNav = renderNavigation(structure?.navigation.header, 'Navegação da vitrine');
   const footerNav = renderNavigation(structure?.navigation.footer, 'Links do rodapé');
   const cityLink = menu.locality && menu.items?.some((item) => ['offer', 'donation', 'trade'].includes(item.priceMode))
@@ -1015,9 +1017,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <meta property="og:locale" content="pt_BR">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
-  <link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
+  ${heroPhoto ? '' : `<link rel="preload" href="/assets/fonts/syne.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
-  <script src="/theme.js"></script>
+  `}<script src="/theme.js"></script>
   <link rel="stylesheet" href="/vitrine/vitrine.css">
 </head>
 <body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>

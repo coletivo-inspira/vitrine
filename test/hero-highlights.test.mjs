@@ -80,7 +80,7 @@ test('hero com foto: imagem com dimensões e prioridade alta, depois do texto, e
   const heroHtml = html.match(/<section id="abertura" class="storefront-hero has-photo"[\s\S]*?<\/section>/)[0];
   assert.ok(heroHtml.indexOf('storefront-hero-copy') < heroHtml.indexOf('storefront-hero-media'),
     'o texto vem antes da foto no HTML (à esquerda no desktop; o CSS sobe a foto no celular)');
-  assert.match(heroHtml, /<img src="\/assets\/pizza-demo\.webp" alt="Pizza margherita[^"]*" width="800" height="1000" fetchpriority="high" decoding="async">/);
+  assert.match(heroHtml, /<img src="\/assets\/pizza-demo-hero\.webp" alt="Pizza margherita[^"]*" width="800" height="1000" fetchpriority="high" decoding="async">/);
   assert.match(heroHtml, /<p class="storefront-eyebrow">Pizzaria de bairro desde 2012<\/p>/);
   assert.match(heroHtml, /<a class="storefront-hero-primary" href="#storefront-catalog">Ver a vitrine<\/a>/);
   const whatsapp = heroHtml.match(/<a class="storefront-hero-secondary" href="([^"]+)" target="_blank" rel="noopener noreferrer">Conversar no WhatsApp<\/a>/);
@@ -89,6 +89,7 @@ test('hero com foto: imagem com dimensões e prioridade alta, depois do texto, e
   assert.equal(url.origin + url.pathname, 'https://wa.me/5511999999999');
   assert.equal(url.searchParams.get('text'), 'Olá! Vi a vitrine Forno & Praça Pizzaria Artesanal e gostaria de conversar.');
   assert.ok(html.includes('id="storefront-catalog"'), 'o destino "selecao" existe na página');
+  assert.ok(!html.includes('as="font"'), 'com foto no hero, as fontes não disputam banda com o LCP');
 });
 
 test('hero: "whatsapp" respeita o modo Mila (ADR 0012) e "pagina:" e âncoras levam à seção certa', async () => {
@@ -141,6 +142,8 @@ test('vitrines publicadas antes da mudança renderizam o hero igual', async () =
   const legacyHtml = renderStorefrontHtml(await publish(legacy));
   assert.ok(legacyHtml.includes('<p class="storefront-eyebrow">Atendimento direto no WhatsApp</p>'));
   assert.ok(!legacyHtml.includes('has-photo'));
+  assert.equal(html.match(/rel="preload" href="\/assets\/fonts\/[a-z-]+\.ttf" as="font"/g).length, 2,
+    'sem foto no hero, as fontes continuam pré-carregadas');
 });
 
 test('projeção pública mantém os campos novos e o artefato passa na checagem de vazamento', async () => {

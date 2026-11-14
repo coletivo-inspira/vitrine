@@ -1,0 +1,7 @@
+{
+  "derivedFrom": "pizza-demo.webp",
+  "process": "Mesmo caminho do painel para a foto do hero: createImageBitmap, OffscreenCanvas com lado maior de 800 px e WebP qualidade 0,82 (Chrome 157).",
+  "size": "800x533",
+  "use": "Foto do hero da vitrine de exemplo em test/fixtures/hero-photo-storefront.mjs (issue 131). Ilustração de uma pizzaria fictícia.",
+  "createdAt": "2026-11-14T22:30:00.000Z"
+}

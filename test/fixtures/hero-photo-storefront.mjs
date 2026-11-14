@@ -18,7 +18,7 @@ export async function heroPhotoDraft() {
               eyebrow: 'Pizzaria de bairro desde 2012',
               headline: 'Pizza de fermentação natural, assada na hora',
               subtitle: 'Massa descansada por 48 horas, forno a lenha e ingredientes de pequenos produtores.',
-              imageUrl: '/assets/pizza-demo.webp',
+              imageUrl: '/assets/pizza-demo-hero.webp',
               imageAlt: 'Pizza margherita inteira sobre mesa de pedra clara, com manjericão fresco',
               primaryAction: { label: 'Ver a vitrine', target: 'selecao' },
               secondaryAction: { label: 'Conversar no WhatsApp', target: 'whatsapp' }
