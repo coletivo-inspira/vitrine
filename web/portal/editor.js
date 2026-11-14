@@ -18,6 +18,7 @@ import {
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
+import { mountCommentToVitrinePanel } from './comment-to-vitrine.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -1104,6 +1105,7 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     getSlug: () => currentSite?.slug,
     onChange: () => updateDraftAndPreview()
   });
+  mountCommentToVitrinePanel({ getSlug: () => currentSite?.slug });
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;

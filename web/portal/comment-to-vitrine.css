@@ -1,0 +1,76 @@
+/* Kit Comment-to-Vitrine: link do Direct com origem ig_comment (issue #122) */
+.comment-kit {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.comment-kit > p {
+  margin: 0;
+}
+
+.comment-kit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.comment-kit-copy {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.comment-kit-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.comment-kit-copy-button {
+  flex: 0 0 auto;
+  min-width: 96px;
+  min-height: 44px;
+}
+
+.comment-kit-status {
+  min-height: 1.4em;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.comment-kit-notes {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.comment-kit-notes li + li {
+  margin-top: 4px;
+}
+
+.comment-kit-guide-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--orange);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .comment-kit-copy {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .comment-kit-copy-button {
+    width: 100%;
+  }
+}
