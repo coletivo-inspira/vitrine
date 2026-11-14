@@ -100,8 +100,11 @@ CPU fica bem abaixo do limite do Workers Free (a espera pelo banco não conta co
 Regras do banco: assinatura `canceled` não volta por evento (uma nova contratação gera
 outro identificador); atraso, exclusão e estorno não mudam uma assinatura `pending`;
 evento de assinatura desconhecida fica `unmatched`. Toda mudança vai para
-`audit_logs` com `summary.source = 'service_role'`. Aviso de vencimento e suspensão
-ficam para a issue #114.
+`audit_logs` com `summary.source = 'service_role'`. Tolerância, suspensão e aviso de
+vencimento estão na seção 8 (issue #114).
+
+Um `SUBSCRIPTION_DELETED` vindo depois do cancelamento pelo dono encontra a assinatura
+já `canceled` e fica `ignored`.
 
 ## 4. Chamadas ao Asaas
 
@@ -136,7 +139,8 @@ Consultado em 2026-11-14 na documentação do Asaas; conferir antes de cada muda
 Sem chave real (o que roda no CI):
 
 ```bash
-npm test   # test/billing-asaas.test.mjs e test/database/billing-events.test.mjs
+npm test   # test/billing-asaas.test.mjs, test/database/billing-events.test.mjs,
+           # test/subscription-lifecycle.test.mjs e test/database/subscription-lifecycle.test.mjs
 ```
 
 No sandbox, depois de `BLK-ASAAS-01` (conta Asaas do coletivo e chave de sandbox):
@@ -167,3 +171,23 @@ de evento (não os dados da pessoa) e o resultado de cada passo acima.
 evento normalizado e `subscriptionChangeFor`. `private.billing_events` e as RPCs já
 aceitam `provider = 'stripe'`. O Stripe precisa do seu arquivo em `src/billing/` e de
 uma rota de webhook própria em `src/billing/routes.mjs`.
+
+## 8. Ciclo da assinatura (issue #114)
+
+Detalhes de operação em [`docs/operations-guide.md`](../operations-guide.md), seção 3.
+Lógica em `src/billing/lifecycle.mjs`; migração `20261116000100_subscription_lifecycle.sql`.
+
+- **Cron**: `billing_lifecycle_tick` (só `service_role`) move `active`/`past_due`
+  vencidas para `grace` (`grace_until` = vencimento + 7 dias) e `grace` vencida para
+  `suspended`, até 200 por chamada, com uma chamada por execução do Cron.
+- **Reativação**: `PAYMENT_CONFIRMED`/`PAYMENT_RECEIVED` voltam qualquer estado (menos
+  `canceled`) para `active`, como na seção 3.
+- **`GET /api/billing/notice`** (sessão obrigatória): `{ notice: null | { kind, dueDate,
+  graceUntil, planCode, planName, daysLeft, tenantId } }`, com `kind` em `due_soon`
+  (3 dias antes do vencimento), `grace` ou `suspended`. Lê `read_subscription_notices`
+  com o token da pessoa: só organizações de que ela é dona.
+- **`POST /api/billing/cancel`** `{ tenantId }` (dono, mesma origem, JSON): cancela no
+  Asaas (`DELETE /subscriptions/{id}`, 1 chamada) e grava `canceled` pela RPC
+  `billing_cancel_by_owner`. O plano vale até `current_period_end`; a resposta traz
+  `accessUntil`. `409 SUBSCRIPTION_NOT_CANCELABLE` para assinatura já cancelada, sem
+  assinatura ou manual (essa é do operador). A tela que chama esta rota é a issue #115.
