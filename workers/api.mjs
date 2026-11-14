@@ -82,6 +82,9 @@ import {
   respondIfShowcasePaused,
   siteLifecycleFields
 } from '../src/site-lifecycle.mjs';
+import {
+  handleVitrineJsonRequest, matchVitrineJsonPath, vitrineJsonGone, vitrineJsonPublicationOptions
+} from '../src/vitrine-json.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1825,6 +1828,7 @@ async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      publicJson: rawMenu.features?.publicJson === true,
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
         typeof row.published_at === 'string' && row.published_at
@@ -2376,6 +2380,18 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async resolveDomainRoute(hostname) {
       return fetchShowcaseRoute({ baseUrl, headers: anonHeaders(), fetch: fetchImpl }, hostname);
+    },
+
+    async isPublicJsonEnabled(slug) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/public_json_enabled`, {
+        method: 'POST',
+        headers: { ...anonHeaders(), 'content-type': 'application/json' },
+        body: JSON.stringify({ target_slug: slug })
+      });
+      // 404: migração ainda não aplicada; vale como desligado.
+      if (response.status === 404) return false;
+      if (!response.ok) throw new Error('Falha ao consultar o vitrine.json.');
+      return (await response.json()) === true;
     },
 
     async listAssets(siteId, { token }) {
@@ -3895,12 +3911,26 @@ async function handlePublicAuctionRequest(request, url, env, store, deps, slug, 
   }
 }
 
+function loadPublicPublication(store) {
+  return async (slug) =>
+    (await store.getPublicationBySlug?.(slug)) ?? (await sharedPublicPublications.getPublicationBySlug(slug));
+}
+
 async function handleCustomHostname(request, url, store, assets, context, env = {}, deps = {}) {
   const auctionMatch = url.pathname.match(PUBLIC_AUCTION_PATH);
   if (auctionMatch && typeof store.resolveDomain === 'function') {
     const domainSlug = await store.resolveDomain(url.hostname);
     if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
     return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
+  }
+  if (url.pathname === '/vitrine.json') {
+    const route = await resolveShowcaseRoute(store, url.hostname);
+    if (!isValidSlug(route?.slug)) return new Response(null, { status: 404 });
+    if (!route.canonical) return vitrineJsonGone();
+    return handleVitrineJsonRequest(request, {
+      slug: route.slug, store, env, loadPublication: loadPublicPublication(store),
+      cacheUrl: `${url.origin}/${route.slug}/vitrine.json`
+    });
   }
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 404 });
   const route = await resolveShowcaseRoute(store, url.hostname);
@@ -4131,6 +4161,14 @@ export function createApiHandler(deps = {}) {
       const cityPageResponse = await handleCityRequest(request, url, method, store, _ctx);
       if (cityPageResponse) {
         return cityPageResponse;
+      }
+
+      const vitrineJsonSlug = matchVitrineJsonPath(pathname);
+      if (vitrineJsonSlug && !RESERVED_PUBLIC_PATHS.has(vitrineJsonSlug)) {
+        return handleVitrineJsonRequest(request, {
+          slug: vitrineJsonSlug, store, env, loadPublication: loadPublicPublication(store),
+          cacheUrl: `${url.origin}${pathname}`
+        });
       }
 
       const publicResponse = await handlePublicStorefrontOrMenuRequest(
@@ -5430,7 +5468,8 @@ export function createApiHandler(deps = {}) {
           revision: draft.revision,
           siteId: site.id,
           ...draftLimits(entitlements),
-          ...publicationSeoOptions({ slug: site.slug, entitlements, domains })
+          ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
+          ...vitrineJsonPublicationOptions(entitlements)
         });
 
         if (typeof store.savePublication === 'function') {

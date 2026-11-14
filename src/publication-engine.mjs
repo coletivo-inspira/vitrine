@@ -21,6 +21,7 @@ import {
   renderShareMetaTags,
   shareMetaFor
 } from './local-seo.mjs';
+import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
@@ -100,7 +101,8 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'businessHours',
   'publicAddress',
   'canonicalUrl',
-  'localBusiness'
+  'localBusiness',
+  'features'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -280,6 +282,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
   }
 
   assertPublicSeo(menuArtifact);
+  assertPublicFeatures(menuArtifact);
 
   if (menuArtifact.components !== undefined) {
     if (
@@ -710,7 +713,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
     ...(locality ? { locality } : {}),
     ...projectPublicPlace(migrated),
-    ...projectPublicSeo(migrated, baseMenu.slug, limits)
+    ...projectPublicSeo(migrated, baseMenu.slug, limits),
+    ...projectPublicFeatures(limits)
   };
 
   for (const item of menu.items) {
