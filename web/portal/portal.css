@@ -7286,10 +7286,11 @@ textarea {
   outline-offset: 4px;
 }
 
-.item-visibility-hint {
+.item-visibility .item-visibility-hint {
   margin: 6px 0 0;
   color: var(--ink-soft);
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .item-visibility-label-field {
@@ -7342,4 +7343,22 @@ textarea {
   margin: 0;
   color: var(--ink-soft);
   font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .item-visibility-legend,
+  .item-visibility-label-field label {
+    margin-bottom: 2px;
+    font-size: 11px;
+  }
+
+  .item-visibility .item-visibility-hint {
+    margin-top: 4px;
+    font-size: 11px;
+  }
+
+  .item-visibility-label-field {
+    gap: 2px;
+    margin-top: 6px;
+  }
 }
