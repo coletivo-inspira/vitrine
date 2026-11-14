@@ -131,6 +131,6 @@ toque (`PB-14`) e contrato de webhook com HMAC do feed
 | --- | --- | --- |
 | `BLK-ASAAS-01` | Lino | Abrir a conta Asaas do coletivo (sem mensalidade), gerar a chave de sandbox e, depois, a de produção; gravar com `wrangler secret put ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN`; cadastrar a URL do webhook no painel do Asaas. Libera o teste real da 03 e a produção da 03 a 05 |
 | `BLK-GUAVIRA-01` | Lino com a Guavira Fotos | Autorização escrita para publicar o conteúdo e usar como case (14) |
-| `BLK-STRIPE-01` | Lino, só se decidir | Conta Stripe (06) |
+| `BLK-STRIPE-01` | Lino, só se decidir | Abrir a conta Stripe do coletivo, gerar a chave de teste (live só com nova decisão e `STRIPE_ENV=live`); gravar com `wrangler secret put STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`; cadastrar o endpoint do webhook e salvar o portal do cliente. Libera o teste real da 06 (`docs/billing/stripe.md`) |
 | Lista de domínios de pagamento | Lino | Revisar a lista fechada da 24 antes do merge dela |
 | Rodar o script | Lino | Criar os rótulos e as 27 issues no GitHub (as que já existirem são puladas) |
