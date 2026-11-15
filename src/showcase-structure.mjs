@@ -175,9 +175,12 @@ export function resolveShowcaseManifest(structure, template = {}, vertical = {},
   };
   const navigation = validateValue(structure.navigationMenus ?? {}, navFields);
   const inheritedSections = vertical.sections ?? template.defaultSections ?? [];
+  // Páginas extras do modelo (ex.: "Para empresas"), herdadas como a home: só o que muda fica no rascunho.
+  const inheritedPages = (Array.isArray(template.defaultPages) ? template.defaultPages : [])
+    .filter(page => page?.slug && page.slug !== 'home');
   const sourcePages = structure.pages ?? [{
     slug: 'home', title: 'Início', sections: inheritedSections
-  }];
+  }, ...inheritedPages];
   if (!Array.isArray(sourcePages) || sourcePages.length > 5) throw invalid();
   const slugs = new Set();
   const pages = sourcePages.map(page => {
@@ -187,7 +190,9 @@ export function resolveShowcaseManifest(structure, template = {}, vertical = {},
     slugs.add(page.slug);
     return {
       slug: page.slug, title: validateValue(page.title, 'text'),
-      sections: validateSections(page.sections ?? [], moduleDefaults, page.slug === 'home' ? inheritedSections : []),
+      sections: validateSections(page.sections ?? [], moduleDefaults, page.slug === 'home'
+        ? inheritedSections
+        : inheritedPages.find(entry => entry.slug === page.slug)?.sections ?? []),
       active: page.active !== false
     };
   });

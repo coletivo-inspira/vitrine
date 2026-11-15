@@ -12,7 +12,8 @@ const ALLOWED_PUBLIC_TEMPLATES = Object.freeze([
   'pizzeria-v1',
   'products-v1',
   'booking-v1',
-  'quote-v1'
+  'quote-v1',
+  'servicos-produtos-v1'
 ]);
 
 const RESERVED_PUBLIC_SLUGS = Object.freeze([

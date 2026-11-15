@@ -14,6 +14,7 @@ import {
   normalizeMetricCampaign,
   normalizeMetricSource
 } from '../web/assets/metrics-source.mjs';
+import { SERVICES_PRODUCTS_TEMPLATE_CODE } from './servicos-produtos-template.mjs';
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -40,7 +41,8 @@ export const ALLOWED_TEMPLATES = Object.freeze([
   'pizzeria-v1',
   'products-v1',
   'booking-v1',
-  'quote-v1'
+  'quote-v1',
+  SERVICES_PRODUCTS_TEMPLATE_CODE
 ]);
 
 export const DEFAULT_STOREFRONT_TYPE = 'food';
@@ -495,6 +497,17 @@ export function getDefaultMessages(
       ctaLabel: 'Solicitar orçamento no WhatsApp',
       whatsappTemplate:
         'Olá! Meu nome é {nome}. Tenho interesse em solicitar orçamento para:\n{itens}'
+    };
+  }
+
+  if (template === SERVICES_PRODUCTS_TEMPLATE_CODE) {
+    return {
+      heroTitle: safeName,
+      welcomeText:
+        'Escolha os serviços e produtos que interessam, revise e envie pelo WhatsApp.',
+      ctaLabel: 'Enviar pelo WhatsApp',
+      whatsappTemplate:
+        'Olá! Meu nome é {nome}. Tenho interesse em:\n{itens}\nTotal estimado: {total}'
     };
   }
 
@@ -1313,9 +1326,13 @@ export function createInitialDraftContent({
     businessName: resolvedName,
     whatsapp: validWhatsapp,
     components: getDefaultComponents(validCatalogType, validTemplate),
-    orderFields: getDefaultOrderFields(validCatalogType),
+    orderFields: validTemplate === SERVICES_PRODUCTS_TEMPLATE_CODE
+      ? { ...getDefaultOrderFields(validCatalogType), deliveryOrPickup: false }
+      : getDefaultOrderFields(validCatalogType),
     messages: getDefaultMessages(validCatalogType, resolvedName, validTemplate),
-    categories: []
+    categories: [],
+    // Estrutura vazia: a vitrine publica as seções do modelo desde o primeiro rascunho.
+    ...(validTemplate === SERVICES_PRODUCTS_TEMPLATE_CODE ? { structure: {} } : {})
   };
 }
 

@@ -2476,7 +2476,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async getStructureDefaults(template, { token }) {
       const [templateResult, moduleResult] = await Promise.all([
-        fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&is_custom_only=eq.false&select=default_tokens,default_sections,catalog_type`,
+        fetchImpl(`${baseUrl}/rest/v1/templates?code=eq.${encodeURIComponent(template)}&active=eq.true&is_custom_only=eq.false&select=default_tokens,default_sections,default_pages,catalog_type`,
           { headers: authHeaders(token) }),
         fetchImpl(`${baseUrl}/rest/v1/modules?active=eq.true&select=code,default_config`,
           { headers: authHeaders(token) })
@@ -2485,7 +2485,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
       const [row] = await templateResult.json();
       return {
         catalogType: row?.catalog_type,
-        template: { defaultTokens: row?.default_tokens, defaultSections: row?.default_sections },
+        template: { defaultTokens: row?.default_tokens, defaultSections: row?.default_sections, defaultPages: row?.default_pages },
         modules: Object.fromEntries((await moduleResult.json()).map(entry => [entry.code, entry.default_config]))
       };
     },
