@@ -211,8 +211,9 @@ test('Issue #126 — regras puras, diálogos e adaptador REST', async () => {
 
   assert.deepEqual(storefrontCacheUrls('loja', ['https://vitrine.inspira.dev.br/'], ['loja.com.br']), [
     'https://vitrine.inspira.dev.br/loja', 'https://vitrine.inspira.dev.br/loja/',
-    'https://vitrine.inspira.dev.br/data/vitrines/loja/menu.json',
-    'https://loja.com.br/loja', 'https://loja.com.br/loja/', 'https://loja.com.br/data/vitrines/loja/menu.json'
+    'https://vitrine.inspira.dev.br/data/vitrines/loja/menu.json', 'https://vitrine.inspira.dev.br/loja/vitrine.json',
+    'https://loja.com.br/loja', 'https://loja.com.br/loja/', 'https://loja.com.br/data/vitrines/loja/menu.json',
+    'https://loja.com.br/loja/vitrine.json'
   ]);
 
   const page = pausedShowcaseResponse('GET');

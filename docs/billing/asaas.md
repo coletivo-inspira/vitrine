@@ -192,3 +192,27 @@ Lógica em `src/billing/lifecycle.mjs`; migração `20261116000100_subscription_
   `billing_cancel_by_owner`. O plano vale até `current_period_end`; a resposta traz
   `accessUntil`. `409 SUBSCRIPTION_NOT_CANCELABLE` para assinatura já cancelada, sem
   assinatura ou manual (essa é do operador). A tela que chama esta rota é a issue #115.
+
+## 9. Tela "Plano e cobrança" e página de preços (issue #115)
+
+- **`GET /api/billing/overview`** (sessão obrigatória, `cache-control: no-store`): para
+  cada organização de que a pessoa é dona (até 5, lidas com o token dela pela RLS de
+  `tenants` e `subscriptions`), devolve plano, situação (`active`, `grace`, `suspended`,
+  `canceled`, `pending` ou `none`, pelas mesmas datas de `private.site_entitlements`),
+  próximo vencimento, `canCheckout`, `canCancel` e `invoices`. Nunca devolve
+  `provider_subscription_id`. `billing.available` é `false` sem `ASAAS_API_KEY` ou com
+  chave de produção em modo sandbox; o painel mostra "cobrança ainda não disponível".
+- **Faturas**: `listPayments` faz 1 `GET /subscriptions/{id}/payments?limit=12` por
+  organização a cada abertura da tela. Só id, datas, valor, situação e links
+  `https://*.asaas.com` (fatura e comprovante); nada é gravado no banco. Falha do Asaas
+  vira `invoices.status = "error"` e o painel mostra erro com "Tentar de novo", nunca
+  "sem faturas".
+- **`GET /api/sites/:id/entitlements`** (membro da vitrine): plano atual, limites e, em
+  `locked`, o plano que libera domínio próprio, SEO local e mais blocos de itens. O painel
+  usa isso para mostrar o selo do plano antes do clique.
+- **Troca de plano**: com assinatura ativa, em tolerância ou atrasada, `checkout` devolve
+  `409`; a tela leva a um pedido para a equipe (`#pedidos`). Sem assinatura, pendente,
+  suspensa ou cancelada, abre o checkout (um único envio mesmo com clique duplo).
+- **`/planos/`**: `scripts/build.mjs` gera a seção de planos de `content/plans.json`
+  (`src/pricing-page.mjs`), entre `<!-- planos:inicio -->` e `<!-- planos:fim -->`.
+  Mudar o JSON e rodar `npm run build` atualiza a página.

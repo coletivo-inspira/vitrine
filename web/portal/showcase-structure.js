@@ -1,5 +1,6 @@
 import { HIGHLIGHT_ICON_LABELS, highlightIconSvg } from '../assets/highlight-icons.mjs';
 import { FAQ_DEFAULT_TITLE, FAQ_SERVICE_SUGGESTIONS } from '../assets/faq-block.mjs';
+import { lockAction, unlockAction } from './plan-gate.mjs';
 
 const modules = {
   hero: ['Cabeçalho', { headline: 'Título', subtitle: 'Subtítulo' }],
@@ -675,6 +676,18 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
     nameInput = element;
   }
 
+  // Selo do plano no botão de seção quando os blocos de itens do plano acabaram.
+  const blockGate = choices?.planGate?.itemBlocks ?? null;
+  const gateSyncs = [];
+  const countActiveItemBlocks = () => [...pageList.children]
+    .map((page) => page.read?.())
+    .filter((page) => page && page.active !== false)
+    .flatMap((page) => page.sections ?? [])
+    .filter((section) => section.moduleCode === 'catalog_grid' && section.active !== false).length;
+  const syncGates = () => gateSyncs.forEach((sync) => sync());
+  form.addEventListener('click', () => queueMicrotask(syncGates));
+  form.addEventListener('change', () => queueMicrotask(syncGates));
+
   let selectedModelValue = choices?.selected ?? '';
   const hasModelChoices = Boolean(choices?.templates?.length);
 
@@ -1177,6 +1190,23 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
     });
     addSecBar.appendChild(addSecBtn);
     pageBody.appendChild(addSecBar);
+    if (blockGate?.plan) {
+      const sync = () => {
+        const full = moduleSelect.value === 'catalog_grid' && countActiveItemBlocks() >= blockGate.max;
+        if (full && !addSecBtn.dataset.planLocked) {
+          lockAction(
+            addSecBtn,
+            blockGate.plan,
+            `Seu plano tem ${blockGate.max === 1 ? '1 bloco' : `${blockGate.max} blocos`} de itens. Mais blocos fazem parte do plano ${blockGate.plan.name}; o botão leva a Plano e cobrança.`
+          );
+        } else if (!full && addSecBtn.dataset.planLocked) {
+          unlockAction(addSecBtn);
+        }
+      };
+      moduleSelect.addEventListener('change', sync);
+      gateSyncs.push(sync);
+      sync();
+    }
 
     detailsCard.appendChild(pageBody);
     detailsCard.validate = () => [...sections.children].every((row) => row.validate?.() ?? true);
@@ -1250,5 +1280,6 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
     }
   });
 
+  syncGates();
   root.replaceChildren(form);
 }

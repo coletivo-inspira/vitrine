@@ -78,9 +78,11 @@ Checagens reutilizáveis em `src/entitlements.mjs`:
 - `assertItemBlocksAllowed` e `draftLimits` cobrem blocos de itens e itens ativos.
 
 Já aplicados: itens ativos (rascunho, prévia e publicação), blocos de itens e domínio
-próprio (`custom_domain`). Prontos para as rotas que ainda não existem:
-`vitrine.json` chama `requirePlanFeature(entitlements, 'public_json')` e o webhook de
-pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')`, ambos com
+próprio (`custom_domain`) e `vitrine.json` (`public_json`, issue #120): o direito é
+gravado no snapshot como `features.publicJson` na publicação e a suspensão é conferida
+pela RPC anônima `public_json_enabled(slug)`, só em falta no cache da borda (contrato em
+[`docs/vitrine-json.md`](vitrine-json.md)). Pronto para a rota que ainda não existe: o
+webhook de pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhook')` com
 `loadSiteEntitlements` sem sessão.
 
 Selo de apoio do plano Gratuito (issue #135): `src/storefront-footer.mjs` traduz o
@@ -112,6 +114,12 @@ recurso `custom_domain` (`resolve_showcase_host`); sem ele, `302` para
 Nada em `sites`, `drafts`, `publications` ou `site_memberships` é apagado. Operação na
 seção 3 de `docs/operations-guide.md`.
 
+O painel tem a tela "Plano e cobrança" (`#plano`, `web/portal/billing-panel.mjs`), que lê
+`GET /api/billing/overview` (faturas direto do Asaas, sem gravar nada), e mostra o plano
+que libera cada recurso travado com `GET /api/sites/:id/entitlements`
+(`web/portal/plan-gate.mjs`). `/planos/` é gerada de `content/plans.json` no build.
+Detalhes na seção 9 de `docs/billing/asaas.md`.
+
 ## Insights por origem (issue #119)
 
 `public.site_metrics_daily` ganhou `source` e `campaign` (migração
@@ -132,6 +140,17 @@ receita de sete seções na página inicial mais a página "Para empresas" desli
 Páginas de modelo ficam em `public.templates.default_pages` e são herdadas por
 `resolveShowcaseManifest` como as seções; o rascunho só guarda o que mudou. Receita e
 decisões em `docs/modelo-servicos-e-produtos.md`.
+
+## Item "Em breve" (issue #133)
+
+Estado público `availability: "soon"` (com `availabilityLabel` opcional, até 24
+caracteres) em `web/assets/item-availability.mjs`, usado pela publicação, pela vitrine e
+pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continua sendo
+`active: false` e `available` segue bloqueado em `assertNoPrivateLeakage`. O item
+"Em breve" aparece com selo e "Avise-me pelo WhatsApp" (`wa.me`, número e código da Mila
+no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
+seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
+`20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 

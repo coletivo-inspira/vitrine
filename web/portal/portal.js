@@ -4,6 +4,7 @@ import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phon
 import { createInterestsMultiSelect } from './multi-select.mjs';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 import { loadBillingNotice } from './billing-notice.mjs';
+import { initBillingPanel, loadBillingPanel } from './billing-panel.mjs';
 import { loadDemoInvitations } from './linktree-import.js';
 import { activeSites, createSiteViewFilter, decorateSiteItem, emptyViewMessage, sitesForCurrentView } from './site-lifecycle.js';
 import { renderInsightsOrigin } from './insights-origin.mjs';
@@ -42,6 +43,7 @@ const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
 const pedidosSection = globalThis.document?.getElementById('pedidos-section');
+const planoSection = globalThis.document?.getElementById('plano-section');
 const wizardSection = globalThis.document?.getElementById('wizard-section');
 const profileGateSection = globalThis.document?.getElementById('profile-gate-section');
 
@@ -133,6 +135,7 @@ export function getSectionFromHash(hash) {
     '#leiloes': 'leiloes',
     '#perfil': 'perfil',
     '#pedidos': 'pedidos',
+    '#plano': 'plano',
     '#wizard': 'wizard',
     '#editor': 'editor',
     '#profile-gate': 'profile-gate',
@@ -206,6 +209,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupWizardFlow();
   setupInsightsControls();
   initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
+  initBillingPanel({ getSites: () => sites, isOnline: () => isOnline, publicOrigin: () => PUBLIC_SITE_ORIGIN });
   setupHashRouting();
   await checkSession();
   if (currentUser) {
@@ -883,6 +887,7 @@ export function showSection(section) {
     if (leiloesSection) leiloesSection.hidden = section !== 'leiloes';
     if (perfilSection) perfilSection.hidden = section !== 'perfil';
     if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
+    if (planoSection) planoSection.hidden = section !== 'plano';
     if (wizardSection) wizardSection.hidden = section !== 'wizard';
     if (editorSection) editorSection.hidden = section !== 'editor';
     if (profileGateSection) profileGateSection.hidden = section !== 'profile-gate';
@@ -906,6 +911,9 @@ export function showSection(section) {
     }
     if (section === 'leiloes') {
       void loadAuctionsPanel();
+    }
+    if (section === 'plano') {
+      void loadBillingPanel();
     }
   }
 }
