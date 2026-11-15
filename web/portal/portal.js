@@ -1,4 +1,5 @@
 import { detectPlatformCms, hasPlatformAdminAccess, initializePlatformCms, showPlatformCms } from './platform-cms.js';
+import { detectSponsorImpact, hasSponsorImpactAccess, initializeSponsorImpact, showSponsorImpact } from './sponsor-impact.mjs';
 import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
@@ -139,7 +140,8 @@ export function getSectionFromHash(hash) {
     '#wizard': 'wizard',
     '#editor': 'editor',
     '#profile-gate': 'profile-gate',
-    '#administracao': 'platform-cms'
+    '#administracao': 'platform-cms',
+    '#impacto': 'impacto'
   };
   return hashToSection[hash] || 'inicio';
 }
@@ -158,7 +160,13 @@ export function handleRouting() {
   const hash = globalThis.window?.location?.hash || '';
   let section = getSectionFromHash(hash);
 
-  if (!complete) {
+  if (!complete && hasSponsorImpactAccess()) {
+    if (section !== 'impacto' && globalThis.window) {
+      globalThis.window.location.hash = '#impacto';
+      return;
+    }
+    section = 'impacto';
+  } else if (!complete) {
     section = 'profile-gate';
     if (globalThis.window && globalThis.window.location.hash !== '#profile-gate') {
       globalThis.window.location.hash = '#profile-gate';
@@ -670,6 +678,7 @@ export async function exchangePkceCode(code, deps = {}) {
     onSection(initialSection);
     await loadSitesFn();
     void detectPlatformCms(true);
+    void detectSponsorImpact(true);
     return { ok: true, user: sessionData.user, sites };
   } catch {
     return handlePkceFailure(
@@ -699,6 +708,7 @@ export async function checkSession(deps = {}) {
       
       await loadSitesFn();
       void detectPlatformCms(true);
+      void detectSponsorImpact(true);
       
       const initialHash = deps.locationHash ?? deps.location?.hash ?? globalThis.window?.location?.hash ?? '';
       const initialSection = getSectionFromHash(initialHash);
@@ -850,6 +860,7 @@ async function handleLogout() {
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
   currentUser = null;
   void detectPlatformCms(false);
+  void detectSponsorImpact(false);
   sites = [];
   activeSite = null;
   clearEditor();
@@ -874,10 +885,12 @@ async function handleLogout() {
 // Section Switching with sidebar/bottom-nav integration
 export function showSection(section) {
   if (section === 'platform-cms' && !hasPlatformAdminAccess()) section = 'inicio';
+  if (section === 'impacto' && !hasSponsorImpactAccess()) section = 'inicio';
   // Toggle Auth section
   if (authSection) authSection.hidden = section !== 'auth';
   if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
   showPlatformCms(section === 'platform-cms');
+  showSponsorImpact(section === 'impacto');
 
   if (section !== 'auth') {
     // Show/Hide authenticated content panes
@@ -2558,4 +2571,7 @@ function renderInsightsLikes(likes) {
 
 initializePlatformCms(() => {
   if (globalThis.window?.location?.hash === '#administracao') handleRouting();
+});
+initializeSponsorImpact(() => {
+  if (['#impacto', '#profile-gate'].includes(globalThis.window?.location?.hash)) handleRouting();
 });

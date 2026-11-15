@@ -1,5 +1,5 @@
 // Modelo "Serviços e produtos" (issue #136). Espelha a linha de `public.templates`
-// gravada em supabase/migrations/20261116001400_template_servicos_produtos.sql; o
+// gravada em supabase/migrations/20261116001800_template_servicos_produtos.sql; o
 // teste test/servicos-produtos-template.test.mjs garante que os dois não divergem.
 // Receita e porquê de cada seção: docs/modelo-servicos-e-produtos.md.
 

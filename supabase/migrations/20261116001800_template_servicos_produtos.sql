@@ -1,4 +1,4 @@
--- Migração 20261116001400_template_servicos_produtos.sql
+-- Migração 20261116001800_template_servicos_produtos.sql
 -- Modelo "Serviços e produtos" (issue #136): vertical `services`, páginas opcionais por
 -- modelo (`default_pages`, com "Para empresas" desligada) e a lista de módulos com o
 -- `highlights` e os campos novos de `hero`, `testimonials` e `faq` (issues #131 e #132).

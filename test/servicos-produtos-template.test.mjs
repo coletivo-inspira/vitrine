@@ -17,7 +17,7 @@ import { createApiHandler, createMemoryStore } from '../workers/api.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsDir = resolve(root, 'supabase/migrations');
-const MIGRATION = '20261116001400_template_servicos_produtos.sql';
+const MIGRATION = '20261116001800_template_servicos_produtos.sql';
 const HOME_ORDER = ['hero', 'highlights', 'catalog_grid', 'about_story', 'testimonials', 'faq', 'hero'];
 const FORBIDDEN = /(?<![\p{L}\p{N}])(cat[aá]logos?|card[aá]pios?|rifas?|sorteios?|carrinho|checkout)(?![\p{L}\p{N}])/giu;
 

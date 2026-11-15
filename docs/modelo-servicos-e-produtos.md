@@ -33,7 +33,7 @@ trabalho"); não há nome, preço nem depoimento inventado.
 ## Onde está
 
 - Receita: `src/servicos-produtos-template.mjs`, espelhada na migração
-  `supabase/migrations/20261116001400_template_servicos_produtos.sql`
+  `supabase/migrations/20261116001800_template_servicos_produtos.sql`
   (`public.templates`, coluna nova `default_pages`). O teste
   `test/servicos-produtos-template.test.mjs` confere que as duas são iguais.
 - Páginas do modelo: `resolveShowcaseManifest` herda `defaultPages` como herda as
