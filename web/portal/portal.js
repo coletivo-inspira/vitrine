@@ -1685,6 +1685,9 @@ async function handleCreateWizardSite() {
   } else if (model === 'products') {
     template = 'products-v1';
     catalogType = 'products';
+  } else if (model === 'services') {
+    template = 'servicos-produtos-v1';
+    catalogType = 'products';
   }
 
   if (isOnline) {
@@ -1774,7 +1777,8 @@ async function handleCreateWizardSite() {
         slug,
         businessName: name,
         whatsapp: profile.whatsapp || "5511999999999",
-        categories: []
+        categories: [],
+        ...(template === 'servicos-produtos-v1' ? { structure: {} } : {})
       }
     };
     localStorage.setItem(`vitrine_local_draft_${newId}`, JSON.stringify(defaultDraft));
