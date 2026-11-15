@@ -10,6 +10,7 @@ import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.m
 import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
 import { validateQuoteLeadConfig } from '../web/assets/quote-lead.mjs';
+import { channelDraftErrors } from '../web/assets/channels.mjs';
 import {
   UNRECORDED_SOURCE,
   normalizeMetricCampaign,
@@ -1448,7 +1449,8 @@ export function validateDraftContent(content, options = {}) {
   const [placeError, ...morePlaceErrors] = [
     ...collectPlaceErrors(content),
     ...validateLocalSeo(content.localSeo).errors,
-    ...validateQuoteLeadConfig(content.quoteLead).errors
+    ...validateQuoteLeadConfig(content.quoteLead).errors,
+    ...channelDraftErrors(content)
   ];
   if (placeError) {
     throw new PortalValidationError(422, placeError.code, placeError.message, {

@@ -24,6 +24,7 @@ import {
 import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
 import { assertPublicQuoteLead, projectPublicQuoteLead } from './quote-webhook.mjs';
+import { assertPublicChannels, projectPublicChannels } from './channels.mjs';
 import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
@@ -106,7 +107,9 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'quoteLead',
   'localBusiness',
   'features',
-  'supportBadge'
+  'supportBadge',
+  'instagramUrl',
+  'publicEmail'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -290,6 +293,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
   assertPublicSeo(menuArtifact);
   assertPublicFeatures(menuArtifact);
   assertPublicFooter(menuArtifact);
+  assertPublicChannels(menuArtifact);
 
   if (menuArtifact.components !== undefined) {
     if (
@@ -723,7 +727,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...projectPublicQuoteLead(migrated, limits),
     ...projectPublicSeo(migrated, baseMenu.slug, limits),
     ...projectPublicFeatures(limits),
-    ...projectPublicFooter(limits)
+    ...projectPublicFooter(limits),
+    ...projectPublicChannels(migrated)
   };
 
   for (const item of menu.items) {

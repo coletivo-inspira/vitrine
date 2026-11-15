@@ -53,6 +53,7 @@ import {
   LEADS_PATH, QUOTE_WEBHOOK_PATH, createMemoryQuoteWebhooks, createRestQuoteWebhooks, handleLeadRequest,
   handleQuoteWebhookRequest, quoteLeadPublicationOptions
 } from '../src/quote-webhook.mjs';
+import { CHANNELS_PATH, handleChannelsRequest } from '../src/channels.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -1816,6 +1817,8 @@ export async function hydratePublicationRecord(row) {
     ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
     ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
     ...(rawMenu.quoteLead ? { quoteLead: rawMenu.quoteLead } : {}),
+    ...(rawMenu.instagramUrl ? { instagramUrl: rawMenu.instagramUrl } : {}),
+    ...(rawMenu.publicEmail ? { publicEmail: rawMenu.publicEmail } : {}),
     ...(rawMenu.localBusiness ? { localSeo: {
       businessType: rawMenu.localBusiness.type,
       ...(rawMenu.localBusiness.areaServed ? { areaServed: rawMenu.localBusiness.areaServed } : {})
@@ -5057,6 +5060,17 @@ export function createApiHandler(deps = {}) {
           respond: jsonResponse,
           guardMutation: validateMutationOriginAndJson,
           readJson: parseJsonRequest
+        });
+      }
+
+      const channelsMatch = pathname.match(CHANNELS_PATH);
+      if (channelsMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        return await handleChannelsRequest({
+          method, store, user, env, siteId: decodeURIComponent(channelsMatch[1]), respond: jsonResponse,
+          loadPublication: async (slug) =>
+            (await store.getPublicationBySlug?.(slug)) ?? (await sharedPublicPublications.getPublicationBySlug(slug))
         });
       }
 

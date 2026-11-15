@@ -19,6 +19,7 @@ import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
 import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
+import { mountChannelsPanel, refreshChannelsPanel } from './channels-panel.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -442,6 +443,7 @@ function setActiveTab(tabId) {
   panes.forEach((pane) => {
     pane.hidden = pane.id !== `pane-${tabId}`;
   });
+  if (tabId === 'channels') refreshChannelsPanel();
 
   const controlsPane = globalThis.document?.querySelector('.editor-controls-pane');
   const previewPane = globalThis.document?.querySelector('.editor-preview-pane');
@@ -459,6 +461,19 @@ function setActiveTab(tabId) {
       previewPane.hidden = false;
     }
   }
+}
+
+function openEditorSection(tabId, targetId) {
+  setActiveTab(tabId);
+  const target = globalThis.document?.getElementById(targetId);
+  if (!target || target.hidden) return;
+  if (target.tagName === 'DETAILS') target.open = true;
+  const focusable = target.tagName === 'DETAILS' ? target.querySelector('summary') : target;
+  target.scrollIntoView?.({ block: 'start' });
+  if (focusable && !focusable.hasAttribute('tabindex') && !/^(INPUT|SELECT|TEXTAREA|BUTTON|SUMMARY|A)$/.test(focusable.tagName)) {
+    focusable.setAttribute('tabindex', '-1');
+  }
+  focusable?.focus?.({ preventScroll: true });
 }
 
 function updateCsvModelLink() {
@@ -1110,6 +1125,13 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     isOnline: currentIsOnline,
     getContent: () => currentDraft?.content,
     onChange: () => updateDraftAndPreview()
+  });
+  void mountChannelsPanel({
+    site: currentSite,
+    isOnline: currentIsOnline,
+    getContent: () => currentDraft?.content,
+    onChange: () => updateDraftAndPreview(),
+    openSection: openEditorSection
   });
 
   const comp = currentDraft.content.components || {};
