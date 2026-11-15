@@ -175,7 +175,7 @@ link em itens "Em breve", de lance e de troca, e `assertNoPrivateLeakage` confer
 snapshot de novo. Aparece na página do item (`renderPurchaseExtras`) e na etapa "Revisar
 e enviar", em nova aba com `rel="noopener noreferrer"`, sem parâmetros acrescentados e
 fora do total e da mensagem do WhatsApp. Os cliques contam em `payment_link_click`
-(migração `20261116001300_metric_payment_link_click.sql`). O pagamento é do negócio e do
+(migração `20261116001700_metric_payment_link_click.sql`). O pagamento é do negócio e do
 provedor dele (ADR 0013, item 8; seção "Vendas do seu negócio" dos termos).
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
