@@ -300,7 +300,8 @@ export function storefrontCacheUrls(slug, origins = [], hostnames = []) {
   return [...bases].flatMap(base => [
     `${base}/${slug}`,
     `${base}/${slug}/`,
-    `${base}/data/vitrines/${slug}/menu.json`
+    `${base}/data/vitrines/${slug}/menu.json`,
+    `${base}/${slug}/vitrine.json`
   ]);
 }
 

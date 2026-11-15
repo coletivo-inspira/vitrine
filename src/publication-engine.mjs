@@ -21,6 +21,7 @@ import {
   renderShareMetaTags,
   shareMetaFor
 } from './local-seo.mjs';
+import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
 import { assertPublicQuoteLead, projectPublicQuoteLead } from './quote-webhook.mjs';
 import {
@@ -104,6 +105,7 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'canonicalUrl',
   'quoteLead',
   'localBusiness',
+  'features',
   'supportBadge'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
@@ -286,6 +288,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
   assertPublicQuoteLead(menuArtifact);
 
   assertPublicSeo(menuArtifact);
+  assertPublicFeatures(menuArtifact);
   assertPublicFooter(menuArtifact);
 
   if (menuArtifact.components !== undefined) {
@@ -719,6 +722,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...projectPublicPlace(migrated),
     ...projectPublicQuoteLead(migrated, limits),
     ...projectPublicSeo(migrated, baseMenu.slug, limits),
+    ...projectPublicFeatures(limits),
     ...projectPublicFooter(limits)
   };
 
