@@ -10,6 +10,7 @@ import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
 import { createItemHref, resolveItemBasePath, setupItemPage } from '../assets/item-page.mjs';
 import { renderStorefrontFooterHtml } from '../assets/storefront-footer.mjs';
 import { QR_SOURCE, bindRouteClickMetric, resolveVisitOrigin } from '../assets/metrics-source.mjs';
+import { PAYMENT_LINK_CLICK_METRIC, bindPaymentLinkClickMetric } from '../assets/payment-link.mjs';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED_PATHS = new Set([
@@ -259,7 +260,7 @@ export function createStorefrontMetricsCollector({
       queue.push({ type: 'whatsapp_order', estimatedCents, hour, ...originFields });
       flush();
       return true;
-    } else if (type === 'route_click' || type === 'notify_click') {
+    } else if (type === 'route_click' || type === 'notify_click' || type === PAYMENT_LINK_CLICK_METRIC) {
       queue.push({ type, hour, ...originFields });
       flush();
       return true;
@@ -522,6 +523,7 @@ export async function bootStorefront(deps = {}) {
     globalThis.recordStorefrontEvent = (type, payload) => collector.record(type, payload);
     collector.record('visit');
     bindRouteClickMetric(doc, (type) => collector.record(type));
+    bindPaymentLinkClickMetric(doc, (type) => collector.record(type));
     for (const itemId of focusItemId ? [focusItemId] : validItemIds.slice(0, 12)) {
       collector.record('item_view', { itemId });
     }

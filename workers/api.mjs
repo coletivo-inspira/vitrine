@@ -56,6 +56,10 @@ import {
 import { applyOriginEntitlement, metricRowKey, withOriginInsights } from '../src/insights-by-origin.mjs';
 import { canonicalUrlFor, publicationSeoOptions } from '../src/local-seo.mjs';
 import { publicationFooterOptions } from '../src/storefront-footer.mjs';
+import {
+  LEADS_PATH, QUOTE_WEBHOOK_PATH, createMemoryQuoteWebhooks, createRestQuoteWebhooks, handleLeadRequest,
+  handleQuoteWebhookRequest, quoteLeadPublicationOptions
+} from '../src/quote-webhook.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
 import {
@@ -1226,6 +1230,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     metricsDaily,
     itemLikes,
     ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
+    ...createMemoryQuoteWebhooks({ sites }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -1817,6 +1822,7 @@ export async function hydratePublicationRecord(row) {
     ...(rawMenu.locality ? { locality: { listed: true, city: rawMenu.locality.city, uf: rawMenu.locality.uf } } : {}),
     ...(rawMenu.businessHours ? { businessHours: rawMenu.businessHours } : {}),
     ...(rawMenu.publicAddress ? { publicAddress: rawMenu.publicAddress } : {}),
+    ...(rawMenu.quoteLead ? { quoteLead: rawMenu.quoteLead } : {}),
     ...(rawMenu.localBusiness ? { localSeo: {
       businessType: rawMenu.localBusiness.type,
       ...(rawMenu.localBusiness.areaServed ? { areaServed: rawMenu.localBusiness.areaServed } : {})
@@ -1843,6 +1849,7 @@ export async function hydratePublicationRecord(row) {
       publicJson: rawMenu.features?.publicJson === true,
       ...(rawMenu.supportBadge === false ? { supportBadge: false } : {}),
       localSeo: Boolean(rawMenu.localBusiness),
+      quoteLead: Boolean(rawMenu.quoteLead),
       ...(typeof rawMenu.canonicalUrl === 'string' ? { canonicalUrl: rawMenu.canonicalUrl } : {}),
       revision: Number.isSafeInteger(row.revision) && row.revision >= 1 ? row.revision : 1,
       publishedAt:
@@ -1988,6 +1995,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
   return {
     ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
+    ...createRestQuoteWebhooks({ baseUrl, fetchImpl, authHeaders }),
 
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
@@ -4048,7 +4056,8 @@ export function createApiHandler(deps = {}) {
     if (url.hostname === SANDBOX_HOST) return handleSandboxPage(request, url, store);
 
     const isItemLikesRoute = pathname === '/api/likes' || pathname === '/api/likes/';
-    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname) && !isItemLikesRoute) {
+    const isLeadsRoute = LEADS_PATH.test(pathname);
+    if (env.CF_SAAS_CNAME_TARGET && isExternalHostname(url.hostname) && !isItemLikesRoute && !isLeadsRoute) {
       try {
         return await handleCustomHostname(request, url, store, assetsFetcher, _ctx, env, deps);
       } catch {
@@ -4081,6 +4090,7 @@ export function createApiHandler(deps = {}) {
         const entitlements = await loadSiteEntitlements(store, siteId, options);
         const { menu } = await compilePublicStorefront(content, site, {
           revision,
+          ...(await quoteLeadPublicationOptions(store, siteId, { ...options, entitlements })),
           ...draftLimits(entitlements),
           ...publicationSeoOptions({ slug: site.slug, entitlements }),
           ...publicationFooterOptions({ entitlements })
@@ -5077,6 +5087,31 @@ export function createApiHandler(deps = {}) {
         });
       }
 
+      const leadsMatch = pathname.match(LEADS_PATH);
+      if (leadsMatch) {
+        return await handleLeadRequest({
+          request, url, slug: leadsMatch[1], store, env, ctx: _ctx, fetch: deps.fetch,
+          respond: jsonResponse,
+          guardMutation: validateMutationOriginAndJson,
+          loadPublication: async (slug) =>
+            (await store.getPublicationBySlug?.(slug)) ?? (await sharedPublicPublications.getPublicationBySlug(slug))
+        });
+      }
+
+      const quoteWebhookMatch = pathname.match(QUOTE_WEBHOOK_PATH);
+      if (quoteWebhookMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        return await handleQuoteWebhookRequest({
+          request, url, method, store, user, env, fetch: deps.fetch,
+          siteId: decodeURIComponent(quoteWebhookMatch[1]),
+          action: quoteWebhookMatch[2],
+          respond: jsonResponse,
+          guardMutation: validateMutationOriginAndJson,
+          readJson: parseJsonRequest
+        });
+      }
+
       const entitlementsMatch = pathname.match(/^\/api\/sites\/([^/]+)\/entitlements\/?$/);
       if (entitlementsMatch) {
         if (method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET para consultar o plano da vitrine.');
@@ -5540,6 +5575,7 @@ export function createApiHandler(deps = {}) {
         const compiled = await compilePublicStorefront(content, site, {
           revision: draft.revision,
           siteId: site.id,
+          ...(await quoteLeadPublicationOptions(store, site.id, { token: user.token, env, entitlements })),
           ...draftLimits(entitlements),
           ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
           ...vitrineJsonPublicationOptions(entitlements),

@@ -14,6 +14,7 @@ import {
   splitParagraphs
 } from '../web/assets/item-page-fields.mjs';
 import { NOTIFY_BUTTON_LABEL, buildNotifyHref, isItemSoon, soonBadgeText } from '../web/assets/item-availability.mjs';
+import { PAYMENT_LINK_ICON, PAYMENT_LINK_NOTICE, publicPaymentLink } from '../web/assets/payment-link.mjs';
 
 /** ADR 0009: o snapshot publicado tem no máximo 256 KiB. */
 export const MAX_PUBLIC_MANIFEST_BYTES = 256 * 1024;
@@ -246,9 +247,17 @@ function renderSelectArea(menu, item) {
   return `<div id="storefront-catalog" class="item-page-select" data-item-select>${fallback}</div>`;
 }
 
-/** Ponto de extensão abaixo da seleção (link de pagamento, #134). */
-function renderPurchaseExtras() {
-  return '';
+/**
+ * Ponto de extensão abaixo da seleção: link de pagamento do próprio negócio (#134),
+ * como ação secundária. O WhatsApp continua sendo a ação principal.
+ */
+function renderPurchaseExtras(menu, item, mode) {
+  const link = publicPaymentLink(item, mode);
+  if (!link) return '';
+  return `<div class="sf-payment-link-box item-page-payment">
+          <a class="sf-secondary-button sf-payment-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" data-payment-link aria-describedby="item-page-payment-note">${escapeHtml(link.label)}${PAYMENT_LINK_ICON}<span class="sf-visually-hidden"> (abre em nova aba)</span></a>
+          <p class="sf-payment-note" id="item-page-payment-note">${escapeHtml(PAYMENT_LINK_NOTICE)}</p>
+        </div>`;
 }
 
 function renderShare(shareUrl, title) {
@@ -341,7 +350,7 @@ export function renderItemPageDocument(storefrontHtml, menu, itemRef, { basePath
         ${lead}
         ${renderDetails(menu, item)}
         ${renderSelectArea(menu, item)}
-        ${renderPurchaseExtras(menu, item)}
+        ${renderPurchaseExtras(menu, item, mode)}
         ${renderShare(itemUrl, share.title)}
       </div>
     </article>

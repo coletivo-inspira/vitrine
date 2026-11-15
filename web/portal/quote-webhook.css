@@ -1,0 +1,232 @@
+.quote-webhook-card {
+  margin-top: 28px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.quote-webhook-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quote-webhook-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.quote-webhook-badge {
+  flex: 0 0 auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.quote-webhook-badge.is-ready {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.quote-webhook-badge.is-failing,
+.quote-webhook-badge.is-locked {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+
+.quote-webhook-locked {
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  background: var(--apricot);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.quote-webhook-locked p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.quote-webhook-locked-title {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.quote-webhook-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quote-webhook-fields:disabled,
+.quote-webhook-card input:disabled,
+.quote-webhook-card button:disabled {
+  opacity: .6;
+}
+
+.quote-webhook-card button:disabled {
+  cursor: not-allowed;
+}
+
+.quote-webhook-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.quote-webhook-label {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.quote-webhook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.quote-webhook-card .button-small,
+.quote-webhook-card .text-link-btn {
+  min-height: 44px;
+}
+
+.quote-webhook-remove {
+  align-self: flex-start;
+}
+
+.quote-webhook-secret {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.quote-webhook-secret-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.quote-webhook-warning {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--apricot);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quote-webhook-confirm {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.quote-webhook-status {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.quote-webhook-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  gap: 12px;
+  font-size: 14px;
+}
+
+.quote-webhook-status dt {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.quote-webhook-status dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.quote-webhook-message {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.quote-webhook-message.is-success {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.quote-webhook-message.is-error {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.live-preview-box .sf-quote-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.live-preview-box .sf-quote-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.live-preview-box .sf-quote-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 720px) {
+  .quote-webhook-card {
+    padding: 22px 18px;
+  }
+
+  .quote-webhook-header {
+    flex-direction: column;
+  }
+
+  .quote-webhook-status-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .quote-webhook-secret {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

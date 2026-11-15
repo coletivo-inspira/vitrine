@@ -206,12 +206,12 @@ test('PGlite: migração 20261116000200 grava origem, rota e QR sem dados pessoa
     await assert.rejects(
       db.query(
         `insert into public.site_metrics_daily (site_id, metric_date, metric_hour, metric_name)
-         values ($1, current_date, 1, 'payment_link_click')`,
+         values ($1, current_date, 1, 'coupon_click')`,
         [SITE]
       ),
       /site_metrics_daily_metric_name_check/
     );
-    await assert.rejects(recordAsAnon(db, [{ type: 'payment_link_click' }]), /INVALID_EVENTS_BATCH/);
+    await assert.rejects(recordAsAnon(db, [{ type: 'coupon_click' }]), /INVALID_EVENTS_BATCH/);
 
     await db.query(
       `insert into public.site_metrics_daily (site_id, metric_date, metric_hour, metric_name, source, count_value)
@@ -244,7 +244,9 @@ test('resumo por origem: funil visitas → cliques no WhatsApp e contagem de rot
     qrVisits: 4,
     previousQrVisits: 0,
     notifyClicks: 0,
-    previousNotifyClicks: 0
+    previousNotifyClicks: 0,
+    paymentLinkClicks: 0,
+    previousPaymentLinkClicks: 0
   });
   assert.deepEqual(summary.origins.sources.map((s) => [s.source, s.visits, s.orders, s.conversionPercent]), [
     ['ig_comment', 8, 2, 25],
@@ -308,7 +310,9 @@ test('Worker: Insights mostram rota e QR para todos e a origem só no Profission
     qrVisits: 1,
     previousQrVisits: 0,
     notifyClicks: 0,
-    previousNotifyClicks: 0
+    previousNotifyClicks: 0,
+    paymentLinkClicks: 0,
+    previousPaymentLinkClicks: 0
   });
   assert.equal(free.origins.available, false);
   assert.equal(free.origins.requiredPlan.name, 'Profissional');

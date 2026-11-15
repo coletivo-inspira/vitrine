@@ -50,7 +50,9 @@ export function summarizeOriginMetrics(rows, { period = '7d', referenceDate = ne
     qrVisits: 0,
     previousQrVisits: 0,
     notifyClicks: 0,
-    previousNotifyClicks: 0
+    previousNotifyClicks: 0,
+    paymentLinkClicks: 0,
+    previousPaymentLinkClicks: 0
   };
   const bySource = new Map();
   const byCampaign = new Map();
@@ -78,6 +80,10 @@ export function summarizeOriginMetrics(rows, { period = '7d', referenceDate = ne
     }
     if (name === 'notify_click') {
       reach[isCurrent ? 'notifyClicks' : 'previousNotifyClicks'] += count;
+      continue;
+    }
+    if (name === 'payment_link_click') {
+      reach[isCurrent ? 'paymentLinkClicks' : 'previousPaymentLinkClicks'] += count;
       continue;
     }
     if (!isCurrent || (name !== 'visit' && name !== 'whatsapp_order')) continue;

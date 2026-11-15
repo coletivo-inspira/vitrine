@@ -23,6 +23,7 @@ import {
 } from './local-seo.mjs';
 import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
+import { assertPublicQuoteLead, projectPublicQuoteLead } from './quote-webhook.mjs';
 import {
   assertPublicItemPageFields,
   assertPublicManifestSize,
@@ -42,8 +43,17 @@ import {
   soonBadgeText
 } from '../web/assets/item-availability.mjs';
 import {
+  PAYMENT_LINK_DEFAULT_LABEL,
+  PAYMENT_LINK_HIDDEN_PRICE_MODES,
+  PAYMENT_LINK_LABEL_MAX,
+  checkPaymentLinkUrl,
+  normalizePaymentLinkLabel
+} from '../web/assets/payment-link.mjs';
+import {
   DEFAULT_TEMPLATE,
+  PAYMENT_LINK_HOSTS,
   PortalValidationError,
+  validateItemPaymentLink,
   isItemActive,
   migrateLegacyDraftContent,
   projectPublicLocality,
@@ -120,6 +130,7 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'businessHours',
   'publicAddress',
   'canonicalUrl',
+  'quoteLead',
   'localBusiness',
   'features',
   'supportBadge'
@@ -149,7 +160,8 @@ const ALLOWED_ITEM_KEYS = new Set([
   'faq',
   'gallery',
   'availability',
-  'availabilityLabel'
+  'availabilityLabel',
+  'paymentLink'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -266,6 +278,41 @@ function assertPublicItemAvailability(item) {
   }
 }
 
+// Link de pagamento do negócio (#134): fica fora do item "Em breve", do lance e da troca.
+function projectPaymentLink(rawItem, extras) {
+  if (rawItem.paymentLink === undefined || rawItem.paymentLink === null) return undefined;
+  if (extras.availability === ITEM_AVAILABILITY_SOON || PAYMENT_LINK_HIDDEN_PRICE_MODES.includes(extras.priceMode)) {
+    return undefined;
+  }
+  validateItemPaymentLink(rawItem);
+  const { url } = checkPaymentLinkUrl(rawItem.paymentLink.url, PAYMENT_LINK_HOSTS);
+  const label = normalizePaymentLinkLabel(rawItem.paymentLink.label);
+  return label && label !== PAYMENT_LINK_DEFAULT_LABEL ? { url, label } : { url };
+}
+
+function assertPublicPaymentLink(item) {
+  if (item.paymentLink === undefined) return;
+  const link = item.paymentLink;
+  const leakage = (message) => new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', message);
+  if (!link || typeof link !== 'object' || Array.isArray(link) || Object.keys(link).some((key) => key !== 'url' && key !== 'label')) {
+    throw leakage('Link de pagamento público inválido.');
+  }
+  if (item.availability === ITEM_AVAILABILITY_SOON || PAYMENT_LINK_HIDDEN_PRICE_MODES.includes(item.priceMode)) {
+    throw leakage('Link de pagamento em item que não o mostra.');
+  }
+  const checked = checkPaymentLinkUrl(link.url, PAYMENT_LINK_HOSTS);
+  if (checked.error || checked.url !== link.url) throw leakage('Link de pagamento público fora da lista de domínios.');
+  if (
+    link.label !== undefined &&
+    (typeof link.label !== 'string' ||
+      !link.label ||
+      link.label !== normalizePaymentLinkLabel(link.label) ||
+      link.label.length > PAYMENT_LINK_LABEL_MAX)
+  ) {
+    throw leakage('Texto do botão de pagamento inválido.');
+  }
+}
+
 export function assertNoPrivateLeakage(menuArtifact) {
   if (!menuArtifact || typeof menuArtifact !== 'object' || Array.isArray(menuArtifact)) {
     throw new PortalValidationError(422, 'INVALID_PUBLIC_MENU', 'Artefato público inválido.');
@@ -329,6 +376,8 @@ export function assertNoPrivateLeakage(menuArtifact) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Horário ou endereço público inválido.');
     }
   }
+
+  assertPublicQuoteLead(menuArtifact);
 
   assertPublicSeo(menuArtifact);
   assertPublicFeatures(menuArtifact);
@@ -403,6 +452,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
     }
     assertPublicItemPageFields(item);
     assertPublicItemAvailability(item);
+    assertPublicPaymentLink(item);
   }
 
   for (const category of menuArtifact.categories ?? []) {
@@ -426,6 +476,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
         }
       }
       assertPublicItemAvailability(item);
+      assertPublicPaymentLink(item);
     }
   }
 }
@@ -593,6 +644,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
           const label = normalizeAvailabilityLabel(rawItem.availabilityLabel);
           if (label) extras.availabilityLabel = label;
         }
+        const paymentLink = projectPaymentLink(rawItem, extras);
+        if (paymentLink) extras.paymentLink = paymentLink;
         extras.pageFields = projectItemPageFields(rawItem);
         rawItemExtrasById.set(itemId, extras);
       }
@@ -634,6 +687,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
       ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {}),
       ...(extras.availability !== undefined ? { availability: extras.availability } : {}),
       ...(extras.availabilityLabel !== undefined ? { availabilityLabel: extras.availabilityLabel } : {}),
+      ...(extras.paymentLink !== undefined ? { paymentLink: extras.paymentLink } : {}),
       ...extras.pageFields
     };
     validatedItemsById.set(item.id, projectedItem);
@@ -777,6 +831,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
     ...(locality ? { locality } : {}),
     ...projectPublicPlace(migrated),
+    ...projectPublicQuoteLead(migrated, limits),
     ...projectPublicSeo(migrated, baseMenu.slug, limits),
     ...projectPublicFeatures(limits),
     ...projectPublicFooter(limits)

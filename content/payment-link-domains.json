@@ -1,0 +1,18 @@
+{
+  "about": "Domínios aceitos no link de pagamento do próprio negócio (issue #134). Só https:// com host exatamente igual a um destes (sem subdomínio curinga, porta ou credenciais). Lista lida pelo servidor, pelo editor (copiada para /data/ no build) e pelos testes. Incluir um provedor exige revisão da equipe.",
+  "domains": [
+    { "host": "mpago.la", "provider": "Mercado Pago" },
+    { "host": "mpago.li", "provider": "Mercado Pago" },
+    { "host": "link.mercadopago.com.br", "provider": "Mercado Pago" },
+    { "host": "www.mercadopago.com.br", "provider": "Mercado Pago" },
+    { "host": "pay.hotmart.com", "provider": "Hotmart" },
+    { "host": "www.asaas.com", "provider": "Asaas" },
+    { "host": "sandbox.asaas.com", "provider": "Asaas (sandbox)" },
+    { "host": "pag.ae", "provider": "PagSeguro" },
+    { "host": "pagseguro.uol.com.br", "provider": "PagSeguro" },
+    { "host": "picpay.me", "provider": "PicPay" },
+    { "host": "buy.stripe.com", "provider": "Stripe" },
+    { "host": "pay.kiwify.com.br", "provider": "Kiwify" },
+    { "host": "www.sympla.com.br", "provider": "Sympla" }
+  ]
+}
