@@ -245,6 +245,10 @@ O estado “Em preparação” combina superfície damasco, indicador laranja, t
 
 `details` e `summary` nativos com divisórias finas. A linha clicável tem altura mínima de 70px (72px no menor breakpoint); o mais gira 45 graus ao abrir. Respostas usam texto de 14px e até 65ch. O foco segue o tratamento global.
 
+### Página do item (vitrine pública)
+
+`/<endereço>/item/<item>` reaproveita cabeçalho, gaveta e rodapé da vitrine. Trilha pequena, galeria 4:3 com miniaturas de 96×72 (borda primária na ativa) e, a partir de 800px, duas colunas (galeria 1.1fr, resumo 1fr). Um único h1 com o nome; o preço aparece uma vez, logo abaixo, e o controle de seleção do cartão omite o próprio preço. Detalhes em `dl` com divisórias finas; "Sobre este item", perguntas no mesmo padrão do FAQ e "Veja também" com até 3 cartões (3 colunas a partir de 640px). "Compartilhar" só aparece quando há `navigator.share` ou área de transferência. No cartão, "Ver detalhes" é um link sublinhado discreto, só para itens com conteúdo de página.
+
 ### Official Signature and Illustrations
 
 A marca própria aprovada da Vitrine é a opção A: V de duas lâminas na caixa

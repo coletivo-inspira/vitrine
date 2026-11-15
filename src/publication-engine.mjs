@@ -24,6 +24,15 @@ import {
 import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
 import {
+  assertPublicItemPageFields,
+  assertPublicManifestSize,
+  findPublishedItem,
+  itemPageShellMenu,
+  projectItemPageFields,
+  renderItemPageDocument
+} from './item-page.mjs';
+import { assignItemSlugs, hasItemPageContent, itemPagePath } from '../web/assets/item-page-fields.mjs';
+import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
@@ -124,7 +133,12 @@ const ALLOWED_ITEM_KEYS = new Set([
   'durationMinutes',
   'section',
   'auctionEndsAt',
-  'bidIncrementCents'
+  'bidIncrementCents',
+  'slug',
+  'details',
+  'longDescription',
+  'faq',
+  'gallery'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -354,6 +368,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
         );
       }
     }
+    assertPublicItemPageFields(item);
   }
 
   for (const category of menuArtifact.categories ?? []) {
@@ -538,6 +553,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
         ) {
           extras.durationMinutes = rawItem.durationMinutes;
         }
+        extras.pageFields = projectItemPageFields(rawItem);
         rawItemExtrasById.set(itemId, extras);
       }
     }
@@ -555,10 +571,12 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
   }
 
   const validatedItemsById = new Map();
+  const itemSlugs = assignItemSlugs(baseMenu.items);
   const projectedItems = baseMenu.items.map((item) => {
     const extras = rawItemExtrasById.get(item.id) ?? {};
     const projectedItem = {
       id: item.id,
+      slug: itemSlugs.get(item.id),
       name: item.name,
       ...(extras.priceMode !== undefined ? { priceMode: extras.priceMode } : {}),
       ...(extras.conditions !== undefined ? { conditions: extras.conditions } : {}),
@@ -573,7 +591,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
       ...(extras.auctionEndsAt !== undefined ? { auctionEndsAt: extras.auctionEndsAt } : {}),
       ...(extras.bidIncrementCents !== undefined ? { bidIncrementCents: extras.bidIncrementCents } : {}),
       ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
-      ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {})
+      ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {}),
+      ...extras.pageFields
     };
     validatedItemsById.set(item.id, projectedItem);
     return projectedItem;
@@ -726,6 +745,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
   }
 
   assertNoPrivateLeakage(menu);
+  assertPublicManifestSize(menu);
   return deepFreeze(menu);
 }
 
@@ -772,7 +792,8 @@ export function formatPublicPriceBRL(priceCents) {
   return `R$ ${reais.toLocaleString('pt-BR')},${centavos}`;
 }
 
-export function renderStorefrontCatalogMarkup(menu) {
+export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug ?? ''}` } = {}) {
+  const itemSlugs = assignItemSlugs(menu?.items ?? []);
   const categories =
     Array.isArray(menu?.categories) && menu.categories.length > 0
       ? menu.categories
@@ -794,11 +815,15 @@ export function renderStorefrontCatalogMarkup(menu) {
           const descHtml = item.description
             ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>`
             : '';
+          const detailsHtml = hasItemPageContent(item)
+            ? `<a class="sf-item-details-link" href="${escapeHtml(itemPagePath(basePath, itemSlugs.get(String(item.id))))}" aria-label="Ver detalhes de ${escapeHtml(item.name)}">Ver detalhes</a>`
+            : '';
           return [
             `<article class="menu-item-card" data-item-id="${escapeHtml(item.id)}">`,
             `  <div class="menu-item-body">`,
             `    <h3 class="menu-item-title">${escapeHtml(item.name)}</h3>`,
             descHtml ? `    ${descHtml}` : '',
+            detailsHtml ? `    ${detailsHtml}` : '',
             `  </div>`,
             `  <div class="menu-item-footer">`,
             `    <span class="menu-item-price">${escapeHtml(formatPublicPriceBRL(item.priceCents))}</span>`,
@@ -1055,12 +1080,12 @@ function renderPublicSections(pages, menu, catalog, placeHtml = '') {
  * HTML da vitrine publicada. `canonicalUrl` substitui o endereço gravado no snapshot
  * (ex.: pedido atendido pelo domínio próprio).
  */
-export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = true, canonicalUrl } = {}) {
+export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = true, canonicalUrl, basePath } = {}) {
   const share = shareMetaFor(menu, { canonicalUrl });
   const descriptionTag = `<meta name="description" content="${escapeHtml(share.description)}">`;
   const shareTags = renderShareMetaTags(share);
   const jsonLd = renderLocalBusinessJsonLd(menu, { canonicalUrl: share.url });
-  const catalog = renderStorefrontCatalogMarkup(menu);
+  const catalog = renderStorefrontCatalogMarkup(menu, basePath === undefined ? undefined : { basePath });
   const { chipsHtml, sectionsHtml } = catalog;
   const structure = menu.structure ? projectShowcaseManifest({
     themeOverrides: menu.structure.theme, navigationMenus: menu.structure.navigation, pages: menu.structure.pages
@@ -1137,4 +1162,20 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   ${interactive ? '<script type="module" src="/vitrine/vitrine.js"></script>' : ''}
 </body>
 </html>`;
+}
+
+/**
+ * HTML da página própria do item (`itemRef`: endereço ou identificador do item), com
+ * o mesmo cabeçalho, gaveta e rodapé da vitrine. `null` quando o item não existe.
+ * `bySlugOnly`: a rota pública aceita só o endereço do item.
+ */
+export function renderStorefrontItemHtml(menu, itemRef, { interactive = true, canonicalUrl, basePath, bySlugOnly = false } = {}) {
+  const found = findPublishedItem(menu, itemRef, { bySlugOnly });
+  if (!found) return null;
+  return renderItemPageDocument(
+    renderStorefrontHtml(itemPageShellMenu(menu, found.item), undefined, { interactive, canonicalUrl, basePath }),
+    menu,
+    itemRef,
+    { canonicalUrl, basePath, bySlugOnly }
+  );
 }
