@@ -77,8 +77,13 @@
 }
 
 .quote-webhook-fields:disabled,
-.quote-webhook-card input:disabled {
+.quote-webhook-card input:disabled,
+.quote-webhook-card button:disabled {
   opacity: .6;
+}
+
+.quote-webhook-card button:disabled {
+  cursor: not-allowed;
 }
 
 .quote-webhook-row {

@@ -22,6 +22,8 @@ const panel = {
   busy: false,
   message: null,
   urlDraft: null,
+  urlError: null,
+  focusUrl: false,
   getContent: () => null,
   onChange: () => {},
   fetchImpl: null,
@@ -95,7 +97,7 @@ function renderFieldsConfig(doc, root, locked) {
     doc,
     'p',
     'form-help',
-    'A pessoa vê os campos em "Dados para o orçamento" e só envia se marcar o consentimento. Vale a partir da próxima publicação.'
+    'A pessoa vê os campos em "Pré-orçamento (opcional)", antes do WhatsApp, e só envia se marcar o consentimento. Vale a partir da próxima publicação.'
   ));
   root.append(group);
 }
@@ -113,7 +115,8 @@ function renderUrl(doc, root, status, locked) {
   input.spellcheck = false;
   input.disabled = locked;
   input.value = panel.urlDraft ?? status?.url ?? '';
-  input.setAttribute('aria-describedby', 'quote-webhook-url-help');
+  input.setAttribute('aria-describedby', panel.urlError ? 'quote-webhook-url-error quote-webhook-url-help' : 'quote-webhook-url-help');
+  if (panel.urlError) input.setAttribute('aria-invalid', 'true');
   input.addEventListener('input', () => {
     panel.urlDraft = input.value;
   });
@@ -126,8 +129,18 @@ function renderUrl(doc, root, status, locked) {
   help.id = 'quote-webhook-url-help';
   const actions = el(doc, 'div', 'quote-webhook-actions');
   actions.append(button(doc, 'Salvar endereço', 'button button-small button-pill', () => saveUrl(input.value), locked || panel.busy));
-  group.append(label, input, help, actions);
+  group.append(label, input);
+  if (panel.urlError) {
+    const error = el(doc, 'span', 'form-error-msg', panel.urlError);
+    error.id = 'quote-webhook-url-error';
+    group.append(error);
+  }
+  group.append(help, actions);
   root.append(group);
+  if (panel.focusUrl) {
+    panel.focusUrl = false;
+    queueMicrotask(() => input.focus());
+  }
 }
 
 function renderSecret(doc, root, status, locked) {
@@ -300,7 +313,11 @@ async function request(suffix, method, body) {
     const data = await response.json().catch(() => ({}));
     if (generation !== panel.generation) return null;
     if (data?.quoteWebhook) panel.status = data.quoteWebhook;
-    if (!response.ok) throw new Error(data?.error?.message ?? 'Não foi possível concluir. Tente de novo.');
+    if (!response.ok) {
+      const error = new Error(data?.error?.message ?? 'Não foi possível concluir. Tente de novo.');
+      error.field = data?.error?.field;
+      throw error;
+    }
     return data;
   } finally {
     if (generation === panel.generation) panel.busy = false;
@@ -312,8 +329,13 @@ async function saveUrl(value) {
     const data = await request('', 'PUT', { url: String(value ?? '').trim() });
     if (!data) return;
     panel.urlDraft = null;
+    panel.urlError = null;
     setMessage('Endereço salvo.', 'success');
   } catch (error) {
+    if (error.field === 'quoteWebhook.url') {
+      panel.urlError = error.message;
+      panel.focusUrl = true;
+    }
     setMessage(error.message, 'error');
   }
 }
@@ -374,6 +396,7 @@ export async function mountQuoteWebhookPanel({
   panel.generation += 1;
   Object.assign(panel, {
     site, status: null, secret: null, confirmRotate: false, busy: false, message: null, urlDraft: null,
+    urlError: null, focusUrl: false,
     getContent: getContent ?? (() => null), onChange: onChange ?? (() => {}), fetchImpl, container, doc
   });
   const allowed = Boolean(isOnline && site && ['owner', 'admin'].includes(site.role));
