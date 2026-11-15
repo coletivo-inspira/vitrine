@@ -196,8 +196,9 @@ function sleep(ms) {
 
 /**
  * Até 3 tentativas, só para `5xx` e erro de rede, com espera de 0,5 s e 1,5 s. Não segue
- * redirecionamentos (um 3xx vale como falha), para que o destino não desvie para a rede
- * interna. Cada tentativa assina com um timestamp novo e o mesmo `X-Vitrine-Delivery`.
+ * redirecionamentos, para que o destino não desvie para a rede interna; um `3xx` conta
+ * como entregue porque o Apps Script responde 302 depois de rodar o `doPost`. Cada
+ * tentativa assina com um timestamp novo e o mesmo `X-Vitrine-Delivery`.
  */
 export async function deliverQuoteWebhook({
   url, secret, event, payload, fetch: customFetch, now = () => Date.now(),
@@ -229,7 +230,7 @@ export async function deliverQuoteWebhook({
       httpStatus = response.status;
       await response.body?.cancel?.().catch?.(() => {});
       if (httpStatus >= 500 && httpStatus <= 599) continue;
-      return { ok: httpStatus >= 200 && httpStatus < 300, httpStatus, attempts: attempt, deliveryId };
+      return { ok: httpStatus >= 200 && httpStatus < 400, httpStatus, attempts: attempt, deliveryId };
     } catch {
       httpStatus = null;
     }

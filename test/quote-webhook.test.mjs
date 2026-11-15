@@ -187,11 +187,12 @@ test('entrega: no máximo 3 tentativas para 5xx e erro de rede; 4xx e 3xx não r
     { ok: true, httpStatus: 204, attempts: 3 }
   );
 
-  for (const status of [400, 302]) {
+  for (const [status, ok] of [[400, false], [410, false], [302, true]]) {
     const once = recordingFetch(() => new Response(null, { status }));
     const outcome = await deliverQuoteWebhook({ ...base, fetch: once.fetchImpl });
-    assert.equal(once.calls.length, 1);
-    assert.equal(outcome.ok, false);
+    assert.equal(once.calls.length, 1, `HTTP ${status} não repete`);
+    assert.equal(outcome.ok, ok, `HTTP ${status}`);
+    assert.equal(once.calls[0].init.redirect, 'manual', 'redirecionamento nunca é seguido');
   }
   await assert.rejects(deliverQuoteWebhook({ ...base, url: 'https://10.0.0.1/x', fetch: failing.fetchImpl }));
 });
