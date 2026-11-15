@@ -23,6 +23,13 @@ import {
   normalizeBidderWhatsapp
 } from './auction-rules.mjs';
 import { hasItemPageContent } from './item-page-fields.mjs';
+import {
+  NOTIFY_BUTTON_LABEL,
+  NOTIFY_CLICK_METRIC,
+  buildNotifyHref,
+  isItemSoon,
+  soonBadgeText
+} from './item-availability.mjs';
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -129,8 +136,13 @@ export class StorefrontRenderer {
     return Math.min(getQuotaRemaining(item), QUOTA_MAX_PER_SELECTION);
   }
 
+  /** Item que pode entrar na seleção: visível e fora do estado "Em breve" (#133). */
+  isSelectable(item) {
+    return Boolean(item) && item.active !== false && !isItemSoon(item);
+  }
+
   setQuotaQuantity(item, delta) {
-    if (!item || item.active === false || this.getItemPriceMode(item) !== 'quota') return false;
+    if (!this.isSelectable(item) || this.getItemPriceMode(item) !== 'quota') return false;
     const limit = this.getQuotaSelectionLimit(item);
     const current = this.cart.get(item.id) || 0;
     const next = Math.max(0, Math.min(current + delta, limit));
@@ -347,7 +359,12 @@ export class StorefrontRenderer {
     return normalized;
   }
 
+  /** Itens que entram na seleção, no total e na mensagem: sem os ocultos e os "Em breve". */
   getAllActiveItems() {
+    return this.getVisibleItems().filter((item) => this.isSelectable(item));
+  }
+
+  getVisibleItems() {
     const list = [];
     for (const cat of this.getNormalizedCategories()) {
       for (const item of cat.items) {
@@ -504,7 +521,7 @@ export class StorefrontRenderer {
   }
 
   setQuantity(item, delta) {
-    if (!item || item.active === false) return;
+    if (!this.isSelectable(item)) return;
     const minQty = this.getMinQuantity(item);
     const current = this.cart.get(item.id) || 0;
 
@@ -546,7 +563,7 @@ export class StorefrontRenderer {
   }
 
   toggleSingleSelect(item) {
-    if (!item || item.active === false) return;
+    if (!this.isSelectable(item)) return;
     if (this.cart.has(item.id)) {
       this.cart.delete(item.id);
     } else {
@@ -793,7 +810,7 @@ export class StorefrontRenderer {
   getFocusItem() {
     const focusId = this.options.focusItemId;
     if (!focusId) return null;
-    return this.getAllActiveItems().find((item) => String(item.id) === String(focusId)) ?? null;
+    return this.getVisibleItems().find((item) => String(item.id) === String(focusId)) ?? null;
   }
 
   /** Página do item: só o controle de seleção do cartão e a barra da seleção. */
@@ -1259,7 +1276,7 @@ export class StorefrontRenderer {
   }
 
   submitOffer(item, rawText) {
-    if (!item || item.active === false) return false;
+    if (!this.isSelectable(item)) return false;
     const digits = String(rawText ?? '').replace(/\D/g, '');
     const cents = parseInt(digits, 10) || 0;
     const minCents = Number.isInteger(item.priceCents) && item.priceCents > 0 ? item.priceCents : 0;
@@ -1298,7 +1315,7 @@ export class StorefrontRenderer {
   }
 
   submitTrade(item, proposalText) {
-    if (!item || item.active === false) return false;
+    if (!this.isSelectable(item)) return false;
     const cleaned = String(proposalText ?? '').trim();
     if (!cleaned) {
       this.itemErrors.set(item.id, 'Informe o que você oferece em troca.');
@@ -1422,12 +1439,15 @@ export class StorefrontRenderer {
 
     const priceMode = this.getItemPriceMode(item);
     const qty = this.cart.get(item.id) || 0;
+    const soon = isItemSoon(item);
     const card = document.createElement('article');
     card.className = isInactive
       ? 'menu-item-card is-inactive'
-      : qty > 0
-        ? 'menu-item-card is-selected'
-        : 'menu-item-card';
+      : soon
+        ? 'menu-item-card is-soon'
+        : qty > 0
+          ? 'menu-item-card is-selected'
+          : 'menu-item-card';
     if (item.id) {
       card.setAttribute('data-item-id', String(item.id));
     }
@@ -1467,6 +1487,13 @@ export class StorefrontRenderer {
                 ? 'Cotas'
                 : 'Troca';
         titleRow.appendChild(modeBadge);
+      }
+
+      if (soon) {
+        const soonBadge = document.createElement('span');
+        soonBadge.className = 'sf-soon-badge';
+        soonBadge.textContent = soonBadgeText(item);
+        titleRow.appendChild(soonBadge);
       }
 
       if (isInactive) {
@@ -1546,8 +1573,51 @@ export class StorefrontRenderer {
     grid.appendChild(card);
   }
 
+  /** Item "Em breve": sem quantidade nem seleção; só o "Avise-me pelo WhatsApp". */
+  renderSoonFooter(item, resolvedComponents, catalogType) {
+    const footer = document.createElement('div');
+    footer.className = 'menu-item-footer sf-footer-stacked sf-soon-footer';
+    const priceMode = this.getItemPriceMode(item);
+    const focused = Boolean(this.options.focusItemId);
+    if (
+      !focused &&
+      priceMode === 'fixed' &&
+      resolvedComponents.price &&
+      (catalogType !== 'quote' || item.priceCents > 0)
+    ) {
+      const price = document.createElement('span');
+      price.className = 'menu-item-price';
+      price.textContent = this.formatPrice(item.priceCents);
+      footer.appendChild(price);
+    }
+    if (focused) {
+      const note = document.createElement('p');
+      note.className = 'sf-soon-note';
+      note.textContent = 'Ainda não dá para escolher este item. Peça para ser avisado(a) quando estiver disponível.';
+      footer.appendChild(note);
+    }
+    const href = buildNotifyHref(this.menu, item);
+    if (!href) return footer;
+    const link = document.createElement('a');
+    link.className = 'whatsapp-order-button sf-notify-button';
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.setAttribute('data-notify-item', String(item.id));
+    link.setAttribute('aria-label', `${NOTIFY_BUTTON_LABEL}: ${item.name || 'item'}`);
+    link.textContent = NOTIFY_BUTTON_LABEL;
+    link.addEventListener('click', () => {
+      if (this.options.isPublicPage && typeof globalThis.recordStorefrontEvent === 'function') {
+        globalThis.recordStorefrontEvent(NOTIFY_CLICK_METRIC);
+      }
+    });
+    footer.appendChild(link);
+    return footer;
+  }
+
   /** Controle de seleção do item (rodapé do cartão), também usado na página do item. */
   renderItemFooter(item, resolvedComponents, catalogType) {
+    if (isItemSoon(item)) return this.renderSoonFooter(item, resolvedComponents, catalogType);
     const isInactive = item.active === false;
     const priceMode = this.getItemPriceMode(item);
     const qty = this.cart.get(item.id) || 0;

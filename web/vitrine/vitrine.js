@@ -259,8 +259,8 @@ export function createStorefrontMetricsCollector({
       queue.push({ type: 'whatsapp_order', estimatedCents, hour, ...originFields });
       flush();
       return true;
-    } else if (type === 'route_click') {
-      queue.push({ type: 'route_click', hour, ...originFields });
+    } else if (type === 'route_click' || type === 'notify_click') {
+      queue.push({ type, hour, ...originFields });
       flush();
       return true;
     } else {

@@ -19,8 +19,16 @@ import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
 import { mountCommentToVitrinePanel } from './comment-to-vitrine.mjs';
+import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import { renderItemPageFields } from './item-page-fields.mjs';
 import { itemPageTexts } from '../assets/item-page-fields.mjs';
+import {
+  DEFAULT_SOON_LABEL,
+  ITEM_AVAILABILITY_LABEL_MAX,
+  ITEM_VISIBILITY_STATES,
+  applyItemVisibilityState,
+  itemVisibilityState
+} from '../assets/item-availability.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -372,6 +380,8 @@ export async function loadEditor(site, isOnline) {
     historyStatus.textContent = '';
     historyList.replaceChildren();
   }
+
+  void applyPlanGates(site, isOnline);
 
   if (conflictBanner) conflictBanner.hidden = true;
   if (publicationStatusBar) publicationStatusBar.hidden = true;
@@ -1658,7 +1668,8 @@ function renderItems() {
                   ? formatCentsToReais(item.priceCents)
                   : '';
       const sectionText = item.section ? `Seção: ${item.section}` : '';
-      const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
+      const visibility = ITEM_VISIBILITY_STATES.find((state) => state.value === itemVisibilityState(item));
+      const details = [priceText, sectionText, visibility.label].filter(Boolean);
       previewSub.textContent = details.join(' · ');
       previewInfo.appendChild(previewSub);
 
@@ -1789,6 +1800,8 @@ function renderItems() {
     termWarning.className = 'item-quota-term-warning item-fields-full';
     termWarning.setAttribute('role', 'status');
     fields.appendChild(termWarning);
+
+    renderItemVisibilityField(item, fields);
 
     // Selector: Tipo do item (Products & Quote)
     if (!isBooking) {
@@ -2228,27 +2241,6 @@ function renderItems() {
     const sep = document.createElement('div');
     sep.className = 'footer-divider';
 
-    // Visible switch
-    const activeLabel = document.createElement('label');
-    activeLabel.className = 'toggle-container-forms';
-
-    const activeCheckbox = document.createElement('input');
-    activeCheckbox.type = 'checkbox';
-    activeCheckbox.setAttribute('role', 'switch');
-    activeCheckbox.setAttribute('aria-checked', item.active !== false ? 'true' : 'false');
-    activeCheckbox.checked = item.active !== false;
-    activeCheckbox.addEventListener('change', () => {
-      item.active = activeCheckbox.checked;
-      activeCheckbox.setAttribute('aria-checked', item.active ? 'true' : 'false');
-      updateDraftAndPreview();
-    });
-
-    const activeLabelText = document.createElement('span');
-    activeLabelText.textContent = 'Visível na vitrine';
-
-    activeLabel.appendChild(activeCheckbox);
-    activeLabel.appendChild(activeLabelText);
-
     // Save and collapse card button
     const collapseBtn = document.createElement('button');
     collapseBtn.type = 'button';
@@ -2263,13 +2255,87 @@ function renderItems() {
     footerRight.appendChild(footerDupBtn);
     footerRight.appendChild(trashBtn);
     footerRight.appendChild(sep);
-    footerRight.appendChild(activeLabel);
     footerRight.appendChild(collapseBtn);
     footer.appendChild(footerRight);
 
     card.appendChild(footer);
     itemsContainer.appendChild(card);
   });
+}
+
+/**
+ * Controle único de visibilidade do item (#133, `PB-20`/`UX-66-012`): Disponível, Em
+ * breve ou Oculto. Grupo de rádios nativo (setas do teclado) e texto opcional do selo.
+ */
+function renderItemVisibilityField(item, fields) {
+  const group = document.createElement('fieldset');
+  group.className = 'form-group item-fields-full item-visibility';
+  const legend = document.createElement('legend');
+  legend.className = 'item-visibility-legend';
+  legend.textContent = 'Na vitrine';
+  group.appendChild(legend);
+
+  const options = document.createElement('div');
+  options.className = 'item-visibility-options';
+  const hint = document.createElement('p');
+  hint.className = 'item-visibility-hint';
+  hint.id = `item-visibility-hint-${item.id}`;
+  hint.setAttribute('aria-live', 'polite');
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'item-visibility-label-field';
+  const labelFor = `item-soon-label-${item.id}`;
+  const lLabel = document.createElement('label');
+  lLabel.setAttribute('for', labelFor);
+  lLabel.textContent = `Texto do selo (opcional, até ${ITEM_AVAILABILITY_LABEL_MAX} caracteres)`;
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.id = labelFor;
+  labelInput.className = 'item-input input-styled-height';
+  labelInput.maxLength = ITEM_AVAILABILITY_LABEL_MAX;
+  labelInput.placeholder = `${DEFAULT_SOON_LABEL} (ex.: Próxima turma em março)`;
+  labelInput.value = item.availabilityLabel || '';
+  labelInput.addEventListener('input', () => {
+    if (labelInput.value.trim()) item.availabilityLabel = labelInput.value;
+    else delete item.availabilityLabel;
+    updateDraftAndPreview();
+  });
+  labelGroup.appendChild(lLabel);
+  labelGroup.appendChild(labelInput);
+
+  const sync = (state) => {
+    hint.textContent = ITEM_VISIBILITY_STATES.find((entry) => entry.value === state).hint;
+    labelGroup.hidden = state !== 'soon';
+  };
+
+  const current = itemVisibilityState(item);
+  for (const state of ITEM_VISIBILITY_STATES) {
+    const optionLabel = document.createElement('label');
+    optionLabel.className = 'item-visibility-option';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = `item-visibility-${item.id}`;
+    radio.value = state.value;
+    radio.checked = state.value === current;
+    radio.setAttribute('aria-describedby', hint.id);
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      applyItemVisibilityState(item, state.value);
+      sync(state.value);
+      updateDraftAndPreview();
+    });
+    const text = document.createElement('span');
+    text.textContent = state.label;
+    optionLabel.appendChild(radio);
+    optionLabel.appendChild(text);
+    options.appendChild(optionLabel);
+  }
+
+  group.appendChild(options);
+  group.appendChild(hint);
+  group.appendChild(labelGroup);
+  sync(current);
+  fields.appendChild(group);
 }
 
 function canvasToWebpBlob(canvas, quality) {
@@ -3359,7 +3425,12 @@ structurePanel?.addEventListener('toggle', async () => {
         structureStatus.textContent = error.message;
         structureFields.querySelector('form')?.showFieldErrors?.(error.missingFields);
       }
-    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, uploadTestimonialPhoto });
+    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, uploadTestimonialPhoto, planGate });
+    const planSummary = await loadSitePlan(site.id);
+    if (site !== currentSite || !structurePanel.open) return;
+    const planGate = planSummary
+      ? { itemBlocks: { max: planSummary.limits.itemBlocks, plan: requiredPlanFor(planSummary, 'item_blocks') } }
+      : null;
     render(resolved, savedStructure?.templateCode);
   } catch (error) {
     if (site === currentSite) structureStatus.textContent = error.message;
@@ -3466,17 +3537,25 @@ function domainAction(text, type = 'button') {
   return button;
 }
 
-function renderDomainForm(site) {
+function renderDomainForm(site, planSummary = null) {
   const form = document.createElement('form');
   const label = document.createElement('label');
   const hostname = document.createElement('input');
-  hostname.placeholder = 'cardapio.exemplo.com.br';
+  hostname.placeholder = 'loja.exemplo.com.br';
   hostname.required = true;
   hostname.maxLength = 253;
   hostname.autocomplete = 'off';
   label.append('Domínio próprio ', hostname);
   const submit = domainAction('Vincular domínio', 'submit');
   form.append(label, submit);
+  const plan = requiredPlanFor(planSummary, 'custom_domain');
+  if (plan) {
+    lockAction(
+      submit,
+      plan,
+      `Domínio próprio faz parte do plano ${plan.name} ou superior e depende de vaga e da configuração do DNS. O botão leva a Plano e cobrança.`
+    );
+  }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
@@ -3497,11 +3576,11 @@ async function refreshDomains() {
   const site = currentSite;
   domainStatus.textContent = 'Consultando domínios…';
   try {
-    const { domains } = await publicationRequest(site, 'domains');
+    const [{ domains }, planSummary] = await Promise.all([publicationRequest(site, 'domains'), loadSitePlan(site.id)]);
     if (site !== currentSite || !domainPanel.open) return;
     domainStatus.textContent = domains.length ? '' : 'Nenhum domínio próprio vinculado.';
     domainList.replaceChildren();
-    renderDomainForm(site);
+    renderDomainForm(site, planSummary);
     for (const domain of domains) {
       const entry = document.createElement('li');
       const name = document.createElement('strong');
@@ -3551,3 +3630,26 @@ async function refreshDomains() {
   }
 }
 domainPanel?.addEventListener('toggle', refreshDomains);
+
+// Selos dos recursos pagos visíveis antes de abrir os painéis (issue #115).
+async function applyPlanGates(site, isOnline) {
+  const domainSummary = globalThis.document?.getElementById('custom-domains-summary');
+  const seoLegend = globalThis.document?.getElementById('editor-seo-legend');
+  const seoHint = globalThis.document?.getElementById('editor-seo-plan-hint');
+  const clear = () => {
+    markPlanRequirement(domainSummary, null);
+    markPlanRequirement(seoLegend, null);
+    if (seoHint) seoHint.hidden = true;
+  };
+  clear();
+  if (!isOnline) return;
+  const summary = await loadSitePlan(site.id);
+  if (site !== currentSite || !summary) return;
+  markPlanRequirement(domainSummary, requiredPlanFor(summary, 'custom_domain'));
+  const seoPlan = requiredPlanFor(summary, 'local_seo');
+  markPlanRequirement(seoLegend, seoPlan);
+  if (seoHint && seoPlan) {
+    seoHint.textContent = `Os dados para o Google entram na vitrine publicada a partir do plano ${seoPlan.name}. Você já pode preencher; eles passam a valer quando o plano estiver ativo.`;
+    seoHint.hidden = false;
+  }
+}

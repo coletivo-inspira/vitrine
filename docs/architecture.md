@@ -114,6 +114,12 @@ recurso `custom_domain` (`resolve_showcase_host`); sem ele, `302` para
 Nada em `sites`, `drafts`, `publications` ou `site_memberships` é apagado. Operação na
 seção 3 de `docs/operations-guide.md`.
 
+O painel tem a tela "Plano e cobrança" (`#plano`, `web/portal/billing-panel.mjs`), que lê
+`GET /api/billing/overview` (faturas direto do Asaas, sem gravar nada), e mostra o plano
+que libera cada recurso travado com `GET /api/sites/:id/entitlements`
+(`web/portal/plan-gate.mjs`). `/planos/` é gerada de `content/plans.json` no build.
+Detalhes na seção 9 de `docs/billing/asaas.md`.
+
 ## Insights por origem (issue #119)
 
 `public.site_metrics_daily` ganhou `source` e `campaign` (migração
@@ -126,6 +132,17 @@ armazenamento; Worker e banco normalizam de novo (lista fechada, até 32 caracte
 desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é descartada).
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
+
+## Item "Em breve" (issue #133)
+
+Estado público `availability: "soon"` (com `availabilityLabel` opcional, até 24
+caracteres) em `web/assets/item-availability.mjs`, usado pela publicação, pela vitrine e
+pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continua sendo
+`active: false` e `available` segue bloqueado em `assertNoPrivateLeakage`. O item
+"Em breve" aparece com selo e "Avise-me pelo WhatsApp" (`wa.me`, número e código da Mila
+no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
+seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
+`20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
