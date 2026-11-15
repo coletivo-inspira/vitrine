@@ -253,6 +253,10 @@ O estado “Em preparação” combina superfície damasco, indicador laranja, t
 
 Selo `sf-soon-badge` no padrão do estado "Em preparação": damasco, ponto laranja de 6 px, 12 px semibold e raio curto; texto "Em breve" ou o do dono (até 24 caracteres). O cartão mantém o preço e troca o controle de seleção por "Avise-me pelo WhatsApp" (ação principal, largura total, 44 px); a página do item acrescenta uma nota curta acima do botão. No editor, "Na vitrine" é um grupo de três rádios em pílula (Disponível / Em breve / Oculto), largura total, com o efeito de cada estado logo abaixo e o campo "Texto do selo" só em "Em breve"; substitui o interruptor "Visível na vitrine".
 
+### Link de pagamento do negócio (vitrine pública e editor)
+
+Ação secundária `sf-secondary-button` (44 px, contorno fino, ícone de "abre em outro site" de 16 px) logo abaixo do controle de seleção na página do item, seguida do aviso em 13 px carvão suave; no celular ocupa a largura toda. Na etapa "Revisar e enviar", caixa com divisória fina e título Syne 16 px, um link por item escolhido e o mesmo aviso; o WhatsApp continua sendo a ação principal. No editor, grupo "Link de pagamento (opcional)" em largura total com endereço, texto do botão, erro no campo e a lista "Sites de pagamento aceitos" recolhível.
+
 ### Official Signature and Illustrations
 
 A marca própria aprovada da Vitrine é a opção A: V de duas lâminas na caixa

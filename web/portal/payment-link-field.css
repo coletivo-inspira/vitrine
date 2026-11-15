@@ -1,0 +1,104 @@
+.item-payment-link {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(var(--glass) / .35);
+}
+
+.item-payment-link-legend {
+  float: left;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.item-payment-link-legend + * {
+  clear: both;
+}
+
+.item-payment-link-intro {
+  margin: 0;
+}
+
+.item-payment-link-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item-payment-link-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.item-payment-link-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.item-payment-link-problem {
+  overflow-wrap: anywhere;
+}
+
+.item-payment-link-problem:empty {
+  display: none;
+}
+
+.item-payment-link-mode-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--apricot);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.item-payment-link-domains {
+  min-width: 0;
+  font-size: 13px;
+}
+
+.item-payment-link-domains-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.item-payment-link-domains-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 16px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+}
+
+.item-payment-link-domains-list li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.item-payment-link-host {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.item-payment-link-domains .form-help {
+  margin: 0;
+}
