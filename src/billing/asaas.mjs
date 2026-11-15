@@ -103,6 +103,52 @@ export function parseAsaasWebhookEvent(payload) {
   };
 }
 
+const PAYMENT_STATES = Object.freeze({
+  PENDING: 'pending',
+  AWAITING_RISK_ANALYSIS: 'pending',
+  CONFIRMED: 'paid',
+  RECEIVED: 'paid',
+  RECEIVED_IN_CASH: 'paid',
+  OVERDUE: 'overdue',
+  REFUNDED: 'refunded',
+  REFUND_REQUESTED: 'refunded',
+  REFUND_IN_PROGRESS: 'refunded',
+  CHARGEBACK_REQUESTED: 'refunded',
+  CHARGEBACK_DISPUTE: 'refunded',
+  AWAITING_CHARGEBACK_REVERSAL: 'refunded'
+});
+
+export const MAX_LISTED_PAYMENTS = 12;
+
+function asaasLink(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && CHECKOUT_HOSTS.test(url.hostname) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Cobrança do Asaas para o histórico do painel: só identificador, datas, valor,
+// situação e links do próprio Asaas. Nome, documento e e-mail da pessoa ficam de fora.
+export function projectAsaasPayment(payment) {
+  const id = providerId(payment?.id);
+  const dueDate = typeof payment?.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payment.dueDate) ? payment.dueDate : null;
+  if (!id || !dueDate) return null;
+  const value = Number(payment.value);
+  const paidDate = [payment.paymentDate, payment.clientPaymentDate, payment.confirmedDate]
+    .find((entry) => typeof entry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry)) ?? null;
+  return {
+    id,
+    dueDate,
+    paidDate,
+    valueCents: Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null,
+    state: PAYMENT_STATES[payment.status] ?? 'other',
+    invoiceUrl: asaasLink(payment.invoiceUrl),
+    receiptUrl: asaasLink(payment.transactionReceiptUrl)
+  };
+}
+
 async function readProviderError(response) {
   const body = await response.json().catch(() => null);
   const code = body?.errors?.[0]?.code;
@@ -194,6 +240,16 @@ export function createAsaasProvider(config, deps = {}) {
         status: typeof data?.status === 'string' ? data.status : null,
         nextDueDate: typeof data?.nextDueDate === 'string' ? data.nextDueDate : null
       };
+    },
+
+    // Uma chamada; a lista vem do Asaas a cada consulta e nada é gravado na Vitrine.
+    async listPayments(subscriptionId, { limit = MAX_LISTED_PAYMENTS } = {}) {
+      const id = requireId(subscriptionId, 'assinatura');
+      const size = Math.min(Math.max(Number.parseInt(limit, 10) || MAX_LISTED_PAYMENTS, 1), MAX_LISTED_PAYMENTS);
+      const data = await call('GET', `/subscriptions/${encodeURIComponent(id)}/payments?limit=${size}`);
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      return rows.map(projectAsaasPayment).filter(Boolean)
+        .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
     },
 
     async cancelSubscription(subscriptionId) {

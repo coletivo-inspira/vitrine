@@ -114,6 +114,12 @@ recurso `custom_domain` (`resolve_showcase_host`); sem ele, `302` para
 Nada em `sites`, `drafts`, `publications` ou `site_memberships` é apagado. Operação na
 seção 3 de `docs/operations-guide.md`.
 
+O painel tem a tela "Plano e cobrança" (`#plano`, `web/portal/billing-panel.mjs`), que lê
+`GET /api/billing/overview` (faturas direto do Asaas, sem gravar nada), e mostra o plano
+que libera cada recurso travado com `GET /api/sites/:id/entitlements`
+(`web/portal/plan-gate.mjs`). `/planos/` é gerada de `content/plans.json` no build.
+Detalhes na seção 9 de `docs/billing/asaas.md`.
+
 ## Insights por origem (issue #119)
 
 `public.site_metrics_daily` ganhou `source` e `campaign` (migração
@@ -130,7 +136,7 @@ Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Wo
 ## Pré-orçamento com webhook assinado (issue #121)
 
 `src/quote-webhook.mjs`, `web/assets/quote-lead.mjs`, `web/portal/quote-webhook.mjs` e a
-migração `20261116001000_quote_webhooks.sql`. O rascunho guarda `quoteLead.fields`
+migração `20261116001600_quote_webhooks.sql`. O rascunho guarda `quoteLead.fields`
 (categoria, data, bairro); o snapshot só recebe `quoteLead` com o recurso
 `quote_webhook` e a integração pronta, decidido na publicação. `POST
 /api/sites/:endereço/leads` (público, mesma origem, consentimento obrigatório, limite
@@ -142,6 +148,17 @@ gerado no Worker, mostrado uma vez e guardado cifrado (AES-GCM, chave
 `private.quote_webhooks`, que só tem endereço, último status e contadores. Leitura
 reutilizável do status em `readQuoteWebhookStatus`. Contrato e receitas em
 `docs/pre-orcamento-webhook.md`.
+
+## Item "Em breve" (issue #133)
+
+Estado público `availability: "soon"` (com `availabilityLabel` opcional, até 24
+caracteres) em `web/assets/item-availability.mjs`, usado pela publicação, pela vitrine e
+pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continua sendo
+`active: false` e `available` segue bloqueado em `assertNoPrivateLeakage`. O item
+"Em breve" aparece com selo e "Avise-me pelo WhatsApp" (`wa.me`, número e código da Mila
+no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
+seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
+`20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
