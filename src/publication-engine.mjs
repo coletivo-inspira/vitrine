@@ -23,6 +23,7 @@ import {
 } from './local-seo.mjs';
 import { assertPublicFeatures, projectPublicFeatures } from './vitrine-json.mjs';
 import { assertPublicFooter, projectPublicFooter, renderStorefrontFooterHtml } from './storefront-footer.mjs';
+import { assertPublicQuoteLead, projectPublicQuoteLead } from './quote-webhook.mjs';
 import {
   assertPublicItemPageFields,
   assertPublicManifestSize,
@@ -120,6 +121,7 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'businessHours',
   'publicAddress',
   'canonicalUrl',
+  'quoteLead',
   'localBusiness',
   'features',
   'supportBadge'
@@ -329,6 +331,8 @@ export function assertNoPrivateLeakage(menuArtifact) {
       throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Horário ou endereço público inválido.');
     }
   }
+
+  assertPublicQuoteLead(menuArtifact);
 
   assertPublicSeo(menuArtifact);
   assertPublicFeatures(menuArtifact);
@@ -777,6 +781,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...(migrated.structure ? { structure: projectShowcaseManifest(migrated.structure) } : {}),
     ...(locality ? { locality } : {}),
     ...projectPublicPlace(migrated),
+    ...projectPublicQuoteLead(migrated, limits),
     ...projectPublicSeo(migrated, baseMenu.slug, limits),
     ...projectPublicFeatures(limits),
     ...projectPublicFooter(limits)

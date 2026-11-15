@@ -18,6 +18,7 @@ import {
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
+import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import { renderItemPageFields } from './item-page-fields.mjs';
 import { itemPageTexts } from '../assets/item-page-fields.mjs';
@@ -1114,6 +1115,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   mountSeoPanel({
     getContent: () => currentDraft?.content,
     getSlug: () => currentSite?.slug,
+    onChange: () => updateDraftAndPreview()
+  });
+  void mountQuoteWebhookPanel({
+    site: currentSite,
+    isOnline: currentIsOnline,
+    getContent: () => currentDraft?.content,
     onChange: () => updateDraftAndPreview()
   });
 

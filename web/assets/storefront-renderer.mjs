@@ -1,4 +1,5 @@
 import { ORDER_RELAY_MILA, isMilaRelayCode, withMilaRelayPrefix } from './mila-relay.mjs';
+import { hasQuoteLead, quoteLeadMessageLines, renderQuoteLeadFields, sendQuoteLead } from './quote-lead.mjs';
 
 /**
  * Shared Storefront Renderer for Vitrine Inspira.
@@ -318,7 +319,8 @@ export class StorefrontRenderer {
         f.date ||
         (Array.isArray(f.timeSlots) && f.timeSlots.length > 0) ||
         f.deliveryOrPickup ||
-        f.notes
+        f.notes ||
+        hasQuoteLead(this.menu)
     );
   }
 
@@ -2208,6 +2210,8 @@ export class StorefrontRenderer {
       form.appendChild(group);
     }
 
+    renderQuoteLeadFields(form, this);
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (resolvedFields.customerName && !this.customerDetails.customerName.trim()) {
@@ -2269,8 +2273,11 @@ export class StorefrontRenderer {
   }
 
   buildOrderMessage() {
+    const leadLines = quoteLeadMessageLines(this.menu, this.quoteLead?.values, {
+      skipDate: Boolean(this.getResolvedOrderFields().date)
+    });
     return withMilaRelayPrefix(
-      this.buildOrderBody(),
+      [this.buildOrderBody(), ...leadLines].join('\n'),
       this.getOrderRelay(),
       this.menu?.name || this.menu?.businessName || ''
     );
@@ -2607,6 +2614,7 @@ export class StorefrontRenderer {
     sendBtn.rel = 'noopener noreferrer';
 
     sendBtn.addEventListener('click', () => {
+      if (!this.options.isPreview) sendQuoteLead(this);
       if (typeof globalThis.recordStorefrontEvent === 'function') {
         globalThis.recordStorefrontEvent('whatsapp_order', {
           estimatedCents: this.getCartTotal()
