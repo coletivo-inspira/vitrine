@@ -1,5 +1,5 @@
-// Insights por origem (issue #119, ADR 0013). Cliques em "Traçar rota" e visitas
-// pelo QR Code valem para todos os planos; visitas por origem e o funil por origem
+// Insights por origem (issue #119, ADR 0013). Cliques em "Traçar rota", em "Avise-me"
+// (#133) e visitas pelo QR Code valem para todos os planos; visitas por origem e o funil por origem
 // (visitas → cliques para enviar no WhatsApp) são do recurso conversion_reports.
 import { UNRECORDED_SOURCE, metricSourceLabel } from '../web/assets/metrics-source.mjs';
 import { hasPlanFeature, planFeatureRequiredError } from './entitlements.mjs';
@@ -44,7 +44,14 @@ export function summarizeOriginMetrics(rows, { period = '7d', referenceDate = ne
   const previousEnd = addUtcDays(currentStart, -1);
   const previousStart = addUtcDays(previousEnd, -(days - 1));
 
-  const reach = { routeClicks: 0, previousRouteClicks: 0, qrVisits: 0, previousQrVisits: 0 };
+  const reach = {
+    routeClicks: 0,
+    previousRouteClicks: 0,
+    qrVisits: 0,
+    previousQrVisits: 0,
+    notifyClicks: 0,
+    previousNotifyClicks: 0
+  };
   const bySource = new Map();
   const byCampaign = new Map();
   const entry = (map, key, base) => {
@@ -67,6 +74,10 @@ export function summarizeOriginMetrics(rows, { period = '7d', referenceDate = ne
     }
     if (name === 'qr_visit') {
       reach[isCurrent ? 'qrVisits' : 'previousQrVisits'] += count;
+      continue;
+    }
+    if (name === 'notify_click') {
+      reach[isCurrent ? 'notifyClicks' : 'previousNotifyClicks'] += count;
       continue;
     }
     if (!isCurrent || (name !== 'visit' && name !== 'whatsapp_order')) continue;

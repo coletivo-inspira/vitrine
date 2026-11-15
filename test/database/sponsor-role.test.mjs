@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const MIGRATION = '20261116000800_sponsor_role.sql';
+const MIGRATION = '20261116001500_sponsor_role.sql';
 const ADMIN = '81000000-0000-0000-0000-0000000000a1';
 const SPONSOR = '81000000-0000-0000-0000-0000000000b1';
 const OWNER = '81000000-0000-0000-0000-0000000000c1';
