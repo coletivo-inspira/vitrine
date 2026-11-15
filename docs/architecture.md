@@ -88,8 +88,8 @@ webhook de pré-orçamento chama `requirePlanFeature(entitlements, 'quote_webhoo
 Selo de apoio do plano Gratuito (issue #135): `src/storefront-footer.mjs` traduz o
 recurso `support_badge_optional` em `supportBadge: false` no snapshot, decidido na
 publicação como o SEO local. Snapshot sem o campo mostra o selo. O rodapé lê
-`instagramUrl` e `publicEmail` quando o snapshot os tiver; nenhum dos dois é
-projetado ainda (central de canais, #125).
+`instagramUrl` e `publicEmail`, projetados desde a central de canais (#125); o
+cabeçalho lê `instagramUrl`. Contrato em [`docs/central-de-canais.md`](central-de-canais.md).
 
 ## Cobrança pelo Asaas (ADR 0013, issue #113)
 
