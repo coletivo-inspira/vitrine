@@ -12,6 +12,7 @@
   <script src="../theme.js"></script>
   <link rel="stylesheet" href="./portal.css">
   <link rel="stylesheet" href="./site-lifecycle.css">
+  <link rel="stylesheet" href="./billing.css">
   <link rel="stylesheet" href="./item-page-fields.css">
   <link rel="stylesheet" href="./insights-origin.css">
 </head>
@@ -163,6 +164,12 @@
             <a href="#pedidos" class="nav-link" data-section="pedidos">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Customizações
+            </a>
+          </li>
+          <li>
+            <a href="#plano" class="nav-link" data-section="plano">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              Plano e cobrança
             </a>
           </li>
           <li class="nav-admin-item" hidden>
@@ -633,11 +640,68 @@
           <div id="auctions-list" class="auctions-list"></div>
         </section>
 
+        <section id="plano-section" class="shell-section" aria-labelledby="plano-title" hidden>
+          <div class="section-header">
+            <h1 id="plano-title" class="display-title">Plano e cobrança</h1>
+            <p class="section-desc">O plano de cada vitrine, a situação da assinatura e as faturas do Asaas. Recursos pagos mostram no próprio botão o plano que os libera.</p>
+          </div>
+          <div id="billing-panel-message" class="billing-panel-message" hidden></div>
+          <div id="billing-panel-body" class="billing-panel-body"></div>
+          <p class="billing-pricing"><a id="billing-pricing-link" class="text-link" href="https://vitrine.inspira.dev.br/planos/" target="_blank" rel="noopener noreferrer">Ver todos os planos, limites e preços <span class="visually-hidden">(abre em nova aba)</span><span aria-hidden="true">↗</span></a></p>
+
+          <dialog id="billing-change-dialog" class="portal-dialog billing-dialog" aria-labelledby="billing-change-title" aria-describedby="billing-change-summary">
+            <form id="billing-change-form" class="portal-dialog-body" novalidate>
+              <h2 id="billing-change-title" class="portal-dialog-title">Mudar de plano</h2>
+              <fieldset id="billing-change-plans" class="billing-plan-options">
+                <legend>Escolha o plano</legend>
+              </fieldset>
+              <div id="billing-change-details" class="billing-details">
+                <p class="form-help">Nome, CPF ou CNPJ e e-mail seguem só para o Asaas, que emite a cobrança. A Vitrine guarda apenas o identificador da assinatura.</p>
+                <div class="form-group">
+                  <label for="billing-name">Nome ou razão social</label>
+                  <input type="text" id="billing-name" autocomplete="name" maxlength="100" aria-describedby="billing-name-error">
+                  <span id="billing-name-error" class="form-error-msg" hidden>Informe o nome completo ou a razão social.</span>
+                </div>
+                <div class="form-group">
+                  <label for="billing-cpfCnpj">CPF ou CNPJ</label>
+                  <input type="text" id="billing-cpfCnpj" inputmode="text" autocomplete="off" maxlength="18" aria-describedby="billing-cpfCnpj-error">
+                  <span id="billing-cpfCnpj-error" class="form-error-msg" hidden>Confira o CPF ou CNPJ.</span>
+                </div>
+                <div class="form-group">
+                  <label for="billing-email">E-mail de cobrança</label>
+                  <input type="email" id="billing-email" autocomplete="email" maxlength="254" aria-describedby="billing-email-error">
+                  <span id="billing-email-error" class="form-error-msg" hidden>Informe um e-mail válido.</span>
+                </div>
+              </div>
+              <p id="billing-change-summary" class="billing-effect" aria-live="polite"></p>
+              <div id="billing-change-message" class="billing-panel-message" hidden></div>
+              <div class="portal-dialog-actions">
+                <button id="billing-change-back" class="button button-small button-secondary button-pill" type="button">Voltar</button>
+                <button id="billing-change-submit" class="button button-small button-pill" type="submit">Ir para o pagamento</button>
+              </div>
+            </form>
+          </dialog>
+
+          <dialog id="billing-cancel-dialog" class="portal-dialog billing-dialog" aria-labelledby="billing-cancel-title" aria-describedby="billing-cancel-summary">
+            <div class="portal-dialog-body">
+              <h2 id="billing-cancel-title" class="portal-dialog-title">Cancelar assinatura?</h2>
+              <p id="billing-cancel-summary" class="portal-dialog-desc"></p>
+              <ul id="billing-cancel-effects" class="billing-effects"></ul>
+              <div id="billing-cancel-message" class="billing-panel-message" hidden></div>
+              <div class="portal-dialog-actions">
+                <button id="billing-cancel-back" class="button button-small button-secondary button-pill" type="button">Manter assinatura</button>
+                <button id="billing-cancel-confirm" class="button button-small button-pill" type="button">Cancelar assinatura</button>
+              </div>
+            </div>
+          </dialog>
+        </section>
+
         <!-- Section 3: Perfil e Interesses -->
         <section id="perfil-section" class="shell-section" hidden>
           <div class="section-header">
             <h1 class="display-title">Perfil e Interesses</h1>
             <p class="section-desc">Personalize as informações da sua conta e selecione seus interesses de negócio.</p>
+            <p class="billing-profile-link"><a class="text-link" href="#plano">Plano e cobrança <span aria-hidden="true">→</span></a></p>
           </div>
 
           <div class="portal-card portal-card-narrow">
@@ -1320,8 +1384,9 @@
                     <a id="editor-address-route-link" class="text-link" href="#" target="_blank" rel="noopener" hidden>Testar o botão "Traçar rota"</a>
                   </fieldset>
 
-                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-seo-group" aria-describedby="editor-seo-help">
-                    <legend class="locality-legend">Google e WhatsApp</legend>
+                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-seo-group" aria-describedby="editor-seo-help editor-seo-plan-hint">
+                    <legend id="editor-seo-legend" class="locality-legend">Google e WhatsApp</legend>
+                    <p id="editor-seo-plan-hint" class="plan-gate-hint" hidden></p>
                     <span id="editor-seo-help" class="form-help">O tipo de negócio e a área atendida completam os dados que o Google lê, junto com o endereço e o horário acima. Os dados para o Google fazem parte do plano Essencial ou superior; o cartão do link vale para todas as vitrines. Vale a partir da próxima publicação.</span>
                     <div class="locality-field">
                       <label for="editor-seo-type">Tipo de negócio</label>
@@ -1460,7 +1525,7 @@
                   </details>
 
                   <details id="custom-domains" class="portal-card" hidden>
-                    <summary>Domínios e publicação</summary>
+                    <summary id="custom-domains-summary">Domínios e publicação</summary>
                     <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
                     <p id="custom-domains-status" role="status"></p>
                     <div id="custom-domains-fields"></div>

@@ -120,6 +120,31 @@ export function assertItemBlocksAllowed(entitlements, nextPages, previousPages =
   );
 }
 
+// Recursos com trava no painel: o selo mostra o plano que libera antes do clique.
+export const PANEL_GATED_FEATURES = Object.freeze(['custom_domain', 'local_seo']);
+
+// Para GET /api/sites/:id/entitlements: o plano da vitrine e, por recurso travado, o
+// plano mais barato que libera (null quando já está liberado).
+export function planGateSummary(entitlements) {
+  const current = entitlements ?? FREE_ENTITLEMENTS;
+  const locked = {};
+  for (const feature of PANEL_GATED_FEATURES) {
+    locked[feature] = hasPlanFeature(current, feature)
+      ? null
+      : requiredPlanSummary(cheapestPlanWithFeature(PLAN_TABLE, feature));
+  }
+  const moreBlocks = [...PLAN_TABLE.plans]
+    .filter((plan) => plan.limits.itemBlocks > current.maxItemBlocks)
+    .sort((a, b) => a.monthlyPriceCents - b.monthlyPriceCents)[0] ?? null;
+  locked[ITEM_BLOCKS_FEATURE] = requiredPlanSummary(moreBlocks);
+  return {
+    plan: { code: current.planCode, name: current.planName },
+    limits: { activeItems: current.maxActiveItems, itemBlocks: current.maxItemBlocks, vitrines: current.maxVitrines },
+    features: [...current.features],
+    locked
+  };
+}
+
 // Opções para validateDraftContent e compilePublicStorefront.
 export function draftLimits(entitlements) {
   return { maxActiveItems: entitlements.maxActiveItems, planName: entitlements.planName };

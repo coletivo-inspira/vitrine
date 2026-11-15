@@ -3,12 +3,13 @@
 // Issue #114: GET /api/billing/notice (aviso do Início) e POST /api/billing/cancel.
 // Issue #116: POST /api/billing/stripe/webhook (Stripe-Signature) e
 // POST /api/billing/stripe/portal (portal do cliente do Stripe, dono do tenant).
+// Issue #115: GET /api/billing/overview (tela "Plano e cobrança" do painel).
 // workers/api.mjs só encaminha; tudo de cobrança fica aqui e em src/billing/.
 import planTableSource from '../../content/plans.json' with { type: 'json' };
 import { planByCode, validatePlanTable } from '../plans.mjs';
 import { createAsaasProvider, resolveAsaasConfig } from './asaas.mjs';
 import { createStripeProvider, resolveStripeConfig } from './stripe.mjs';
-import { pickSubscriptionNotice } from './lifecycle.mjs';
+import { pickSubscriptionNotice, subscriptionSummary } from './lifecycle.mjs';
 import {
   BillingProviderError,
   assertBillingProvider,
@@ -22,6 +23,7 @@ export const BILLING_NOTICE_PATH = '/api/billing/notice';
 export const BILLING_CANCEL_PATH = '/api/billing/cancel';
 export const STRIPE_WEBHOOK_PATH = '/api/billing/stripe/webhook';
 export const STRIPE_PORTAL_PATH = '/api/billing/stripe/portal';
+export const BILLING_OVERVIEW_PATH = '/api/billing/overview';
 export const BILLING_NOT_CONFIGURED = 'BILLING_NOT_CONFIGURED';
 export const BILLING_PROVIDERS = Object.freeze(['asaas', 'stripe']);
 export const DEFAULT_BILLING_PROVIDER = 'asaas';
@@ -32,10 +34,13 @@ const UUID_PATTERN = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const MAX_WEBHOOK_BYTES = 64 * 1024;
 const MAX_CHECKOUT_BYTES = 8 * 1024;
 const ACTIVE_STATUSES = new Set(['active', 'past_due', 'grace']);
+// Cada organização com assinatura no Asaas custa uma chamada de faturas; o teto mantém
+// a tela dentro dos subrequests do Workers Free.
+export const MAX_OVERVIEW_ORGANIZATIONS = 5;
 
 const BILLING_PATHS = new Set([
   BILLING_CHECKOUT_PATH, ASAAS_WEBHOOK_PATH, BILLING_NOTICE_PATH, BILLING_CANCEL_PATH,
-  STRIPE_WEBHOOK_PATH, STRIPE_PORTAL_PATH
+  STRIPE_WEBHOOK_PATH, STRIPE_PORTAL_PATH, BILLING_OVERVIEW_PATH
 ]);
 
 export function isBillingRoute(pathname) {
@@ -96,6 +101,39 @@ export function createSupabaseBillingStore({ supabaseUrl, anonKey, serviceRoleKe
       if (!response.ok) throw new BillingStoreError('BILLING_STORE_FAILED');
       const rows = await response.json();
       return Array.isArray(rows) ? rows[0] ?? null : null;
+    },
+
+    // Com o token da pessoa: o filtro por owner_user_id deixa de fora as organizações
+    // que um platform_admin enxerga pela RLS sem ser dono.
+    async listOwnedTenants({ token, userId }) {
+      const query = new URLSearchParams({
+        owner_user_id: `eq.${userId}`,
+        select: 'id,name',
+        order: 'created_at.asc',
+        limit: String(MAX_OVERVIEW_ORGANIZATIONS)
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/tenants?${query}`, {
+        headers: { apikey: anonKey, authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new BillingStoreError('BILLING_STORE_FAILED');
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows : [];
+    },
+
+    // Com o token da pessoa (RLS subscriptions_owner_read).
+    async listSubscriptions(tenantIds, { token }) {
+      const ids = tenantIds.filter((id) => UUID_PATTERN.test(id));
+      if (!ids.length) return [];
+      const query = new URLSearchParams({
+        tenant_id: `in.(${ids.join(',')})`,
+        select: 'tenant_id,plan_code,status,provider,provider_subscription_id,current_period_end,grace_until'
+      });
+      const response = await fetchImpl(`${baseUrl}/rest/v1/subscriptions?${query}`, {
+        headers: { apikey: anonKey, authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new BillingStoreError('BILLING_STORE_FAILED');
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows : [];
     },
 
     async attachCheckout({ tenantId, userId, planCode, provider, customerId, subscriptionId }) {
@@ -355,6 +393,84 @@ async function handleNotice(request, env, helpers) {
   return jsonResponse(200, { notice: pickSubscriptionNotice(rows, now) }, { 'cache-control': 'no-store' });
 }
 
+function publicPlan(plan) {
+  return {
+    code: plan.code,
+    name: plan.name,
+    monthlyPriceCents: plan.monthlyPriceCents,
+    limits: plan.limits,
+    features: plan.features
+  };
+}
+
+async function invoicesFor(row, provider, available) {
+  if (!row?.provider_subscription_id || row.provider !== provider.name) return { status: 'none', items: [] };
+  if (!available || typeof provider.listPayments !== 'function') return { status: 'unavailable', items: [] };
+  try {
+    return { status: 'ok', items: await provider.listPayments(row.provider_subscription_id) };
+  } catch {
+    return { status: 'error', items: [] };
+  }
+}
+
+// Tela "Plano e cobrança": só organizações de que a pessoa é dona. O identificador da
+// assinatura no provedor não sai do Worker; as faturas vêm do Asaas a cada consulta.
+async function handleOverview(request, env, helpers) {
+  const { deps, errorResponse, jsonResponse } = helpers;
+  const user = await helpers.resolveUser();
+  if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+  const store = resolveBillingStore(env, deps);
+  const provider = resolveAsaasProvider(env, deps);
+  const available = Boolean(store) && provider.configured !== false;
+  const payload = {
+    billing: { available, mode: provider.mode ?? 'sandbox' },
+    plans: PLAN_TABLE.plans.map(publicPlan),
+    organizations: []
+  };
+  const noStore = { 'cache-control': 'no-store' };
+  if (!store || typeof store.listOwnedTenants !== 'function') return jsonResponse(200, payload, noStore);
+
+  let tenants;
+  let rows;
+  try {
+    tenants = (await store.listOwnedTenants({ token: user.token, userId: user.id, env }))
+      .filter((tenant) => typeof tenant?.id === 'string' && UUID_PATTERN.test(tenant.id))
+      .slice(0, MAX_OVERVIEW_ORGANIZATIONS);
+    rows = tenants.length ? await store.listSubscriptions(tenants.map((tenant) => tenant.id), { token: user.token, env }) : [];
+  } catch {
+    return errorResponse(503, 'BILLING_STORE_UNAVAILABLE', 'Não foi possível consultar a assinatura. Tente de novo.');
+  }
+
+  const now = typeof deps.now === 'function' ? deps.now() : new Date();
+  const free = planByCode(PLAN_TABLE, 'free');
+  payload.organizations = await Promise.all(tenants.map(async (tenant) => {
+    const row = rows.find((entry) => entry?.tenant_id === tenant.id) ?? null;
+    const summary = subscriptionSummary(row, now);
+    const plan = planByCode(PLAN_TABLE, summary.effectivePlanCode) ?? free;
+    const subscribed = row ? planByCode(PLAN_TABLE, row.plan_code) : null;
+    return {
+      tenantId: tenant.id,
+      name: typeof tenant.name === 'string' ? tenant.name : '',
+      plan: { code: plan.code, name: plan.name, monthlyPriceCents: plan.monthlyPriceCents },
+      subscription: row ? {
+        planCode: summary.planCode,
+        planName: subscribed?.name ?? null,
+        monthlyPriceCents: subscribed?.monthlyPriceCents ?? null,
+        state: summary.state,
+        provider: summary.provider,
+        currentPeriodEnd: summary.currentPeriodEnd,
+        graceUntil: summary.graceUntil,
+        accessUntil: summary.accessUntil
+      } : null,
+      canCheckout: available && !(row && ACTIVE_STATUSES.has(row.status)),
+      canCancel: Boolean(store) && Boolean(row?.provider_subscription_id) && row.status !== 'canceled'
+        && BILLING_PROVIDERS.includes(row.provider) && resolveProvider(row.provider, env, deps).configured !== false,
+      invoices: await invoicesFor(row, provider, available)
+    };
+  }));
+  return jsonResponse(200, payload, noStore);
+}
+
 // Cancelamento a pedido do dono: cancela no provedor e marca 'canceled'. O plano vale
 // até current_period_end (decisão da issue #114). Se a gravação falhar depois do
 // cancelamento no provedor, o webhook SUBSCRIPTION_DELETED marca 'canceled' do mesmo jeito.
@@ -529,6 +645,10 @@ export async function handleBillingRoute(request, env = {}, ctx = {}, helpers) {
   if (path === BILLING_NOTICE_PATH) {
     if (method !== 'GET') return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET nesta rota de cobrança.');
     return handleNotice(request, env, safeHelpers);
+  }
+  if (path === BILLING_OVERVIEW_PATH) {
+    if (method !== 'GET') return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET nesta rota de cobrança.');
+    return handleOverview(request, env, safeHelpers);
   }
   if (method !== 'POST') {
     return helpers.errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use POST nesta rota de cobrança.');
