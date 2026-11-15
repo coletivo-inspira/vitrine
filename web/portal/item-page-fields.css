@@ -1,0 +1,154 @@
+.item-page-editor {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(var(--glass) / .35);
+}
+
+.item-page-editor-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 48px;
+  padding: 10px 44px 10px 14px;
+  position: relative;
+  list-style: none;
+  cursor: pointer;
+}
+
+.item-page-editor-summary::-webkit-details-marker {
+  display: none;
+}
+
+.item-page-editor-summary::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform .2s var(--ease);
+}
+
+.item-page-editor[open] > .item-page-editor-summary::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.item-page-editor-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.item-page-editor-hint {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.item-page-editor-body {
+  display: grid;
+  gap: 14px;
+  padding: 0 14px 16px;
+  min-width: 0;
+}
+
+.item-page-editor-intro {
+  margin: 0;
+}
+
+.item-page-editor-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item-page-editor-field label,
+.item-page-editor-faq legend {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.item-page-editor-problem:empty {
+  display: none;
+}
+
+.item-page-editor-faq {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.item-page-editor-faq legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.item-page-editor-faq-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-page-editor-faq-entry {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.item-page-editor-faq-entry > .button,
+.item-page-editor-faq-add,
+.item-page-editor-gallery .button {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.item-page-editor-question {
+  min-height: 0;
+  resize: vertical;
+}
+
+.item-page-editor-gallery-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-page-editor-gallery-entry {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.item-page-editor-gallery-entry img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-page-editor-summary::after {
+    transition: none;
+  }
+}

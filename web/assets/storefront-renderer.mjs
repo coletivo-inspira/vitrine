@@ -23,6 +23,7 @@ import {
   normalizeBidderName,
   normalizeBidderWhatsapp
 } from './auction-rules.mjs';
+import { hasItemPageContent } from './item-page-fields.mjs';
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -634,9 +635,12 @@ export class StorefrontRenderer {
     const wrap = document.createElement('div');
     wrap.className = 'storefront-render-wrap';
 
-    this.renderStepper(wrap);
+    const focusItem = this.getFocusItem();
+    if (!(focusItem && this.stage === 1)) this.renderStepper(wrap);
 
-    if (this.stage === 1) {
+    if (focusItem && this.stage === 1) {
+      this.renderFocusedItem(focusItem, wrap);
+    } else if (this.stage === 1) {
       this.renderStage1(wrap);
     } else if (this.stage === 2) {
       this.renderStage2(wrap);
@@ -784,7 +788,28 @@ export class StorefrontRenderer {
     }
 
     parent.appendChild(catalogContainer);
+    this.renderCartBar(parent);
+  }
 
+  /** Item em foco (página do item): `options.focusItemId` presente entre os itens ativos. */
+  getFocusItem() {
+    const focusId = this.options.focusItemId;
+    if (!focusId) return null;
+    return this.getAllActiveItems().find((item) => String(item.id) === String(focusId)) ?? null;
+  }
+
+  /** Página do item: só o controle de seleção do cartão e a barra da seleção. */
+  renderFocusedItem(item, parent) {
+    const holder = document.createElement('div');
+    holder.className = 'sf-focus-item';
+    holder.setAttribute('data-item-id', String(item.id));
+    holder.appendChild(this.renderItemFooter(item, this.getResolvedComponents(), this.getCatalogType()));
+    parent.appendChild(holder);
+    this.renderCartBar(parent);
+  }
+
+  renderCartBar(parent) {
+    const catalogType = this.getCatalogType();
     const cartCount = this.getCartCount();
     if (cartCount > 0) {
       const cartBar = document.createElement('div');
@@ -1466,6 +1491,18 @@ export class StorefrontRenderer {
       body.appendChild(desc);
     }
 
+    const detailsHref = typeof this.options.itemHref === 'function' && hasItemPageContent(item)
+      ? this.options.itemHref(item)
+      : '';
+    if (detailsHref) {
+      const detailsLink = document.createElement('a');
+      detailsLink.className = 'sf-item-details-link';
+      detailsLink.href = detailsHref;
+      detailsLink.textContent = 'Ver detalhes';
+      detailsLink.setAttribute('aria-label', `Ver detalhes de ${item.name || 'item'}`);
+      body.appendChild(detailsLink);
+    }
+
     if (priceMode === 'donation' && typeof item.conditions === 'string' && item.conditions.trim()) {
       const condP = document.createElement('p');
       condP.className = 'sf-item-condition-note';
@@ -1506,6 +1543,16 @@ export class StorefrontRenderer {
       body.appendChild(metaRow);
     }
 
+    card.appendChild(body);
+    card.appendChild(this.renderItemFooter(item, resolvedComponents, catalogType));
+    grid.appendChild(card);
+  }
+
+  /** Controle de seleção do item (rodapé do cartão), também usado na página do item. */
+  renderItemFooter(item, resolvedComponents, catalogType) {
+    const isInactive = item.active === false;
+    const priceMode = this.getItemPriceMode(item);
+    const qty = this.cart.get(item.id) || 0;
     const footer = document.createElement('div');
     footer.className = 'menu-item-footer';
 
@@ -1751,9 +1798,7 @@ export class StorefrontRenderer {
       }
     }
 
-    card.appendChild(body);
-    card.appendChild(footer);
-    grid.appendChild(card);
+    return footer;
   }
 
   renderQuotaDetails(item, body) {
