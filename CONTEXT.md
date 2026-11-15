@@ -54,6 +54,10 @@ _Evitar_: carência, bloqueio da vitrine.
 
 **Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento, CMS institucional e benefícios comerciais; não se confunde com proprietário de vitrine.
 
+**Patrocinador**: Pessoa ou entidade que financia o plano Gratuito/Social por cota negociada fora do sistema. No painel tem só a tela Impacto, atribuída por um Operador Inspira; não abre vitrines, rascunhos nem a administração.
+
+**Impacto**: Tela somente leitura do patrocinador com o número de vitrines sociais ativas (plano Gratuito/Social, não arquivadas) e suas visitas e cliques para enviar no WhatsApp somados por mês e por cidade, sem nome de negócio nem itens. Cidade com menos de 5 vitrines entra em "Outras cidades".
+
 **Organização cliente (Inquilino / Tenant)**: Agrupador comercial de um cliente que pode possuir uma ou mais vitrines sob cotas controladas, mantendo o isolamento de acesso por vitrine.
 
 **Módulo**: Bloco funcional reutilizável de uma vitrine (ex.: topo/hero, grade de catálogo, agendamento, depoimentos, FAQ, horários/localização, componente em sandbox).

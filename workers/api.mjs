@@ -5,6 +5,7 @@ import { validateCmsSection } from '../src/platform-cms.mjs';
 import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
 import { handleLinktreeRoute, matchLinktreeRoute, purgeExpiredLinktreeDemos, resolveLinktreeRepository } from '../src/linktree-import.mjs';
+import { handleSponsorRoute, matchSponsorRoute, resolveSponsorRepository, sponsorRouteNeedsGuard } from '../src/sponsor-impact.mjs';
 import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
@@ -4392,6 +4393,26 @@ export function createApiHandler(deps = {}) {
           repository: resolveLinktreeRepository(store, env, deps.fetch),
           options,
           fetch: deps.linktreeFetch ?? globalThis.fetch
+        });
+        return jsonResponse(status, body, { 'cache-control': 'no-store' });
+      }
+
+      const sponsorRoute = matchSponsorRoute(pathname);
+      if (sponsorRoute) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        if (sponsorRoute.admin && !await store.isPlatformAdmin?.(user.id, options)) {
+          return errorResponse(403, 'FORBIDDEN_PLATFORM_ADMIN', 'Acesso restrito aos operadores da plataforma.');
+        }
+        if (sponsorRouteNeedsGuard(sponsorRoute, method)) {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: method === 'POST' });
+          if (guardError) return guardError;
+        }
+        const payload = method === 'POST' ? (await parseJsonRequest(request)).parsed : undefined;
+        const { status, body } = await handleSponsorRoute(sponsorRoute, method, payload, {
+          repository: resolveSponsorRepository(store, env, deps.fetch),
+          options
         });
         return jsonResponse(status, body, { 'cache-control': 'no-store' });
       }
