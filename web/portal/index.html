@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="./payment-link-field.css">
   <link rel="stylesheet" href="./insights-origin.css">
   <link rel="stylesheet" href="./quote-webhook.css">
+  <link rel="stylesheet" href="./channels-panel.css">
   <link rel="stylesheet" href="./sponsor-impact.css">
 </head>
 <body>
@@ -1173,6 +1174,10 @@
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span>Pedido</span>
             </button>
+            <button type="button" role="tab" class="tab-btn" data-tab="channels" aria-selected="false" aria-label="Canais: links diretos e integrações">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span>Canais</span>
+            </button>
             <button type="button" role="tab" class="tab-btn mobile-only-tab" data-tab="preview" aria-selected="false" aria-label="Prévia ao vivo">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               <span>Prévia</span>
@@ -1725,6 +1730,11 @@
                   </div>
                 </form>
                 <section id="quote-webhook-panel" class="portal-card quote-webhook-card" aria-labelledby="quote-webhook-title" hidden></section>
+              </div>
+
+              <!-- PANE 5: Channels -->
+              <div id="pane-channels" class="editor-tab-pane" hidden>
+                <section id="channels-panel" class="channels-panel" aria-labelledby="channels-title"></section>
               </div>
 
             </div>

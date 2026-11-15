@@ -181,7 +181,8 @@ test('extrai nome, descrição, foto e links; WhatsApp e Instagram viram botões
   const draft = buildLinktreeDemoDraft(profile, { importedAt: '2026-11-14T12:00:00.000Z' });
   assert.equal(draft.slug, 'ana-doces');
   assert.equal(draft.content.whatsapp, '5531999998888');
-  assert.equal(draft.content.instagram, 'ana.doces');
+  assert.equal(draft.content.instagramUrl, 'https://www.instagram.com/ana.doces/');
+  assert.equal(draft.content.instagram, undefined, 'campo único do rascunho: instagramUrl');
   assert.equal(draft.content.messages.welcomeText, 'Bolos e tortas por encomenda');
   assert.deepEqual(draft.content.categories[0].items, [
     { id: 'link-1', name: 'Cardápio de bolos', url: 'https://ana.example.com/bolos', active: true }

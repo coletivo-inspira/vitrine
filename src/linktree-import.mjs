@@ -5,6 +5,7 @@ import {
   isValidSlug,
   validateDraftContent
 } from './portal-validation.mjs';
+import { instagramUrlFromHandle } from '../web/assets/channels.mjs';
 
 export const LINKTREE_HOST = 'linktr.ee';
 export const LINKTREE_USERNAME_PATTERN = /^[A-Za-z0-9_.]{1,30}$/;
@@ -332,7 +333,7 @@ export function buildLinktreeDemoDraft(profile, { slug, importedAt = new Date().
   });
   content.messages = { ...content.messages, heroTitle: profile.name };
   if (profile.description) content.messages.welcomeText = profile.description;
-  if (profile.instagram) content.instagram = profile.instagram;
+  if (profile.instagram) content.instagramUrl = instagramUrlFromHandle(profile.instagram);
   content.categories = profile.links.length ? [{
     id: 'links-linktree',
     name: 'Links',
