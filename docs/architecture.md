@@ -125,6 +125,22 @@ desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é desc
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
 
+## Pré-orçamento com webhook assinado (issue #121)
+
+`src/quote-webhook.mjs`, `web/assets/quote-lead.mjs`, `web/portal/quote-webhook.mjs` e a
+migração `20261116001000_quote_webhooks.sql`. O rascunho guarda `quoteLead.fields`
+(categoria, data, bairro); o snapshot só recebe `quoteLead` com o recurso
+`quote_webhook` e a integração pronta, decidido na publicação. `POST
+/api/sites/:endereço/leads` (público, mesma origem, consentimento obrigatório, limite
+por IP em memória sem gravar o IP) responde `202` e entrega em `ctx.waitUntil`, com
+`X-Vitrine-Signature: sha256=<hex>` sobre `timestamp.corpo` e até 3 tentativas para
+`5xx` e erro de rede; sem o recurso, `404` (`paidFeatureGoneResponse`). O segredo é
+gerado no Worker, mostrado uma vez e guardado cifrado (AES-GCM, chave
+`QUOTE_WEBHOOK_ENCRYPTION_KEY`, id da vitrine como dado associado) em
+`private.quote_webhooks`, que só tem endereço, último status e contadores. Leitura
+reutilizável do status em `readQuoteWebhookStatus`. Contrato e receitas em
+`docs/pre-orcamento-webhook.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
