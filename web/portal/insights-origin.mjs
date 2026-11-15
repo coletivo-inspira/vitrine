@@ -126,6 +126,9 @@ export function renderInsightsOrigin(container, insights, doc = globalThis.docum
   if ((reach.notifyClicks ?? 0) > 0 || (reach.previousNotifyClicks ?? 0) > 0) {
     reachRow.append(reachPill(doc, 'Cliques em "Avise-me"', reach.notifyClicks ?? 0, reach.previousNotifyClicks ?? 0));
   }
+  if ((reach.paymentLinkClicks ?? 0) > 0 || (reach.previousPaymentLinkClicks ?? 0) > 0) {
+    reachRow.append(reachPill(doc, 'Cliques no link de pagamento', reach.paymentLinkClicks ?? 0, reach.previousPaymentLinkClicks ?? 0));
+  }
   container.append(reachRow);
 
   const body = el(doc, 'div', 'origin-body');

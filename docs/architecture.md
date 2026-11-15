@@ -179,6 +179,21 @@ no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao res
 seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
 `20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
 
+## Link de pagamento do próprio negócio (issue #134)
+
+Campo opcional por item `paymentLink: { url, label? }` (texto até 32 caracteres, padrão
+"Pagar no site do negócio"), com as regras em `web/assets/payment-link.mjs`. Só `https://`
+com host exatamente igual a um da lista única `content/payment-link-domains.json`, sem
+porta, credenciais ou subdomínio curinga; o servidor recusa o resto com `field` e
+`fieldErrors` (`paymentLink.url`/`paymentLink.label`, com `itemId`), e o build copia a
+lista para `/assets/payment-link-domains.json`, lida pelo editor. A publicação omite o
+link em itens "Em breve", de lance e de troca, e `assertNoPrivateLeakage` confere o
+snapshot de novo. Aparece na página do item (`renderPurchaseExtras`) e na etapa "Revisar
+e enviar", em nova aba com `rel="noopener noreferrer"`, sem parâmetros acrescentados e
+fora do total e da mensagem do WhatsApp. Os cliques contam em `payment_link_click`
+(migração `20261116001700_metric_payment_link_click.sql`). O pagamento é do negócio e do
+provedor dele (ADR 0013, item 8; seção "Vendas do seu negócio" dos termos).
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

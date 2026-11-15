@@ -31,6 +31,7 @@ import {
   isItemSoon,
   soonBadgeText
 } from './item-availability.mjs';
+import { PAYMENT_LINK_ICON_PATH, PAYMENT_LINK_NOTICE, publicPaymentLink } from './payment-link.mjs';
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -2390,6 +2391,66 @@ export class StorefrontRenderer {
     });
   }
 
+  /**
+   * Links de pagamento do próprio negócio (#134) dos itens escolhidos, como ação
+   * secundária: não mudam o total nem a mensagem, e o WhatsApp segue como envio.
+   */
+  renderReviewPaymentLinks(card) {
+    const entries = [];
+    for (const item of this.getAllActiveItems()) {
+      if (!this.cart.has(item.id)) continue;
+      const link = publicPaymentLink(item, this.getItemPriceMode(item));
+      if (link) entries.push({ item, link });
+    }
+    if (!entries.length) return;
+    const section = document.createElement('section');
+    section.className = 'sf-payment-link-box review-payment-links';
+    const noteId = `${this.idPrefix}-payment-note`;
+    const title = document.createElement('h3');
+    title.textContent = entries.length === 1 ? 'Pagamento no site do negócio (opcional)' : 'Pagamentos no site do negócio (opcionais)';
+    section.appendChild(title);
+    const list = document.createElement('ul');
+    list.className = 'review-payment-list';
+    for (const { item, link } of entries) {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'review-payment-item';
+      name.textContent = item.name || 'Item';
+      const anchor = document.createElement('a');
+      anchor.className = 'sf-secondary-button sf-payment-link';
+      anchor.href = link.url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.setAttribute('data-payment-link', '');
+      anchor.setAttribute('aria-label', `${link.label}: ${item.name || 'item'} (abre em nova aba)`);
+      anchor.setAttribute('aria-describedby', noteId);
+      anchor.textContent = link.label;
+      if (typeof document.createElementNS === 'function') {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const icon = document.createElementNS(svgNs, 'svg');
+        icon.setAttribute('class', 'sf-payment-link-icon');
+        icon.setAttribute('width', '16');
+        icon.setAttribute('height', '16');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.setAttribute('focusable', 'false');
+        const path = document.createElementNS(svgNs, 'path');
+        path.setAttribute('d', PAYMENT_LINK_ICON_PATH);
+        icon.appendChild(path);
+        anchor.appendChild(icon);
+      }
+      li.append(name, anchor);
+      list.appendChild(li);
+    }
+    section.appendChild(list);
+    const note = document.createElement('p');
+    note.className = 'sf-payment-note';
+    note.id = noteId;
+    note.textContent = PAYMENT_LINK_NOTICE;
+    section.appendChild(note);
+    card.appendChild(section);
+  }
+
   renderStage3(parent) {
     const catalogType = this.getCatalogType();
     const resolvedComponents = this.getResolvedComponents();
@@ -2461,6 +2522,7 @@ export class StorefrontRenderer {
       summaryList.appendChild(itemRow);
     }
     card.appendChild(summaryList);
+    this.renderReviewPaymentLinks(card);
 
     const cartTotal = this.getCartTotal();
     const hasOffers = this.hasSelectedOffers();

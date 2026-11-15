@@ -30,6 +30,7 @@ await acquireBuildLock();
 try {
   const catalog = JSON.parse(await readFile(new URL('../content/portfolio.json', import.meta.url), 'utf8'));
   const contact = JSON.parse(await readFile(new URL('../content/contact.json', import.meta.url), 'utf8'));
+  const paymentLinkDomains = JSON.parse(await readFile(new URL('../content/payment-link-domains.json', import.meta.url), 'utf8'));
   const loja1Source = JSON.parse(await readFile(new URL('../content/vitrines/loja1.json', import.meta.url), 'utf8'));
   const publicCases = publishedPortfolio(catalog);
   const contactHref = quoteContactLink(contact.teamWhatsapp);
@@ -57,6 +58,8 @@ try {
   await mkdir(resolve(output, 'data/vitrines/loja1/releases'), { recursive: true });
   await writeFile(resolve(output, 'data/portfolio.json'), JSON.stringify(publicCases));
   await writeFile(resolve(output, 'data/contact.json'), JSON.stringify({ href: contactHref }));
+  // O editor confere o link de pagamento com a mesma lista do servidor (#134).
+  await writeFile(resolve(output, 'assets/payment-link-domains.json'), JSON.stringify({ domains: paymentLinkDomains.domains }));
   await writeFile(resolve(output, 'data/vitrines/loja1/menu.json'), loja1Compiled.json);
   await writeFile(
     resolve(output, `data/vitrines/loja1/releases/${loja1Compiled.hash}.json`),
