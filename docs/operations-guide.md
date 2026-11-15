@@ -59,6 +59,17 @@ Vale para vitrines com "Receber pedidos pela Mila" ligado em Configurações. A 
 
 Cada consulta fica registrada na auditoria da vitrine (`mila_relay_lookup`). Nada do que é colado no painel é salvo.
 
+### 2.4 Acesso de patrocinador à tela Impacto (issue #127)
+
+A cota de patrocínio é negociada por contrato, fora do sistema. Depois de assinada:
+
+1. A pessoa do patrocinador entra uma vez no painel com Google e envia o identificador da conta (o mesmo usado para adicioná-la à equipe de uma vitrine).
+2. Em **Administração da plataforma › Patrocinadores**, cole o identificador e clique em **Dar acesso ao Impacto**.
+3. Na próxima vez que abrir o painel, ela vê **Impacto** no menu: vitrines sociais ativas, visitas e cliques para enviar no WhatsApp por mês e por cidade, sem nome de negócio nem itens. Não vê vitrines de terceiros, rascunhos nem a administração.
+4. Ao fim do contrato, clique em **Retirar acesso** na mesma aba.
+
+Atribuir e retirar ficam na auditoria da plataforma (`sponsor_granted`, `sponsor_revoked`). Uma conta que já é operadora da plataforma não muda de papel por aqui.
+
 ---
 
 ## 3. Planos, Cobrança Recorrente e Ciclo de 7 Dias de Tolerância (ADR 0013, issue #114)

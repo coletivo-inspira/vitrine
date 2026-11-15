@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="./item-page-fields.css">
   <link rel="stylesheet" href="./insights-origin.css">
   <link rel="stylesheet" href="./quote-webhook.css">
+  <link rel="stylesheet" href="./sponsor-impact.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo-portal">Pular para o conteúdo</a>
@@ -165,6 +166,12 @@
             <a href="#pedidos" class="nav-link" data-section="pedidos">
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Customizações
+            </a>
+          </li>
+          <li class="nav-sponsor-item" hidden>
+            <a href="#impacto" class="nav-link" data-section="impacto">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg>
+              Impacto
             </a>
           </li>
           <li>
@@ -376,6 +383,7 @@
             <button type="button" role="tab" id="platform-tab-overview" class="admin-tab" aria-controls="platform-operations" aria-selected="true">Visão geral</button>
             <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1">Pedidos pela Mila</button>
             <button type="button" role="tab" id="platform-tab-linktree" class="admin-tab" aria-controls="platform-linktree" aria-selected="false" tabindex="-1">Importar do Linktree</button>
+            <button type="button" role="tab" id="platform-tab-sponsors" class="admin-tab" aria-controls="platform-sponsors" aria-selected="false" tabindex="-1">Patrocinadores</button>
             <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1">Modelos de vitrine</button>
             <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1">Site institucional</button>
           </div>
@@ -438,6 +446,24 @@
             </article>
           </div>
 
+          <div id="platform-sponsors" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-sponsors" tabindex="0" hidden>
+            <article class="portal-card admin-card sponsor-admin">
+              <h2>Patrocinadores</h2>
+              <p class="admin-card-desc">Quem tem este papel vê só a tela Impacto: visitas e cliques para enviar no WhatsApp das vitrines sociais, somados por mês e por cidade, sem nome de negócio nem itens. Não abre vitrines, rascunhos nem esta administração.</p>
+              <form id="platform-sponsor-form" class="form-flex-col sponsor-admin-form" novalidate>
+                <div class="form-group">
+                  <label for="platform-sponsor-user">Conta do patrocinador (identificador)</label>
+                  <input type="text" id="platform-sponsor-user" class="item-input input-styled-height" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" placeholder="00000000-0000-0000-0000-000000000000" aria-describedby="platform-sponsor-user-help">
+                  <p id="platform-sponsor-user-help" class="form-help">O mesmo identificador usado para adicionar alguém à equipe de uma vitrine. A pessoa precisa ter entrado no painel uma vez.</p>
+                </div>
+                <button type="submit" class="button button-pill sponsor-admin-submit">Dar acesso ao Impacto</button>
+              </form>
+              <p id="platform-sponsor-status" class="form-help" role="status"></p>
+              <h3 class="sponsor-admin-list-title">Com acesso</h3>
+              <ul id="platform-sponsor-list" class="admin-list sponsor-admin-list" aria-label="Patrocinadores com acesso ao Impacto"></ul>
+            </article>
+          </div>
+
           <div id="platform-templates" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-templates" tabindex="0" hidden>
             <article class="portal-card admin-card">
               <h2>Modelos de vitrine</h2>
@@ -483,6 +509,61 @@
               </div>
             </div>
           </dialog>
+        </section>
+
+        <section id="sponsor-impact-section" class="shell-section sponsor-impact" aria-labelledby="sponsor-impact-title" hidden>
+          <div class="section-header">
+            <div class="card-eyebrow">Patrocínio · somente leitura</div>
+            <h1 id="sponsor-impact-title" class="display-title" tabindex="-1">Impacto</h1>
+            <p class="section-desc">Alcance das vitrines sociais (plano Gratuito/Social) que o patrocínio apoia. Só números somados: nenhum nome de negócio, endereço, item ou contato aparece aqui.</p>
+          </div>
+
+          <ul id="sponsor-impact-kpis" class="admin-kpi-grid" aria-label="Resumo do impacto"></ul>
+          <p id="sponsor-impact-status" class="admin-status" role="status"></p>
+
+          <article id="sponsor-impact-suppressed" class="portal-card admin-card sponsor-impact-empty" hidden>
+            <h2>Ainda não dá para mostrar sem identificar ninguém</h2>
+            <p class="admin-card-desc">Os números aparecem quando houver pelo menos 5 vitrines sociais ativas. Com menos que isso, uma soma poderia revelar os dados de um negócio.</p>
+          </article>
+
+          <div id="sponsor-impact-content" class="sponsor-impact-grid" hidden>
+            <article class="portal-card admin-card">
+              <h2>Por mês</h2>
+              <p class="admin-card-desc">Todas as vitrines sociais ativas, mês a mês.</p>
+              <div class="impact-table-wrap">
+                <table class="impact-table">
+                  <caption class="impact-sr-only">Visitas e cliques para enviar no WhatsApp por mês</caption>
+                  <thead>
+                    <tr><th scope="col">Mês</th><th scope="col" class="impact-cell-number">Visitas</th><th scope="col" class="impact-cell-number">Cliques no WhatsApp</th></tr>
+                  </thead>
+                  <tbody id="sponsor-impact-months"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="portal-card admin-card">
+              <div class="impact-card-head">
+                <div>
+                  <h2>Por cidade</h2>
+                  <p id="sponsor-impact-period-label" class="admin-card-desc">Somados nos últimos 12 meses</p>
+                </div>
+                <div class="form-group-inline">
+                  <label for="sponsor-impact-period">Período</label>
+                  <select id="sponsor-impact-period" class="select-styled compact-select"></select>
+                </div>
+              </div>
+              <div class="impact-table-wrap">
+                <table class="impact-table">
+                  <caption class="impact-sr-only">Vitrines, visitas e cliques para enviar no WhatsApp por cidade</caption>
+                  <thead>
+                    <tr><th scope="col">Cidade</th><th scope="col" class="impact-cell-number">Vitrines</th><th scope="col" class="impact-cell-number">Visitas</th><th scope="col" class="impact-cell-number">Cliques no WhatsApp</th></tr>
+                  </thead>
+                  <tbody id="sponsor-impact-cities"></tbody>
+                </table>
+              </div>
+              <p class="impact-footnote">Cidades com menos de 5 vitrines não aparecem sozinhas: entram em "Outras cidades". Se esse grupo ficaria pequeno, a menor cidade também entra nele, para que a diferença entre o total e as cidades não revele ninguém.</p>
+            </article>
+          </div>
         </section>
 
         <section id="insights-section" class="shell-section" hidden>
@@ -1700,6 +1781,12 @@
           <a href="#pedidos" class="nav-link" data-section="pedidos">
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>Pedidos</span>
+          </a>
+        </li>
+        <li class="nav-sponsor-item" hidden>
+          <a href="#impacto" class="nav-link" data-section="impacto">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg>
+            <span>Impacto</span>
           </a>
         </li>
         <li class="nav-admin-item" hidden>
