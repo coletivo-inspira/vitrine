@@ -20,6 +20,8 @@ import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
 import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import { mountChannelsPanel, refreshChannelsPanel } from './channels-panel.mjs';
+import { renderItemPageFields } from './item-page-fields.mjs';
+import { itemPageTexts } from '../assets/item-page-fields.mjs';
 import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
@@ -2165,9 +2167,16 @@ function renderItems() {
       fields.appendChild(gPhoto);
     }
 
+    renderItemPageFields(item, fields, {
+      onChange: updateDraftAndPreview,
+      uploadImage: async (file) => uploadImageToSupabaseStorage(await resizeAndConvertToWebP(file), `${item.id}-galeria`),
+      isOnline: () => currentIsOnline,
+      notify: showFeedback
+    });
+
     const refreshTermWarning = () => {
       const term = findProhibitedQuotaTerm(
-        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward],
+        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, ...itemPageTexts(item)],
         { quota: itemPriceMode === 'quota' }
       );
       termWarning.hidden = !term;
