@@ -125,6 +125,14 @@ desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é desc
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
 
+## Modelo "Serviços e produtos" (issue #136)
+
+`servicos-produtos-v1` (migração `20261116001400_template_servicos_produtos.sql`) é uma
+receita de sete seções na página inicial mais a página "Para empresas" desligada.
+Páginas de modelo ficam em `public.templates.default_pages` e são herdadas por
+`resolveShowcaseManifest` como as seções; o rascunho só guarda o que mudou. Receita e
+decisões em `docs/modelo-servicos-e-produtos.md`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:
