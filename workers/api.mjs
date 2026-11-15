@@ -42,9 +42,13 @@ import {
 import {
   compilePublicStorefront,
   computeSha256Hex,
-  renderStorefrontHtml
+  renderStorefrontHtml,
+  renderStorefrontItemHtml
 } from '../src/publication-engine.mjs';
 import { ORDER_RELAY_MILA, normalizeMilaRelayCode } from '../web/assets/mila-relay.mjs';
+import {
+  customDomainPath, customDomainPublicPaths, itemPageUsesStorageImages, matchItemPagePath
+} from '../src/item-page.mjs';
 import {
   assertItemBlocksAllowed, draftLimits, loadSiteEntitlements, planGateSummary, requirePlanFeature
 } from '../src/entitlements.mjs';
@@ -85,6 +89,9 @@ import {
   respondIfShowcasePaused,
   siteLifecycleFields
 } from '../src/site-lifecycle.mjs';
+import {
+  handleVitrineJsonRequest, matchVitrineJsonPath, vitrineJsonGone, vitrineJsonPublicationOptions
+} from '../src/vitrine-json.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1832,6 +1839,7 @@ export async function hydratePublicationRecord(row) {
     {
       siteId: row.site_id ?? undefined,
       maxActiveItems: TECHNICAL_MAX_ACTIVE_ITEMS,
+      publicJson: rawMenu.features?.publicJson === true,
       ...(rawMenu.supportBadge === false ? { supportBadge: false } : {}),
       localSeo: Boolean(rawMenu.localBusiness),
       ...(typeof rawMenu.canonicalUrl === 'string' ? { canonicalUrl: rawMenu.canonicalUrl } : {}),
@@ -2386,6 +2394,18 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async resolveDomainRoute(hostname) {
       return fetchShowcaseRoute({ baseUrl, headers: anonHeaders(), fetch: fetchImpl }, hostname);
+    },
+
+    async isPublicJsonEnabled(slug) {
+      const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/public_json_enabled`, {
+        method: 'POST',
+        headers: { ...anonHeaders(), 'content-type': 'application/json' },
+        body: JSON.stringify({ target_slug: slug })
+      });
+      // 404: migração ainda não aplicada; vale como desligado.
+      if (response.status === 404) return false;
+      if (!response.ok) throw new Error('Falha ao consultar o vitrine.json.');
+      return (await response.json()) === true;
     },
 
     async listAssets(siteId, { token }) {
@@ -3675,6 +3695,31 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
     return renderNotFoundPageResponse(request, method, assetsFetcher);
   }
 
+  // 4. Página do item: /<slug>/item/<item>, só a partir do snapshot publicado (ADR 0008).
+  const itemRoute = matchItemPagePath(pathname);
+  if (itemRoute && !RESERVED_PUBLIC_PATHS.has(itemRoute.slug)) {
+    const pausedResponse = await respondIfShowcasePaused(store, itemRoute.slug, method);
+    if (pausedResponse) return pausedResponse;
+    const pub =
+      (await store.getPublicationBySlug?.(itemRoute.slug)) ??
+      (await sharedPublicPublications.getPublicationBySlug(itemRoute.slug));
+    const html = pub
+      ? renderStorefrontItemHtml(pub.menu, itemRoute.itemSlug, { ...renderOptions, bySlugOnly: true })
+      : null;
+    if (!html) return renderNotFoundPageResponse(request, method, assetsFetcher);
+    return new Response(method === 'HEAD' ? null : html, {
+      status: 200,
+      headers: {
+        ...PUBLIC_SECURITY_HEADERS,
+        'content-security-policy': (itemPageUsesStorageImages(pub.menu, itemRoute.itemSlug)
+          ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER) + (pub.menu.structure ? WIDGET_FRAME_CSP : ''),
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': STOREFRONT_CACHE_CONTROL,
+        etag: `"${pub.hash}"`
+      }
+    });
+  }
+
   return null;
 }
 
@@ -3905,6 +3950,11 @@ async function handlePublicAuctionRequest(request, url, env, store, deps, slug, 
   }
 }
 
+function loadPublicPublication(store) {
+  return async (slug) =>
+    (await store.getPublicationBySlug?.(slug)) ?? (await sharedPublicPublications.getPublicationBySlug(slug));
+}
+
 async function handleCustomHostname(request, url, store, assets, context, env = {}, deps = {}) {
   const auctionMatch = url.pathname.match(PUBLIC_AUCTION_PATH);
   if (auctionMatch && typeof store.resolveDomain === 'function') {
@@ -3912,12 +3962,21 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
     if (!isValidSlug(domainSlug) || domainSlug !== auctionMatch[1]) return new Response(null, { status: 404 });
     return handlePublicAuctionRequest(request, url, env, store, deps, domainSlug, Boolean(auctionMatch[2]));
   }
+  if (url.pathname === '/vitrine.json') {
+    const route = await resolveShowcaseRoute(store, url.hostname);
+    if (!isValidSlug(route?.slug)) return new Response(null, { status: 404 });
+    if (!route.canonical) return vitrineJsonGone();
+    return handleVitrineJsonRequest(request, {
+      slug: route.slug, store, env, loadPublication: loadPublicPublication(store),
+      cacheUrl: `${url.origin}/${route.slug}/vitrine.json`
+    });
+  }
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 404 });
   const route = await resolveShowcaseRoute(store, url.hostname);
   const slug = route?.slug;
   if (!isValidSlug(slug)) return new Response(null, { status: 404 });
-  const path = url.pathname === '/' ? `/${slug}` : url.pathname;
-  const publicPaths = new Set([`/${slug}`, `/${slug}/`, `/data/vitrines/${slug}/menu.json`]);
+  const path = customDomainPath(slug, url.pathname);
+  const publicPaths = customDomainPublicPaths(slug, path);
   if (!publicPaths.has(path)) return new Response(null, { status: 404 });
   if (!route.canonical) return nonCanonicalDomainResponse(resolvePublicOrigins(env, deps).publicSiteOrigin, path);
   const cache = globalThis.caches?.default;
@@ -3926,7 +3985,7 @@ async function handleCustomHostname(request, url, store, assets, context, env = 
   const refresh = async () => {
     const response = await handlePublicStorefrontOrMenuRequest(
       request, path, 'GET', store, assets,
-      { canonicalUrl: canonicalUrlFor({ slug, domains: [{ hostname: url.hostname, status: 'active', ssl_status: 'active' }] }) }
+      { basePath: '', canonicalUrl: canonicalUrlFor({ slug, domains: [{ hostname: url.hostname, status: 'active', ssl_status: 'active' }] }) }
     );
     if (response?.ok && cache) {
       const headers = new Headers(response.headers);
@@ -4142,6 +4201,14 @@ export function createApiHandler(deps = {}) {
       const cityPageResponse = await handleCityRequest(request, url, method, store, _ctx);
       if (cityPageResponse) {
         return cityPageResponse;
+      }
+
+      const vitrineJsonSlug = matchVitrineJsonPath(pathname);
+      if (vitrineJsonSlug && !RESERVED_PUBLIC_PATHS.has(vitrineJsonSlug)) {
+        return handleVitrineJsonRequest(request, {
+          slug: vitrineJsonSlug, store, env, loadPublication: loadPublicPublication(store),
+          cacheUrl: `${url.origin}${pathname}`
+        });
       }
 
       const publicResponse = await handlePublicStorefrontOrMenuRequest(
@@ -5454,6 +5521,7 @@ export function createApiHandler(deps = {}) {
           siteId: site.id,
           ...draftLimits(entitlements),
           ...publicationSeoOptions({ slug: site.slug, entitlements, domains }),
+          ...vitrineJsonPublicationOptions(entitlements),
           ...publicationFooterOptions({ entitlements })
         });
 
