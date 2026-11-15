@@ -1,0 +1,8 @@
+{
+  "generatedBy": "ImageGen (Cursor GenerateImage), 2026-11-15",
+  "prompt": "Realistic natural-light photograph of a small ceramics studio: a woman in her thirties with a linen apron shaping a clay bowl on a pottery wheel, her face partly visible and smiling, hands covered in clay. Behind her, wooden shelves with handmade mugs and bowls in soft neutral glazes (cream, sand, muted terracotta). Warm daylight from a window on the left, calm and clean composition, shallow depth of field, no text, no logos, no watermark. Vertical framing with the subject centered.",
+  "process": "Original 864x1152 reduzido para 800 px de largura e recortado no centro para 800x1000 (proporção do hero), WebP qualidade 78 com ffmpeg/libwebp.",
+  "size": "800x1000",
+  "use": "Foto do hero da vitrine de exemplo do modelo Serviços e produtos (content/vitrines/servicos-produtos-exemplo.json, issue 136). Pessoa e ateliê fictícios, ilustração.",
+  "createdAt": "2026-11-15T00:30:00.000Z"
+}
