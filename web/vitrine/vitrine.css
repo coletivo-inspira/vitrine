@@ -1663,6 +1663,14 @@ html:has(.selection-drawer[open]) {
   margin: 0;
 }
 
+.item-page-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
 .item-page-title {
   margin: 0;
   font-family: "Syne", sans-serif;
@@ -2831,4 +2839,50 @@ html[data-theme="dark"] .storefront-open-badge[data-state="open"]::before {
   .storefront-route-button {
     transition: none;
   }
+}
+
+/* Item "Em breve" (#133): selo, sem seleção, e "Avise-me pelo WhatsApp". */
+.sf-soon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 3px 9px;
+  border-radius: var(--radius-status);
+  background: var(--apricot);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sf-soon-badge::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.sf-soon-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sf-soon-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.sf-notify-button {
+  text-align: center;
+}
+
+.menu-item-card.is-soon .menu-item-photo {
+  opacity: 0.82;
 }

@@ -11,6 +11,11 @@ import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
 import { itemPageTexts, normalizeItemPageFields } from '../web/assets/item-page-fields.mjs';
 import {
+  ITEM_AVAILABILITY_LABEL_MAX,
+  ITEM_AVAILABILITY_VALUES,
+  NOTIFY_CLICK_METRIC
+} from '../web/assets/item-availability.mjs';
+import {
   UNRECORDED_SOURCE,
   normalizeMetricCampaign,
   normalizeMetricSource
@@ -158,7 +163,8 @@ export const CATALOG_IMAGES_BUCKET = 'catalog-images';
 export const MAX_CATALOG_IMAGE_BYTES = 262144;
 
 // Única lista de métricas no código; o banco espelha em private.site_metric_names()
-// e private.site_item_metric_names() (migração 20261116000200_metrics_source.sql).
+// e private.site_item_metric_names() (migrações 20261116000200_metrics_source.sql e
+// 20261116001200_metric_notify_click.sql).
 // Um novo nome entra aqui e numa migração que recria essas duas funções.
 export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'visit',
@@ -166,7 +172,8 @@ export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'item_select',
   'whatsapp_order',
   'route_click',
-  'qr_visit'
+  'qr_visit',
+  NOTIFY_CLICK_METRIC
 ]);
 // Métricas por item exigem itemId e não carregam origem.
 export const ITEM_METRIC_EVENT_TYPES = Object.freeze(['item_view', 'item_select']);
@@ -1341,6 +1348,27 @@ export function measureDraftBytes(content) {
 
 export const getDraftByteLength = measureDraftBytes;
 
+/** `availability` (`available`/`soon`) e o texto do selo "Em breve" (#133). */
+export function validateItemAvailability(item) {
+  if (item.availability !== undefined && item.availability !== null && !ITEM_AVAILABILITY_VALUES.includes(item.availability)) {
+    throw new PortalValidationError(
+      422,
+      'INVALID_ITEM_AVAILABILITY',
+      'A disponibilidade do item deve ser "Disponível" ou "Em breve".'
+    );
+  }
+  if (item.availabilityLabel !== undefined && item.availabilityLabel !== null) {
+    if (typeof item.availabilityLabel !== 'string' || item.availabilityLabel.replace(/\s+/g, ' ').trim().length > ITEM_AVAILABILITY_LABEL_MAX) {
+      throw new PortalValidationError(
+        422,
+        'INVALID_ITEM_AVAILABILITY',
+        `O texto do selo "Em breve" deve ter no máximo ${ITEM_AVAILABILITY_LABEL_MAX} caracteres.`
+      );
+    }
+    assertNoDangerousTextPayload(item.availabilityLabel, 422, 'INVALID_ITEM');
+  }
+}
+
 export function isItemActive(item) {
   if (!item || typeof item !== 'object') return false;
   return item.active !== false && item.available !== false;
@@ -1556,7 +1584,7 @@ export function validateDraftContent(content, options = {}) {
     const pageFields = validateItemPageFields(item);
 
     const prohibitedTerm = findProhibitedQuotaTerm(
-      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, ...itemPageTexts(pageFields)],
+      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, item.availabilityLabel, ...itemPageTexts(pageFields)],
       { quota: itemPriceMode === 'quota' }
     );
     if (prohibitedTerm) {
@@ -1588,6 +1616,8 @@ export function validateDraftContent(content, options = {}) {
       }
       assertNoDangerousTextPayload(item.tradeFor, 422, 'INVALID_ITEM');
     }
+
+    validateItemAvailability(item);
 
     if (item.name !== undefined) {
       if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 160) {

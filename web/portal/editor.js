@@ -22,6 +22,13 @@ import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from '
 import { renderItemPageFields } from './item-page-fields.mjs';
 import { itemPageTexts } from '../assets/item-page-fields.mjs';
 import {
+  DEFAULT_SOON_LABEL,
+  ITEM_AVAILABILITY_LABEL_MAX,
+  ITEM_VISIBILITY_STATES,
+  applyItemVisibilityState,
+  itemVisibilityState
+} from '../assets/item-availability.mjs';
+import {
   QUOTA_MAX_TOTAL,
   QUOTA_MIN_TOTAL,
   QUOTA_TEXT_MAX_LENGTH,
@@ -1659,7 +1666,8 @@ function renderItems() {
                   ? formatCentsToReais(item.priceCents)
                   : '';
       const sectionText = item.section ? `Seção: ${item.section}` : '';
-      const details = [priceText, sectionText, item.active !== false ? 'Visível' : 'Oculto'].filter(Boolean);
+      const visibility = ITEM_VISIBILITY_STATES.find((state) => state.value === itemVisibilityState(item));
+      const details = [priceText, sectionText, visibility.label].filter(Boolean);
       previewSub.textContent = details.join(' · ');
       previewInfo.appendChild(previewSub);
 
@@ -1790,6 +1798,8 @@ function renderItems() {
     termWarning.className = 'item-quota-term-warning item-fields-full';
     termWarning.setAttribute('role', 'status');
     fields.appendChild(termWarning);
+
+    renderItemVisibilityField(item, fields);
 
     // Selector: Tipo do item (Products & Quote)
     if (!isBooking) {
@@ -2229,27 +2239,6 @@ function renderItems() {
     const sep = document.createElement('div');
     sep.className = 'footer-divider';
 
-    // Visible switch
-    const activeLabel = document.createElement('label');
-    activeLabel.className = 'toggle-container-forms';
-
-    const activeCheckbox = document.createElement('input');
-    activeCheckbox.type = 'checkbox';
-    activeCheckbox.setAttribute('role', 'switch');
-    activeCheckbox.setAttribute('aria-checked', item.active !== false ? 'true' : 'false');
-    activeCheckbox.checked = item.active !== false;
-    activeCheckbox.addEventListener('change', () => {
-      item.active = activeCheckbox.checked;
-      activeCheckbox.setAttribute('aria-checked', item.active ? 'true' : 'false');
-      updateDraftAndPreview();
-    });
-
-    const activeLabelText = document.createElement('span');
-    activeLabelText.textContent = 'Visível na vitrine';
-
-    activeLabel.appendChild(activeCheckbox);
-    activeLabel.appendChild(activeLabelText);
-
     // Save and collapse card button
     const collapseBtn = document.createElement('button');
     collapseBtn.type = 'button';
@@ -2264,13 +2253,87 @@ function renderItems() {
     footerRight.appendChild(footerDupBtn);
     footerRight.appendChild(trashBtn);
     footerRight.appendChild(sep);
-    footerRight.appendChild(activeLabel);
     footerRight.appendChild(collapseBtn);
     footer.appendChild(footerRight);
 
     card.appendChild(footer);
     itemsContainer.appendChild(card);
   });
+}
+
+/**
+ * Controle único de visibilidade do item (#133, `PB-20`/`UX-66-012`): Disponível, Em
+ * breve ou Oculto. Grupo de rádios nativo (setas do teclado) e texto opcional do selo.
+ */
+function renderItemVisibilityField(item, fields) {
+  const group = document.createElement('fieldset');
+  group.className = 'form-group item-fields-full item-visibility';
+  const legend = document.createElement('legend');
+  legend.className = 'item-visibility-legend';
+  legend.textContent = 'Na vitrine';
+  group.appendChild(legend);
+
+  const options = document.createElement('div');
+  options.className = 'item-visibility-options';
+  const hint = document.createElement('p');
+  hint.className = 'item-visibility-hint';
+  hint.id = `item-visibility-hint-${item.id}`;
+  hint.setAttribute('aria-live', 'polite');
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'item-visibility-label-field';
+  const labelFor = `item-soon-label-${item.id}`;
+  const lLabel = document.createElement('label');
+  lLabel.setAttribute('for', labelFor);
+  lLabel.textContent = `Texto do selo (opcional, até ${ITEM_AVAILABILITY_LABEL_MAX} caracteres)`;
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.id = labelFor;
+  labelInput.className = 'item-input input-styled-height';
+  labelInput.maxLength = ITEM_AVAILABILITY_LABEL_MAX;
+  labelInput.placeholder = `${DEFAULT_SOON_LABEL} (ex.: Próxima turma em março)`;
+  labelInput.value = item.availabilityLabel || '';
+  labelInput.addEventListener('input', () => {
+    if (labelInput.value.trim()) item.availabilityLabel = labelInput.value;
+    else delete item.availabilityLabel;
+    updateDraftAndPreview();
+  });
+  labelGroup.appendChild(lLabel);
+  labelGroup.appendChild(labelInput);
+
+  const sync = (state) => {
+    hint.textContent = ITEM_VISIBILITY_STATES.find((entry) => entry.value === state).hint;
+    labelGroup.hidden = state !== 'soon';
+  };
+
+  const current = itemVisibilityState(item);
+  for (const state of ITEM_VISIBILITY_STATES) {
+    const optionLabel = document.createElement('label');
+    optionLabel.className = 'item-visibility-option';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = `item-visibility-${item.id}`;
+    radio.value = state.value;
+    radio.checked = state.value === current;
+    radio.setAttribute('aria-describedby', hint.id);
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      applyItemVisibilityState(item, state.value);
+      sync(state.value);
+      updateDraftAndPreview();
+    });
+    const text = document.createElement('span');
+    text.textContent = state.label;
+    optionLabel.appendChild(radio);
+    optionLabel.appendChild(text);
+    options.appendChild(optionLabel);
+  }
+
+  group.appendChild(options);
+  group.appendChild(hint);
+  group.appendChild(labelGroup);
+  sync(current);
+  fields.appendChild(group);
 }
 
 function canvasToWebpBlob(canvas, quality) {
