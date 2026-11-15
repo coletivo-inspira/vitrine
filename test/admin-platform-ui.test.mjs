@@ -30,7 +30,7 @@ test('Administração: abas acessíveis no lugar dos <details>', () => {
   assert.match(adminHtml, /role="tablist"/);
   assert.match(adminHtml, /class="display-title"/);
   const tabs = [...adminHtml.matchAll(/<button\b[^>]*role="tab"[^>]*>([^<]+)<\/button>/g)];
-  assert.deepEqual(tabs.map(([, label]) => label), ['Visão geral', 'Pedidos pela Mila', 'Importar do Linktree', 'Modelos de vitrine', 'Site institucional']);
+  assert.deepEqual(tabs.map(([, label]) => label), ['Visão geral', 'Pedidos pela Mila', 'Importar do Linktree', 'Patrocinadores', 'Modelos de vitrine', 'Site institucional']);
   for (const [tag] of tabs) {
     const panelId = tag.match(/aria-controls="([^"]+)"/)[1];
     const tabId = tag.match(/id="([^"]+)"/)[1];
