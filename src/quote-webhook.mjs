@@ -354,13 +354,15 @@ export function validateLeadPayload(parsed, menu) {
  * aleatório do próprio isolate: nem o IP em claro fica guardado, e nada vai para o banco.
  */
 export function createLeadRateLimiter({ limit, windowMs, maxKeys } = LEAD_RATE_LIMIT, now = () => Date.now()) {
-  const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+  // O Workers proíbe gerar aleatórios no escopo global: o sal nasce na primeira requisição.
+  let salt = null;
   const buckets = new Map();
   return {
     get size() {
       return buckets.size;
     },
     async take(address, slug) {
+      salt ??= toHex(crypto.getRandomValues(new Uint8Array(16)));
       const digest = await crypto.subtle.digest('SHA-256', utf8.encode(`${salt}|${address}|${slug}`));
       const key = toHex(digest);
       const at = now();
@@ -383,7 +385,12 @@ export function createLeadRateLimiter({ limit, windowMs, maxKeys } = LEAD_RATE_L
   };
 }
 
-const sharedRateLimiter = createLeadRateLimiter();
+let sharedRateLimiter = null;
+
+function defaultRateLimiter() {
+  sharedRateLimiter ??= createLeadRateLimiter();
+  return sharedRateLimiter;
+}
 
 function presentLastDelivery(raw) {
   if (!raw || typeof raw !== 'object' || !raw.at) return null;
@@ -497,7 +504,7 @@ async function readLeadBody(request) {
  */
 export async function handleLeadRequest({
   request, url, slug, store, env = {}, ctx = {}, respond, guardMutation, loadPublication,
-  fetch: fetchImpl, rateLimiter = sharedRateLimiter, now = () => Date.now()
+  fetch: fetchImpl, rateLimiter = defaultRateLimiter(), now = () => Date.now()
 }) {
   if (request.method !== 'POST') {
     throw new PortalValidationError(405, 'METHOD_NOT_ALLOWED', 'Use POST para enviar o pré-orçamento.');
