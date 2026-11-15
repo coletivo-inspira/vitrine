@@ -23,7 +23,7 @@ test('Perfil sai do menu inferior e da barra lateral', () => {
   assert.doesNotMatch(bottomNav, /data-section="perfil"|href="#perfil"/);
   assert.doesNotMatch(sidebar, /data-section="perfil"|href="#perfil"/);
   const labels = [...bottomNav.matchAll(/<span>([^<]+)<\/span>/g)].map(([, label]) => label);
-  assert.deepEqual(labels, ['Início', 'Vitrines', 'Insights', 'Pedidos', 'Admin']);
+  assert.deepEqual(labels, ['Início', 'Vitrines', 'Insights', 'Pedidos', 'Impacto', 'Admin']);
 });
 
 test('Perfil fica no topo, imediatamente antes do Sair', () => {
