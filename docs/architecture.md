@@ -133,6 +133,14 @@ desconhecido vira `outro`, campanha com e-mail ou seis dígitos seguidos é desc
 Rota e QR aparecem em todos os planos; visitas e funil por origem só saem do Worker com
 `conversion_reports` (`src/insights-by-origin.mjs`).
 
+## Modelo "Serviços e produtos" (issue #136)
+
+`servicos-produtos-v1` (migração `20261116001800_template_servicos_produtos.sql`) é uma
+receita de sete seções na página inicial mais a página "Para empresas" desligada.
+Páginas de modelo ficam em `public.templates.default_pages` e são herdadas por
+`resolveShowcaseManifest` como as seções; o rascunho só guarda o que mudou. Receita e
+decisões em `docs/modelo-servicos-e-produtos.md`.
+
 ## Pré-orçamento com webhook assinado (issue #121)
 
 `src/quote-webhook.mjs`, `web/assets/quote-lead.mjs`, `web/portal/quote-webhook.mjs` e a

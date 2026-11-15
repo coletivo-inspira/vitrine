@@ -21,7 +21,8 @@ const TEMPLATE_SWATCHES = {
   'pizzeria-v1': '#C74414',
   'products-v1': '#133824',
   'booking-v1': '#2E5E4E',
-  'quote-v1': '#8C5A32'
+  'quote-v1': '#8C5A32',
+  'servicos-produtos-v1': '#9C4221'
 };
 
 let uidCounter = 0;
@@ -733,6 +734,7 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
         if (item.code === 'booking-v1') dot.classList.add('swatch-forest');
         else if (item.code === 'quote-v1') dot.classList.add('swatch-earth');
         else if (item.code === 'products-v1') dot.classList.add('swatch-deep');
+        else if (item.code === 'servicos-produtos-v1') dot.classList.add('swatch-clay');
         thumb.appendChild(dot);
 
         const labelStrong = el(doc, 'strong', 'structure-model-name', item.name);

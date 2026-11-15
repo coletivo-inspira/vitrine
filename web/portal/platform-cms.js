@@ -724,7 +724,7 @@ async function templateRequest(payload) {
 
 function showSelectedTemplate(creating = false) {
   const template = availableTemplates.find(entry => entry.code === templateSelect.value);
-  templateCopy.hidden = !template || !['pizzeria-v1', 'products-v1', 'booking-v1', 'quote-v1'].includes(template.code);
+  templateCopy.hidden = !template || !['pizzeria-v1', 'products-v1', 'booking-v1', 'quote-v1', 'servicos-produtos-v1'].includes(template.code);
   if (!template) {
     templateFields.replaceChildren();
     return;

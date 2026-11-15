@@ -4904,6 +4904,10 @@ textarea {
   background: #133824;
 }
 
+.structure-model-swatch-dot.swatch-clay {
+  background: #9C4221;
+}
+
 .structure-model-name {
   font-weight: 700;
   line-height: 1.25;

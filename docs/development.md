@@ -30,11 +30,10 @@ Referência: [GitHub Spec Kit](https://github.com/github/spec-kit).
 ## Orçamento da vitrine pública
 
 `test/storefront-budget.test.mjs` roda em `npm test`. Ele publica as vitrines de
-exemplo (todo arquivo de `content/vitrines/`, hoje `pizzeria-v1`; uma `quote-v1`
-simples e outra com seções) e confere o HTML estático do build, o HTML do Worker,
-a prévia sem JS e as três etapas desenhadas por `StorefrontRenderer`.
-`servicos-produtos-v1` entra sozinho quando houver exemplo em `content/vitrines/`
-ou o modelo estiver em `ALLOWED_TEMPLATES`. A página do item entra quando o motor
+exemplo (todo arquivo de `content/vitrines/`: `pizzeria-v1` e o Ateliê Barro Claro
+de `servicos-produtos-v1`; uma `quote-v1` simples e outra com seções) e confere o
+HTML estático do build, o HTML do Worker, a prévia sem JS e as três etapas
+desenhadas por `StorefrontRenderer`. A página do item entra quando o motor
 exportar `renderStorefrontItemHtml(menu, itemId)`.
 
 | Regra | Limite |
@@ -60,4 +59,7 @@ em 5 rodadas, elemento a foto; com o cabeçalho novo da vitrine (#128), 2,39 s
 (`/loja1`: 1,86 s). Com foto no hero, a página não pré-carrega as
 fontes (elas chegam pelo `@font-face` com `font-display: swap`) e o painel
 comprime a foto do hero para até 100 KB; com as fontes pré-carregadas a mesma
-página ficava em 3,6 s, e com a foto de 197 KB em 5,2 s.
+página ficava em 3,6 s, e com a foto de 197 KB em 5,2 s. Em 2026-11-15, o exemplo
+`servicos-produtos-v1` (issue #136, foto WebP de 53 KB no hero, página "Para
+empresas" ligada), servido do `dist` no `npm run preview`: mediana 2,06 s em 5
+rodadas, elemento a foto; `/loja1` na mesma máquina: 2,35 s (`p#storefront-subtitle`).

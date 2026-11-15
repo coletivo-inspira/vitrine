@@ -1048,13 +1048,15 @@ export function renderStorefrontHeader(menu, structure = null) {
 const HERO_IMAGE_WIDTH = 800;
 const HERO_IMAGE_HEIGHT = 1000;
 
-function heroWhatsappHref(menu) {
+function whatsappConversationHref(menu, text) {
   const phone = String(menu.whatsapp ?? '').replace(/\D/g, '');
   if (!phone) return '';
-  const message = withMilaRelayPrefix(
-    `Olá! Vi a vitrine ${menu.name} e gostaria de conversar.`, menu.orderRelay, menu.name
-  );
+  const message = withMilaRelayPrefix(text, menu.orderRelay, menu.name);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+function heroWhatsappHref(menu) {
+  return whatsappConversationHref(menu, `Olá! Vi a vitrine ${menu.name} e gostaria de conversar.`);
 }
 
 export function resolveHeroActionHref(target, menu, { hasCatalog = true } = {}) {
@@ -1124,12 +1126,42 @@ function renderTestimonials(config, id) {
     </section>`;
 }
 
+// Hero fora da abertura: chamada com título de seção e até duas ações (ex.: chamada final).
+function renderSectionHero(menu, config, id, options) {
+  if (!config.headline) return '';
+  const actions = renderHeroAction(config.primaryAction, 'storefront-hero-primary', menu, options) +
+    renderHeroAction(config.secondaryAction, 'storefront-hero-secondary', menu, options);
+  return `<section id="${escapeHtml(id)}" class="storefront-module${actions ? ' storefront-cta' : ''}">
+      <h2>${escapeHtml(config.headline)}</h2>${config.subtitle ? `
+      <p>${escapeHtml(config.subtitle)}</p>` : ''}${actions ? `
+      <div class="storefront-hero-actions">${actions}</div>` : ''}
+    </section>`;
+}
+
+// Pedido de orçamento numa página secundária ("Para empresas"): a grade de itens já
+// apareceu na home, então a seção vira uma chamada para conversar sobre o orçamento.
+function renderQuoteRequestCta(menu, id, page, { hasCatalog }) {
+  const audience = page.slug === 'home' ? '' : ` (${page.title})`;
+  const href = whatsappConversationHref(menu,
+    `Olá! Vi a vitrine ${menu.name}${audience} e gostaria de pedir um orçamento.`);
+  if (!href) return '';
+  const headingId = `${id}-titulo`;
+  return `<section id="${escapeHtml(id)}" class="storefront-quote-cta" aria-labelledby="${escapeHtml(headingId)}">
+      <h3 id="${escapeHtml(headingId)}">Pedir um orçamento</h3>
+      <p>Conte o que precisa, a quantidade e o prazo. A conversa continua pelo WhatsApp.</p>
+      <div class="storefront-hero-actions">
+        <a class="storefront-hero-primary" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Pedir orçamento pelo WhatsApp</a>${hasCatalog ? `
+        <a class="storefront-hero-secondary" href="#storefront-catalog">Escolher itens da vitrine</a>` : ''}
+      </div>
+    </section>`;
+}
+
 function renderCategoryNavigation(chipsHtml) {
   return `<nav id="category-nav" class="category-chips" aria-label="Categorias da vitrine">${chipsHtml}</nav>`;
 }
 
 function renderStorefrontCatalog({ chipsHtml, sectionsHtml }, id = '', columns) {
-  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} aria-label="Catálogo da vitrine">
+  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} aria-label="Itens da vitrine">
       ${renderCategoryNavigation(chipsHtml)}
       <div id="storefront-catalog" class="storefront-catalog"${columns ? ` data-columns="${columns}"` : ''}>
         ${sectionsHtml}
@@ -1145,7 +1177,9 @@ function renderPublicSections(pages, menu, catalog, placeHtml = '') {
     const blocks = page.sections.map(({ id, moduleCode, config }) => {
       const section = content => content ? `<section id="${escapeHtml(id)}" class="storefront-module">${content}</section>` : '';
       if (catalogModules.has(moduleCode)) {
-        if (catalogRendered) return '';
+        if (catalogRendered) {
+          return moduleCode === 'quote_request' ? renderQuoteRequestCta(menu, id, page, { hasCatalog }) : '';
+        }
         catalogRendered = true;
         return renderStorefrontCatalog(catalog, id, config.columns);
       }
@@ -1170,8 +1204,7 @@ function renderPublicSections(pages, menu, catalog, placeHtml = '') {
             mainHeroRendered = true;
             return renderStorefrontHero(menu, config, id, '', { hasCatalog }) + placeHtml;
           }
-          return section(config.headline
-            ? `<h2>${escapeHtml(config.headline)}</h2><p>${escapeHtml(config.subtitle ?? '')}</p>` : '');
+          return renderSectionHero(menu, config, id, { hasCatalog });
         default:
           return '';
       }

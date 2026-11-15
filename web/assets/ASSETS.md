@@ -31,6 +31,9 @@
 - pizza-demo-hero.webp: pizza-demo.webp passada pelo mesmo caminho do painel
   para a foto do hero (lado maior de 800 px, WebP qualidade 0,82, 97,5 KB).
   Usada na vitrine de exemplo com foto no hero (issue 131); detalhes no sidecar.
+- atelie-exemplo-hero.webp: foto gerada pelo ImageGen em 2026-11-15 para um ateliê
+  fictício (pessoa fictícia), 800×1000, WebP de 53 KB. Foto do hero da vitrine de
+  exemplo do modelo "Serviços e produtos" (issue 136); prompt no sidecar.
 - highlight-icons.mjs: ícones de traço 24×24 desenhados para o módulo Destaques
   (lista fechada), sem arquivo externo nem fonte de ícones.
 

@@ -154,7 +154,8 @@ function auditStorefrontHtml(html, { fragment = false } = {}) {
     }
   }
   const interfaceText = `${textOf(body)} ${announced.join(' ')}`;
-  const englishPattern = new RegExp(`\\b(${STOREFRONT_BUDGET.englishTerms.join('|')})\\b`, 'gi');
+  // `\b` do JavaScript trata letras acentuadas como fronteira ("cartão" casaria "cart").
+  const englishPattern = new RegExp(`(?<![\\p{L}\\p{N}_])(${STOREFRONT_BUDGET.englishTerms.join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
   const found = new Set([...interfaceText.matchAll(englishPattern)].map((match) => match[1]));
   for (const term of found) violations.push(`texto de interface em inglês: "${term}"`);
 

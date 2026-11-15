@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "template": "servicos-produtos-v1",
+  "storefrontType": "art",
+  "catalogType": "products",
+  "slug": "atelie-barro-claro",
+  "businessName": "Ateliê Barro Claro",
+  "whatsapp": "5511999999999",
+  "orderFields": {
+    "date": false,
+    "timeSlots": [],
+    "deliveryOrPickup": false,
+    "customerName": true,
+    "notes": true
+  },
+  "messages": {
+    "heroTitle": "Ateliê Barro Claro",
+    "welcomeText": "Vitrine de exemplo do modelo Serviços e produtos: ateliê, pessoas, valores e depoimentos são fictícios.",
+    "ctaLabel": "Enviar pelo WhatsApp",
+    "whatsappTemplate": "Olá! Meu nome é {nome}. Tenho interesse em:\n{itens}\nTotal estimado: {total}"
+  },
+  "categories": [
+    {
+      "id": "aulas",
+      "name": "Aulas e cursos",
+      "items": [
+        {
+          "id": "aula-experimental",
+          "name": "Aula experimental de torno",
+          "description": "Exemplo fictício: 2 horas no torno com argila e queima inclusas. Turmas de até 4 pessoas.",
+          "priceCents": 12000,
+          "active": true
+        },
+        {
+          "id": "curso-quatro-encontros",
+          "name": "Curso de cerâmica em 4 encontros",
+          "description": "Exemplo fictício: do preparo da argila ao esmalte, um encontro por semana aos sábados.",
+          "priceCents": 42000,
+          "active": true
+        },
+        {
+          "id": "mentoria-atelie",
+          "name": "Mentoria para abrir o seu ateliê",
+          "description": "Exemplo fictício: 3 conversas online sobre forno, preço das peças e organização das turmas.",
+          "priceCents": 36000,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "pecas",
+      "name": "Peças do ateliê",
+      "items": [
+        {
+          "id": "caneca-torneada",
+          "name": "Caneca torneada",
+          "description": "Exemplo fictício: 300 ml, esmalte areia, pode ir ao micro-ondas.",
+          "priceCents": 8500,
+          "active": true
+        },
+        {
+          "id": "tigela-servir",
+          "name": "Tigela de servir",
+          "description": "Exemplo fictício: 22 cm de diâmetro, esmalte terracota fosco.",
+          "priceCents": 14000,
+          "active": true
+        },
+        {
+          "id": "jogo-pratos",
+          "name": "Jogo de 4 pratos rasos",
+          "description": "Exemplo fictício: feitos sob encomenda, prazo de 30 dias.",
+          "priceCents": 32000,
+          "active": true
+        },
+        {
+          "id": "peca-em-teste",
+          "name": "Vaso em teste de esmalte (oculto)",
+          "description": "Item oculto de exemplo: não aparece na vitrine publicada.",
+          "priceCents": 9000,
+          "active": false
+        }
+      ]
+    }
+  ],
+  "structure": {
+    "templateCode": "servicos-produtos-v1",
+    "themeOverrides": { "accentColor": "#9C4221", "fontPair": "editorial-syne", "buttonStyle": "rounded" },
+    "navigationMenus": {
+      "header": [
+        { "label": "Aulas e peças", "href": "#sec-itens" },
+        { "label": "Sobre", "href": "#sec-sobre" },
+        { "label": "Para empresas", "href": "#pagina-empresas" }
+      ],
+      "footer": [
+        { "label": "Perguntas frequentes", "href": "#sec-perguntas" },
+        { "label": "Para empresas", "href": "#pagina-empresas" }
+      ]
+    },
+    "pages": [
+      {
+        "slug": "home",
+        "title": "Início",
+        "sections": [
+          {
+            "id": "sec-abertura",
+            "moduleCode": "hero",
+            "config": {
+              "eyebrow": "Cerâmica feita à mão",
+              "headline": "Aulas de torno e peças para usar todo dia",
+              "subtitle": "Vitrine de exemplo: um ateliê fictício que ensina cerâmica em turmas pequenas e vende as peças que saem do forno.",
+              "imageUrl": "/assets/atelie-exemplo-hero.webp",
+              "imageAlt": "Ceramista de avental sorrindo enquanto modela uma tigela no torno, com prateleiras de canecas ao fundo",
+              "primaryAction": { "label": "Ver aulas e peças", "target": "selecao" },
+              "secondaryAction": { "label": "Conversar no WhatsApp", "target": "whatsapp" }
+            }
+          },
+          {
+            "id": "sec-destaques",
+            "moduleCode": "highlights",
+            "config": {
+              "items": [
+                { "icon": "pessoas", "text": "Turmas de até 4 pessoas" },
+                { "icon": "calendario", "text": "Aulas aos sábados, manhã e tarde" },
+                { "icon": "garantia", "text": "Remarcação gratuita com 48 horas" },
+                { "icon": "mensagem", "text": "Atendimento direto pelo WhatsApp" }
+              ]
+            }
+          },
+          { "id": "sec-itens", "moduleCode": "catalog_grid", "config": { "columns": 2 } },
+          {
+            "id": "sec-sobre",
+            "moduleCode": "about_story",
+            "config": {
+              "bio": "Exemplo fictício: o ateliê começou numa garagem em 2016 e hoje recebe turmas pequenas para quem nunca tocou em argila. Cada peça à venda passou pelo mesmo forno das aulas."
+            }
+          },
+          {
+            "id": "sec-depoimentos",
+            "moduleCode": "testimonials",
+            "config": {
+              "items": [
+                { "name": "Pessoa fictícia 1", "quote": "Saí da aula experimental com uma tigela torta e muita vontade de voltar.", "context": "Aula experimental de torno", "consent": true },
+                { "name": "Pessoa fictícia 2", "quote": "As canecas chegaram bem embaladas e são as preferidas aqui de casa.", "context": "Caneca torneada", "consent": true }
+              ]
+            }
+          },
+          {
+            "id": "sec-perguntas",
+            "moduleCode": "faq",
+            "config": {
+              "items": [
+                { "q": "Quais são as formas de pagamento?", "a": "Exemplo fictício: Pix ou cartão no dia da aula. As peças são pagas na retirada." },
+                { "q": "É online ou presencial?", "a": "Exemplo fictício: as aulas são presenciais no ateliê; a mentoria é online." },
+                { "q": "E se eu precisar remarcar?", "a": "Exemplo fictício: avise com 48 horas e a aula muda de data sem custo." }
+              ]
+            }
+          },
+          {
+            "id": "sec-chamada-final",
+            "moduleCode": "hero",
+            "config": {
+              "headline": "Vamos marcar a sua primeira aula?",
+              "subtitle": "Conte o melhor dia e quantas pessoas vêm com você.",
+              "primaryAction": { "label": "Conversar no WhatsApp", "target": "whatsapp" }
+            }
+          }
+        ]
+      },
+      {
+        "slug": "empresas",
+        "title": "Para empresas",
+        "active": true,
+        "sections": [
+          {
+            "id": "sec-empresas-abertura",
+            "moduleCode": "hero",
+            "config": {
+              "headline": "Oficinas de cerâmica para equipes",
+              "subtitle": "Exemplo fictício: encontros de 3 horas no ateliê ou na empresa, para grupos de 6 a 20 pessoas, e brindes feitos sob encomenda."
+            }
+          },
+          { "id": "sec-empresas-orcamento", "moduleCode": "quote_request", "config": { "allowNotes": true } },
+          {
+            "id": "sec-empresas-perguntas",
+            "moduleCode": "faq",
+            "config": {
+              "title": "Perguntas de empresas",
+              "items": [
+                { "q": "Você emite nota fiscal?", "a": "Exemplo fictício: sim, para oficinas e encomendas acima de 10 peças." },
+                { "q": "Em quanto tempo chega o orçamento?", "a": "Exemplo fictício: em até 2 dias úteis, com data, local e número de pessoas." }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

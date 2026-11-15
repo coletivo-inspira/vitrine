@@ -1059,7 +1059,8 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
       'pizzeria-v1',
       'products-v1',
       'booking-v1',
-      'quote-v1'
+      'quote-v1',
+      'servicos-produtos-v1'
     ]);
     assert.deepEqual(ALLOWED_STOREFRONT_TYPES, ['food', 'art', 'photo', 'health', 'tech']);
     assert.deepEqual(ALLOWED_CATALOG_TYPES, ['products', 'booking', 'quote']);

@@ -2229,6 +2229,54 @@ html:has(.selection-drawer[open]) {
   border-block-start: 1px solid var(--line);
 }
 
+/* Chamada final (hero fora da abertura) e pedido de orçamento da página "Para empresas". */
+.storefront-cta,
+.storefront-quote-cta {
+  padding: 24px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background-color: var(--apricot);
+}
+
+.storefront-cta h2 {
+  margin: 0 0 8px;
+  max-width: 28ch;
+  font-family: "Syne", sans-serif;
+  font-size: clamp(1.4rem, 3.4vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+
+.storefront-cta p,
+.storefront-quote-cta p {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--ink-soft);
+}
+
+.storefront-cta .storefront-hero-actions,
+.storefront-quote-cta .storefront-hero-actions {
+  margin-top: 20px;
+}
+
+.storefront-quote-cta {
+  margin-block: 1.5rem;
+}
+
+.storefront-quote-cta h3 {
+  margin: 0 0 8px;
+  font-family: "Syne", sans-serif;
+  font-size: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .storefront-cta,
+  .storefront-quote-cta {
+    padding: 32px;
+  }
+}
+
 /* Depoimentos: cartões em grade, sem carrossel. */
 .storefront-testimonials-list {
   display: grid;
