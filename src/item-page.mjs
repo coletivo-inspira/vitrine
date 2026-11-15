@@ -13,6 +13,7 @@ import {
   normalizeItemPageFields,
   splitParagraphs
 } from '../web/assets/item-page-fields.mjs';
+import { NOTIFY_BUTTON_LABEL, buildNotifyHref, isItemSoon, soonBadgeText } from '../web/assets/item-availability.mjs';
 
 /** ADR 0009: o snapshot publicado tem no máximo 256 KiB. */
 export const MAX_PUBLIC_MANIFEST_BYTES = 256 * 1024;
@@ -221,9 +222,21 @@ function renderDetails(menu, item) {
 /**
  * Ponto de extensão da área de seleção. Sem JavaScript fica o link do WhatsApp; com
  * JavaScript, `vitrine.js` desenha aqui o mesmo controle do cartão. O item "Em breve"
- * (#133) troca este conteúdo.
+ * (#133) não tem seleção: só o "Avise-me pelo WhatsApp".
  */
 function renderSelectArea(menu, item) {
+  if (isItemSoon(item)) {
+    const href = buildNotifyHref(menu, item);
+    const link = href
+      ? `<a class="whatsapp-order-button sf-notify-button" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-notify-item="${escapeHtml(item.id)}">${NOTIFY_BUTTON_LABEL}</a>`
+      : '';
+    return `<div id="storefront-catalog" class="item-page-select" data-item-select>
+          <div class="sf-soon-footer">
+            <p class="sf-soon-note">Ainda não dá para escolher este item. Peça para ser avisado(a) quando estiver disponível.</p>
+            ${link}
+          </div>
+        </div>`;
+  }
   let fallback = '';
   try {
     fallback = `<a class="whatsapp-order-button" href="${escapeHtml(whatsappLink(menu, item.id))}" target="_blank" rel="noopener noreferrer">Pedir no WhatsApp</a>`;
@@ -267,6 +280,7 @@ function renderItemFaq(faq) {
 }
 
 function relatedPriceText(menu, item) {
+  if (isItemSoon(item)) return soonBadgeText(item);
   const mode = priceMode(menu, item);
   if (mode !== 'fixed') return MODE_LABELS[mode];
   if (menu.components?.price === false || (menu.catalogType === 'quote' && !(item.priceCents > 0))) return '';
@@ -321,7 +335,7 @@ export function renderItemPageDocument(storefrontHtml, menu, itemRef, { basePath
     <article class="item-page${gallery ? ' has-gallery' : ''}" data-item-id="${escapeHtml(item.id)}">
       ${gallery}
       <div class="item-page-summary">
-        ${mode !== 'fixed' ? `<p class="sf-mode-badge sf-mode-${mode} item-page-mode">${MODE_LABELS[mode]}</p>` : ''}
+        ${mode !== 'fixed' || isItemSoon(item) ? `<p class="item-page-badges">${mode !== 'fixed' ? `<span class="sf-mode-badge sf-mode-${mode} item-page-mode">${MODE_LABELS[mode]}</span>` : ''}${isItemSoon(item) ? `<span class="sf-soon-badge">${escapeHtml(soonBadgeText(item))}</span>` : ''}</p>` : ''}
         <h1 class="item-page-title">${escapeHtml(item.name)}</h1>
         ${renderPriceLine(menu, item, mode)}
         ${lead}

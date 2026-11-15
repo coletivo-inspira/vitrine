@@ -667,7 +667,7 @@ export function createMemoryQuoteWebhooks({ sites, now = () => new Date() }) {
   };
 }
 
-/** Adaptador PostgREST para a migração 20261116001000_quote_webhooks.sql. */
+/** Adaptador PostgREST para a migração 20261116001600_quote_webhooks.sql. */
 export function createRestQuoteWebhooks({ baseUrl, fetchImpl, authHeaders }) {
   function serviceHeaders(env) {
     const key = env?.SUPABASE_SERVICE_ROLE_KEY;

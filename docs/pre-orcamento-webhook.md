@@ -209,7 +209,7 @@ ambiente invalida todos os segredos; cada dono gera um novo.
   aleatório de pelo menos 32 caracteres (por exemplo `openssl rand -hex 32`). Sem ela,
   "Gerar segredo" e "Enviar teste" respondem `503` e a rota pública responde `404`.
 - `SUPABASE_SERVICE_ROLE_KEY` já é usado por outras rotas e também serve aqui.
-- Migração `20261116001000_quote_webhooks.sql` (aplicada pelo workflow de deploy).
+- Migração `20261116001600_quote_webhooks.sql` (aplicada pelo workflow de deploy).
 
 ## Rotas
 

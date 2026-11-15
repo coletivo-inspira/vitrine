@@ -66,6 +66,43 @@ export function subscriptionNotice(sub, now = new Date()) {
   return null;
 }
 
+const OPEN_STATUSES = new Set(['active', 'past_due', 'grace']);
+
+// Situação mostrada na tela "Plano e cobrança" (issue #115), com a mesma regra de datas
+// de private.site_entitlements: `state` em none, pending, active, grace, suspended ou
+// canceled, e `effectivePlanCode` é o plano que vale agora.
+export function subscriptionSummary(sub, now = new Date()) {
+  const at = toTime(now);
+  const status = sub?.status ?? null;
+  const planCode = sub?.plan_code ?? sub?.planCode ?? null;
+  const periodEnd = toTime(sub?.current_period_end ?? sub?.currentPeriodEnd);
+  const until = graceUntilTime(sub);
+  const iso = (time) => (time === null ? null : new Date(time).toISOString());
+  const base = {
+    planCode,
+    status,
+    provider: sub?.provider ?? null,
+    currentPeriodEnd: iso(periodEnd),
+    graceUntil: null,
+    accessUntil: null
+  };
+  if (!sub || !status) return { ...base, state: 'none', effectivePlanCode: 'free' };
+  if (status === 'pending') return { ...base, state: 'pending', effectivePlanCode: 'free' };
+  if (status === 'canceled') {
+    const valid = periodEnd !== null && periodEnd > at;
+    return { ...base, state: 'canceled', accessUntil: valid ? iso(periodEnd) : null, effectivePlanCode: valid ? planCode : 'free' };
+  }
+  const late = OPEN_STATUSES.has(status) && periodEnd !== null && periodEnd <= at;
+  if (status === 'suspended' || ((late || status !== 'active') && until !== null && until <= at)) {
+    return { ...base, state: 'suspended', graceUntil: iso(until), effectivePlanCode: 'free' };
+  }
+  if (late || status === 'past_due' || status === 'grace') {
+    return { ...base, state: 'grace', graceUntil: iso(until), effectivePlanCode: planCode };
+  }
+  if (status === 'active') return { ...base, state: 'active', effectivePlanCode: planCode };
+  return { ...base, state: 'none', effectivePlanCode: 'free' };
+}
+
 // O aviso mais grave entre as organizações da pessoa (a suspensão antes da tolerância,
 // e entre iguais o prazo mais curto).
 export function pickSubscriptionNotice(rows, now = new Date()) {

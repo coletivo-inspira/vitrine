@@ -123,6 +123,9 @@ export function renderInsightsOrigin(container, insights, doc = globalThis.docum
   const reachRow = el(doc, 'div', 'origin-reach');
   reachRow.append(reachPill(doc, 'Visitas pelo QR Code', reach.qrVisits ?? 0, reach.previousQrVisits ?? 0));
   reachRow.append(reachPill(doc, 'Cliques em "Traçar rota"', reach.routeClicks ?? 0, reach.previousRouteClicks ?? 0));
+  if ((reach.notifyClicks ?? 0) > 0 || (reach.previousNotifyClicks ?? 0) > 0) {
+    reachRow.append(reachPill(doc, 'Cliques em "Avise-me"', reach.notifyClicks ?? 0, reach.previousNotifyClicks ?? 0));
+  }
   container.append(reachRow);
 
   const body = el(doc, 'div', 'origin-body');

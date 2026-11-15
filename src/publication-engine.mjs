@@ -35,6 +35,15 @@ import {
 } from './item-page.mjs';
 import { assignItemSlugs, hasItemPageContent, itemPagePath } from '../web/assets/item-page-fields.mjs';
 import {
+  ITEM_AVAILABILITY_LABEL_MAX,
+  ITEM_AVAILABILITY_SOON,
+  NOTIFY_BUTTON_LABEL,
+  buildNotifyHref,
+  isItemSoon,
+  normalizeAvailabilityLabel,
+  soonBadgeText
+} from '../web/assets/item-availability.mjs';
+import {
   DEFAULT_TEMPLATE,
   PortalValidationError,
   isItemActive,
@@ -143,7 +152,9 @@ const ALLOWED_ITEM_KEYS = new Set([
   'details',
   'longDescription',
   'faq',
-  'gallery'
+  'gallery',
+  'availability',
+  'availabilityLabel'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -236,6 +247,28 @@ function deepFreeze(obj) {
     }
   }
   return obj;
+}
+
+// Só "Em breve" vai ao snapshot; "Disponível" é o padrão e "Oculto" nem publica o item.
+function assertPublicItemAvailability(item) {
+  if (item.availability === undefined) {
+    if (item.availabilityLabel !== undefined) {
+      throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Texto do selo sem o estado "Em breve".');
+    }
+    return;
+  }
+  if (item.availability !== ITEM_AVAILABILITY_SOON) {
+    throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Disponibilidade pública inválida.');
+  }
+  if (
+    item.availabilityLabel !== undefined &&
+    (typeof item.availabilityLabel !== 'string' ||
+      !item.availabilityLabel ||
+      item.availabilityLabel !== normalizeAvailabilityLabel(item.availabilityLabel) ||
+      item.availabilityLabel.length > ITEM_AVAILABILITY_LABEL_MAX)
+  ) {
+    throw new PortalValidationError(422, 'PRIVATE_FIELD_LEAKAGE', 'Texto do selo "Em breve" inválido.');
+  }
 }
 
 export function assertNoPrivateLeakage(menuArtifact) {
@@ -377,6 +410,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
       }
     }
     assertPublicItemPageFields(item);
+    assertPublicItemAvailability(item);
   }
 
   for (const category of menuArtifact.categories ?? []) {
@@ -399,6 +433,7 @@ export function assertNoPrivateLeakage(menuArtifact) {
           );
         }
       }
+      assertPublicItemAvailability(item);
     }
   }
 }
@@ -561,6 +596,11 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
         ) {
           extras.durationMinutes = rawItem.durationMinutes;
         }
+        if (isItemSoon(rawItem)) {
+          extras.availability = ITEM_AVAILABILITY_SOON;
+          const label = normalizeAvailabilityLabel(rawItem.availabilityLabel);
+          if (label) extras.availabilityLabel = label;
+        }
         extras.pageFields = projectItemPageFields(rawItem);
         rawItemExtrasById.set(itemId, extras);
       }
@@ -600,6 +640,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
       ...(extras.bidIncrementCents !== undefined ? { bidIncrementCents: extras.bidIncrementCents } : {}),
       ...(extras.minQuantity !== undefined ? { minQuantity: extras.minQuantity } : {}),
       ...(extras.durationMinutes !== undefined ? { durationMinutes: extras.durationMinutes } : {}),
+      ...(extras.availability !== undefined ? { availability: extras.availability } : {}),
+      ...(extras.availabilityLabel !== undefined ? { availabilityLabel: extras.availabilityLabel } : {}),
       ...extras.pageFields
     };
     validatedItemsById.set(item.id, projectedItem);
@@ -821,7 +863,8 @@ export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug 
       const countLabel = cat.items.length === 1 ? '1 opção' : `${cat.items.length} opções`;
       const itemsHtml = cat.items
         .map((item) => {
-          const waHref = whatsappLink(menu, item.id);
+          const soon = isItemSoon(item);
+          const waHref = soon ? buildNotifyHref(menu, item) : whatsappLink(menu, item.id);
           const descHtml = item.description
             ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>`
             : '';
@@ -829,15 +872,18 @@ export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug 
             ? `<a class="sf-item-details-link" href="${escapeHtml(itemPagePath(basePath, itemSlugs.get(String(item.id))))}" aria-label="Ver detalhes de ${escapeHtml(item.name)}">Ver detalhes</a>`
             : '';
           return [
-            `<article class="menu-item-card" data-item-id="${escapeHtml(item.id)}">`,
+            `<article class="menu-item-card${soon ? ' is-soon' : ''}" data-item-id="${escapeHtml(item.id)}">`,
             `  <div class="menu-item-body">`,
             `    <h3 class="menu-item-title">${escapeHtml(item.name)}</h3>`,
+            soon ? `    <p class="sf-soon-badge">${escapeHtml(soonBadgeText(item))}</p>` : '',
             descHtml ? `    ${descHtml}` : '',
             detailsHtml ? `    ${detailsHtml}` : '',
             `  </div>`,
             `  <div class="menu-item-footer">`,
             `    <span class="menu-item-price">${escapeHtml(formatPublicPriceBRL(item.priceCents))}</span>`,
-            `    <a class="whatsapp-order-button" href="${escapeHtml(waHref)}" target="_blank" rel="noopener noreferrer">Pedir no WhatsApp</a>`,
+            soon
+              ? `    <a class="whatsapp-order-button sf-notify-button" href="${escapeHtml(waHref)}" target="_blank" rel="noopener noreferrer" data-notify-item="${escapeHtml(item.id)}" aria-label="${escapeHtml(`${NOTIFY_BUTTON_LABEL}: ${item.name}`)}">${NOTIFY_BUTTON_LABEL}</a>`
+              : `    <a class="whatsapp-order-button" href="${escapeHtml(waHref)}" target="_blank" rel="noopener noreferrer">Pedir no WhatsApp</a>`,
             `  </div>`,
             `</article>`
           ]
