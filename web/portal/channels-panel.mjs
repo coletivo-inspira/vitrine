@@ -378,7 +378,7 @@ function renderInstagramCard(ctx, doc, list, content, canEdit) {
       id: 'channels-instagram',
       label: 'Endereço ou @perfil',
       value: current ?? '',
-      placeholder: '@seu.perfil ou https://www.instagram.com/seu.perfil/',
+      placeholder: '@seuperfil',
       help: 'Só perfis do instagram.com. Sem login: é um link direto.',
       type: 'text',
       onValue(raw, commit) {

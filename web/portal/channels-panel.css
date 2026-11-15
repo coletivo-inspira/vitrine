@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 28px;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .channels-header {
@@ -246,7 +247,7 @@
   }
 }
 
-@media (max-width: 720px) {
+@container (max-width: 560px) {
   .channels-card {
     padding: 16px;
   }

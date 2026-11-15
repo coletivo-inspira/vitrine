@@ -160,7 +160,7 @@ test('Testar do WhatsApp: wa.me sem mensagem no modo direto; no modo Mila, o nú
   });
   const mila = whatsappTestLink({ whatsapp: '5531988887777', orderRelay: 'mila' }, 'atelie-barro');
   assert.equal(mila.number, MILA_WHATSAPP);
-  assert.equal(mila.url, `https://wa.me/${MILA_WHATSAPP}?text=${encodeURIComponent(`#${buildMilaRelayCode('atelie-barro')} `)}`);
+  assert.equal(mila.url, `https://wa.me/${MILA_WHATSAPP}?text=${encodeURIComponent(`#${buildMilaRelayCode('atelie-barro')}`)}`);
   assert.equal(whatsappTestLink({ whatsapp: '123' }, 'x').url, null);
 });
 

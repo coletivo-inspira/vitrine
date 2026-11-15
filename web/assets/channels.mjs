@@ -107,7 +107,7 @@ export function whatsappTestLink(content, slug) {
     return {
       via: 'mila',
       number: MILA_WHATSAPP,
-      url: `https://wa.me/${MILA_WHATSAPP}${code ? `?text=${encodeURIComponent(`#${code} `)}` : ''}`
+      url: `https://wa.me/${MILA_WHATSAPP}${code ? `?text=${encodeURIComponent(`#${code}`)}` : ''}`
     };
   }
   const number = typeof content?.whatsapp === 'string' ? content.whatsapp.trim() : '';

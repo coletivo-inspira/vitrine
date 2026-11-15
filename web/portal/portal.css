@@ -3309,11 +3309,14 @@ textarea {
     font-size: 12px;
     padding: 0 10px;
   }
+  .editor-tabs-selector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
   .tab-btn {
     min-height: 48px;
-    font-size: 10px;
-    letter-spacing: -0.02em;
-    padding: 5px 1px;
+    font-size: 12px;
+    padding: 5px 4px;
     border-radius: 12px;
   }
   .tab-btn .nav-icon {
