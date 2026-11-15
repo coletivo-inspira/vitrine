@@ -9,6 +9,7 @@ import {
 import { AUCTION_RULES, parseAuctionEndsAt } from '../web/assets/auction-rules.mjs';
 import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
+import { validateQuoteLeadConfig } from '../web/assets/quote-lead.mjs';
 import { itemPageTexts, normalizeItemPageFields } from '../web/assets/item-page-fields.mjs';
 import {
   ITEM_AVAILABILITY_LABEL_MAX,
@@ -21,6 +22,17 @@ import {
   normalizeMetricSource
 } from '../web/assets/metrics-source.mjs';
 import { SERVICES_PRODUCTS_TEMPLATE_CODE } from './servicos-produtos-template.mjs';
+import {
+  PAYMENT_LINK_CLICK_METRIC,
+  PAYMENT_LINK_LABEL_MAX,
+  checkPaymentLinkUrl,
+  normalizePaymentLinkLabel,
+  paymentLinkHosts
+} from '../web/assets/payment-link.mjs';
+import paymentLinkConfig from '../content/payment-link-domains.json' with { type: 'json' };
+
+/** Hosts aceitos no link de pagamento do negócio (#134); fonte: content/payment-link-domains.json. */
+export const PAYMENT_LINK_HOSTS = paymentLinkHosts(paymentLinkConfig);
 
 export const RESERVED_SLUGS = Object.freeze([
   'admin',
@@ -165,8 +177,8 @@ export const CATALOG_IMAGES_BUCKET = 'catalog-images';
 export const MAX_CATALOG_IMAGE_BYTES = 262144;
 
 // Única lista de métricas no código; o banco espelha em private.site_metric_names()
-// e private.site_item_metric_names() (migrações 20261116000200_metrics_source.sql e
-// 20261116001200_metric_notify_click.sql).
+// e private.site_item_metric_names() (migrações 20261116000200_metrics_source.sql,
+// 20261116001200_metric_notify_click.sql e 20261116001700_metric_payment_link_click.sql).
 // Um novo nome entra aqui e numa migração que recria essas duas funções.
 export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'visit',
@@ -175,7 +187,8 @@ export const ALLOWED_METRIC_EVENT_TYPES = Object.freeze([
   'whatsapp_order',
   'route_click',
   'qr_visit',
-  NOTIFY_CLICK_METRIC
+  NOTIFY_CLICK_METRIC,
+  PAYMENT_LINK_CLICK_METRIC
 ]);
 // Métricas por item exigem itemId e não carregam origem.
 export const ITEM_METRIC_EVENT_TYPES = Object.freeze(['item_view', 'item_select']);
@@ -1386,6 +1399,40 @@ export function validateItemAvailability(item) {
   }
 }
 
+function paymentLinkError(item, subfield, code, message) {
+  const field = `paymentLink.${subfield}`;
+  return new PortalValidationError(422, code, message, {
+    field,
+    fieldErrors: [{ field, itemId: String(item.id ?? ''), code, message }]
+  });
+}
+
+/**
+ * Link de pagamento do próprio negócio (#134): `{ url, label? }`. Só `https://` de um
+ * host exatamente na lista de content/payment-link-domains.json. Devolve o texto do
+ * botão (para a checagem de termos proibidos).
+ */
+export function validateItemPaymentLink(item, hosts = PAYMENT_LINK_HOSTS) {
+  const link = item.paymentLink;
+  if (link === undefined || link === null) return '';
+  if (typeof link !== 'object' || Array.isArray(link) || Object.keys(link).some((key) => key !== 'url' && key !== 'label')) {
+    throw paymentLinkError(item, 'url', 'INVALID_PAYMENT_LINK', 'Link de pagamento inválido.');
+  }
+  const { error } = checkPaymentLinkUrl(link.url, hosts);
+  if (error) throw paymentLinkError(item, 'url', error.code, error.message);
+  if (link.label === undefined || link.label === null) return '';
+  if (typeof link.label !== 'string' || normalizePaymentLinkLabel(link.label).length > PAYMENT_LINK_LABEL_MAX) {
+    throw paymentLinkError(
+      item,
+      'label',
+      'INVALID_PAYMENT_LINK',
+      `O texto do botão de pagamento deve ter no máximo ${PAYMENT_LINK_LABEL_MAX} caracteres.`
+    );
+  }
+  assertNoDangerousTextPayload(link.label, 422, 'INVALID_ITEM');
+  return link.label;
+}
+
 export function isItemActive(item) {
   if (!item || typeof item !== 'object') return false;
   return item.active !== false && item.available !== false;
@@ -1501,7 +1548,8 @@ export function validateDraftContent(content, options = {}) {
 
   const [placeError, ...morePlaceErrors] = [
     ...collectPlaceErrors(content),
-    ...validateLocalSeo(content.localSeo).errors
+    ...validateLocalSeo(content.localSeo).errors,
+    ...validateQuoteLeadConfig(content.quoteLead).errors
   ];
   if (placeError) {
     throw new PortalValidationError(422, placeError.code, placeError.message, {
@@ -1599,9 +1647,10 @@ export function validateDraftContent(content, options = {}) {
     }
 
     const pageFields = validateItemPageFields(item);
+    const paymentLinkLabel = validateItemPaymentLink(item);
 
     const prohibitedTerm = findProhibitedQuotaTerm(
-      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, item.availabilityLabel, ...itemPageTexts(pageFields)],
+      [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, item.availabilityLabel, paymentLinkLabel, ...itemPageTexts(pageFields)],
       { quota: itemPriceMode === 'quota' }
     );
     if (prohibitedTerm) {

@@ -18,8 +18,10 @@ import {
 import { formatAuctionDeadline } from '../assets/auction-rules.mjs';
 import { mountPlacePanel, showPlaceServerErrors } from './place-panel.mjs';
 import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
+import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import { renderItemPageFields } from './item-page-fields.mjs';
+import { renderPaymentLinkField, showPaymentLinkServerErrors } from './payment-link-field.mjs';
 import { itemPageTexts } from '../assets/item-page-fields.mjs';
 import {
   DEFAULT_SOON_LABEL,
@@ -1116,6 +1118,12 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     getSlug: () => currentSite?.slug,
     onChange: () => updateDraftAndPreview()
   });
+  void mountQuoteWebhookPanel({
+    site: currentSite,
+    isOnline: currentIsOnline,
+    getContent: () => currentDraft?.content,
+    onChange: () => updateDraftAndPreview()
+  });
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;
@@ -2151,6 +2159,12 @@ function renderItems() {
       fields.appendChild(gPhoto);
     }
 
+    renderPaymentLinkField(item, fields, {
+      onChange: updateDraftAndPreview,
+      priceMode: itemPriceMode,
+      soon: itemVisibilityState(item) === 'soon'
+    });
+
     renderItemPageFields(item, fields, {
       onChange: updateDraftAndPreview,
       uploadImage: async (file) => uploadImageToSupabaseStorage(await resizeAndConvertToWebP(file), `${item.id}-galeria`),
@@ -2160,7 +2174,7 @@ function renderItems() {
 
     const refreshTermWarning = () => {
       const term = findProhibitedQuotaTerm(
-        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, ...itemPageTexts(item)],
+        [item.name, item.description, item.conditions, item.tradeFor, item.section, item.quotaReward, item.paymentLink?.label, ...itemPageTexts(item)],
         { quota: itemPriceMode === 'quota' }
       );
       termWarning.hidden = !term;
@@ -2259,6 +2273,20 @@ function renderItems() {
     card.appendChild(footer);
     itemsContainer.appendChild(card);
   });
+}
+
+/** Abre o cartão do item com erro no link de pagamento e leva o foco ao campo. */
+function revealPaymentLinkError(error) {
+  const itemId = showPaymentLinkServerErrors(error, { focus: false });
+  if (!itemId || !currentDraft) return;
+  const category = (currentDraft.content.categories || []).find((cat) => (cat.items || []).some((entry) => String(entry.id) === itemId));
+  if (!category) return;
+  setActiveTab('items');
+  selectedCategoryForItems = category.id;
+  if (editorCategorySelect) editorCategorySelect.value = category.id;
+  activeEditingItemId = category.items.find((entry) => String(entry.id) === itemId).id;
+  renderItems();
+  showPaymentLinkServerErrors(error, { focus: true });
 }
 
 /**
@@ -2839,6 +2867,7 @@ function updateDraftAndPreview({ skipAutosave = false } = {}) {
           const errCode = errData?.error?.code;
           showPlaceServerErrors(errData?.error, { focus: false });
           showSeoServerErrors(errData?.error, { focus: false });
+          showPaymentLinkServerErrors(errData?.error, { focus: false });
           if (indicator) {
             indicator.textContent =
               errCode === 'ACTIVE_ITEMS_LIMIT_EXCEEDED'
@@ -3079,6 +3108,7 @@ async function handleSaveDraft() {
         if (!showPlaceServerErrors(data.error, { reveal: () => setActiveTab('settings') })) {
           showSeoServerErrors(data.error, { reveal: () => setActiveTab('settings') });
         }
+        revealPaymentLinkError(data.error);
       }
     } catch {
       if (generation !== editorLoadGeneration) return;

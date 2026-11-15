@@ -4294,6 +4294,19 @@ textarea {
   color: var(--ink);
 }
 
+/* Mensagens do servidor (por exemplo, link de pagamento fora da lista) quebram linha no celular. */
+.autosave-indicator.error {
+  max-width: 100%;
+  border-radius: 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.editor-status-line {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .editor-advanced-sections {
   margin-top: 32px;
   padding-top: 24px;

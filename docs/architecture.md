@@ -141,6 +141,22 @@ Páginas de modelo ficam em `public.templates.default_pages` e são herdadas por
 `resolveShowcaseManifest` como as seções; o rascunho só guarda o que mudou. Receita e
 decisões em `docs/modelo-servicos-e-produtos.md`.
 
+## Pré-orçamento com webhook assinado (issue #121)
+
+`src/quote-webhook.mjs`, `web/assets/quote-lead.mjs`, `web/portal/quote-webhook.mjs` e a
+migração `20261116001600_quote_webhooks.sql`. O rascunho guarda `quoteLead.fields`
+(categoria, data, bairro); o snapshot só recebe `quoteLead` com o recurso
+`quote_webhook` e a integração pronta, decidido na publicação. `POST
+/api/sites/:endereço/leads` (público, mesma origem, consentimento obrigatório, limite
+por IP em memória sem gravar o IP) responde `202` e entrega em `ctx.waitUntil`, com
+`X-Vitrine-Signature: sha256=<hex>` sobre `timestamp.corpo` e até 3 tentativas para
+`5xx` e erro de rede; sem o recurso, `404` (`paidFeatureGoneResponse`). O segredo é
+gerado no Worker, mostrado uma vez e guardado cifrado (AES-GCM, chave
+`QUOTE_WEBHOOK_ENCRYPTION_KEY`, id da vitrine como dado associado) em
+`private.quote_webhooks`, que só tem endereço, último status e contadores. Leitura
+reutilizável do status em `readQuoteWebhookStatus`. Contrato e receitas em
+`docs/pre-orcamento-webhook.md`.
+
 ## Patrocinador e tela Impacto (issue #127)
 
 Migração `20261116001500_sponsor_role.sql`, `src/sponsor-impact.mjs` e, no painel,
@@ -170,6 +186,21 @@ pelo editor. "Disponível" é o padrão e não vai ao snapshot; "Oculto" continu
 no modo Mila) e fica fora da seleção, do total e da mensagem, inclusive ao restaurar a
 seleção salva. Os cliques contam na métrica agregada `notify_click` (migração
 `20261116001200_metric_notify_click.sql`); nenhum contato é guardado.
+
+## Link de pagamento do próprio negócio (issue #134)
+
+Campo opcional por item `paymentLink: { url, label? }` (texto até 32 caracteres, padrão
+"Pagar no site do negócio"), com as regras em `web/assets/payment-link.mjs`. Só `https://`
+com host exatamente igual a um da lista única `content/payment-link-domains.json`, sem
+porta, credenciais ou subdomínio curinga; o servidor recusa o resto com `field` e
+`fieldErrors` (`paymentLink.url`/`paymentLink.label`, com `itemId`), e o build copia a
+lista para `/assets/payment-link-domains.json`, lida pelo editor. A publicação omite o
+link em itens "Em breve", de lance e de troca, e `assertNoPrivateLeakage` confere o
+snapshot de novo. Aparece na página do item (`renderPurchaseExtras`) e na etapa "Revisar
+e enviar", em nova aba com `rel="noopener noreferrer"`, sem parâmetros acrescentados e
+fora do total e da mensagem do WhatsApp. Os cliques contam em `payment_link_click`
+(migração `20261116001700_metric_payment_link_click.sql`). O pagamento é do negócio e do
+provedor dele (ADR 0013, item 8; seção "Vendas do seu negócio" dos termos).
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 

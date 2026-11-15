@@ -473,7 +473,8 @@ test('Spec 008 PR (e) - Métricas Agregadas sem Dados Pessoais e Painel de Insig
       'whatsapp_order',
       'route_click',
       'qr_visit',
-      'notify_click'
+      'notify_click',
+      'payment_link_click'
     ]);
     assert.deepEqual(ALLOWED_INSIGHTS_PERIODS, ['7d', '30d', '90d']);
     assert.equal(isBotUserAgent('Googlebot/2.1'), true);
