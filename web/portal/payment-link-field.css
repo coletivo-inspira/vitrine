@@ -24,6 +24,11 @@
   clear: both;
 }
 
+.item-payment-link .form-help {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .item-payment-link-intro {
   margin: 0;
 }
@@ -101,4 +106,23 @@
 
 .item-payment-link-domains .form-help {
   margin: 0;
+}
+
+/* Mesmo visual de `.form-group input[type="text"]`, que não alcança `type="url"`. */
+@media (min-width: 521px) {
+  .form-group .item-payment-link-field input[type="url"] {
+    min-height: 48px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 16px;
+    font-family: var(--font-body);
+  }
+}
+
+.form-group .item-payment-link-field input[type="url"]:focus {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
 }
