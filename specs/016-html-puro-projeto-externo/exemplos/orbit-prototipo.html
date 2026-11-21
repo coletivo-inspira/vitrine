@@ -1,0 +1,3550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit — Protótipo Interativo Multi-Dispositivo (Liquid Glass)</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fonte Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #070a12;
+      color: #f8fafc;
+    }
+
+    /* Fundo ambiental do estúdio — iluminação suave, paleta sóbria e camadas de profundidade */
+    .studio-bg {
+      background:
+        radial-gradient(circle at 18% 16%, rgba(124, 106, 214, 0.16), transparent 44%),
+        radial-gradient(circle at 84% 78%, rgba(72, 169, 197, 0.13), transparent 46%),
+        radial-gradient(circle at 52% 48%, rgba(30, 41, 66, 0.48), #070a12 84%);
+    }
+
+    /* =========================================================================
+       SISTEMA DE DESIGN LIQUID GLASS (VIDRO ÓPTICO TRANSLÚCIDO + LUZ ESPECULAR)
+       ========================================================================= */
+    .app-ambient-bg {
+      background:
+        radial-gradient(90% 60% at 15% 10%, rgba(139, 118, 224, 0.22), transparent 62%),
+        radial-gradient(80% 55% at 88% 22%, rgba(78, 174, 206, 0.18), transparent 60%),
+        radial-gradient(75% 60% at 50% 92%, rgba(176, 118, 184, 0.15), transparent 62%),
+        linear-gradient(165deg, #0b101d 0%, #0f1628 48%, #0a0f1c 100%);
+    }
+
+    @keyframes ambientDrift {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(14px, -12px, 0) scale(1.06); }
+    }
+
+    .ambient-orb {
+      animation: ambientDrift 14s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* Superfície flutuante Liquid Glass (barras, cápsulas de navegação, HUD) */
+    .lg-bar {
+      position: relative;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.14) 0%,
+        rgba(226, 232, 240, 0.06) 45%,
+        rgba(148, 163, 184, 0.09) 100%
+      );
+      backdrop-filter: blur(26px) saturate(175%);
+      -webkit-backdrop-filter: blur(26px) saturate(175%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow:
+        0 14px 36px rgba(2, 6, 23, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.36),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.07);
+    }
+
+    /* Painéis e cartões frosted Liquid Glass com alta legibilidade */
+    .lg-panel {
+      position: relative;
+      background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.10) 0%,
+        rgba(203, 213, 225, 0.045) 50%,
+        rgba(15, 23, 42, 0.38) 100%
+      );
+      backdrop-filter: blur(20px) saturate(150%);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow:
+        0 10px 28px rgba(2, 6, 23, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    /* Folha modal Liquid Glass (mais fosca para garantir contraste de leitura) */
+    .lg-sheet {
+      position: relative;
+      background: linear-gradient(
+        155deg,
+        rgba(30, 41, 66, 0.84) 0%,
+        rgba(15, 23, 42, 0.90) 55%,
+        rgba(11, 17, 32, 0.94) 100%
+      );
+      backdrop-filter: blur(30px) saturate(165%);
+      -webkit-backdrop-filter: blur(30px) saturate(165%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow:
+        0 24px 60px rgba(2, 6, 23, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* Cápsulas e botões de vidro translúcido */
+    .lg-pill {
+      position: relative;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.05) 100%);
+      backdrop-filter: blur(18px) saturate(155%);
+      -webkit-backdrop-filter: blur(18px) saturate(155%);
+      border: 1px solid rgba(255, 255, 255, 0.19);
+      box-shadow:
+        0 6px 18px rgba(2, 6, 23, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.16s ease, box-shadow 0.2s ease;
+    }
+
+    .lg-pill:hover {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.19) 0%, rgba(255, 255, 255, 0.08) 100%);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Botão primário em vidro líquido tingido (paleta sóbria lilás/índigo) */
+    .lg-btn-primary {
+      position: relative;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.80) 0%, rgba(99, 102, 241, 0.74) 55%, rgba(56, 189, 248, 0.64) 100%);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      box-shadow:
+        0 10px 26px rgba(99, 102, 241, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      transition: all 0.2s ease;
+    }
+
+    .lg-btn-primary:hover {
+      filter: brightness(1.08);
+      box-shadow:
+        0 12px 30px rgba(124, 58, 237, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    /* Lente ativa para abas e controles segmentados */
+    .lg-active-lens {
+      background: linear-gradient(140deg, rgba(255, 255, 255, 0.24) 0%, rgba(196, 181, 253, 0.16) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      box-shadow:
+        0 4px 14px rgba(2, 6, 23, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    /* Brilho especular interativo que acompanha o ponteiro em superfícies Liquid Glass */
+    .lg-sheen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.28s ease;
+      background: radial-gradient(
+        180px circle at var(--lg-x, 50%) var(--lg-y, 20%),
+        rgba(255, 255, 255, 0.16),
+        transparent 68%
+      );
+    }
+
+    .lg-sheen:hover::before {
+      opacity: 1;
+    }
+
+    /* Cabeçalho flutuante sutil em vidro */
+    .lg-header {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.62) 0%, rgba(15, 23, 42, 0.38) 100%);
+      backdrop-filter: blur(22px) saturate(160%);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+    }
+
+    /* Scrollbars discretas dentro das telas dos dispositivos */
+    .orbit-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .orbit-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .orbit-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+    }
+    .orbit-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    /* Canvas pixel art nítido */
+    .pixel-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* =========================================================================
+       MOLDURAS REALISTAS DOS DISPOSITIVOS (LAPTOP, SMARTPHONE, SMARTWATCH)
+       ========================================================================= */
+    #device-scaler {
+      transform-origin: center center;
+      will-change: transform;
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* 1. Laptop (Computador) */
+    .laptop-shell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      filter: drop-shadow(0 36px 70px rgba(0, 0, 0, 0.7));
+    }
+
+    .laptop-lid {
+      background: linear-gradient(160deg, #272c3a 0%, #141821 45%, #0c0f16 100%);
+      padding: 16px 16px 14px 16px;
+      border-radius: 24px 24px 10px 10px;
+      border: 1.5px solid rgba(255, 255, 255, 0.14);
+      position: relative;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    }
+
+    .laptop-camera {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .laptop-screen {
+      width: 1160px;
+      height: 720px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0b101d;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+    }
+
+    .laptop-base {
+      width: 1270px;
+      height: 20px;
+      background: linear-gradient(180deg, #334155 0%, #1e293b 45%, #0f172a 100%);
+      border-radius: 4px 4px 16px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-top: none;
+      position: relative;
+      display: flex;
+      justify-content: center;
+    }
+
+    .laptop-notch {
+      width: 132px;
+      height: 6px;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: 0 0 8px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: none;
+    }
+
+    /* 2. Smartphone (Celular 9:16) */
+    .phone-shell {
+      position: relative;
+      padding: 13px;
+      border-radius: 56px;
+      background: linear-gradient(155deg, #2d3446 0%, #161b26 42%, #0c0f17 100%);
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      box-shadow:
+        0 34px 70px rgba(0, 0, 0, 0.72),
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+    }
+
+    .phone-btn-left-1, .phone-btn-left-2, .phone-btn-right {
+      position: absolute;
+      background: #2d3548;
+      border-radius: 3px;
+    }
+    .phone-btn-left-1 { left: -4px; top: 152px; width: 4px; height: 42px; }
+    .phone-btn-left-2 { left: -4px; top: 206px; width: 4px; height: 42px; }
+    .phone-btn-right { right: -4px; top: 185px; width: 4px; height: 64px; }
+
+    .phone-screen {
+      width: 390px;
+      height: 800px;
+      border-radius: 44px;
+      overflow: hidden;
+      background: #0b101d;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 3. Smartwatch (Apple Watch 45mm) */
+    .watch-assembly {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      filter: drop-shadow(0 30px 55px rgba(0, 0, 0, 0.75));
+    }
+
+    .watch-band-top, .watch-band-bottom {
+      width: 176px;
+      height: 76px;
+      background: linear-gradient(90deg, #151924 0%, #242b3d 50%, #151924 100%);
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .watch-band-top {
+      border-radius: 24px 24px 0 0;
+      margin-bottom: -14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .watch-band-bottom {
+      border-radius: 0 0 24px 24px;
+      margin-top: -14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .watch-case {
+      position: relative;
+      padding: 16px;
+      border-radius: 74px;
+      background: linear-gradient(150deg, #3b4256 0%, #191e2b 55%, #0c0f17 100%);
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, 0.35),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.6);
+      z-index: 2;
+    }
+
+    .watch-crown {
+      position: absolute;
+      right: -11px;
+      top: 86px;
+      width: 11px;
+      height: 54px;
+      border-radius: 5px;
+      background: repeating-linear-gradient(180deg, #64748b 0px, #64748b 3px, #1e293b 3px, #1e293b 6px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .watch-side-btn {
+      position: absolute;
+      right: -6px;
+      top: 164px;
+      width: 6px;
+      height: 62px;
+      border-radius: 3px;
+      background: #334155;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .watch-screen {
+      width: 272px;
+      height: 330px;
+      border-radius: 58px;
+      overflow: hidden;
+      background: #060914;
+      position: relative;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+  </style>
+</head>
+<body class="studio-bg flex h-screen w-screen overflow-hidden select-none">
+
+  <!-- =========================================================================
+       BARRA LATERAL ESQUERDA DO ESTÚDIO (INSPECTOR DE DISPOSITIVOS)
+       ========================================================================= -->
+  <aside class="z-30 flex flex-col items-center justify-between w-16 sm:w-[78px] h-full bg-white/[0.03] backdrop-blur-2xl border-r border-white/[0.12] shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)] py-4 shrink-0">
+    <!-- Logo Orbit brilhante -->
+    <div class="flex flex-col items-center gap-1.5">
+      <button type="button" onclick="resetToHome()" title="Orbit — Início" class="lg-pill lg-sheen group relative w-11 h-11 rounded-2xl p-[1.5px] transition-transform active:scale-95">
+        <div class="w-full h-full rounded-[14px] bg-gradient-to-br from-violet-500/30 via-indigo-500/20 to-cyan-400/25 flex items-center justify-center">
+          <svg class="w-6 h-6 text-violet-200" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="5.5" fill="url(#orbitCore)"/>
+            <ellipse cx="16" cy="16" rx="13" ry="5.5" transform="rotate(-28 16 16)" stroke="url(#orbitRing)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="25.5" cy="11" r="2.2" fill="#67e8f9"/>
+            <defs>
+              <linearGradient id="orbitCore" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#e9d5ff"/>
+                <stop offset="1" stop-color="#818cf8"/>
+              </linearGradient>
+              <linearGradient id="orbitRing" x1="3" y1="16" x2="29" y2="16" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#c4b5fd"/>
+                <stop offset="1" stop-color="#67e8f9"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </button>
+      <span class="text-[10px] font-bold tracking-[0.18em] uppercase text-slate-300/80">Orbit</span>
+    </div>
+
+    <!-- Seletor de Dispositivos (Computador, Celular, Relógio) -->
+    <div class="flex flex-col items-center gap-3">
+      <button type="button" id="dock-desktop" onclick="switchDevice('desktop')" title="Modo Computador (Notebook)" class="dock-btn lg-sheen relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="12" rx="2"/>
+          <path d="M2 20h20"/>
+        </svg>
+      </button>
+      <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400 -mt-2">Desktop</span>
+
+      <button type="button" id="dock-mobile" onclick="switchDevice('mobile')" title="Modo Celular (Smartphone 9:16)" class="dock-btn lg-sheen relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="2" width="12" height="20" rx="3"/>
+          <path d="M11 18h2"/>
+        </svg>
+      </button>
+      <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400 -mt-2">Celular</span>
+
+      <button type="button" id="dock-watch" onclick="switchDevice('watch')" title="Modo Relógio (Apple Watch)" class="dock-btn lg-sheen relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6.5" y="6" width="11" height="12" rx="3.5"/>
+          <path d="M9 6V3h6v3"/>
+          <path d="M9 18v3h6v-3"/>
+          <circle cx="12" cy="12" r="1.5"/>
+        </svg>
+      </button>
+      <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400 -mt-2">Relógio</span>
+    </div>
+
+    <!-- Indicador de Versão MVP -->
+    <div class="flex flex-col items-center gap-1">
+      <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-400/15 text-emerald-300 border border-emerald-300/30">MVP</span>
+      <span class="text-[9px] text-slate-400">v1.2</span>
+    </div>
+  </aside>
+
+  <!-- =========================================================================
+       PALCO CENTRAL DO SIMULADOR
+       ========================================================================= -->
+  <main class="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
+    <!-- Barra superior discreta com informações da simulação -->
+    <header class="z-20 flex items-center justify-between px-4 sm:px-6 pt-3 pb-1 shrink-0">
+      <div class="lg-pill flex items-center gap-2.5 px-3.5 py-1.5 rounded-full">
+        <span class="w-2 h-2 rounded-full bg-violet-300 animate-pulse shadow-[0_0_8px_rgba(196,181,253,0.8)]"></span>
+        <span id="studio-device-label" class="text-xs font-semibold text-white">Celular · 390×800 (9:16)</span>
+        <span class="hidden md:inline text-white/20">|</span>
+        <span class="hidden md:inline text-xs text-slate-300/85">Liquid Glass UI · <strong class="text-white font-semibold">Lucas Silva</strong></span>
+      </div>
+
+      <!-- Atalhos rápidos para demonstrar telas durante a apresentação -->
+      <div class="lg-pill hidden sm:flex items-center gap-1 px-2 py-1 rounded-full">
+        <span class="text-[11px] text-slate-300/80 pl-2 pr-1">Ir direto:</span>
+        <button type="button" onclick="navigateQuick('orbita')" class="px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-100 hover:bg-white/15 transition">Órbita</button>
+        <button type="button" onclick="navigateQuick('parque')" class="px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-100 hover:bg-white/15 transition">Parque 2D</button>
+        <button type="button" onclick="navigateQuick('comunidade')" class="px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-100 hover:bg-white/15 transition">Comunidade</button>
+        <button type="button" onclick="navigateQuick('perfil')" class="px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-100 hover:bg-white/15 transition">Meu Hub</button>
+      </div>
+    </header>
+
+    <!-- Palco onde o dispositivo escolhido é centralizado e escalado automaticamente -->
+    <section id="device-stage" class="flex-1 flex items-center justify-center relative overflow-hidden p-3 sm:p-5">
+      <div id="device-scaler"></div>
+    </section>
+
+    <!-- Rodapé compacto do estúdio -->
+    <footer class="z-20 flex items-center justify-center px-4 pb-2.5 pt-0.5 shrink-0">
+      <p id="studio-hint-text" class="lg-pill text-[11px] text-slate-200/90 px-4 py-1.5 rounded-full text-center">
+        Dica: arraste as bolhas na Órbita, clique no chão ou use WASD/D-Pad no Parque 2D e alterne os dispositivos na esquerda.
+      </p>
+    </footer>
+  </main>
+
+  <script>
+    /* =========================================================================
+       1. DADOS SIMULADOS, INTENÇÕES, APLICATIVOS EXTERNOS E ESTADO GLOBAL
+       ========================================================================= */
+    const INTENTIONS = {
+      troca: {
+        id: 'troca',
+        label: 'Troca de Ideia',
+        short: 'Troca',
+        emoji: '💬',
+        color: '#a78bfa',
+        bg: 'rgba(167, 139, 250, 0.18)',
+        border: 'rgba(167, 139, 250, 0.45)'
+      },
+      amizade: {
+        id: 'amizade',
+        label: 'Amizade & Rolê',
+        short: 'Amizade',
+        emoji: '🤝',
+        color: '#34d399',
+        bg: 'rgba(52, 211, 153, 0.18)',
+        border: 'rgba(52, 211, 153, 0.45)'
+      },
+      casual: {
+        id: 'casual',
+        label: 'Casual / Hoje',
+        short: 'Casual',
+        emoji: '🔥',
+        color: '#fb923c',
+        bg: 'rgba(251, 146, 60, 0.18)',
+        border: 'rgba(251, 146, 60, 0.45)'
+      },
+      namoro: {
+        id: 'namoro',
+        label: 'Conhecer Alguém',
+        short: 'Conhecer',
+        emoji: '💜',
+        color: '#f472b6',
+        bg: 'rgba(244, 114, 182, 0.18)',
+        border: 'rgba(244, 114, 182, 0.45)'
+      },
+      apoio: {
+        id: 'apoio',
+        label: 'Comunidade & Apoio',
+        short: 'Apoio',
+        emoji: '🛡️',
+        color: '#38bdf8',
+        bg: 'rgba(56, 189, 248, 0.18)',
+        border: 'rgba(56, 189, 248, 0.45)'
+      }
+    };
+
+    const EXTERNAL_APPS = {
+      grindr: {
+        id: 'grindr',
+        name: 'Grindr',
+        bg: '#f5b800',
+        textColor: '#111827',
+        noExternalLink: true,
+        desc: 'Sem link externo — exibe selo de presença ativa'
+      },
+      scruff: {
+        id: 'scruff',
+        name: 'Scruff',
+        bg: '#2563eb',
+        textColor: '#ffffff',
+        noExternalLink: true,
+        desc: 'Sem link externo — exibe selo de presença ativa'
+      },
+      tinder: {
+        id: 'tinder',
+        name: 'Tinder',
+        bg: '#fe3c72',
+        textColor: '#ffffff',
+        noExternalLink: true,
+        desc: 'Selo de conta ativa para matches rápidos'
+      },
+      bumble: {
+        id: 'bumble',
+        name: 'Bumble',
+        bg: '#facc15',
+        textColor: '#111827',
+        noExternalLink: true,
+        desc: 'Selo de conta ativa no Bumble'
+      },
+      insta: {
+        id: 'insta',
+        name: 'Instagram',
+        bg: 'linear-gradient(135deg,#f59e0b,#ec4899,#8b5cf6)',
+        textColor: '#ffffff',
+        noExternalLink: false,
+        desc: 'Compartilhe seu @ do Instagram'
+      },
+      spotify: {
+        id: 'spotify',
+        name: 'Spotify',
+        bg: '#1db954',
+        textColor: '#052e16',
+        noExternalLink: false,
+        desc: 'Mostre seu perfil musical e playlists'
+      }
+    };
+
+    const SIMULATED_PROFILES = [
+      {
+        id: 'p1',
+        name: 'Matheus',
+        age: 26,
+        dist: '180m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'amizade',
+        intentions: ['amizade', 'troca'],
+        bio: 'Designer de produto, apaixonado por café gelado e procurando meu gato Paçoca pelo parque.',
+        avatar: { bg: '#1e3a8a', skin: '#f1c27d', hair: '#1f2937', shirt: '#38bdf8', accessory: 'glasses' },
+        apps: { grindr: { active: true }, scruff: { active: false }, tinder: { active: true }, insta: { active: true, handle: '@matheus.ux' }, spotify: { active: true, handle: 'matheus.sounds' } }
+      },
+      {
+        id: 'p2',
+        name: 'Rafa',
+        age: 29,
+        dist: '320m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'casual',
+        intentions: ['casual', 'troca'],
+        bio: 'Curto academia de manhã, eletrônica à noite e conversas sem enrolação.',
+        avatar: { bg: '#7c2d12', skin: '#c68642', hair: '#111827', shirt: '#fb923c', accessory: 'beard' },
+        apps: { grindr: { active: true }, scruff: { active: true }, tinder: { active: false }, insta: { active: true, handle: '@rafa.fitsp' } }
+      },
+      {
+        id: 'p3',
+        name: 'Thiago',
+        age: 24,
+        dist: '450m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'namoro',
+        intentions: ['namoro', 'troca'],
+        bio: 'Cinema independente, livrarias de rua e alguém legal pra dividir um vinho no domingo.',
+        avatar: { bg: '#581c87', skin: '#ffdbac', hair: '#451a03', shirt: '#c084fc', accessory: 'none' },
+        apps: { grindr: { active: false }, scruff: { active: false }, tinder: { active: true }, bumble: { active: true }, insta: { active: true, handle: '@thiago.cine' }, spotify: { active: true, handle: 'thiago.indie' } }
+      },
+      {
+        id: 'p4',
+        name: 'Dani',
+        age: 27,
+        dist: '510m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'apoio',
+        intentions: ['apoio', 'amizade'],
+        bio: 'Enfermeiro no SUS e voluntário em campanhas de PrEP e vacinação. Manda dúvida sem medo!',
+        avatar: { bg: '#064e3b', skin: '#8d5524', hair: '#0f172a', shirt: '#34d399', accessory: 'glasses' },
+        apps: { grindr: { active: true }, scruff: { active: true }, insta: { active: true, handle: '@dani.saude' } }
+      },
+      {
+        id: 'p5',
+        name: 'Diego',
+        age: 31,
+        dist: '640m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'troca',
+        intentions: ['troca', 'casual'],
+        bio: 'Engenheiro de software, DJ amador nos fins de semana e viciado em café coado.',
+        avatar: { bg: '#78350f', skin: '#e0ac69', hair: '#1e1b4b', shirt: '#f59e0b', accessory: 'beard' },
+        apps: { grindr: { active: true }, scruff: { active: true }, tinder: { active: true }, spotify: { active: true, handle: 'dj.diego' } }
+      },
+      {
+        id: 'p6',
+        name: 'Bruno',
+        age: 25,
+        dist: '790m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'amizade',
+        intentions: ['amizade', 'apoio'],
+        bio: 'Recém-chegado na cidade! Topando rolês culturais, parques e conhecer gente do vale.',
+        avatar: { bg: '#1e1b4b', skin: '#f1c27d', hair: '#713f12', shirt: '#818cf8', accessory: 'cap' },
+        apps: { grindr: { active: true }, tinder: { active: true }, insta: { active: true, handle: '@bruno.nomad' } }
+      },
+      {
+        id: 'p7',
+        name: 'Leo',
+        age: 28,
+        dist: '850m',
+        online: true,
+        inPark: true,
+        primaryIntention: 'troca',
+        intentions: ['troca', 'namoro'],
+        bio: 'Fotógrafo urbano. Sempre testando lentes novas perto da fonte do parque.',
+        avatar: { bg: '#0f172a', skin: '#c68642', hair: '#111827', shirt: '#60a5fa', accessory: 'none' },
+        apps: { grindr: { active: false }, scruff: { active: true }, bumble: { active: true }, insta: { active: true, handle: '@leo.frames' } }
+      },
+      {
+        id: 'p8',
+        name: 'Caio',
+        age: 23,
+        dist: '920m',
+        online: true,
+        inPark: false,
+        primaryIntention: 'casual',
+        intentions: ['casual'],
+        bio: 'Noite livre por aqui. Sem burocracia e boa energia.',
+        avatar: { bg: '#881337', skin: '#ffdbac', hair: '#27272a', shirt: '#fb7185', accessory: 'none' },
+        apps: { grindr: { active: true }, tinder: { active: true } }
+      },
+      {
+        id: 'p9',
+        name: 'Vitor',
+        age: 33,
+        dist: '1.1km',
+        online: false,
+        inPark: false,
+        primaryIntention: 'namoro',
+        intentions: ['namoro', 'amizade'],
+        bio: 'Arquiteto, pai de duas plantas sobreviventes e fã de gastronomia de boteco.',
+        avatar: { bg: '#312e81', skin: '#e0ac69', hair: '#3f3f46', shirt: '#a5b4fc', accessory: 'beard' },
+        apps: { scruff: { active: true }, bumble: { active: true }, insta: { active: true, handle: '@vitor.arq' } }
+      },
+      {
+        id: 'p10',
+        name: 'Gui',
+        age: 26,
+        dist: '1.2km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'troca',
+        intentions: ['troca', 'amizade'],
+        bio: 'Dev front-end construindo projetos paralelos e ouvindo pop alternativo.',
+        avatar: { bg: '#164e63', skin: '#f1c27d', hair: '#0f172a', shirt: '#22d3ee', accessory: 'glasses' },
+        apps: { grindr: { active: true }, insta: { active: true, handle: '@gui.codes' }, spotify: { active: true, handle: 'gui.dev' } }
+      },
+      {
+        id: 'p11',
+        name: 'Henrique',
+        age: 30,
+        dist: '1.4km',
+        online: false,
+        inPark: false,
+        primaryIntention: 'casual',
+        intentions: ['casual', 'amizade'],
+        bio: 'Corrida no parque, cerveja artesanal e papo reto.',
+        avatar: { bg: '#3f6212', skin: '#8d5524', hair: '#18181b', shirt: '#a3e635', accessory: 'beard' },
+        apps: { grindr: { active: true }, scruff: { active: true } }
+      },
+      {
+        id: 'p12',
+        name: 'Igor',
+        age: 25,
+        dist: '1.5km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'apoio',
+        intentions: ['apoio', 'troca'],
+        bio: 'Psicólogo clínico com foco em acolhimento LGBT+. Amo trocar recomendações de livros.',
+        avatar: { bg: '#0c4a6e', skin: '#ffdbac', hair: '#451a03', shirt: '#38bdf8', accessory: 'glasses' },
+        apps: { bumble: { active: true }, insta: { active: true, handle: '@igor.psi' } }
+      },
+      {
+        id: 'p13',
+        name: 'Pedro',
+        age: 27,
+        dist: '1.7km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'namoro',
+        intentions: ['namoro', 'troca'],
+        bio: 'Cozinho massa fresca muito bem. Procurando companhia pra estrear uma receita nova.',
+        avatar: { bg: '#701a75', skin: '#c68642', hair: '#171717', shirt: '#e879f9', accessory: 'none' },
+        apps: { tinder: { active: true }, bumble: { active: true }, insta: { active: true, handle: '@pedro.chef' } }
+      },
+      {
+        id: 'p14',
+        name: 'Sam',
+        age: 24,
+        dist: '1.9km',
+        online: false,
+        inPark: false,
+        primaryIntention: 'amizade',
+        intentions: ['amizade', 'troca'],
+        bio: 'Ilustrador 2D e viciado em pixel art. Adoro rolês de jogos de tabuleiro.',
+        avatar: { bg: '#134e4a', skin: '#f1c27d', hair: '#4c1d95', shirt: '#2dd4bf', accessory: 'cap' },
+        apps: { grindr: { active: true }, insta: { active: true, handle: '@sam.pixels' }, spotify: { active: true, handle: 'sam.lofi' } }
+      },
+      {
+        id: 'p15',
+        name: 'Alex',
+        age: 32,
+        dist: '2.1km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'casual',
+        intentions: ['casual', 'troca'],
+        bio: 'Viagens curtas de carro, música alta e boas companhias.',
+        avatar: { bg: '#450a0a', skin: '#e0ac69', hair: '#1c1917', shirt: '#f87171', accessory: 'beard' },
+        apps: { grindr: { active: true }, scruff: { active: true }, tinder: { active: true } }
+      },
+      {
+        id: 'p16',
+        name: 'André',
+        age: 28,
+        dist: '2.3km',
+        online: false,
+        inPark: false,
+        primaryIntention: 'troca',
+        intentions: ['troca', 'apoio'],
+        bio: 'Produtor cultural organizando rodas de conversa e saraus independentes.',
+        avatar: { bg: '#3b0764', skin: '#8d5524', hair: '#09090b', shirt: '#c084fc', accessory: 'none' },
+        apps: { insta: { active: true, handle: '@andre.cultura' }, spotify: { active: true, handle: 'andre.mpb' } }
+      },
+      {
+        id: 'p17',
+        name: 'Felipe',
+        age: 26,
+        dist: '2.6km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'amizade',
+        intentions: ['amizade', 'namoro'],
+        bio: 'Trilhas nos fins de semana e viciado em séries de ficção científica.',
+        avatar: { bg: '#14532d', skin: '#ffdbac', hair: '#3f2e21', shirt: '#4ade80', accessory: 'none' },
+        apps: { tinder: { active: true }, insta: { active: true, handle: '@felipe.trilhas' } }
+      },
+      {
+        id: 'p18',
+        name: 'Nando',
+        age: 29,
+        dist: '2.9km',
+        online: true,
+        inPark: false,
+        primaryIntention: 'casual',
+        intentions: ['casual', 'amizade'],
+        bio: 'Bom humor acima de tudo. Se tiver café ou praia na jogada, já ganhou pontos.',
+        avatar: { bg: '#1e3a8a', skin: '#c68642', hair: '#18181b', shirt: '#60a5fa', accessory: 'glasses' },
+        apps: { grindr: { active: true }, scruff: { active: true }, insta: { active: true, handle: '@nando.rio' } }
+      }
+    ];
+
+    const COMMUNITY_POSTS = [
+      {
+        id: 'c1',
+        category: 'vacinas',
+        categoryLabel: '💉 Vacinas',
+        badgeColor: 'bg-cyan-400/15 text-cyan-200 border-cyan-300/35',
+        title: 'Calendário de Vacinação Adulto no SUS: HPV, Hepatites A & B e Mpox',
+        summary: 'Guia direto ao ponto sobre quais vacinas gratuitas estão disponíveis para a nossa comunidade e como agendar no posto mais próximo.',
+        author: 'Dani Rocha · Enfermeiro & Curadoria Orbit',
+        date: 'Hoje · 14:20',
+        readTime: '3 min',
+        likes: 84,
+        liked: false,
+        content: [
+          'Manter a carteira de vacinação em dia é uma das formas mais simples e eficazes de autocuidado. Muitas pessoas ainda não sabem que o SUS oferece proteção gratuita para várias infecções relevantes para adultos sexualmente ativos.',
+          '• Hepatite B: esquema de 3 doses disponível gratuitamente em qualquer UBS para todas as faixas etárias.',
+          '• Hepatite A e HPV (quadrivalente): disponíveis em centros de referência (CRIE) para grupos prioritários, incluindo usuários de PrEP e pessoas vivendo com HIV.',
+          '• Mpox: fique atento às janelas de campanha municipal para públicos prioritários. Leve sempre seu cartão do SUS ou CPF e documento com foto.'
+        ],
+        comments: [
+          { author: 'Bruno M.', time: 'há 40 min', text: 'Consegui tomar a segunda dose de Hepatite B ontem no posto do bairro, super rápido!' },
+          { author: 'Matheus', time: 'há 18 min', text: 'Excelente resumo! Muita gente no trabalho não sabia que usuários de PrEP têm direito à HPV.' }
+        ]
+      },
+      {
+        id: 'c2',
+        category: 'prevencao',
+        categoryLabel: '🛡️ Prevenção',
+        badgeColor: 'bg-emerald-400/15 text-emerald-200 border-emerald-300/35',
+        title: 'PrEP Diária vs. PrEP Sob Demanda (2+1+1): como escolher com segurança',
+        summary: 'Entenda as diferenças entre os dois protocolos de prevenção ao HIV aprovados pelo Ministério da Saúde e como iniciar gratuitamente.',
+        author: 'Coletivo Saúde do Vale',
+        date: 'Ontem',
+        readTime: '4 min',
+        likes: 119,
+        liked: true,
+        content: [
+          'A Profilaxia Pré-Exposição (PrEP) revolucionou a prevenção combinada. Hoje existem dois modelos principais acompanhados gratuitamente pelo SUS:',
+          '1. PrEP Diária: 1 comprimido todos os dias no mesmo horário. Indicada para qualquer pessoa com vida sexual ativa que prefere previsibilidade e proteção contínua.',
+          '2. PrEP Sob Demanda (2+1+1): voltada especificamente para homens cis e pessoas designadas do sexo masculino ao nascer que têm relações menos frequentes (2 comprimidos entre 2h e 24h antes da relação, 1 comprimido 24h depois e outro 48h depois).',
+          'Importante: a PrEP previne o HIV, mas não outras ISTs — por isso a testagem regular trimestral e o diálogo aberto continuam essenciais.'
+        ],
+        comments: [
+          { author: 'Diego', time: 'ontem', text: 'A modalidade sob demanda facilitou muito minha rotina. Recomendo conversar no CTA da sua cidade.' }
+        ]
+      },
+      {
+        id: 'c3',
+        category: 'bemestar',
+        categoryLabel: '🧠 Saúde Mental',
+        badgeColor: 'bg-violet-400/15 text-violet-200 border-violet-300/35',
+        title: 'Fadiga de grade quadrada: por que os apps de encontro estão nos esgotando?',
+        summary: 'Como a dinâmica mecânica de catálogo e rejeição silenciosa afeta a autoestima — e como espaços sociais mais humanos podem mudar isso.',
+        author: 'Igor Mendes · Psicólogo Clínico',
+        date: 'Há 2 dias',
+        readTime: '5 min',
+        likes: 156,
+        liked: false,
+        content: [
+          'Passar horas rolando grades infinitas de torsos e respondendo roteiros automáticos ("oi / tudo bem / foto") gera um desgaste emocional real, conhecido como fadiga de aplicativos de relacionamento.',
+          'Quando toda interação nasce de um filtro instantâneo sem contexto, o cérebro associa socialização a avaliação constante. Criar espaços com contexto compartilhado — como salas de conversa leve, parques virtuais e interesses explícitos — devolve a naturalidade do encontro.',
+          'Dica prática: defina janelas de uso, desative notificações invasivas e priorize ambientes onde você também possa conversar sem pressão.'
+        ],
+        comments: [
+          { author: 'Thiago', time: 'há 1 dia', text: 'Me senti 100% representado. A ideia de ter uma sala estilo parque tira aquele clima frio de catálogo.' },
+          { author: 'Leo', time: 'há 9 horas', text: 'Total! Poder avisar no perfil que hoje só quero troca de ideia já corta metade do estresse.' }
+        ]
+      },
+      {
+        id: 'c4',
+        category: 'debates',
+        categoryLabel: '💬 Discussão',
+        badgeColor: 'bg-amber-400/15 text-amber-200 border-amber-300/35',
+        title: 'Qual recurso você mais sente falta nas versões Web dos apps de relacionamento?',
+        summary: 'Fórum aberto da comunidade Orbit: conte suas maiores dores de usabilidade para ajudar a moldar o roadmap do MVP.',
+        author: 'Lucas Silva · Criador do Orbit',
+        date: 'Há 3 dias',
+        readTime: '2 min',
+        likes: 92,
+        liked: false,
+        content: [
+          'O Orbit nasceu de uma frustração simples: usar apps de encontro no computador é quase sempre uma experiência limitada, desconectada e fragmentada entre 4 plataformas diferentes.',
+          'Queremos construir esse hub junto com a comunidade. O que mais faz falta no seu dia a dia? Filtros por intenção real? Espaços abertos para fazer amizades? Integração mais limpa com o relógio?',
+          'Deixe sua ideia nos comentários abaixo — estamos documentando tudo abertamente para a próxima versão!'
+        ],
+        comments: [
+          { author: 'Gui', time: 'há 2 dias', text: 'Atalhos de teclado decentes no desktop e separar claramente quem quer conversar de quem quer algo imediato!' }
+        ]
+      }
+    ];
+
+    // Estado Global Único (sincronizado entre Computador, Celular e Relógio)
+    const AppState = {
+      device: 'mobile',          // Começa no Celular (9:16) para destacar o Liquid Glass, alternável na esquerda
+      activeTab: 'orbita',       // 'orbita' | 'parque' | 'comunidade' | 'perfil'
+      orbitaViewMode: 'radial',  // 'radial' | 'lista'
+      orbitaFilter: 'all',       // 'all' | intentionId
+      communityFilter: 'all',    // 'all' | 'vacinas' | 'prevencao' | 'bemestar' | 'debates'
+      watchPage: 0,              // 0: Órbita, 1: Parque, 2: Meu Cartão
+      selectedProfileId: null,
+      selectedArticleId: null,
+      showDesktopDpad: false,
+      foundPacoca: false,
+      currentScale: 1,
+      user: {
+        name: 'Lucas Silva',
+        firstName: 'Lucas',
+        age: 27,
+        handle: '@lucassilva',
+        city: 'Belo Horizonte · MG',
+        isPublic: true,
+        primaryIntention: 'troca',
+        intentions: ['troca', 'amizade', 'apoio'],
+        bio: 'Construindo o Orbit — um hub social em Liquid Glass com comunidade, saúde e interações mais humanas.',
+        avatar: { bg: '#4c1d95', skin: '#f1c27d', hair: '#1e1b4b', shirt: '#a855f7', accessory: 'glasses' },
+        apps: {
+          grindr: { active: true, handle: '' },
+          scruff: { active: true, handle: '' },
+          tinder: { active: true, handle: '' },
+          bumble: { active: false, handle: '' },
+          insta: { active: true, handle: '@lucas.orbit' },
+          spotify: { active: true, handle: 'lucas.vibes' }
+        }
+      }
+    };
+
+    let activeOrbitEngine = null;
+    let activeParkEngine = null;
+
+    /* =========================================================================
+       2. UTILITÁRIOS (SEGURANÇA HTML, AVATARES SVG, ÍCONES DE APPS, CLIPBOARD)
+       ========================================================================= */
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function createAvatarSVG(cfg, size = 64) {
+      const glasses = cfg.accessory === 'glasses'
+        ? `<rect x="19" y="24" width="11" height="7" rx="2.5" fill="rgba(15,23,42,0.35)" stroke="#e2e8f0" stroke-width="1.6"/>
+           <rect x="34" y="24" width="11" height="7" rx="2.5" fill="rgba(15,23,42,0.35)" stroke="#e2e8f0" stroke-width="1.6"/>
+           <line x1="30" y1="27.5" x2="34" y2="27.5" stroke="#e2e8f0" stroke-width="1.6"/>`
+        : '';
+      const beard = cfg.accessory === 'beard'
+        ? `<path d="M21 34 Q32 45 43 34 L42 39 Q32 47 22 39 Z" fill="${cfg.hair}" opacity="0.72"/>`
+        : '';
+      const cap = cfg.accessory === 'cap'
+        ? `<path d="M18 22 Q32 10 46 22 Z" fill="${cfg.shirt}"/><rect x="16" y="20" width="32" height="4" rx="2" fill="${cfg.shirt}"/>`
+        : '';
+
+      return `
+        <svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="w-full h-full block">
+          <defs>
+            <linearGradient id="bg_${cfg.bg.replace('#','')}_${size}" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="${cfg.bg}"/>
+              <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" fill="url(#bg_${cfg.bg.replace('#','')}_${size})"/>
+          <circle cx="52" cy="12" r="16" fill="rgba(255,255,255,0.08)"/>
+          <!-- Ombros / Camiseta -->
+          <path d="M11 64 C11 49 20 44 32 44 C44 44 53 49 53 64 Z" fill="${cfg.shirt}"/>
+          <!-- Pescoço -->
+          <rect x="27" y="38" width="10" height="9" rx="4" fill="${cfg.skin}"/>
+          <!-- Rosto -->
+          <circle cx="32" cy="28" r="13.5" fill="${cfg.skin}"/>
+          <!-- Cabelo -->
+          <path d="M18.5 26 C18.5 16 25 12 32 12 C39 12 45.5 16 45.5 26 C43 21 38 19 32 19 C26 19 21 21 18.5 26 Z" fill="${cfg.hair}"/>
+          ${cap}
+          <!-- Olhos -->
+          <circle cx="26.5" cy="27.5" r="1.8" fill="#0f172a"/>
+          <circle cx="37.5" cy="27.5" r="1.8" fill="#0f172a"/>
+          <!-- Sorriso -->
+          <path d="M27.5 33.5 Q32 37 36.5 33.5" fill="none" stroke="#7c2d12" stroke-width="1.7" stroke-linecap="round"/>
+          ${beard}
+          ${glasses}
+        </svg>
+      `;
+    }
+
+    function renderAppBadgeIcon(appId, cls = 'w-3.5 h-3.5') {
+      switch (appId) {
+        case 'grindr':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 3 5.8 3 11.2c0 4.5 2.4 8.2 5.6 9.9.7.4 1.5-.1 1.5-.9v-1.3c.6.1 1.2.2 1.9.2s1.3-.1 1.9-.2v1.3c0 .8.8 1.3 1.5.9 3.2-1.7 5.6-5.4 5.6-9.9C21 5.8 17.5 2 12 2zm-3.2 9.8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6.4 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>`;
+        case 'scruff':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.4 0-8 3.6-8 8 0 3.7 2.5 6.8 6 7.7V21l2-1.2 2 1.2v-2.3c3.5-.9 6-4 6-7.7 0-4.4-3.6-8-8-8zm-3 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm6 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm-3 4.5c-1.8 0-3.2-.8-4-2h8c-.8 1.2-2.2 2-4 2z"/></svg>`;
+        case 'tinder':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.2c.6 3.2-1.2 5.4-3.1 6.3-.3-1.4-.1-2.8.4-3.9C7.3 6.5 5 10 5 13.7 5 18 8.3 21.5 12.6 21.5c4.2 0 7.4-3.2 7.4-7.5 0-4.8-3.1-9.2-6.5-11.8z"/></svg>`;
+        case 'bumble':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 6.5v11L12 22l8-4.5v-11L12 2zm-4 7h8v1.8H8V9zm1.2 3.2h5.6V14H9.2v-1.8zm1.5 3.2h2.6v1.8h-2.6v-1.8z"/></svg>`;
+        case 'insta':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>`;
+        case 'spotify':
+          return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M8 10.2c2.8-.8 5.8-.5 8.2.8"/><path d="M8.6 13.2c2.2-.6 4.6-.4 6.6.7"/><path d="M9.4 16c1.6-.4 3.4-.2 4.8.5"/></svg>`;
+        default:
+          return `<span>★</span>`;
+      }
+    }
+
+    function showDeviceToast(message, type = 'info') {
+      const container = document.getElementById('device-toast-container');
+      if (!container) return;
+
+      const el = document.createElement('div');
+      const isWatch = AppState.device === 'watch';
+      const accent = type === 'success'
+        ? 'border-emerald-300/40 bg-emerald-950/80 text-emerald-50'
+        : 'border-white/25 bg-slate-900/80 text-white';
+
+      el.className = `${isWatch ? 'text-[10px] px-3 py-1.5 rounded-2xl max-w-[230px]' : 'text-xs px-4 py-2.5 rounded-2xl max-w-[300px]'} font-medium border shadow-[0_14px_34px_rgba(2,6,23,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] backdrop-blur-2xl transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto text-center ${accent}`;
+      el.textContent = message;
+      container.appendChild(el);
+
+      requestAnimationFrame(() => {
+        el.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        el.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => el.remove(), 320);
+      }, 2700);
+    }
+
+    function copyTextSafe(text, toastMessage) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showDeviceToast(toastMessage || 'Copiado para a área de transferência!', 'success');
+      } catch (err) {
+        showDeviceToast(toastMessage || 'Pronto!', 'info');
+      }
+    }
+
+    function copyUserOrbitLink() {
+      const clean = (AppState.user.handle || 'lucassilva').replace('@', '');
+      copyTextSafe(`orbit.app/${clean}`, 'Link do seu Orbit copiado! 🔗');
+    }
+
+    function copyProfileAppHandle(profileId, appId) {
+      const p = SIMULATED_PROFILES.find(item => item.id === profileId);
+      const app = EXTERNAL_APPS[appId];
+      if (!p || !app) return;
+      const handle = p.apps[appId] && p.apps[appId].handle ? p.apps[appId].handle : '';
+      if (handle) {
+        copyTextSafe(handle, `${handle} (${app.name}) copiado!`);
+      } else {
+        showDeviceToast(`${p.name} confirmou presença ativa no ${app.name}! ✨`, 'success');
+      }
+    }
+
+    function copyArticleLink(postId) {
+      copyTextSafe(`orbit.app/comunidade/${postId}`, 'Link público do artigo copiado! 🔗');
+    }
+
+    /* =========================================================================
+       3. CONTROLE DO ESTÚDIO MULTI-DISPOSITIVO E ESCALA AUTOMÁTICA
+       ========================================================================= */
+    function cleanupActiveEngines() {
+      if (activeOrbitEngine) {
+        activeOrbitEngine.destroy();
+        activeOrbitEngine = null;
+      }
+      if (activeParkEngine) {
+        activeParkEngine.destroy();
+        activeParkEngine = null;
+      }
+    }
+
+    function fitDeviceToStage() {
+      const stage = document.getElementById('device-stage');
+      const scaler = document.getElementById('device-scaler');
+      if (!stage || !scaler) return;
+
+      const dims = {
+        desktop: { w: 1290, h: 790 },
+        mobile: { w: 430, h: 840 },
+        watch: { w: 325, h: 520 }
+      }[AppState.device];
+
+      const availW = Math.max(240, stage.clientWidth - 20);
+      const availH = Math.max(240, stage.clientHeight - 16);
+      const scale = Math.min(availW / dims.w, availH / dims.h, 1.05);
+
+      AppState.currentScale = scale;
+      scaler.style.transform = `scale(${scale.toFixed(4)})`;
+    }
+
+    function updateStudioChrome() {
+      const labels = {
+        desktop: 'Computador · 1160×720',
+        mobile: 'Celular · 390×800 (9:16)',
+        watch: 'Apple Watch · 45mm'
+      };
+      const hints = {
+        desktop: 'Dica: arraste a Órbita, use WASD/clique no Parque 2D e edite seus selos no Meu Hub.',
+        mobile: 'Dica: navegue pela cápsula flutuante Liquid Glass abaixo e use o D-Pad ou toque no chão do Parque 2D.',
+        watch: 'Dica: arraste a colmeia radial no relógio, toque em uma bolha para acenar ou use os pontos abaixo.'
+      };
+
+      const labelEl = document.getElementById('studio-device-label');
+      const hintEl = document.getElementById('studio-hint-text');
+      if (labelEl) labelEl.textContent = labels[AppState.device];
+      if (hintEl) hintEl.textContent = hints[AppState.device];
+
+      ['desktop', 'mobile', 'watch'].forEach((d) => {
+        const btn = document.getElementById(`dock-${d}`);
+        if (!btn) return;
+        if (d === AppState.device) {
+          btn.className = 'dock-btn lg-active-lens lg-sheen relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all text-white';
+        } else {
+          btn.className = 'dock-btn lg-sheen relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all border bg-white/[0.04] border-white/[0.11] text-slate-300 hover:text-white hover:bg-white/[0.10]';
+        }
+      });
+    }
+
+    function switchDevice(device) {
+      if (!['desktop', 'mobile', 'watch'].includes(device)) return;
+      AppState.device = device;
+      AppState.selectedProfileId = null;
+      AppState.selectedArticleId = null;
+      updateStudioChrome();
+      renderDeviceShell();
+      fitDeviceToStage();
+    }
+
+    function navigateQuick(tab) {
+      AppState.activeTab = tab;
+      AppState.selectedProfileId = null;
+      AppState.selectedArticleId = null;
+      if (AppState.device === 'watch') {
+        if (tab === 'orbita') AppState.watchPage = 0;
+        else if (tab === 'parque') AppState.watchPage = 1;
+        else if (tab === 'perfil') AppState.watchPage = 2;
+        else {
+          AppState.device = 'mobile';
+          updateStudioChrome();
+          renderDeviceShell();
+          fitDeviceToStage();
+          return;
+        }
+        renderActiveScreen();
+        return;
+      }
+      renderActiveScreen();
+    }
+
+    function resetToHome() {
+      AppState.activeTab = 'orbita';
+      AppState.orbitaViewMode = 'radial';
+      AppState.orbitaFilter = 'all';
+      AppState.watchPage = 0;
+      AppState.selectedProfileId = null;
+      AppState.selectedArticleId = null;
+      renderActiveScreen();
+    }
+
+    function setTab(tab) {
+      AppState.activeTab = tab;
+      AppState.selectedProfileId = null;
+      AppState.selectedArticleId = null;
+      renderActiveScreen();
+    }
+
+    /* =========================================================================
+       4. MOLDURAS DOS DISPOSITIVOS (DESKTOP, MOBILE 9:16, WATCH)
+       ========================================================================= */
+    function renderDeviceShell() {
+      cleanupActiveEngines();
+      const scaler = document.getElementById('device-scaler');
+      if (!scaler) return;
+
+      const ambientOrbsLayer = `
+        <div class="pointer-events-none absolute inset-0 overflow-hidden z-0">
+          <div class="ambient-orb absolute -top-20 -left-16 w-72 h-72 rounded-full bg-violet-400/20 blur-[80px]"></div>
+          <div class="ambient-orb absolute top-1/3 -right-20 w-72 h-72 rounded-full bg-cyan-300/15 blur-[85px]" style="animation-delay:-5s;"></div>
+          <div class="ambient-orb absolute -bottom-24 left-1/4 w-80 h-64 rounded-full bg-indigo-400/15 blur-[90px]" style="animation-delay:-9s;"></div>
+        </div>
+      `;
+
+      if (AppState.device === 'desktop') {
+        scaler.innerHTML = `
+          <div class="laptop-shell">
+            <div class="laptop-lid">
+              <div class="laptop-camera"></div>
+              <div class="laptop-screen app-ambient-bg flex flex-col">
+                ${ambientOrbsLayer}
+                <!-- Barra superior estilo macOS Liquid Glass -->
+                <div class="relative z-20 h-10 bg-white/[0.04] backdrop-blur-2xl border-b border-white/[0.11] px-4 flex items-center justify-between shrink-0">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-400/85 shadow-inner"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-300/85 shadow-inner"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400/85 shadow-inner"></span>
+                    <div class="ml-3 px-3.5 py-1 rounded-full bg-white/[0.07] border border-white/[0.13] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] text-[11px] text-slate-200/90 flex items-center gap-1.5">
+                      <span class="text-emerald-300">🔒</span> orbit.app/${escapeHtml(AppState.user.handle.replace('@', ''))}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 text-[11px] text-slate-200/80 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.1]">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                    <span>18 pessoas na sua órbita · 7 no Parque</span>
+                  </div>
+                </div>
+                <!-- Corpo principal do app Desktop com Sidebar Liquid Glass flutuante -->
+                <div class="flex flex-1 min-h-0 relative z-10 p-3 gap-3">
+                  <aside class="lg-bar w-[228px] rounded-[24px] flex flex-col justify-between p-3.5 shrink-0">
+                    <div>
+                      <div class="flex items-center gap-2.5 px-2 mb-5">
+                        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-400/60 via-indigo-400/50 to-cyan-300/50 border border-white/30 flex items-center justify-center shadow-[0_8px_20px_rgba(99,102,241,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]">
+                          <svg class="w-5 h-5 text-white" viewBox="0 0 32 32" fill="none">
+                            <circle cx="16" cy="16" r="5" fill="white"/>
+                            <ellipse cx="16" cy="16" rx="12" ry="5" transform="rotate(-28 16 16)" stroke="white" stroke-width="2"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <div class="text-base font-extrabold tracking-tight text-white leading-none">Orbit</div>
+                          <div class="text-[10px] text-slate-300/90 font-medium mt-0.5">Liquid Glass Hub</div>
+                        </div>
+                      </div>
+                      <nav id="desktop-nav" class="flex flex-col gap-1.5"></nav>
+                    </div>
+                    <div id="desktop-user-mini" onclick="setTab('perfil')" class="lg-pill lg-sheen cursor-pointer p-2.5 rounded-2xl flex items-center gap-2.5"></div>
+                  </aside>
+
+                  <div id="app-viewport" class="flex-1 min-w-0 h-full relative overflow-hidden rounded-[24px] border border-white/[0.12] bg-slate-950/35 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"></div>
+
+                  <div id="device-modal-root" class="pointer-events-none absolute inset-0 z-40"></div>
+                  <div id="device-toast-container" class="pointer-events-none absolute bottom-6 right-6 z-50 flex flex-col items-end gap-2"></div>
+                </div>
+              </div>
+            </div>
+            <div class="laptop-base"><div class="laptop-notch"></div></div>
+          </div>
+        `;
+      } else if (AppState.device === 'mobile') {
+        scaler.innerHTML = `
+          <div class="phone-shell">
+            <div class="phone-btn-left-1"></div>
+            <div class="phone-btn-left-2"></div>
+            <div class="phone-btn-right"></div>
+            <div class="phone-screen app-ambient-bg">
+              ${ambientOrbsLayer}
+
+              <!-- Barra de status translúcida + Dynamic Island -->
+              <div class="h-11 px-6 pt-2 flex items-center justify-between bg-transparent shrink-0 relative z-20">
+                <span class="text-xs font-bold text-white/95 tracking-tight">16:36</span>
+                <div class="w-[104px] h-[26px] rounded-full bg-black/95 border border-white/15 flex items-center justify-end pr-2.5 shadow-lg">
+                  <span class="w-2.5 h-2.5 rounded-full bg-indigo-950 border border-indigo-400/40"></span>
+                </div>
+                <div class="flex items-center gap-1.5 text-white/95">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18h3v-4H2v4zm5 0h3v-7H7v7zm5 0h3V7h-3v11zm5 0h3V3h-3v15z"/></svg>
+                  <div class="w-5 h-2.5 rounded-[3px] border border-white/75 p-[1.5px] flex items-center">
+                    <div class="w-full h-full bg-emerald-300 rounded-[1px]"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Conteúdo do app mobile (desliza por baixo da cápsula Liquid Glass flutuante) -->
+              <div id="app-viewport" class="flex-1 min-h-0 relative overflow-hidden z-10"></div>
+
+              <!-- Barra de navegação inferior flutuante em cápsula Liquid Glass (iOS 26 style) -->
+              <div class="pointer-events-none absolute bottom-4 left-3.5 right-3.5 z-30 flex flex-col items-center gap-2">
+                <nav id="mobile-nav" class="pointer-events-auto lg-bar w-full h-[60px] rounded-[30px] px-2 flex items-center justify-around"></nav>
+                <div class="w-28 h-1 rounded-full bg-white/35"></div>
+              </div>
+
+              <div id="device-modal-root" class="pointer-events-none absolute inset-0 z-40"></div>
+              <div id="device-toast-container" class="pointer-events-none absolute bottom-[92px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        scaler.innerHTML = `
+          <div class="watch-assembly">
+            <div class="watch-band-top"></div>
+            <div class="watch-case">
+              <div class="watch-crown" title="Digital Crown"></div>
+              <div class="watch-side-btn" title="Botão Lateral"></div>
+              <div class="watch-screen app-ambient-bg flex flex-col">
+                <div id="app-viewport" class="flex-1 relative overflow-hidden"></div>
+                <div id="device-modal-root" class="pointer-events-none absolute inset-0 z-40"></div>
+                <div id="device-toast-container" class="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center"></div>
+              </div>
+            </div>
+            <div class="watch-band-bottom"></div>
+          </div>
+        `;
+      }
+
+      renderActiveScreen();
+    }
+
+    function renderNavigation() {
+      const navItems = [
+        {
+          id: 'orbita',
+          label: 'Órbita & Perto',
+          short: 'Órbita',
+          icon: `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><ellipse cx="12" cy="12" rx="9.5" ry="4.5" transform="rotate(-25 12 12)"/></svg>`
+        },
+        {
+          id: 'parque',
+          label: 'Parque 2D',
+          short: 'Parque',
+          badge: '7',
+          icon: `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 6.5 11h3L7 17h10l-2.5-6h3L12 3z"/><path d="M12 17v4"/></svg>`
+        },
+        {
+          id: 'comunidade',
+          label: 'Comunidade',
+          short: 'Saúde',
+          icon: `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 8 4 4.5 7.5 4.5c2 0 3.5 1.1 4.5 2.5 1-1.4 2.5-2.5 4.5-2.5 3.5 0 5.9 3.5 4.5 7-2 5-9 9.5-9 9.5z"/></svg>`
+        },
+        {
+          id: 'perfil',
+          label: 'Meu Perfil Hub',
+          short: 'Meu Hub',
+          icon: `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>`
+        }
+      ];
+
+      if (AppState.device === 'desktop') {
+        const nav = document.getElementById('desktop-nav');
+        if (nav) {
+          nav.innerHTML = navItems.map((item) => {
+            const active = AppState.activeTab === item.id;
+            return `
+              <button type="button" onclick="setTab('${item.id}')" class="lg-sheen relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${active ? 'lg-active-lens text-white' : 'text-slate-300/85 hover:text-white hover:bg-white/[0.08] border border-transparent'}">
+                <span class="flex items-center gap-3">
+                  <span class="${active ? 'text-white' : 'text-slate-300/80'}">${item.icon}</span>
+                  <span>${item.label}</span>
+                </span>
+                ${item.badge ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-300/35">${item.badge}</span>` : ''}
+              </button>
+            `;
+          }).join('');
+        }
+
+        const mini = document.getElementById('desktop-user-mini');
+        if (mini) {
+          const prim = INTENTIONS[AppState.user.primaryIntention];
+          mini.innerHTML = `
+            <div class="w-9 h-9 rounded-full overflow-hidden shrink-0" style="box-shadow: 0 0 0 2px ${prim.color};">
+              ${createAvatarSVG(AppState.user.avatar, 36)}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white truncate">${escapeHtml(AppState.user.name)}</div>
+              <div class="text-[10px] text-slate-300/85 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full ${AppState.user.isPublic ? 'bg-emerald-300' : 'bg-amber-300'}"></span>
+                <span>${AppState.user.isPublic ? 'Perfil Público' : 'Privado'}</span>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      if (AppState.device === 'mobile') {
+        const nav = document.getElementById('mobile-nav');
+        if (nav) {
+          nav.innerHTML = navItems.map((item) => {
+            const active = AppState.activeTab === item.id;
+            return `
+              <button type="button" onclick="setTab('${item.id}')" class="relative flex flex-col items-center justify-center gap-0.5 flex-1 h-[46px] rounded-[22px] transition-all ${active ? 'lg-active-lens text-white' : 'text-slate-300/75 hover:text-white'}">
+                ${item.icon}
+                <span class="text-[10px] font-semibold tracking-tight">${item.short}</span>
+                ${item.badge ? `<span class="absolute top-1 right-4 w-4 h-4 rounded-full bg-emerald-400 text-[9px] font-extrabold text-slate-950 flex items-center justify-center shadow">${item.badge}</span>` : ''}
+              </button>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function renderActiveScreen() {
+      cleanupActiveEngines();
+      renderNavigation();
+
+      if (AppState.device === 'watch') {
+        renderWatchScreen();
+        renderDeviceModals();
+        return;
+      }
+
+      if (AppState.activeTab === 'orbita') renderOrbitaScreen();
+      else if (AppState.activeTab === 'parque') renderParqueScreen();
+      else if (AppState.activeTab === 'comunidade') renderComunidadeScreen();
+      else if (AppState.activeTab === 'perfil') renderPerfilScreen();
+
+      renderDeviceModals();
+    }
+
+    /* =========================================================================
+       5. TELA 1: ÓRBITA RADIAL (COLMEIA APPLE WATCH) + LISTA PERTO DE MIM
+       ========================================================================= */
+    function getFilteredProfiles() {
+      if (AppState.orbitaFilter === 'all') return SIMULATED_PROFILES;
+      return SIMULATED_PROFILES.filter(p => p.intentions.includes(AppState.orbitaFilter));
+    }
+
+    function setOrbitaViewMode(mode) {
+      AppState.orbitaViewMode = mode;
+      renderActiveScreen();
+    }
+
+    function setOrbitaFilter(filter) {
+      AppState.orbitaFilter = filter;
+      renderActiveScreen();
+    }
+
+    function renderOrbitaScreen() {
+      const viewport = document.getElementById('app-viewport');
+      if (!viewport) return;
+      const isMobile = AppState.device === 'mobile';
+      const profiles = getFilteredProfiles();
+
+      const filterPills = [
+        { id: 'all', label: 'Todos', color: '#e2e8f0' },
+        ...Object.values(INTENTIONS).map(i => ({ id: i.id, label: i.short, color: i.color }))
+      ];
+
+      viewport.innerHTML = `
+        <div class="flex flex-col h-full w-full relative">
+          <!-- Cabeçalho Órbita em Liquid Glass -->
+          <div class="lg-header px-4 ${isMobile ? 'pt-2 pb-3' : 'px-5 pt-4 pb-3.5'} z-20 shrink-0">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h1 class="${isMobile ? 'text-base' : 'text-lg'} font-extrabold text-white tracking-tight flex items-center gap-2">
+                  Sua Órbita
+                  <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white/[0.12] text-violet-100 border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]">${profiles.length} perto</span>
+                </h1>
+                ${!isMobile ? `<p class="text-xs text-slate-300/80 mt-0.5">Arraste o radar para explorar conexões ao seu redor · Anel luminoso indica a intenção principal</p>` : ''}
+              </div>
+
+              <!-- Toggle Órbita vs Lista em cápsula Liquid Glass -->
+              <div class="lg-pill flex items-center p-1 rounded-full shrink-0">
+                <button type="button" onclick="setOrbitaViewMode('radial')" class="px-3 py-1 rounded-full text-[11px] font-semibold transition ${AppState.orbitaViewMode === 'radial' ? 'lg-active-lens text-white' : 'text-slate-300 hover:text-white'}">
+                  Órbita
+                </button>
+                <button type="button" onclick="setOrbitaViewMode('lista')" class="px-3 py-1 rounded-full text-[11px] font-semibold transition ${AppState.orbitaViewMode === 'lista' ? 'lg-active-lens text-white' : 'text-slate-300 hover:text-white'}">
+                  Lista
+                </button>
+              </div>
+            </div>
+
+            <!-- Filtros por Intenção -->
+            <div class="flex items-center gap-1.5 mt-2.5 overflow-x-auto orbit-scroll pb-0.5">
+              ${filterPills.map(f => {
+                const active = AppState.orbitaFilter === f.id;
+                return `
+                  <button type="button" onclick="setOrbitaFilter('${f.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition ${active ? 'lg-active-lens text-white' : 'bg-white/[0.06] text-slate-300 border border-white/[0.11] hover:bg-white/[0.12] hover:text-white'}">
+                    <span class="w-2 h-2 rounded-full shadow-sm" style="background:${f.color}"></span>
+                    ${f.label}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Corpo: Modo Radial (Colmeia Apple Watch) ou Modo Lista -->
+          ${AppState.orbitaViewMode === 'radial' ? `
+            <div id="orbit-radial-field" class="relative flex-1 overflow-hidden cursor-grab active:cursor-grabbing select-none" style="background: radial-gradient(circle at center, rgba(167,139,250,0.14) 0%, rgba(15,23,42,0.22) 55%, rgba(7,10,18,0.45) 100%);">
+              <!-- Círculos guia sutis de radar -->
+              <div class="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30">
+                <div class="w-[210px] h-[210px] rounded-full border border-white/25"></div>
+                <div class="absolute w-[390px] h-[390px] rounded-full border border-dashed border-cyan-200/25"></div>
+                <div class="absolute w-[580px] h-[580px] rounded-full border border-white/10"></div>
+              </div>
+
+              <!-- Camada onde as bolhas são posicionadas e escaladas com física fisheye -->
+              <div id="orbit-bubbles-layer" class="absolute inset-0"></div>
+
+              <!-- Botão flutuante Centralizar em cápsula Liquid Glass -->
+              <button type="button" id="orbit-center-btn" class="lg-pill lg-sheen absolute ${isMobile ? 'bottom-[88px] right-3.5' : 'bottom-4 right-4'} z-20 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white active:scale-95">
+                <svg class="w-3.5 h-3.5 text-violet-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+                Centralizar
+              </button>
+
+              ${!isMobile ? `
+                <div class="lg-pill pointer-events-none absolute bottom-4 left-4 z-20 px-3.5 py-2 rounded-full text-[11px] text-slate-200 flex items-center gap-2">
+                  <span class="text-violet-200">✦</span> Arraste para navegar · Toque em uma bolha para ver selos e perfil
+                </div>
+              ` : ''}
+            </div>
+          ` : `
+            <div class="flex-1 overflow-y-auto orbit-scroll ${isMobile ? 'p-3.5 pb-24' : 'p-5'}">
+              <div class="grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-3 lg:grid-cols-4 gap-3.5'}">
+                ${profiles.map(p => renderNearbyCard(p, isMobile)).join('')}
+              </div>
+            </div>
+          `}
+        </div>
+      `;
+
+      if (AppState.orbitaViewMode === 'radial') {
+        const field = document.getElementById('orbit-radial-field');
+        const layer = document.getElementById('orbit-bubbles-layer');
+        const centerBtn = document.getElementById('orbit-center-btn');
+        activeOrbitEngine = new OrbitHoneycombEngine({
+          container: field,
+          layer,
+          centerBtn,
+          profiles,
+          isWatch: false
+        });
+      }
+    }
+
+    function renderNearbyCard(p, isMobile) {
+      const intObj = INTENTIONS[p.primaryIntention];
+      const activeAppKeys = Object.keys(p.apps).filter(k => p.apps[k] && p.apps[k].active);
+      return `
+        <button type="button" onclick="openProfileModal('${p.id}')" class="lg-panel lg-sheen group text-left rounded-[22px] hover:border-white/30 p-3.5 transition-all hover:-translate-y-0.5 flex flex-col gap-2.5">
+          <div class="flex items-center gap-2.5">
+            <div class="relative w-12 h-12 rounded-full overflow-hidden shrink-0" style="box-shadow: 0 0 0 2.5px ${intObj.color}, 0 6px 14px rgba(0,0,0,0.35);">
+              ${createAvatarSVG(p.avatar, 48)}
+              ${p.online ? `<span class="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span>` : ''}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-bold text-white truncate">${p.name}, ${p.age}</div>
+              <div class="text-[11px] text-slate-300/80 flex items-center gap-1">
+                <span>📍 ${p.dist}</span>
+                ${p.inPark ? `<span class="text-emerald-300 font-semibold">· Parque</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="inline-flex self-start items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold backdrop-blur-md" style="background:${intObj.bg}; color:${intObj.color}; border:1px solid ${intObj.border}">
+            ${intObj.emoji} ${intObj.short}
+          </div>
+          ${!isMobile ? `<p class="text-[11px] text-slate-300/85 line-clamp-2 leading-relaxed">${p.bio}</p>` : ''}
+          <div class="flex items-center gap-1.5 mt-auto pt-2 border-t border-white/[0.09]">
+            ${activeAppKeys.slice(0, 4).map(appId => {
+              const app = EXTERNAL_APPS[appId];
+              return `<span title="Ativo no ${app.name}" class="w-5 h-5 rounded-lg flex items-center justify-center shadow-sm" style="background:${app.bg}; color:${app.textColor}">${renderAppBadgeIcon(appId, 'w-3 h-3')}</span>`;
+            }).join('')}
+            ${activeAppKeys.length > 4 ? `<span class="text-[10px] text-slate-300">+${activeAppKeys.length - 4}</span>` : ''}
+          </div>
+        </button>
+      `;
+    }
+
+    /* =========================================================================
+       MOTOR DA GRADE RADIAL (COLMEIA APPLE WATCH COM FÍSICA FISHEYE)
+       ========================================================================= */
+    class OrbitHoneycombEngine {
+      constructor({ container, layer, centerBtn, profiles, isWatch }) {
+        this.container = container;
+        this.layer = layer;
+        this.centerBtn = centerBtn;
+        this.profiles = profiles;
+        this.isWatch = isWatch;
+
+        this.baseRadius = isWatch ? 24 : 36;
+        this.spacing = isWatch ? 64 : 104;
+        this.panX = 0;
+        this.panY = 0;
+        this.velX = 0;
+        this.velY = 0;
+        this.dragging = false;
+        this.moved = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        this.rafId = null;
+        this.nodes = [];
+
+        this.buildNodes();
+        this.bindEvents();
+        this.loop();
+      }
+
+      generateHexRingPositions(count) {
+        // Anéis hexagonais concêntricos em torno de (0, 0)
+        const coords = [];
+        const dirs = [
+          [1, 0], [0.5, Math.sqrt(3) / 2], [-0.5, Math.sqrt(3) / 2],
+          [-1, 0], [-0.5, -Math.sqrt(3) / 2], [0.5, -Math.sqrt(3) / 2]
+        ];
+        let ring = 1;
+        while (coords.length < count) {
+          let x = -ring;
+          let y = 0;
+          // Começa no vértice esquerdo e percorre os 6 lados do anel
+          const startAngle = Math.PI / 6;
+          for (let side = 0; side < 6 && coords.length < count; side++) {
+            const a1 = startAngle + (side * Math.PI) / 3;
+            const a2 = startAngle + ((side + 1) * Math.PI) / 3;
+            for (let step = 0; step < ring && coords.length < count; step++) {
+              const t = step / ring;
+              const rx = (Math.cos(a1) * (1 - t) + Math.cos(a2) * t) * ring * this.spacing;
+              const ry = (Math.sin(a1) * (1 - t) + Math.sin(a2) * t) * ring * this.spacing;
+              coords.push({ x: rx, y: ry });
+            }
+          }
+          ring++;
+        }
+        return coords;
+      }
+
+      buildNodes() {
+        this.layer.innerHTML = '';
+        this.nodes = [];
+
+        // 1. Bolha central do usuário logado (sempre fixa no centro do radar!)
+        const userInt = INTENTIONS[AppState.user.primaryIntention];
+        const centerEl = document.createElement('button');
+        centerEl.type = 'button';
+        centerEl.className = 'absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20 cursor-pointer focus:outline-none';
+        centerEl.innerHTML = `
+          <div class="relative flex flex-col items-center">
+            <div class="rounded-full overflow-hidden shadow-2xl" style="width:${this.baseRadius * 2.15}px; height:${this.baseRadius * 2.15}px; box-shadow: 0 0 0 3px ${userInt.color}, 0 0 0 6px rgba(255,255,255,0.14), 0 12px 28px rgba(0,0,0,0.55);">
+              ${createAvatarSVG(AppState.user.avatar, 96)}
+            </div>
+            <span class="absolute -bottom-2.5 px-2.5 py-0.5 rounded-full bg-slate-900/75 backdrop-blur-xl border border-white/30 text-[10px] font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.35)]">Você</span>
+          </div>
+        `;
+        centerEl.addEventListener('click', () => {
+          if (this.moved) return;
+          if (this.isWatch) setWatchPage(2);
+          else setTab('perfil');
+        });
+        this.layer.appendChild(centerEl);
+        this.centerEl = centerEl;
+
+        // 2. Bolhas dos perfis ao redor
+        const positions = this.generateHexRingPositions(this.profiles.length);
+        const diameter = this.baseRadius * 2;
+
+        this.profiles.forEach((p, idx) => {
+          const intObj = INTENTIONS[p.primaryIntention];
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'absolute left-0 top-0 flex flex-col items-center cursor-pointer focus:outline-none will-change-transform';
+          el.innerHTML = `
+            <div class="relative group">
+              <div class="rounded-full overflow-hidden transition-shadow" style="width:${diameter}px; height:${diameter}px; box-shadow: 0 0 0 2.5px ${intObj.color}, 0 0 0 ${this.isWatch ? '4px' : '5px'} rgba(255,255,255,0.12), 0 10px 22px rgba(0,0,0,0.45);">
+                ${createAvatarSVG(p.avatar, 84)}
+              </div>
+              ${p.online ? `<span class="absolute bottom-0.5 right-0.5 ${this.isWatch ? 'w-2.5 h-2.5' : 'w-3 h-3'} rounded-full bg-emerald-400 border-2 border-slate-950"></span>` : ''}
+              ${p.inPark && !this.isWatch ? `<span title="Está no Parque 2D" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-400/90 backdrop-blur-md text-[10px] flex items-center justify-center shadow border border-white/40">🌳</span>` : ''}
+            </div>
+            <div class="bubble-label mt-1.5 px-2 py-0.5 rounded-full bg-slate-950/65 backdrop-blur-xl border border-white/20 ${this.isWatch ? 'text-[9px]' : 'text-[10px]'} font-bold text-white whitespace-nowrap shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
+              ${p.name} <span class="text-slate-300/80 font-normal">${p.dist}</span>
+            </div>
+          `;
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.moved) return;
+            openProfileModal(p.id);
+          });
+          this.layer.appendChild(el);
+          this.nodes.push({
+            el,
+            labelEl: el.querySelector('.bubble-label'),
+            bx: positions[idx].x,
+            by: positions[idx].y
+          });
+        });
+      }
+
+      bindEvents() {
+        this.onPointerDown = (e) => {
+          this.dragging = true;
+          this.moved = false;
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+          this.velX = 0;
+          this.velY = 0;
+        };
+
+        this.onPointerMove = (e) => {
+          if (!this.dragging) return;
+          const scale = AppState.currentScale || 1;
+          const dx = (e.clientX - this.lastX) / scale;
+          const dy = (e.clientY - this.lastY) / scale;
+          if (Math.hypot(dx, dy) > 2.5) this.moved = true;
+          this.panX += dx;
+          this.panY += dy;
+          this.velX = dx * 0.7;
+          this.velY = dy * 0.7;
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+        };
+
+        this.onPointerUp = () => {
+          this.dragging = false;
+          setTimeout(() => { this.moved = false; }, 60);
+        };
+
+        this.onCenterClick = () => {
+          this.velX = -this.panX * 0.18;
+          this.velY = -this.panY * 0.18;
+        };
+
+        this.container.addEventListener('pointerdown', this.onPointerDown);
+        window.addEventListener('pointermove', this.onPointerMove);
+        window.addEventListener('pointerup', this.onPointerUp);
+        if (this.centerBtn) this.centerBtn.addEventListener('click', this.onCenterClick);
+      }
+
+      loop() {
+        const w = this.container.clientWidth || 360;
+        const h = this.container.clientHeight || 520;
+        const cx = w / 2;
+        const cy = h / 2 - (AppState.device === 'mobile' ? 18 : 0);
+
+        if (!this.dragging) {
+          this.panX += this.velX;
+          this.panY += this.velY;
+          this.velX *= 0.90;
+          this.velY *= 0.90;
+
+          // Limite elástico suave
+          const maxPan = this.isWatch ? 165 : 240;
+          const distPan = Math.hypot(this.panX, this.panY);
+          if (distPan > maxPan) {
+            const pull = (distPan - maxPan) * 0.12;
+            this.panX -= (this.panX / distPan) * pull;
+            this.panY -= (this.panY / distPan) * pull;
+          }
+        }
+
+        // Centro do usuário permanece ancorado no centro visual do radar
+        if (this.centerEl) {
+          this.centerEl.style.left = `${cx}px`;
+          this.centerEl.style.top = `${cy}px`;
+        }
+
+        const maxDist = Math.min(w, h) * 0.56;
+
+        for (let i = 0; i < this.nodes.length; i++) {
+          const n = this.nodes[i];
+          let rx = n.bx + this.panX;
+          let ry = n.by + this.panY;
+
+          // Repulsão suave para nenhuma bolha ficar exatamente atrás do avatar central do usuário
+          const dCenter = Math.hypot(rx, ry);
+          const minClear = this.isWatch ? 54 : 84;
+          if (dCenter > 0.1 && dCenter < minClear) {
+            const push = (minClear - dCenter);
+            rx += (rx / dCenter) * push;
+            ry += (ry / dCenter) * push;
+          }
+
+          const distFromCenter = Math.hypot(rx, ry);
+          const norm = Math.min(1, distFromCenter / Math.max(120, maxDist));
+          // Curva fisheye (maiores perto do centro, menores nas bordas estilo Apple Watch)
+          const scale = 1.12 - norm * 0.56;
+          const opacity = 1 - Math.pow(norm, 2.2) * 0.52;
+
+          const x = cx + rx;
+          const y = cy + ry;
+          n.el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+          n.el.style.opacity = opacity.toFixed(3);
+          n.el.style.zIndex = String(Math.round((1 - norm) * 15) + 1);
+          if (n.labelEl) {
+            n.labelEl.style.opacity = scale > 0.72 ? '1' : '0';
+          }
+        }
+
+        this.rafId = requestAnimationFrame(() => this.loop());
+      }
+
+      destroy() {
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.container.removeEventListener('pointerdown', this.onPointerDown);
+        window.removeEventListener('pointermove', this.onPointerMove);
+        window.removeEventListener('pointerup', this.onPointerUp);
+        if (this.centerBtn) this.centerBtn.removeEventListener('click', this.onCenterClick);
+      }
+    }
+
+    /* =========================================================================
+       6. TELA 2: PARQUE CENTRAL ORBIT (SALA 2D EM PIXEL ART ESTILO WORKADVENTURE)
+       ========================================================================= */
+    function toggleDesktopDpad() {
+      AppState.showDesktopDpad = !AppState.showDesktopDpad;
+      const dpad = document.getElementById('park-dpad');
+      const btn = document.getElementById('toggle-dpad-btn');
+      if (dpad) dpad.classList.toggle('hidden', !AppState.showDesktopDpad);
+      if (btn) btn.classList.toggle('lg-active-lens', AppState.showDesktopDpad);
+    }
+
+    function cycleBotDialogue(botId) {
+      if (activeParkEngine) activeParkEngine.cycleBotDialogue(botId);
+    }
+
+    function renderParqueScreen() {
+      const viewport = document.getElementById('app-viewport');
+      if (!viewport) return;
+      const isMobile = AppState.device === 'mobile';
+      const showDpad = isMobile || AppState.showDesktopDpad;
+
+      viewport.innerHTML = `
+        <div class="relative w-full h-full flex flex-col bg-[#1b2e1e] overflow-hidden">
+          <!-- Canvas 2D do Parque em Pixel Art -->
+          <div id="park-canvas-wrap" class="relative flex-1 w-full min-h-0 overflow-hidden">
+            <canvas id="park-canvas" class="pixel-canvas block w-full h-full cursor-pointer touch-none"></canvas>
+
+            <!-- HUD Superior Flutuante em Liquid Glass -->
+            <div class="pointer-events-none absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
+              <div class="lg-bar pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
+                <span class="${isMobile ? 'text-[11px]' : 'text-xs'} font-bold text-white">Parque Central Orbit</span>
+                <span class="text-[11px] text-emerald-200 font-semibold">· 7 online</span>
+              </div>
+
+              ${!isMobile ? `
+                <div class="flex items-center gap-2">
+                  <div class="lg-bar px-3.5 py-1.5 rounded-full text-[11px] text-slate-100">
+                    🎮 <strong class="text-white">WASD</strong> / Setas ou <strong class="text-white">clique/arraste</strong> no chão
+                  </div>
+                  <button type="button" id="toggle-dpad-btn" onclick="toggleDesktopDpad()" title="Mostrar/ocultar direcional na tela" class="lg-pill pointer-events-auto px-3 py-1.5 rounded-full text-[11px] font-semibold text-white transition ${AppState.showDesktopDpad ? 'lg-active-lens' : ''}">
+                    🕹️ D-Pad
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+
+            ${isMobile ? `
+              <div class="lg-bar pointer-events-none absolute top-[50px] left-3 z-10 px-3 py-1 rounded-full text-[10px] text-white/95">
+                👆 Toque/arraste no chão ou use o direcional
+              </div>
+            ` : ''}
+
+            <!-- D-Pad Direcional em cápsula Liquid Glass -->
+            <div id="park-dpad" class="${showDpad ? '' : 'hidden'} pointer-events-none absolute ${isMobile ? 'bottom-3' : 'bottom-3.5'} left-3 z-20 select-none">
+              <div class="lg-bar grid grid-cols-3 gap-1 w-[108px] h-[108px] p-1.5 rounded-[26px]">
+                <div></div>
+                <button type="button" data-dpad="up" aria-label="Andar para cima" class="pointer-events-auto touch-none rounded-xl bg-white/[0.12] hover:bg-white/[0.24] active:bg-violet-400/60 border border-white/25 text-white flex items-center justify-center shadow-sm transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                </button>
+                <div></div>
+
+                <button type="button" data-dpad="left" aria-label="Andar para esquerda" class="pointer-events-auto touch-none rounded-xl bg-white/[0.12] hover:bg-white/[0.24] active:bg-violet-400/60 border border-white/25 text-white flex items-center justify-center shadow-sm transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div class="rounded-full bg-white/15 border border-white/20 m-1.5"></div>
+                <button type="button" data-dpad="right" aria-label="Andar para direita" class="pointer-events-auto touch-none rounded-xl bg-white/[0.12] hover:bg-white/[0.24] active:bg-violet-400/60 border border-white/25 text-white flex items-center justify-center shadow-sm transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+
+                <div></div>
+                <button type="button" data-dpad="down" aria-label="Andar para baixo" class="pointer-events-auto touch-none rounded-xl bg-white/[0.12] hover:bg-white/[0.24] active:bg-violet-400/60 border border-white/25 text-white flex items-center justify-center shadow-sm transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div></div>
+              </div>
+            </div>
+
+            <!-- Card compacto de interação com o Bot próximo em Liquid Glass -->
+            <div id="park-bot-card" class="hidden lg-sheet pointer-events-auto absolute ${isMobile ? 'bottom-[124px] left-3 right-3' : 'bottom-4 right-4 w-[360px] max-w-[46%]'} z-20 rounded-[22px] p-3.5 transition-all"></div>
+          </div>
+
+          <!-- Barra de Chat Rápido no Parque -->
+          <div class="${isMobile ? 'px-3 pt-2 pb-[86px] bg-slate-950/75 backdrop-blur-2xl border-t border-white/15' : 'px-3 py-2 bg-slate-950/65 backdrop-blur-2xl border-t border-white/15'} shrink-0 z-20">
+            <form id="park-chat-form" class="lg-pill h-10 px-2 rounded-full flex items-center gap-2">
+              <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/35">
+                ${createAvatarSVG(AppState.user.avatar, 28)}
+              </div>
+              <input id="park-chat-input" type="text" maxlength="75" placeholder="Falar no Parque (aparece sobre seu boneco)..." class="flex-1 bg-transparent px-1.5 py-1 text-xs text-white placeholder-slate-300/75 outline-none" />
+              <button type="submit" class="lg-btn-primary px-3.5 py-1 rounded-full text-xs font-bold text-white active:scale-95 shrink-0">
+                Enviar
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+
+      const canvas = document.getElementById('park-canvas');
+      const wrap = document.getElementById('park-canvas-wrap');
+      const botCard = document.getElementById('park-bot-card');
+      const chatForm = document.getElementById('park-chat-form');
+      const chatInput = document.getElementById('park-chat-input');
+      const dpadEl = document.getElementById('park-dpad');
+
+      activeParkEngine = new Park2DEngine({ canvas, wrap, botCard, chatForm, chatInput, dpadEl });
+    }
+
+    class Park2DEngine {
+      constructor({ canvas, wrap, botCard, chatForm, chatInput, dpadEl }) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.wrap = wrap;
+        this.botCard = botCard;
+        this.chatForm = chatForm;
+        this.chatInput = chatInput;
+        this.dpadEl = dpadEl;
+
+        this.worldW = 1200;
+        this.worldH = 900;
+        this.viewW = 390;
+        this.viewH = 560;
+        this.camX = 0;
+        this.camY = 0;
+
+        // Jogador nasce no caminho de areia abaixo da fonte (zero sobreposição com obstáculos)
+        this.player = {
+          x: 600,
+          y: 565,
+          r: 13,
+          speed: 175,
+          targetX: null,
+          targetY: null,
+          walkPhase: 0,
+          facing: 'down',
+          speech: null,
+          speechTimer: 0
+        };
+
+        this.keys = { up: false, down: false, left: false, right: false };
+        this.dpadState = { up: false, down: false, left: false, right: false };
+        this.pointerWalking = false;
+        this.targetPulse = 0;
+        this.time = 0;
+        this.lastFrame = performance.now();
+        this.rafId = null;
+        this.activeBotId = null;
+        this.pacocaSpeechTimer = 0;
+
+        // Obstáculos do mapa
+        this.obstacles = [
+          // Fonte central
+          { type: 'circle', x: 600, y: 450, r: 60, kind: 'fountain' },
+          // Quiosque Café Orbit (noroeste)
+          { type: 'rect', x: 150, y: 125, w: 185, h: 105, kind: 'cafe' },
+          // Totem Saúde & Comunidade (nordeste)
+          { type: 'rect', x: 870, y: 155, w: 126, h: 72, kind: 'totem' },
+          // 4 Bancos na praça central
+          { type: 'rect', x: 468, y: 336, w: 54, h: 20, kind: 'bench' },
+          { type: 'rect', x: 678, y: 336, w: 54, h: 20, kind: 'bench' },
+          { type: 'rect', x: 468, y: 546, w: 54, h: 20, kind: 'bench' },
+          { type: 'rect', x: 678, y: 546, w: 54, h: 20, kind: 'bench' }
+        ];
+
+        // Árvores decorativas (fora das vias principais)
+        this.trees = [
+          { x: 110, y: 310 }, { x: 250, y: 330 }, { x: 130, y: 650 },
+          { x: 280, y: 740 }, { x: 430, y: 170 }, { x: 760, y: 170 },
+          { x: 1070, y: 290 }, { x: 1050, y: 640 }, { x: 900, y: 750 },
+          { x: 420, y: 760 }, { x: 780, y: 760 }, { x: 600, y: 790 }
+        ];
+        this.trees.forEach(t => {
+          this.obstacles.push({ type: 'circle', x: t.x, y: t.y + 8, r: 16, kind: 'tree' });
+        });
+
+        // Flores no gramado
+        this.flowers = [];
+        const flowerColors = ['#fef08a', '#f9a8d4', '#93c5fd', '#ffffff', '#c4b5fd'];
+        for (let i = 0; i < 64; i++) {
+          const fx = 60 + ((i * 173) % 1080);
+          const fy = 60 + ((i * 251) % 780);
+          // Evita colocar flores em cima dos caminhos principais
+          if ((fx > 525 && fx < 675) || (fy > 375 && fy < 525)) continue;
+          if (Math.hypot(fx - 600, fy - 450) < 170) continue;
+          this.flowers.push({ x: fx, y: fy, color: flowerColors[i % flowerColors.length] });
+        }
+
+        // Easter egg: Gatinho Paçoca perto dos arbustos do Café Orbit
+        this.pacoca = { x: 368, y: 215 };
+
+        // 7 Bots autônomos com narrativas próprias
+        this.bots = [
+          {
+            id: 'p1', name: 'Matheus', shirt: '#38bdf8', skin: '#f1c27d', hair: '#1f2937',
+            x: 495, y: 465, speed: 54, walkPhase: 0, pauseTimer: 1.5, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 495, y: 465 }, { x: 385, y: 445 }, { x: 410, y: 310 }, { x: 470, y: 455 }],
+            lines: [
+              'Ei! Você viu meu gato Paçoca por aí? Ele ama os arbustos perto do Café Orbit!',
+              'Se encontrar um gatinho laranja no parque, me avisa! 🐱',
+              'Adorei seu perfil no Orbit — meu selo do Grindr e Insta estão lá no cartão.'
+            ],
+            foundLines: [
+              'VOCÊ ACHOU O PAÇOCA perto do café!! Muito obrigado, salvou meu dia! 🐱💜',
+              'Devo um café gelado no Quiosque Orbit pra você!'
+            ]
+          },
+          {
+            id: 'p2', name: 'Rafa', shirt: '#fb923c', skin: '#c68642', hair: '#111827',
+            x: 720, y: 505, speed: 62, walkPhase: 0, pauseTimer: 0.8, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 720, y: 505 }, { x: 845, y: 465 }, { x: 785, y: 615 }, { x: 695, y: 520 }],
+            lines: [
+              'Acabei de sair da corrida! Nada melhor que esse parque pra puxar papo sem pressão.',
+              'Curti muito esse visual Liquid Glass do Orbit no celular.',
+              'Se animar um rolê hoje mais tarde, dá uma olhada no meu Hub!'
+            ]
+          },
+          {
+            id: 'p3', name: 'Thiago', shirt: '#c084fc', skin: '#ffdbac', hair: '#451a03',
+            x: 300, y: 278, speed: 46, walkPhase: 0, pauseTimer: 2.1, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 300, y: 278 }, { x: 225, y: 278 }, { x: 355, y: 295 }],
+            lines: [
+              'O café gelado daqui do Quiosque Orbit é o melhor da praça ☕',
+              'Tô lendo um livro de cinema por aqui — adoro conhecer gente que curte filmes indie.',
+              'Bem melhor conversar andando pelo parque do que ficar só dando swipe!'
+            ]
+          },
+          {
+            id: 'p4', name: 'Dani', shirt: '#34d399', skin: '#8d5524', hair: '#0f172a',
+            x: 925, y: 268, speed: 44, walkPhase: 0, pauseTimer: 1.8, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 925, y: 268 }, { x: 840, y: 275 }, { x: 970, y: 310 }],
+            lines: [
+              'Oi! Tô aqui perto do Totem de Saúde tirando dúvidas sobre PrEP e vacinas no SUS 🛡️',
+              'Você já viu o guia público de vacinação na aba Comunidade? Vale muito salvar!',
+              'Cuidar da saúde também é construir comunidade.'
+            ]
+          },
+          {
+            id: 'p5', name: 'Diego', shirt: '#f59e0b', skin: '#e0ac69', hair: '#1e1b4b',
+            x: 420, y: 605, speed: 52, walkPhase: 0, pauseTimer: 1.2, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 420, y: 605 }, { x: 525, y: 645 }, { x: 380, y: 550 }],
+            lines: [
+              'Testando um set novo de house no fone enquanto dou uma volta por aqui 🎧',
+              'O link do meu Spotify tá ativo lá no meu cartão Orbit!',
+              'Imagina essa sala com áudio por proximidade num sábado à noite!'
+            ]
+          },
+          {
+            id: 'p6', name: 'Bruno', shirt: '#818cf8', skin: '#f1c27d', hair: '#713f12',
+            x: 755, y: 365, speed: 50, walkPhase: 0, pauseTimer: 1.6, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 755, y: 365 }, { x: 830, y: 410 }, { x: 700, y: 300 }],
+            lines: [
+              'Cheguei na cidade essa semana! O Orbit tá me salvando pra fazer amizade 🗺️',
+              'Você recomenda algum café ou bar legal aqui perto?',
+              'Curti que dá pra mostrar os selos de vários apps num lugar só.'
+            ]
+          },
+          {
+            id: 'p7', name: 'Leo', shirt: '#60a5fa', skin: '#c68642', hair: '#111827',
+            x: 600, y: 345, speed: 48, walkPhase: 0, pauseTimer: 2.0, wpIndex: 0, lineIndex: 0,
+            waypoints: [{ x: 600, y: 345 }, { x: 600, y: 265 }, { x: 545, y: 315 }],
+            lines: [
+              'A luz batendo nessa fonte central tá incrível pra fotografar 📸',
+              'Dica: clica em mim ou se aproxima dos outros bonecos pra ver as histórias!',
+              'Meu Instagram de fotografia tá linkado lá no meu perfil.'
+            ]
+          }
+        ];
+
+        this.resize();
+        this.bindEvents();
+        this.loop(performance.now());
+      }
+
+      resize() {
+        const w = Math.max(240, this.wrap.clientWidth || 390);
+        const h = Math.max(240, this.wrap.clientHeight || 540);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.viewW = w;
+        this.viewH = h;
+        this.canvas.width = Math.round(w * dpr);
+        this.canvas.height = Math.round(h * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      screenToWorld(clientX, clientY) {
+        const rect = this.canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return { x: this.player.x, y: this.player.y };
+        const sx = (clientX - rect.left) * (this.viewW / rect.width);
+        const sy = (clientY - rect.top) * (this.viewH / rect.height);
+        return {
+          x: Math.max(24, Math.min(this.worldW - 24, sx + this.camX)),
+          y: Math.max(24, Math.min(this.worldH - 24, sy + this.camY))
+        };
+      }
+
+      collidesAt(x, y, radius = 13) {
+        if (x < 22 || x > this.worldW - 22 || y < 22 || y > this.worldH - 22) return true;
+        for (let i = 0; i < this.obstacles.length; i++) {
+          const ob = this.obstacles[i];
+          if (ob.type === 'circle') {
+            if (Math.hypot(x - ob.x, y - ob.y) < ob.r + radius) return true;
+          } else {
+            const cx = Math.max(ob.x, Math.min(x, ob.x + ob.w));
+            const cy = Math.max(ob.y, Math.min(y, ob.y + ob.h));
+            if (Math.hypot(x - cx, y - cy) < radius) return true;
+          }
+        }
+        return false;
+      }
+
+      ensureUnstuck() {
+        if (!this.collidesAt(this.player.x, this.player.y, this.player.r)) return;
+        for (let dist = 8; dist <= 96; dist += 8) {
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+            const nx = this.player.x + Math.cos(a) * dist;
+            const ny = this.player.y + Math.sin(a) * dist;
+            if (!this.collidesAt(nx, ny, this.player.r)) {
+              this.player.x = nx;
+              this.player.y = ny;
+              return;
+            }
+          }
+        }
+      }
+
+      bindEvents() {
+        this.onResize = () => this.resize();
+        window.addEventListener('resize', this.onResize);
+
+        this.onKeyDown = (e) => {
+          const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+          if (tag === 'input' || tag === 'textarea') return;
+          const k = e.key.toLowerCase();
+          let handled = true;
+          if (k === 'w' || k === 'arrowup') this.keys.up = true;
+          else if (k === 's' || k === 'arrowdown') this.keys.down = true;
+          else if (k === 'a' || k === 'arrowleft') this.keys.left = true;
+          else if (k === 'd' || k === 'arrowright') this.keys.right = true;
+          else handled = false;
+
+          if (handled) {
+            e.preventDefault();
+            this.player.targetX = null;
+            this.player.targetY = null;
+          }
+        };
+
+        this.onKeyUp = (e) => {
+          const k = e.key.toLowerCase();
+          if (k === 'w' || k === 'arrowup') this.keys.up = false;
+          if (k === 's' || k === 'arrowdown') this.keys.down = false;
+          if (k === 'a' || k === 'arrowleft') this.keys.left = false;
+          if (k === 'd' || k === 'arrowright') this.keys.right = false;
+        };
+
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
+
+        this.onPointerDown = (e) => {
+          e.preventDefault();
+          const pt = this.screenToWorld(e.clientX, e.clientY);
+
+          // Verifica clique no gatinho Paçoca
+          if (Math.hypot(pt.x - this.pacoca.x, pt.y - this.pacoca.y) < 34) {
+            this.triggerPacoca();
+          }
+
+          // Verifica clique no Quiosque Café Orbit
+          if (pt.x >= 150 && pt.x <= 335 && pt.y >= 125 && pt.y <= 230) {
+            showDeviceToast('☕ Café Orbit: você pediu um iced latte virtual!', 'success');
+            this.player.targetX = 245;
+            this.player.targetY = 258;
+            this.targetPulse = 1;
+            return;
+          }
+
+          // Verifica clique no Totem Saúde & Comunidade
+          if (pt.x >= 870 && pt.x <= 996 && pt.y >= 155 && pt.y <= 227) {
+            showDeviceToast('🛡️ Totem Saúde: acesse a aba Comunidade para guias de PrEP e vacinas!', 'info');
+            this.player.targetX = 930;
+            this.player.targetY = 252;
+            this.targetPulse = 1;
+            return;
+          }
+
+          // Verifica clique direto em algum bot
+          for (let i = 0; i < this.bots.length; i++) {
+            const b = this.bots[i];
+            if (Math.hypot(pt.x - b.x, pt.y - b.y) < 34) {
+              this.player.targetX = b.x;
+              this.player.targetY = b.y + 42;
+              if (this.collidesAt(this.player.targetX, this.player.targetY, this.player.r)) {
+                this.player.targetY = b.y - 42;
+              }
+              this.targetPulse = 1;
+              this.focusBot(b, true);
+              return;
+            }
+          }
+
+          // Clique no chão: anda até o ponto e permite arrastar continuamente
+          this.pointerWalking = true;
+          this.player.targetX = pt.x;
+          this.player.targetY = pt.y;
+          this.targetPulse = 1;
+        };
+
+        this.onPointerMove = (e) => {
+          if (!this.pointerWalking) return;
+          const pt = this.screenToWorld(e.clientX, e.clientY);
+          this.player.targetX = pt.x;
+          this.player.targetY = pt.y;
+          this.targetPulse = 0.85;
+        };
+
+        this.onPointerUp = () => {
+          this.pointerWalking = false;
+        };
+
+        this.canvas.addEventListener('pointerdown', this.onPointerDown);
+        window.addEventListener('pointermove', this.onPointerMove);
+        window.addEventListener('pointerup', this.onPointerUp);
+
+        // Eventos do D-Pad na tela
+        this.dpadHandlers = [];
+        if (this.dpadEl) {
+          this.dpadEl.querySelectorAll('[data-dpad]').forEach((btn) => {
+            const dir = btn.getAttribute('data-dpad');
+            const down = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              this.dpadState[dir] = true;
+              this.player.targetX = null;
+              this.player.targetY = null;
+            };
+            const up = () => {
+              this.dpadState[dir] = false;
+            };
+            btn.addEventListener('pointerdown', down);
+            btn.addEventListener('pointerup', up);
+            btn.addEventListener('pointerleave', up);
+            btn.addEventListener('pointercancel', up);
+            this.dpadHandlers.push({ btn, down, up });
+          });
+        }
+
+        // Chat rápido sobre o avatar do jogador
+        this.onChatSubmit = (e) => {
+          e.preventDefault();
+          const msg = (this.chatInput.value || '').trim();
+          if (!msg) return;
+          this.player.speech = msg;
+          this.player.speechTimer = 5.5;
+          this.chatInput.value = '';
+          this.chatInput.blur();
+        };
+        if (this.chatForm) this.chatForm.addEventListener('submit', this.onChatSubmit);
+      }
+
+      triggerPacoca() {
+        this.pacocaSpeechTimer = 4.5;
+        if (!AppState.foundPacoca) {
+          AppState.foundPacoca = true;
+          showDeviceToast('🐱 Você encontrou o Paçoca perto do Café Orbit! Avise o Matheus!', 'success');
+        }
+      }
+
+      getBotLine(bot) {
+        const pool = (bot.id === 'p1' && AppState.foundPacoca && bot.foundLines) ? bot.foundLines : bot.lines;
+        return pool[bot.lineIndex % pool.length];
+      }
+
+      cycleBotDialogue(botId) {
+        const bot = this.bots.find(b => b.id === botId);
+        if (!bot) return;
+        bot.lineIndex++;
+        this.renderBotCard(bot);
+      }
+
+      focusBot(bot, forceCycle = false) {
+        if (forceCycle && this.activeBotId === bot.id) {
+          bot.lineIndex++;
+        }
+        this.activeBotId = bot.id;
+        this.renderBotCard(bot);
+      }
+
+      renderBotCard(bot) {
+        if (!this.botCard) return;
+        if (!bot) {
+          this.botCard.classList.add('hidden');
+          this.activeBotId = null;
+          return;
+        }
+        const profile = SIMULATED_PROFILES.find(p => p.id === bot.id);
+        const prim = profile ? INTENTIONS[profile.primaryIntention] : INTENTIONS.troca;
+        const line = this.getBotLine(bot);
+
+        this.botCard.classList.remove('hidden');
+        this.botCard.innerHTML = `
+          <div class="flex items-start gap-3">
+            <div class="w-11 h-11 rounded-full overflow-hidden shrink-0" style="box-shadow: 0 0 0 2px ${prim.color};">
+              ${profile ? createAvatarSVG(profile.avatar, 44) : ''}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-xs font-extrabold text-white flex items-center gap-1.5">
+                  <span>${bot.name}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:${prim.bg}; color:${prim.color}">${prim.emoji} ${prim.short}</span>
+                </div>
+                <button type="button" onclick="openProfileModal('${bot.id}')" class="lg-pill px-2.5 py-1 rounded-full text-[10px] font-bold text-white shrink-0">
+                  Ver Perfil
+                </button>
+              </div>
+              <p class="text-xs text-slate-100/95 leading-snug mt-1.5">"${escapeHtml(line)}"</p>
+              <div class="flex items-center justify-between mt-2">
+                <span class="text-[10px] text-emerald-300/90">● Perto de você no Parque</span>
+                <button type="button" onclick="cycleBotDialogue('${bot.id}')" class="text-[10px] font-bold text-violet-200 hover:text-white transition">
+                  Continuar papo →
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      update(dt) {
+        this.time += dt;
+        this.ensureUnstuck();
+
+        if (this.player.speechTimer > 0) {
+          this.player.speechTimer = Math.max(0, this.player.speechTimer - dt);
+          if (this.player.speechTimer === 0) this.player.speech = null;
+        }
+        if (this.pacocaSpeechTimer > 0) {
+          this.pacocaSpeechTimer = Math.max(0, this.pacocaSpeechTimer - dt);
+        }
+        if (this.targetPulse > 0) {
+          this.targetPulse = Math.max(0, this.targetPulse - dt * 1.4);
+        }
+
+        // Direção via teclado ou D-Pad
+        let vx = 0;
+        let vy = 0;
+        if (this.keys.left || this.dpadState.left) vx -= 1;
+        if (this.keys.right || this.dpadState.right) vx += 1;
+        if (this.keys.up || this.dpadState.up) vy -= 1;
+        if (this.keys.down || this.dpadState.down) vy += 1;
+
+        let moving = false;
+        if (vx !== 0 || vy !== 0) {
+          const len = Math.hypot(vx, vy);
+          vx = (vx / len) * this.player.speed * dt;
+          vy = (vy / len) * this.player.speed * dt;
+          moving = true;
+        } else if (this.player.targetX !== null && this.player.targetY !== null) {
+          const dx = this.player.targetX - this.player.x;
+          const dy = this.player.targetY - this.player.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 5) {
+            const step = Math.min(dist, this.player.speed * dt);
+            vx = (dx / dist) * step;
+            vy = (dy / dist) * step;
+            moving = true;
+          } else {
+            this.player.targetX = null;
+            this.player.targetY = null;
+          }
+        }
+
+        if (moving) {
+          // Colisão deslizante separada em X e Y
+          const prevX = this.player.x;
+          const prevY = this.player.y;
+          if (!this.collidesAt(this.player.x + vx, this.player.y, this.player.r)) {
+            this.player.x += vx;
+          }
+          if (!this.collidesAt(this.player.x, this.player.y + vy, this.player.r)) {
+            this.player.y += vy;
+          }
+
+          // Se travou no clique automático em algum obstáculo, cancela o alvo
+          if (this.player.targetX !== null && Math.hypot(this.player.x - prevX, this.player.y - prevY) < 0.25 && !this.pointerWalking) {
+            this.player.targetX = null;
+            this.player.targetY = null;
+          }
+
+          this.player.walkPhase += dt * 11;
+          if (Math.abs(vx) > Math.abs(vy)) {
+            this.player.facing = vx > 0 ? 'right' : 'left';
+          } else {
+            this.player.facing = vy > 0 ? 'down' : 'up';
+          }
+        } else {
+          this.player.walkPhase = 0;
+        }
+
+        // Proximidade com o gatinho Paçoca
+        if (Math.hypot(this.player.x - this.pacoca.x, this.player.y - this.pacoca.y) < 62) {
+          this.triggerPacoca();
+        }
+
+        // Atualiza bots e verifica proximidade
+        let nearestBot = null;
+        let nearestDist = 92;
+
+        for (let i = 0; i < this.bots.length; i++) {
+          const b = this.bots[i];
+          const distToPlayer = Math.hypot(b.x - this.player.x, b.y - this.player.y);
+
+          if (distToPlayer < nearestDist) {
+            nearestDist = distToPlayer;
+            nearestBot = b;
+          }
+
+          // Se o jogador está perto, o bot para para conversar
+          if (distToPlayer < 88) {
+            b.walkPhase = 0;
+            continue;
+          }
+
+          if (b.pauseTimer > 0) {
+            b.pauseTimer -= dt;
+            b.walkPhase = 0;
+            continue;
+          }
+
+          const wp = b.waypoints[b.wpIndex];
+          const dx = wp.x - b.x;
+          const dy = wp.y - b.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < 6) {
+            b.wpIndex = (b.wpIndex + 1) % b.waypoints.length;
+            b.pauseTimer = 1.6 + (i % 3) * 0.7;
+            b.walkPhase = 0;
+          } else {
+            const step = Math.min(dist, b.speed * dt);
+            const nx = b.x + (dx / dist) * step;
+            const ny = b.y + (dy / dist) * step;
+            if (!this.collidesAt(nx, ny, 12)) {
+              b.x = nx;
+              b.y = ny;
+              b.walkPhase += dt * 7.5;
+            } else {
+              b.wpIndex = (b.wpIndex + 1) % b.waypoints.length;
+              b.pauseTimer = 1.0;
+            }
+          }
+        }
+
+        if (nearestBot) {
+          if (this.activeBotId !== nearestBot.id) {
+            this.focusBot(nearestBot, false);
+          }
+        } else if (this.activeBotId !== null) {
+          this.renderBotCard(null);
+        }
+
+        // Câmera suave seguindo o jogador
+        const desiredCamX = Math.max(0, Math.min(this.worldW - this.viewW, this.player.x - this.viewW / 2));
+        const desiredCamY = Math.max(0, Math.min(this.worldH - this.viewH, this.player.y - this.viewH / 2));
+        this.camX += (desiredCamX - this.camX) * Math.min(1, dt * 8);
+        this.camY += (desiredCamY - this.camY) * Math.min(1, dt * 8);
+      }
+
+      drawWorld() {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.clearRect(0, 0, this.viewW, this.viewH);
+        ctx.translate(-Math.round(this.camX), -Math.round(this.camY));
+
+        // 1. Gramado pixel art quadriculado
+        const tile = 32;
+        const startCol = Math.max(0, Math.floor(this.camX / tile));
+        const endCol = Math.min(Math.ceil(this.worldW / tile), Math.ceil((this.camX + this.viewW) / tile));
+        const startRow = Math.max(0, Math.floor(this.camY / tile));
+        const endRow = Math.min(Math.ceil(this.worldH / tile), Math.ceil((this.camY + this.viewH) / tile));
+
+        for (let r = startRow; r < endRow; r++) {
+          for (let c = startCol; c < endCol; c++) {
+            ctx.fillStyle = (r + c) % 2 === 0 ? '#2f7a47' : '#2a6f40';
+            ctx.fillRect(c * tile, r * tile, tile, tile);
+          }
+        }
+
+        // 2. Caminhos de areia e praça central circular
+        ctx.fillStyle = '#c8b896';
+        // Cruz principal
+        ctx.fillRect(552, 0, 96, this.worldH);
+        ctx.fillRect(0, 404, this.worldW, 92);
+        // Alamedas superiores conectando Café e Totem
+        ctx.fillRect(190, 232, 820, 56);
+        // Praça circular central
+        ctx.beginPath();
+        ctx.arc(600, 450, 152, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pedrinhas sutis no caminho
+        ctx.fillStyle = '#b6a47e';
+        for (let i = 0; i < 42; i++) {
+          const px = 560 + ((i * 37) % 80);
+          const py = 30 + ((i * 89) % 840);
+          ctx.fillRect(px, py, 5, 4);
+        }
+
+        // 3. Flores no gramado
+        for (let i = 0; i < this.flowers.length; i++) {
+          const f = this.flowers[i];
+          ctx.fillStyle = '#14532d';
+          ctx.fillRect(f.x - 1, f.y + 2, 4, 3);
+          ctx.fillStyle = f.color;
+          ctx.fillRect(f.x - 2, f.y - 2, 5, 5);
+        }
+
+        // 4. Marcador de destino no chão (quando o usuário clica/toca)
+        if (this.player.targetX !== null && this.player.targetY !== null) {
+          const pulse = 8 + Math.sin(this.time * 8) * 3;
+          ctx.strokeStyle = 'rgba(196, 181, 253, 0.9)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(this.player.targetX, this.player.targetY, pulse, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(167, 139, 250, 0.35)';
+          ctx.beginPath();
+          ctx.arc(this.player.targetX, this.player.targetY, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 5. Fonte central animada
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+        ctx.beginPath();
+        ctx.arc(600, 456, 62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#64748b';
+        ctx.beginPath();
+        ctx.arc(600, 450, 58, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath();
+        ctx.arc(600, 450, 50, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0ea5e9';
+        ctx.beginPath();
+        ctx.arc(600, 450, 42, 0, Math.PI * 2);
+        ctx.fill();
+        // Ondas d'água animadas
+        const ripple = 14 + ((this.time * 16) % 24);
+        ctx.strokeStyle = `rgba(224, 242, 254, ${Math.max(0, 0.85 - (ripple - 14) / 28)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(600, 450, ripple, 0, Math.PI * 2);
+        ctx.stroke();
+        // Centro de pedra da fonte
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(590, 440, 20, 20);
+        ctx.fillStyle = '#bae6fd';
+        ctx.fillRect(596, 444 + Math.sin(this.time * 10) * 2, 8, 8);
+
+        // 6. Quiosque Café Orbit (Noroeste)
+        this.drawCafeKiosk(ctx);
+
+        // 7. Totem Saúde & Comunidade (Nordeste)
+        this.drawHealthTotem(ctx);
+
+        // 8. Bancos de madeira
+        const benches = this.obstacles.filter(o => o.kind === 'bench');
+        benches.forEach(b => {
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.fillRect(b.x + 2, b.y + 4, b.w, b.h);
+          ctx.fillStyle = '#92400e';
+          ctx.fillRect(b.x, b.y, b.w, b.h);
+          ctx.fillStyle = '#b45309';
+          ctx.fillRect(b.x + 2, b.y + 2, b.w - 4, 6);
+          ctx.fillRect(b.x + 2, b.y + 11, b.w - 4, 6);
+        });
+
+        // 9. Postes de luz com halo suave
+        const lamps = [
+          { x: 600, y: 315 }, { x: 600, y: 605 }, { x: 460, y: 450 }, { x: 740, y: 450 }
+        ];
+        lamps.forEach(l => {
+          const g = ctx.createRadialGradient(l.x, l.y - 16, 2, l.x, l.y - 16, 36);
+          g.addColorStop(0, 'rgba(254, 240, 138, 0.36)');
+          g.addColorStop(1, 'rgba(254, 240, 138, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(l.x, l.y - 16, 36, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(l.x - 2, l.y - 18, 4, 22);
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(l.x - 4, l.y - 23, 8, 7);
+        });
+
+        // 10. Arbusto + Gatinho Paçoca (Easter Egg)
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(352, 206, 18, 0, Math.PI * 2);
+        ctx.arc(374, 202, 16, 0, Math.PI * 2);
+        ctx.fill();
+        this.drawPacoca(ctx);
+
+        // 11. Entidades ordenadas por Y (profundidade 2.5D: árvores, bots e jogador)
+        const drawables = [];
+        this.trees.forEach(t => drawables.push({ y: t.y, type: 'tree', data: t }));
+        this.bots.forEach(b => drawables.push({ y: b.y, type: 'bot', data: b }));
+        drawables.push({ y: this.player.y, type: 'player', data: this.player });
+        drawables.sort((a, b) => a.y - b.y);
+
+        drawables.forEach(item => {
+          if (item.type === 'tree') this.drawTree(ctx, item.data.x, item.data.y);
+          else if (item.type === 'bot') this.drawCharacter(ctx, item.data, false);
+          else this.drawCharacter(ctx, item.data, true);
+        });
+
+        // 12. Balões de fala por cima de tudo
+        if (this.pacocaSpeechTimer > 0) {
+          this.drawSpeechBubble(ctx, this.pacoca.x, this.pacoca.y - 24, 'Miau! 🐱 (Paçoca)');
+        }
+        if (this.activeBotId) {
+          const b = this.bots.find(item => item.id === this.activeBotId);
+          if (b) this.drawSpeechBubble(ctx, b.x, b.y - 46, this.getBotLine(b));
+        }
+        if (this.player.speech) {
+          this.drawSpeechBubble(ctx, this.player.x, this.player.y - 46, this.player.speech, true);
+        }
+
+        ctx.restore();
+      }
+
+      drawCafeKiosk(ctx) {
+        // Sombra
+        ctx.fillStyle = 'rgba(0,0,0,0.24)';
+        ctx.fillRect(156, 134, 185, 102);
+        // Paredes
+        ctx.fillStyle = '#fef3c7';
+        ctx.fillRect(150, 155, 185, 75);
+        // Balcão
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(166, 204, 153, 20);
+        // Toldo listrado
+        for (let i = 0; i < 8; i++) {
+          ctx.fillStyle = i % 2 === 0 ? '#7c3aed' : '#e9d5ff';
+          ctx.fillRect(146 + i * 24, 125, 24, 34);
+        }
+        // Placa
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(184, 165, 118, 24);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('☕ CAFÉ ORBIT', 243, 181);
+      }
+
+      drawHealthTotem(ctx) {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(876, 162, 126, 70);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(870, 155, 126, 72);
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(872, 157, 122, 68);
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🛡️ SAÚDE & PREP', 933, 183);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '600 9px Inter, sans-serif';
+        ctx.fillText('Guia Público SUS', 933, 202);
+      }
+
+      drawPacoca(ctx) {
+        const x = this.pacoca.x;
+        const y = this.pacoca.y;
+        const bob = Math.sin(this.time * 4) * 1.2;
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(x, y + 6, 9, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Corpinho laranja
+        ctx.fillStyle = '#f97316';
+        ctx.fillRect(x - 7, y - 4 + bob, 14, 9);
+        // Cabeça + orelhinhas
+        ctx.fillRect(x - 5, y - 11 + bob, 10, 8);
+        ctx.fillRect(x - 5, y - 14 + bob, 3, 3);
+        ctx.fillRect(x + 2, y - 14 + bob, 3, 3);
+        // Olhinhos
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x - 3, y - 8 + bob, 2, 2);
+        ctx.fillRect(x + 1, y - 8 + bob, 2, 2);
+      }
+
+      drawTree(ctx, x, y) {
+        ctx.fillStyle = 'rgba(0,0,0,0.24)';
+        ctx.beginPath();
+        ctx.ellipse(x, y + 18, 22, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Tronco
+        ctx.fillStyle = '#713f12';
+        ctx.fillRect(x - 6, y - 2, 12, 22);
+        // Copa pixelada em camadas
+        ctx.fillStyle = '#14532d';
+        ctx.fillRect(x - 22, y - 28, 44, 28);
+        ctx.fillStyle = '#166534';
+        ctx.fillRect(x - 18, y - 36, 36, 26);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(x - 12, y - 40, 24, 16);
+      }
+
+      drawCharacter(ctx, ch, isPlayer) {
+        const x = Math.round(ch.x);
+        const y = Math.round(ch.y);
+        const step = Math.sin(ch.walkPhase || 0) * 3.5;
+
+        // Anel luminoso no chão (jogador ou bot ativo)
+        if (isPlayer) {
+          ctx.strokeStyle = '#c4b5fd';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(x, y + 6, 16, 7, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (this.activeBotId === ch.id) {
+          ctx.strokeStyle = '#6ee7b7';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(x, y + 6, 16, 7, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Sombra
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        ctx.beginPath();
+        ctx.ellipse(x, y + 6, 11, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pernas animadas
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(x - 6, y - 3 + (step > 0 ? -step * 0.5 : 0), 5, 9);
+        ctx.fillRect(x + 1, y - 3 + (step < 0 ? step * 0.5 : 0), 5, 9);
+
+        // Tronco (camiseta)
+        ctx.fillStyle = isPlayer ? '#a855f7' : ch.shirt;
+        ctx.fillRect(x - 8, y - 18, 16, 16);
+
+        // Cabeça
+        ctx.fillStyle = isPlayer ? AppState.user.avatar.skin : ch.skin;
+        ctx.fillRect(x - 7, y - 32, 14, 14);
+
+        // Cabelo
+        ctx.fillStyle = isPlayer ? AppState.user.avatar.hair : ch.hair;
+        ctx.fillRect(x - 8, y - 35, 16, 6);
+
+        // Olhos
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x - 4, y - 26, 2, 2);
+        ctx.fillRect(x + 2, y - 26, 2, 2);
+
+        // Tag de nome
+        const label = isPlayer ? `${AppState.user.firstName} (Você)` : ch.name;
+        ctx.font = 'bold 10px Inter, sans-serif';
+        const tw = ctx.measureText(label).width;
+        const bw = tw + 14;
+        const bx = x - bw / 2;
+        const by = y + 11;
+
+        ctx.fillStyle = isPlayer ? 'rgba(124, 58, 237, 0.92)' : 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, 17, 8);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, by + 12);
+      }
+
+      drawSpeechBubble(ctx, x, y, text, isPlayer = false) {
+        const display = text.length > 44 ? text.slice(0, 42) + '…' : text;
+        ctx.font = '600 10.5px Inter, sans-serif';
+        const tw = ctx.measureText(display).width;
+        const bw = Math.max(64, tw + 18);
+        const bh = 24;
+        const bx = Math.round(x - bw / 2);
+        const by = Math.round(y - bh);
+
+        ctx.fillStyle = isPlayer ? 'rgba(109, 40, 217, 0.94)' : 'rgba(15, 23, 42, 0.92)';
+        ctx.strokeStyle = isPlayer ? 'rgba(221, 214, 254, 0.7)' : 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 11);
+        ctx.fill();
+        ctx.stroke();
+
+        // Pontinha do balão
+        ctx.beginPath();
+        ctx.moveTo(x - 5, by + bh);
+        ctx.lineTo(x + 5, by + bh);
+        ctx.lineTo(x, by + bh + 5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText(display, x, by + 15.5);
+      }
+
+      loop(now) {
+        const dt = Math.min(0.05, Math.max(0.001, (now - this.lastFrame) / 1000));
+        this.lastFrame = now;
+        this.update(dt);
+        this.drawWorld();
+        this.rafId = requestAnimationFrame((t) => this.loop(t));
+      }
+
+      destroy() {
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        window.removeEventListener('resize', this.onResize);
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
+        this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+        window.removeEventListener('pointermove', this.onPointerMove);
+        window.removeEventListener('pointerup', this.onPointerUp);
+        if (this.chatForm) this.chatForm.removeEventListener('submit', this.onChatSubmit);
+        this.dpadHandlers.forEach(({ btn, down, up }) => {
+          btn.removeEventListener('pointerdown', down);
+          btn.removeEventListener('pointerup', up);
+          btn.removeEventListener('pointerleave', up);
+          btn.removeEventListener('pointercancel', up);
+        });
+      }
+    }
+
+    /* =========================================================================
+       7. TELA 3: COMUNIDADE & SAÚDE (FEED PÚBLICO + DISCUSSÕES)
+       ========================================================================= */
+    function setCommunityFilter(cat) {
+      AppState.communityFilter = cat;
+      renderActiveScreen();
+    }
+
+    function togglePostLike(postId, event) {
+      if (event) event.stopPropagation();
+      const post = COMMUNITY_POSTS.find(p => p.id === postId);
+      if (!post) return;
+      post.liked = !post.liked;
+      post.likes += post.liked ? 1 : -1;
+      if (AppState.selectedArticleId === postId) renderDeviceModals();
+      if (AppState.activeTab === 'comunidade') renderComunidadeScreen();
+    }
+
+    function submitArticleComment(postId, event) {
+      event.preventDefault();
+      const input = document.getElementById('article-comment-input');
+      if (!input) return;
+      const text = input.value.trim();
+      if (!text) return;
+      const post = COMMUNITY_POSTS.find(p => p.id === postId);
+      if (!post) return;
+      post.comments.push({ author: AppState.user.name, time: 'agora', text });
+      input.value = '';
+      renderDeviceModals();
+      if (AppState.activeTab === 'comunidade') renderComunidadeScreen();
+      showDeviceToast('Comentário publicado na comunidade! 💬', 'success');
+    }
+
+    function renderComunidadeScreen() {
+      const viewport = document.getElementById('app-viewport');
+      if (!viewport) return;
+      const isMobile = AppState.device === 'mobile';
+
+      const categories = [
+        { id: 'all', label: 'Tudo' },
+        { id: 'vacinas', label: '💉 Vacinas' },
+        { id: 'prevencao', label: '🛡️ Prevenção' },
+        { id: 'bemestar', label: '🧠 Saúde Mental' },
+        { id: 'debates', label: '💬 Discussões' }
+      ];
+
+      const filtered = AppState.communityFilter === 'all'
+        ? COMMUNITY_POSTS
+        : COMMUNITY_POSTS.filter(p => p.category === AppState.communityFilter);
+
+      viewport.innerHTML = `
+        <div class="flex flex-col h-full w-full">
+          <!-- Header Comunidade em Liquid Glass -->
+          <div class="lg-header px-4 ${isMobile ? 'pt-2.5 pb-3' : 'px-6 pt-5 pb-3.5'} shrink-0">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h1 class="${isMobile ? 'text-base' : 'text-xl'} font-extrabold text-white tracking-tight">Comunidade & Saúde</h1>
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/15 text-emerald-200 border border-emerald-300/30">Acesso Público</span>
+                </div>
+                <p class="text-xs text-slate-300/80 mt-0.5">Informação confiável sobre vacinas, prevenção, bem-estar e debates abertos.</p>
+              </div>
+            </div>
+
+            <!-- Filtros em cápsulas Liquid Glass -->
+            <div class="flex items-center gap-1.5 mt-3 overflow-x-auto orbit-scroll pb-0.5">
+              ${categories.map(c => {
+                const active = AppState.communityFilter === c.id;
+                return `
+                  <button type="button" onclick="setCommunityFilter('${c.id}')" class="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold transition ${active ? 'lg-active-lens text-white' : 'bg-white/[0.06] text-slate-300 border border-white/[0.11] hover:bg-white/[0.12] hover:text-white'}">
+                    ${c.label}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Feed de Artigos em painéis frosted glass -->
+          <div class="flex-1 overflow-y-auto orbit-scroll ${isMobile ? 'p-3.5 pb-24' : 'p-6'}">
+            <div class="grid ${isMobile ? 'grid-cols-1 gap-3.5' : 'grid-cols-2 gap-4'} max-w-4xl">
+              ${filtered.map(post => `
+                <article onclick="openArticleModal('${post.id}')" class="lg-panel lg-sheen cursor-pointer group rounded-[24px] hover:border-white/30 p-4 transition-all hover:-translate-y-0.5 flex flex-col justify-between gap-3">
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-2.5">
+                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md ${post.badgeColor}">${post.categoryLabel}</span>
+                      <span class="text-[11px] text-slate-300/70">${post.readTime} · ${post.date}</span>
+                    </div>
+                    <h2 class="text-sm font-bold text-white group-hover:text-violet-100 transition leading-snug">${post.title}</h2>
+                    <p class="text-xs text-slate-300/85 mt-2 leading-relaxed line-clamp-2">${post.summary}</p>
+                  </div>
+
+                  <div class="flex items-center justify-between pt-3 border-t border-white/[0.1] text-[11px] text-slate-300/80">
+                    <span class="truncate pr-2 font-medium text-slate-200">${post.author}</span>
+                    <div class="flex items-center gap-3 shrink-0">
+                      <button type="button" onclick="togglePostLike('${post.id}', event)" class="flex items-center gap-1 hover:text-rose-300 transition ${post.liked ? 'text-rose-300 font-bold' : ''}">
+                        <span>${post.liked ? '❤️' : '🤍'}</span> ${post.likes}
+                      </button>
+                      <span class="flex items-center gap-1">💬 ${post.comments.length}</span>
+                    </div>
+                  </div>
+                </article>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /* =========================================================================
+       8. TELA 4: MEU PERFIL HUB (EDITÁVEL AO VIVO + SELOS DE APPS EXTERNOS)
+       ========================================================================= */
+    function refreshLiveHubPreview() {
+      const box = document.getElementById('live-hub-preview');
+      if (box) box.innerHTML = renderUserHubPreviewCard();
+      renderNavigation();
+    }
+
+    function togglePrivacy() {
+      AppState.user.isPublic = !AppState.user.isPublic;
+      showDeviceToast(
+        AppState.user.isPublic ? 'Seu perfil agora está Público na Órbita 🌐' : 'Perfil alterado para Modo Privado 🔒',
+        'info'
+      );
+      if (AppState.device === 'watch') renderWatchScreen();
+      else renderPerfilScreen();
+    }
+
+    function updateUserBio(val) {
+      AppState.user.bio = val;
+      refreshLiveHubPreview();
+    }
+
+    function toggleUserIntention(id) {
+      const idx = AppState.user.intentions.indexOf(id);
+      if (idx >= 0) {
+        if (AppState.user.intentions.length <= 1) {
+          showDeviceToast('Mantenha pelo menos uma tag ativa no seu Hub.');
+          return;
+        }
+        AppState.user.intentions.splice(idx, 1);
+        if (AppState.user.primaryIntention === id) {
+          AppState.user.primaryIntention = AppState.user.intentions[0];
+        }
+      } else {
+        AppState.user.intentions.push(id);
+      }
+      renderPerfilScreen();
+    }
+
+    function setPrimaryIntention(id) {
+      if (!AppState.user.intentions.includes(id)) {
+        AppState.user.intentions.push(id);
+      }
+      AppState.user.primaryIntention = id;
+      showDeviceToast(`Anel principal atualizado para ${INTENTIONS[id].label} ★`, 'success');
+      renderPerfilScreen();
+    }
+
+    function toggleExternalApp(appId) {
+      const st = AppState.user.apps[appId];
+      if (!st) return;
+      st.active = !st.active;
+      showDeviceToast(
+        st.active ? `Selo do ${EXTERNAL_APPS[appId].name} ativado no seu Hub!` : `Selo do ${EXTERNAL_APPS[appId].name} ocultado.`,
+        st.active ? 'success' : 'info'
+      );
+      renderPerfilScreen();
+    }
+
+    function updateExternalHandle(appId, val) {
+      if (!AppState.user.apps[appId]) return;
+      AppState.user.apps[appId].handle = val;
+      refreshLiveHubPreview();
+    }
+
+    function renderUserHubPreviewCard() {
+      const u = AppState.user;
+      const prim = INTENTIONS[u.primaryIntention] || INTENTIONS.troca;
+      const activeApps = Object.keys(u.apps).filter(k => u.apps[k] && u.apps[k].active);
+      const cleanHandle = (u.handle || 'lucassilva').replace('@', '');
+      const safeBio = escapeHtml(u.bio || 'Adicione uma bio para se apresentar na Órbita.');
+
+      return `
+        <div class="lg-panel lg-sheen rounded-[28px] p-5 relative overflow-hidden">
+          <div class="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl opacity-25" style="background:${prim.color}"></div>
+          <div class="pointer-events-none absolute -bottom-16 -left-16 w-40 h-40 rounded-full blur-3xl opacity-15 bg-cyan-300"></div>
+
+          <div class="flex items-center justify-between gap-2 mb-4 relative">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md ${u.isPublic ? 'bg-emerald-400/15 text-emerald-200 border-emerald-300/35' : 'bg-amber-400/15 text-amber-200 border-amber-300/35'}">
+              <span class="w-1.5 h-1.5 rounded-full ${u.isPublic ? 'bg-emerald-300' : 'bg-amber-300'}"></span>
+              ${u.isPublic ? 'Público na Órbita' : 'Modo Privado'}
+            </span>
+            <span class="text-[11px] font-semibold text-slate-300/85">orbit.app/${escapeHtml(cleanHandle)}</span>
+          </div>
+
+          <div class="flex items-center gap-3.5 relative">
+            <div class="w-16 h-16 rounded-full overflow-hidden shrink-0" style="box-shadow: 0 0 0 2.5px ${prim.color}, 0 0 0 5px rgba(255,255,255,0.14);">
+              ${createAvatarSVG(u.avatar, 64)}
+            </div>
+            <div class="min-w-0">
+              <div class="text-base font-extrabold text-white truncate">${escapeHtml(u.name)}, ${u.age}</div>
+              <div class="text-xs text-violet-200 font-semibold">${escapeHtml(u.handle)}</div>
+              <div class="text-[11px] text-slate-300/80 mt-0.5">📍 ${escapeHtml(u.city)}</div>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-200/90 leading-relaxed mt-3.5 break-words">${safeBio}</p>
+
+          <div class="flex flex-wrap gap-1.5 mt-3.5">
+            ${u.intentions.map(id => {
+              const it = INTENTIONS[id];
+              if (!it) return '';
+              const isPrimary = u.primaryIntention === id;
+              return `
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 backdrop-blur-md" style="background:${it.bg}; color:${it.color}; border:1px solid ${it.border}">
+                  ${it.emoji} ${it.label}${isPrimary ? ' ★' : ''}
+                </span>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="mt-4 pt-3.5 border-t border-white/[0.12]">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300/75 mb-2">Meus aplicativos ativos</div>
+            ${activeApps.length ? `
+              <div class="flex flex-wrap gap-1.5">
+                ${activeApps.map(appId => {
+                  const app = EXTERNAL_APPS[appId];
+                  const handle = (u.apps[appId].handle || '').trim();
+                  const safeHandle = escapeHtml(handle);
+                  return `
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.15] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                      <span class="w-4 h-4 rounded-md flex items-center justify-center shrink-0" style="background:${app.bg}; color:${app.textColor}">
+                        ${renderAppBadgeIcon(appId, 'w-2.5 h-2.5')}
+                      </span>
+                      <span class="text-[11px] font-bold text-white">${app.name}</span>
+                      <span class="text-[10px] ${safeHandle ? 'text-violet-200' : 'text-emerald-200'}">${safeHandle || 'Ativo'}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : `
+              <p class="text-[11px] text-slate-400">Nenhum selo ativado no momento.</p>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPerfilScreen() {
+      const viewport = document.getElementById('app-viewport');
+      if (!viewport) return;
+      const isMobile = AppState.device === 'mobile';
+      const u = AppState.user;
+
+      viewport.innerHTML = `
+        <div class="h-full overflow-y-auto orbit-scroll ${isMobile ? 'p-3.5 pb-24' : 'p-6'}">
+          <div class="max-w-4xl mx-auto">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h1 class="${isMobile ? 'text-base' : 'text-xl'} font-extrabold text-white tracking-tight">Meu Perfil Hub</h1>
+                <p class="text-xs text-slate-300/80 mt-0.5">Centralize seus aplicativos, intenções e controle de privacidade em um só cartão.</p>
+              </div>
+            </div>
+
+            <div class="grid ${isMobile ? 'grid-cols-1 gap-4' : 'grid-cols-12 gap-5'} items-start">
+              <!-- Coluna Esquerda: Preview Ao Vivo do Cartão Orbit -->
+              <div class="${isMobile ? '' : 'col-span-5 sticky top-0'} flex flex-col gap-3">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-300/75">Prévia ao vivo do seu cartão</div>
+                <div id="live-hub-preview">${renderUserHubPreviewCard()}</div>
+              </div>
+
+              <!-- Coluna Direita: Controles Editáveis em Liquid Glass -->
+              <div class="${isMobile ? '' : 'col-span-7'} flex flex-col gap-3.5">
+                <!-- Privacidade -->
+                <div class="lg-panel rounded-[22px] p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-bold text-white">Visibilidade do Perfil</div>
+                    <p class="text-xs text-slate-300/80 mt-0.5">
+                      ${u.isPublic ? 'Público: visível na Órbita e via link compartilhável.' : 'Privado: apenas conexões aprovadas veem seus selos.'}
+                    </p>
+                  </div>
+                  <button type="button" onclick="togglePrivacy()" class="relative w-12 h-7 rounded-full border border-white/25 transition-colors shrink-0 ${u.isPublic ? 'bg-emerald-400/75' : 'bg-white/15'}">
+                    <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${u.isPublic ? 'translate-x-5' : 'translate-x-0'}"></span>
+                  </button>
+                </div>
+
+                <!-- Bio editável + Copiar Link do Meu Orbit -->
+                <div class="lg-panel rounded-[22px] p-4">
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <label for="user-bio-input" class="text-sm font-bold text-white">Sua Bio no Hub</label>
+                    <button type="button" onclick="copyUserOrbitLink()" class="lg-pill px-3 py-1 rounded-full text-[11px] font-bold text-white">
+                      🔗 Copiar Link
+                    </button>
+                  </div>
+                  <textarea id="user-bio-input" rows="2" maxlength="160" oninput="updateUserBio(this.value)" placeholder="Conte um pouco sobre você..." class="w-full bg-slate-950/45 border border-white/15 focus:border-white/35 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-400 outline-none resize-none">${escapeHtml(u.bio)}</textarea>
+                </div>
+
+                <!-- Tags de Intenção -->
+                <div class="lg-panel rounded-[22px] p-4">
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="text-sm font-bold text-white">O que você está buscando?</div>
+                    <span class="text-[10px] text-slate-300/75">★ = cor do anel na Órbita</span>
+                  </div>
+                  <p class="text-xs text-slate-300/80 mb-3">Ative suas tags ou clique na estrela para escolher a cor principal do seu anel.</p>
+                  <div class="flex flex-wrap gap-2">
+                    ${Object.values(INTENTIONS).map(it => {
+                      const selected = u.intentions.includes(it.id);
+                      const isPrimary = u.primaryIntention === it.id;
+                      return `
+                        <div class="inline-flex items-center rounded-full border transition overflow-hidden backdrop-blur-md" style="${selected ? `background:${it.bg}; border-color:${it.border};` : 'background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12);'}">
+                          <button type="button" onclick="toggleUserIntention('${it.id}')" class="px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${selected ? 'text-white' : 'text-slate-300 hover:text-white'}">
+                            <span>${it.emoji}</span>
+                            <span>${it.label}</span>
+                          </button>
+                          <button type="button" onclick="setPrimaryIntention('${it.id}')" title="Definir como anel principal na Órbita" class="px-2.5 py-1.5 border-l border-white/15 text-xs transition ${isPrimary ? 'text-amber-200 bg-white/15' : 'text-slate-400 hover:text-amber-200'}">
+                            ${isPrimary ? '★' : '☆'}
+                          </button>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+
+                <!-- Centralizador de Aplicativos & Redes -->
+                <div class="lg-panel rounded-[22px] p-4">
+                  <div class="text-sm font-bold text-white">Centralizador de Aplicativos & Redes</div>
+                  <p class="text-xs text-slate-300/80 mt-0.5 mb-3">Apps fechados (como Grindr e Scruff) funcionam como selos de presença ativa sem precisar de link externo.</p>
+
+                  <div class="flex flex-col gap-2.5">
+                    ${Object.values(EXTERNAL_APPS).map(app => {
+                      const state = u.apps[app.id];
+                      return `
+                        <div class="rounded-2xl p-3 border transition ${state.active ? 'bg-white/[0.08] border-white/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]' : 'bg-white/[0.03] border-white/[0.08] opacity-75'}">
+                          <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                              <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow" style="background:${app.bg}; color:${app.textColor}">
+                                ${renderAppBadgeIcon(app.id, 'w-4 h-4')}
+                              </div>
+                              <div class="min-w-0">
+                                <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                  ${app.name}
+                                  ${app.noExternalLink && state.active ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-300/30">Ativo no app</span>` : ''}
+                                </div>
+                                <div class="text-[10px] text-slate-300/75 truncate">${app.desc}</div>
+                              </div>
+                            </div>
+                            <button type="button" onclick="toggleExternalApp('${app.id}')" class="relative w-10 h-6 rounded-full border border-white/25 transition-colors shrink-0 ${state.active ? 'bg-violet-400/80' : 'bg-white/15'}">
+                              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${state.active ? 'translate-x-4' : 'translate-x-0'}"></span>
+                            </button>
+                          </div>
+
+                          ${state.active && !app.noExternalLink ? `
+                            <div class="mt-2.5 pl-10">
+                              <input type="text" value="${escapeHtml(state.handle || '')}" oninput="updateExternalHandle('${app.id}', this.value)" placeholder="Seu @usuário no ${app.name}" class="w-full bg-slate-950/45 border border-white/15 focus:border-white/35 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 outline-none"/>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /* =========================================================================
+       9. EXPERIÊNCIA WATCHOS (APPLE WATCH 45MM EM LIQUID GLASS)
+       ========================================================================= */
+    function setWatchPage(pageIndex) {
+      AppState.watchPage = pageIndex;
+      AppState.selectedProfileId = null;
+      renderActiveScreen();
+    }
+
+    function openParkFromWatch() {
+      AppState.activeTab = 'parque';
+      switchDevice('mobile');
+    }
+
+    function renderWatchScreen() {
+      const viewport = document.getElementById('app-viewport');
+      if (!viewport) return;
+
+      const topClock = `
+        <div class="pointer-events-none absolute top-2.5 left-4 right-4 z-30 flex items-center justify-between text-[11px] font-bold text-white/95">
+          <span class="text-violet-200 tracking-tight">Orbit</span>
+          <span>16:36</span>
+        </div>
+      `;
+
+      const dotsMarkup = `
+        <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-30 lg-pill px-2.5 py-1 rounded-full flex items-center justify-center gap-2 pointer-events-auto">
+          <button type="button" onclick="setWatchPage(0)" title="Órbita" class="h-1.5 rounded-full transition-all ${AppState.watchPage === 0 ? 'w-4 bg-white' : 'w-1.5 bg-white/35 hover:bg-white/65'}"></button>
+          <button type="button" onclick="setWatchPage(1)" title="Parque 2D" class="h-1.5 rounded-full transition-all ${AppState.watchPage === 1 ? 'w-4 bg-emerald-300' : 'w-1.5 bg-white/35 hover:bg-white/65'}"></button>
+          <button type="button" onclick="setWatchPage(2)" title="Meu Cartão" class="h-1.5 rounded-full transition-all ${AppState.watchPage === 2 ? 'w-4 bg-cyan-300' : 'w-1.5 bg-white/35 hover:bg-white/65'}"></button>
+        </div>
+      `;
+
+      if (AppState.watchPage === 0) {
+        viewport.innerHTML = `
+          <div id="watch-orbit-field" class="relative w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none" style="background: radial-gradient(circle at center, rgba(167,139,250,0.18) 0%, rgba(10,14,28,0.88) 72%);">
+            ${topClock}
+            <div id="watch-bubbles-layer" class="absolute inset-0"></div>
+            <button type="button" id="watch-center-btn" title="Centralizar" class="lg-pill absolute bottom-7 right-3.5 z-30 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs">
+              ◎
+            </button>
+            ${dotsMarkup}
+          </div>
+        `;
+
+        activeOrbitEngine = new OrbitHoneycombEngine({
+          container: document.getElementById('watch-orbit-field'),
+          layer: document.getElementById('watch-bubbles-layer'),
+          centerBtn: document.getElementById('watch-center-btn'),
+          profiles: SIMULATED_PROFILES.slice(0, 12),
+          isWatch: true
+        });
+      } else if (AppState.watchPage === 1) {
+        const inParkProfiles = SIMULATED_PROFILES.filter(p => p.inPark);
+        viewport.innerHTML = `
+          <div class="relative w-full h-full px-4 pt-9 pb-9 flex flex-col justify-between bg-gradient-to-b from-emerald-950/35 to-[#060a14]">
+            ${topClock}
+            <div class="flex flex-col items-center text-center mt-1">
+              <div class="lg-pill w-12 h-12 rounded-2xl flex items-center justify-center text-2xl">🌳</div>
+              <div class="text-sm font-extrabold text-white mt-2">Parque Central</div>
+              <div class="text-[11px] text-emerald-200 font-semibold flex items-center gap-1 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+                7 pessoas andando agora
+              </div>
+              <div class="flex items-center justify-center -space-x-2 mt-3">
+                ${inParkProfiles.slice(0, 5).map(p => `
+                  <div class="w-8 h-8 rounded-full overflow-hidden border-2 border-[#080d18]">${createAvatarSVG(p.avatar, 32)}</div>
+                `).join('')}
+                <div class="w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border-2 border-[#080d18] text-[10px] font-bold text-white flex items-center justify-center">+2</div>
+              </div>
+            </div>
+
+            <button type="button" onclick="openParkFromWatch()" class="lg-pill w-full py-2.5 rounded-full bg-emerald-400/25 border-emerald-300/40 text-emerald-100 font-extrabold text-xs active:scale-95">
+              Entrar no Celular →
+            </button>
+            ${dotsMarkup}
+          </div>
+        `;
+      } else {
+        const u = AppState.user;
+        const prim = INTENTIONS[u.primaryIntention] || INTENTIONS.troca;
+        const activeApps = Object.keys(u.apps).filter(k => u.apps[k] && u.apps[k].active);
+        viewport.innerHTML = `
+          <div class="relative w-full h-full px-4 pt-9 pb-9 flex flex-col justify-between bg-gradient-to-b from-indigo-950/35 to-[#060914]">
+            ${topClock}
+            <div class="flex flex-col items-center text-center">
+              <div class="w-14 h-14 rounded-full overflow-hidden" style="box-shadow: 0 0 0 2.5px ${prim.color}, 0 0 0 5px rgba(255,255,255,0.14);">
+                ${createAvatarSVG(u.avatar, 56)}
+              </div>
+              <div class="text-sm font-extrabold text-white mt-2">${escapeHtml(u.firstName)}</div>
+              <div class="text-[10px] font-bold mt-0.5" style="color:${prim.color}">${prim.emoji} ${prim.label}</div>
+
+              <div class="flex items-center justify-center gap-1.5 mt-3">
+                ${activeApps.slice(0, 5).map(appId => {
+                  const app = EXTERNAL_APPS[appId];
+                  return `<span class="w-6 h-6 rounded-lg flex items-center justify-center shadow" style="background:${app.bg}; color:${app.textColor}">${renderAppBadgeIcon(appId, 'w-3.5 h-3.5')}</span>`;
+                }).join('')}
+              </div>
+            </div>
+
+            <button type="button" onclick="togglePrivacy()" class="lg-pill w-full py-2 px-3 rounded-full flex items-center justify-between text-xs font-bold ${u.isPublic ? 'text-emerald-200 border-emerald-300/35' : 'text-amber-200 border-amber-300/35'}">
+              <span>${u.isPublic ? '🌐 Público' : '🔒 Privado'}</span>
+              <span class="text-[10px] opacity-80">Alternar</span>
+            </button>
+            ${dotsMarkup}
+          </div>
+        `;
+      }
+    }
+
+    /* =========================================================================
+       10. MODAIS INTERNOS EM LIQUID GLASS (PERFIL E LEITOR DE ARTIGO)
+       ========================================================================= */
+    function openProfileModal(profileId) {
+      AppState.selectedProfileId = profileId;
+      AppState.selectedArticleId = null;
+      renderDeviceModals();
+    }
+
+    function openArticleModal(postId) {
+      AppState.selectedArticleId = postId;
+      AppState.selectedProfileId = null;
+      renderDeviceModals();
+    }
+
+    function closeDeviceModals() {
+      AppState.selectedProfileId = null;
+      AppState.selectedArticleId = null;
+      renderDeviceModals();
+    }
+
+    function sendWaveToProfile(profileId) {
+      const p = SIMULATED_PROFILES.find(item => item.id === profileId);
+      if (!p) return;
+      closeDeviceModals();
+      showDeviceToast(`Você acenou para ${p.name}! 👋`, 'success');
+    }
+
+    function openParkFromProfile() {
+      closeDeviceModals();
+      setTab('parque');
+    }
+
+    function renderDeviceModals() {
+      const root = document.getElementById('device-modal-root');
+      if (!root) return;
+
+      if (!AppState.selectedProfileId && !AppState.selectedArticleId) {
+        root.innerHTML = '';
+        root.classList.add('pointer-events-none');
+        return;
+      }
+
+      root.classList.remove('pointer-events-none');
+
+      // Modal 1: Perfil Detalhado (com selos de apps externos)
+      if (AppState.selectedProfileId) {
+        const p = SIMULATED_PROFILES.find(item => item.id === AppState.selectedProfileId);
+        if (!p) return;
+        const prim = INTENTIONS[p.primaryIntention] || INTENTIONS.troca;
+        const activeApps = Object.keys(p.apps).filter(k => p.apps[k] && p.apps[k].active);
+
+        if (AppState.device === 'watch') {
+          root.innerHTML = `
+            <div class="lg-sheet absolute inset-0 p-4 flex flex-col justify-between z-50">
+              <div class="flex items-center justify-between">
+                <button type="button" onclick="closeDeviceModals()" class="lg-pill w-6 h-6 rounded-full text-white text-xs flex items-center justify-center">✕</button>
+                <span class="text-[10px] font-bold text-slate-300">📍 ${p.dist}</span>
+              </div>
+
+              <div class="flex flex-col items-center text-center">
+                <div class="w-14 h-14 rounded-full overflow-hidden" style="box-shadow: 0 0 0 2.5px ${prim.color}, 0 0 0 5px rgba(255,255,255,0.14);">
+                  ${createAvatarSVG(p.avatar, 56)}
+                </div>
+                <div class="text-sm font-extrabold text-white mt-1.5">${p.name}, ${p.age}</div>
+                <span class="mt-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold" style="background:${prim.bg}; color:${prim.color}">${prim.emoji} ${prim.label}</span>
+
+                <div class="flex items-center justify-center gap-1.5 mt-2.5">
+                  ${activeApps.map(appId => {
+                    const app = EXTERNAL_APPS[appId];
+                    return `<span title="Ativo no ${app.name}" class="w-6 h-6 rounded-lg flex items-center justify-center" style="background:${app.bg}; color:${app.textColor}">${renderAppBadgeIcon(appId, 'w-3.5 h-3.5')}</span>`;
+                  }).join('')}
+                </div>
+              </div>
+
+              <button type="button" onclick="sendWaveToProfile('${p.id}')" class="lg-btn-primary w-full py-2.5 rounded-full text-xs font-extrabold text-white active:scale-95">
+                Acenar 👋
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        const isMobile = AppState.device === 'mobile';
+        root.innerHTML = `
+          <div onclick="closeDeviceModals()" class="absolute inset-0 bg-slate-950/60 backdrop-blur-md flex ${isMobile ? 'items-end p-2.5 pb-4' : 'items-center justify-center p-6'} z-50">
+            <div onclick="event.stopPropagation()" class="lg-sheet ${isMobile ? 'w-full rounded-[32px]' : 'w-full max-w-[430px] rounded-[30px]'} p-5 relative overflow-hidden">
+              <div class="pointer-events-none absolute -top-20 -right-16 w-48 h-48 rounded-full blur-3xl opacity-25" style="background:${prim.color}"></div>
+              <button type="button" onclick="closeDeviceModals()" class="lg-pill absolute top-4 right-4 w-8 h-8 rounded-full text-white text-sm flex items-center justify-center">✕</button>
+
+              <div class="flex items-center gap-3.5">
+                <div class="relative w-16 h-16 rounded-full overflow-hidden shrink-0" style="box-shadow: 0 0 0 2.5px ${prim.color}, 0 0 0 5px rgba(255,255,255,0.14);">
+                  ${createAvatarSVG(p.avatar, 64)}
+                  ${p.online ? `<span class="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-950"></span>` : ''}
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-white leading-tight">${p.name}, ${p.age}</h3>
+                  <div class="text-xs text-slate-300/85 mt-0.5 flex items-center gap-1.5">
+                    <span>📍 ${p.dist}</span>
+                    <span>·</span>
+                    <span class="${p.online ? 'text-emerald-300 font-semibold' : 'text-slate-400'}">${p.online ? 'Online agora' : 'Visto há pouco'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="text-xs text-slate-200/90 leading-relaxed mt-4">${p.bio}</p>
+
+              <!-- Tags de Intenção -->
+              <div class="flex flex-wrap gap-1.5 mt-3.5">
+                ${p.intentions.map(id => {
+                  const it = INTENTIONS[id];
+                  return `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold backdrop-blur-md" style="background:${it.bg}; color:${it.color}; border:1px solid ${it.border}">${it.emoji} ${it.label}</span>`;
+                }).join('')}
+              </div>
+
+              <!-- Selos de Aplicativos Externos -->
+              <div class="mt-4 pt-3.5 border-t border-white/[0.12]">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300/75 mb-2">Presença em outros aplicativos</div>
+                <div class="flex flex-wrap gap-2">
+                  ${activeApps.map(appId => {
+                    const app = EXTERNAL_APPS[appId];
+                    const handle = p.apps[appId].handle || '';
+                    return `
+                      <button type="button" onclick="copyProfileAppHandle('${p.id}', '${appId}')" class="lg-pill inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-left">
+                        <span class="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style="background:${app.bg}; color:${app.textColor}">
+                          ${renderAppBadgeIcon(appId, 'w-3 h-3')}
+                        </span>
+                        <span class="text-[11px] font-bold text-white">${app.name}</span>
+                        <span class="text-[10px] ${handle ? 'text-violet-200' : 'text-emerald-200'}">${escapeHtml(handle) || 'Ativo'}</span>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Ações -->
+              <div class="grid ${p.inPark ? 'grid-cols-2' : 'grid-cols-1'} gap-2.5 mt-5">
+                <button type="button" onclick="sendWaveToProfile('${p.id}')" class="lg-btn-primary py-2.5 px-4 rounded-full text-xs font-extrabold text-white active:scale-95">
+                  Mandar um oi 👋
+                </button>
+                ${p.inPark ? `
+                  <button type="button" onclick="openParkFromProfile()" class="lg-pill py-2.5 px-4 rounded-full border-emerald-300/35 text-xs font-extrabold text-emerald-200 active:scale-95">
+                    🌳 Ir pro Parque
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Modal 2: Leitor de Artigo da Comunidade em Liquid Glass
+      if (AppState.selectedArticleId) {
+        const post = COMMUNITY_POSTS.find(p => p.id === AppState.selectedArticleId);
+        if (!post) return;
+        const isMobile = AppState.device === 'mobile';
+
+        root.innerHTML = `
+          <div onclick="closeDeviceModals()" class="absolute inset-0 bg-slate-950/65 backdrop-blur-md flex items-center justify-center ${isMobile ? 'p-2.5' : 'p-6'} z-50">
+            <div onclick="event.stopPropagation()" class="lg-sheet w-full ${isMobile ? 'max-h-[92%] rounded-[30px]' : 'max-w-[620px] max-h-[88%] rounded-[30px]'} flex flex-col overflow-hidden">
+              <div class="px-5 py-4 border-b border-white/[0.12] flex items-center justify-between gap-3 shrink-0">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${post.badgeColor}">${post.categoryLabel}</span>
+                <button type="button" onclick="closeDeviceModals()" class="lg-pill w-8 h-8 rounded-full text-white text-sm flex items-center justify-center">✕</button>
+              </div>
+
+              <div class="flex-1 overflow-y-auto orbit-scroll p-5">
+                <h2 class="${isMobile ? 'text-base' : 'text-xl'} font-extrabold text-white leading-snug">${post.title}</h2>
+                <div class="text-xs text-slate-300/80 mt-1.5 mb-4">${post.author} · ${post.date}</div>
+
+                <div class="space-y-3 text-xs sm:text-[13px] text-slate-100/95 leading-relaxed">
+                  ${post.content.map(par => `<p>${par}</p>`).join('')}
+                </div>
+
+                <!-- Curtir e Compartilhar -->
+                <div class="flex items-center gap-3 mt-5 pt-4 border-t border-white/[0.12]">
+                  <button type="button" onclick="togglePostLike('${post.id}')" class="lg-pill px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${post.liked ? 'border-rose-300/45 text-rose-200' : 'text-slate-100'}">
+                    ${post.liked ? '❤️ Curtido' : '🤍 Curtir'} (${post.likes})
+                  </button>
+                  <button type="button" onclick="copyArticleLink('${post.id}')" class="lg-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-100">
+                    🔗 Compartilhar
+                  </button>
+                </div>
+
+                <!-- Comentários -->
+                <div class="mt-5">
+                  <div class="text-xs font-bold text-white mb-2.5">Comentários (${post.comments.length})</div>
+                  <div class="space-y-2.5">
+                    ${post.comments.map(c => `
+                      <div class="p-3 rounded-2xl bg-white/[0.06] border border-white/[0.11]">
+                        <div class="flex items-center justify-between text-[11px]">
+                          <span class="font-bold text-violet-200">${escapeHtml(c.author)}</span>
+                          <span class="text-slate-400">${escapeHtml(c.time)}</span>
+                        </div>
+                        <p class="text-xs text-slate-100/90 mt-1 leading-relaxed">${escapeHtml(c.text)}</p>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Formulário de Novo Comentário -->
+              <form onsubmit="submitArticleComment('${post.id}', event)" class="p-3.5 border-t border-white/[0.12] bg-slate-950/45 flex items-center gap-2 shrink-0">
+                <input id="article-comment-input" type="text" placeholder="Escreva um comentário..." class="flex-1 bg-white/[0.08] border border-white/15 focus:border-white/35 rounded-full px-4 py-2 text-xs text-white placeholder-slate-300/75 outline-none"/>
+                <button type="submit" class="lg-btn-primary px-4 py-2 rounded-full text-xs font-bold text-white shrink-0">Publicar</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    /* =========================================================================
+       11. BRILHO ESPECULAR INTERATIVO (LIQUID GLASS SHEEN) & INICIALIZAÇÃO
+       ========================================================================= */
+    document.addEventListener('pointermove', (e) => {
+      const target = e.target && e.target.closest ? e.target.closest('.lg-sheen') : null;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      target.style.setProperty('--lg-x', x.toFixed(1) + '%');
+      target.style.setProperty('--lg-y', y.toFixed(1) + '%');
+    }, { passive: true });
+
+    window.addEventListener('resize', fitDeviceToStage);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateStudioChrome();
+      renderDeviceShell();
+      fitDeviceToStage();
+    });
+  </script>
+</body>
+</html>
