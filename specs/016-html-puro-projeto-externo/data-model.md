@@ -7,14 +7,16 @@ qualquer `grant`, funções `security definer` com `set search_path = ''`, grava
 `private.record_audit_log` e testes em PGlite (`test/database/`). Decisões em
 [research.md](research.md).
 
-Migrações previstas, nesta ordem:
+Migrações previstas, nesta ordem. Os nomes são provisórios: cada arquivo recebe a versão no PR da
+fase que o introduz, sempre maior que a última migração do `main` naquele momento
+([plan.md](plan.md), "Ordem de entrega por fases").
 
-| Arquivo | Conteúdo |
-| --- | --- |
-| `20261121000100_client_customizations_notices.sql` | `client_customizations`, `panel_notices`, auditoria |
-| `20261121000200_html_packages.sql` | `plans.max_html_packages`, pacotes, versões, conteúdo, revisões, controles por vitrine, cotas, RPCs de envio, revisão, leitura e uso; cópia de `custom_components` |
-| `20261121000300_external_project_links.sql` | vínculos, configurações, comprovações, tentativas, `public_showcase_overrides`, métrica `external_redirect` |
-| `20261121000400_admin_clients.sql` | `admin_list_clients`, `admin_read_client`, `read_platform_overview` com uso de HTML |
+| Arquivo | Fase | Conteúdo |
+| --- | --- | --- |
+| `20261121000100_client_customizations_notices.sql` | 1 (Fundação) | `client_customizations`, `panel_notices`, auditoria |
+| `20261121000200_html_packages.sql` | 1 (Fundação, mínima) | `plans.max_html_packages`, pacotes, versões, conteúdo, revisões, controles por vitrine, cotas, concessões de prévia, RPCs de envio, revisão, leitura e uso; cópia de `custom_components` |
+| `20261121000300_external_project_links.sql` | 6 (US4) | vínculos, configurações, comprovações, tentativas, `public_showcase_overrides`, métrica `external_redirect` |
+| `20261121000400_admin_clients.sql` | 7 (US5) | `admin_list_clients`, `admin_read_client`, `read_platform_overview` com uso de HTML |
 
 ## 1. Customização contratada (`public.client_customizations`)
 
@@ -75,11 +77,14 @@ de auditoria.
 
 - **Ativo** (FR-058): tem alguma versão `pending_review`, `approved` ou em uso. Pacotes `origin =
   'operator'` não contam no limite enquanto houver `html_bespoke` vigente.
-- **Gatilho de limite**: ao inserir pacote `origin = 'owner'`, conferir
+- **Gatilho de limite**: em dois pontos, ambos com `pg_advisory_xact_lock` por vitrine, conferir
   `'html_packages' = any(private.site_entitlements(site).features)` e
-  `count(ativos) < plans.max_html_packages` (com `pg_advisory_xact_lock` por vitrine), senão
-  `PLAN_FEATURE_REQUIRED` / `HTML_PACKAGE_LIMIT`. O Worker confere antes e responde no formato do
-  tópico 9 da pesquisa.
+  `count(ativos) < plans.max_html_packages`, senão `PLAN_FEATURE_REQUIRED` / `HTML_PACKAGE_LIMIT`:
+  (1) ao inserir pacote `origin = 'owner'`; (2) na transição `ready → pending_review` de uma versão
+  cujo pacote `origin = 'owner'` ainda não está ativo. Sem o ponto (2), pacotes em `ready` (que não
+  contam como ativos) poderiam ser criados além do limite e enviados para revisão depois. Novas
+  versões de pacotes já ativos não passam pela conferência (US1-8). O Worker confere antes e
+  responde no formato do tópico 9 da pesquisa.
 - **Exclusão** (US6-4): recusada com `HTML_PACKAGE_IN_USE` e a lista de páginas e blocos quando
   alguma versão está no rascunho ou no snapshot atual; fora de uso, apaga versões e conteúdo.
 
@@ -134,7 +139,9 @@ approved ──Retirar do ar──────────▶ withdrawn         
 | `withdrawn` | Retirada do ar | não | não ("Conteúdo indisponível") |
 
 - Transições só por RPC: `submit_html_version` (dono/admin da vitrine, ou operador para
-  `origin = 'operator'`), `decide_html_version` (`platform_admin`; para versões `origin =
+  `origin = 'operator'`; para pacote `origin = 'owner'` ainda não ativo, confere recurso e limite
+  como no gatilho de limite da seção 3 e recusa com `PLAN_FEATURE_REQUIRED`,
+  `feature: "html_packages_limit"`), `decide_html_version` (`platform_admin`; para versões `origin =
   'operator'`, `decided_by <> uploaded_by` quando existir mais de um `platform_admin`, FR-048),
   `withdraw_html_version` (`platform_admin`). Uma versão aprovada pode ser publicada, despublicada
   e republicada sem nova revisão (FR-007). Voltar a uma versão aprovada (US6-3) não muda o estado.
@@ -160,7 +167,27 @@ recebido do Worker). Leitura só por:
   revalidação do cache.
 - `public.service_read_html_version(version_id)` — só `service_role`: para a prévia autenticada e
   a revisão (versões `ready`, `pending_review`, `changes_requested`), chamada pelo Worker depois de
-  conferir o token assinado.
+  conferir o token assinado e consumir a concessão de prévia (abaixo).
+
+### Concessões de prévia (`private.html_preview_grants`)
+
+Torna o token de prévia do host isolado de uso único
+([contracts/sandbox-embed-http.md](contracts/sandbox-embed-http.md), "Modo prévia").
+
+| Campo | Tipo | Regra |
+| --- | --- | --- |
+| `jti` | `uuid` pk | o mesmo `jti` assinado no token |
+| `version_id` | `uuid` not null → `html_package_versions` on delete cascade | |
+| `user_id` | `uuid` not null → `auth.users` | quem pediu a prévia (dono, admin da vitrine ou operador) |
+| `expires_at` | `timestamptz` | emissão + 120 s |
+| `used_at` | `timestamptz` null | gravado no primeiro uso |
+
+- Esquema `private`, sem `grant` para `anon`/`authenticated`. O Worker insere a linha ao emitir o
+  token, depois de conferir o papel de quem pede.
+- `public.consume_html_preview_grant(jti, version_id)` — só `service_role`: numa única instrução,
+  grava `used_at = now()` onde `jti` e `version_id` conferem, `used_at is null` e
+  `expires_at > now()`, e devolve se alguma linha mudou. `false` → `404` no host isolado.
+- Nenhum dado pessoal além do `user_id`; o token e o `jti` não vão para log nem para `audit_logs`.
 
 ## 6. Revisão (`public.html_package_reviews`)
 
@@ -372,6 +399,7 @@ Projeção explícita (Princípio I): sem ids internos, motivos, autores ou cód
 | Configurações do vínculo | 5 mais recentes + ativa + pendente | gatilho |
 | Tentativas de comprovação | 30 por comprovação | gatilho |
 | Avisos lidos | 90 dias | `purge_panel_notices` no Cron |
+| Concessões de prévia | apagadas 1 h depois de vencer, usadas ou não | `purge_html_preview_grants` no Cron |
 | Auditoria | regra existente (`purge_audit_logs_older_than`, 180 dias) | sem mudança |
 
 ## 15. Eventos de auditoria

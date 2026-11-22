@@ -46,7 +46,7 @@ Nenhum item ficou como NEEDS CLARIFICATION: os dez temas técnicos foram resolvi
 | --- | --- | --- |
 | I. Administração privada e publicação pública | O snapshot só pode carregar referências (`packageId`, `versionId`, hash, título, modo de altura), nunca o HTML, a declaração, o relatório ou a revisão. O redirecionamento não pode expor ao público motivo, autor nem comprovação. | Exige projeção explícita; resolvido no desenho |
 | II. Isolamento entre vitrines | Pacotes, versões, revisões, vínculos e comprovações são por vitrine; operadores leem tudo só por RPC com `is_platform_admin`. Precisa de testes de RLS e de chamada direta. | Exige testes; planejados |
-| III. Credenciais apenas no servidor | Token de prévia do host isolado não pode vazar segredo; nenhum segredo novo pode ir para `wrangler.jsonc`. | Atendido com `PREVIEW_HMAC_SECRET` existente |
+| III. Credenciais apenas no servidor | O token de prévia do host isolado vai na URL, porque o cookie de sessão não chega a esse host; ele é uma capacidade derivada, não um segredo, mas precisa ser curto, de uso único e ligado a quem pediu. Nenhum segredo novo pode ir para `wrangler.jsonc`. | Exige endurecimento do token; resolvido no desenho com `PREVIEW_HMAC_SECRET` existente |
 | IV. Custo e condições verificáveis | Novo uso do banco gratuito, da Cache API, do DoH e do Cron precisa de cota, falha e alerta documentados; nenhum serviço pago. | Exige cotas; definidas em research |
 | V. Entregas verificáveis | Sete histórias com cenários; risco alto (código de terceiros, redirecionamento de domínio) pede testes automatizados e aceite manual com pacote hostil. | Exige quickstart; escrito |
 
@@ -56,7 +56,7 @@ Nenhum item ficou como NEEDS CLARIFICATION: os dez temas técnicos foram resolvi
 | --- | --- | --- |
 | I | `sectionConfig` de `custom_sandbox` e `html` da página aceitam só chaves listadas ([data-model.md](./data-model.md) seção 8); o conteúdo fica em `private`, lido só por RPC que exige versão aprovada e hash igual; `public_showcase_overrides` devolve só `paused`, `htmlEnabled` e destino/alcance/abertura ([data-model.md](./data-model.md) seção 12); `302` sem página intermediária, sem canônico, `noindex` | `test/html-framed-page.test.mjs` (snapshot sem campos privados, `assertNoPrivateLeakage`), `test/database/external-project-links.test.mjs` (RPC anônima sem motivo nem prova) |
 | II | RLS por `site_id` com `private.has_site_role`; escrita só por RPC/Worker com verificação de membro e papel; gatilhos de limite e cota no banco; RPCs de administração recusam quem não é `platform_admin`; host isolado sem cookie e com origem opaca; `frame-ancestors` restrito à vitrine dona | `test/database/html-packages.test.mjs`, `test/database/admin-clients.test.mjs`, `test/html-packages-api.test.mjs` (dono A × vitrine B por chamada direta), `test/html-sandbox-embed.test.mjs` |
-| III | Nenhum segredo novo; `SANDBOX_ORIGIN` é variável pública; token de prévia HMAC de 10 minutos ligado a `versionId` + hash; `service_role` só no Worker; nenhum e-mail ou código de verificação em log | `test/security-rls-csp-audit.test.mjs` estendido; revisão de `wrangler.jsonc` no PR |
+| III | Nenhum segredo novo; `SANDBOX_ORIGIN` é variável pública; `service_role` só no Worker; nenhum e-mail ou código de verificação em log. Token de prévia é uma capacidade derivada, não um segredo: HMAC de 120 s, uso único (`private.html_preview_grants`, [data-model.md](./data-model.md) seção 5), ligado a `versionId` + hash e emitido só para quem tem papel na vitrine ou é operador (`userId` gravado na concessão, para rastreio), servido com `no-store` e `referrer-policy: no-referrer`; nunca aparece em log nem no snapshot. O cookie de sessão não chega ao host isolado, por isso o token vai na URL e o host não sabe quem o usa; o risco residual (alguém com a URL nos primeiros 120 s, antes do primeiro uso) está registrado na [ADR 0014](../../docs/adr/0014-pacotes-html-do-proprietario.md) | `test/html-sandbox-embed.test.mjs` (reutilização, vencimento, outra versão, `jti` não emitido); `test/html-packages-api.test.mjs` (emissão recusada a quem não tem papel na vitrine); `test/security-rls-csp-audit.test.mjs` estendido; revisão de `wrangler.jsonc` no PR |
 | IV | Cotas (3 MiB/vitrine, 100 MiB total, alerta em 80% do banco no painel do operador), orçamento do Cron (30 subrequests, fila por `next_check_at`), DoH sem SLA, hosts de terceiros da lista registrados na política de privacidade; falhas: cache servido se o banco falhar, "indisponível" se o hash divergir, verificação transitória não suspende | [research.md](./research.md) tópicos 1, 3, 7 e riscos; `docs/operations-guide.md` atualizado na entrega |
 | V | Cenários A–H em [quickstart.md](./quickstart.md) cobrem as sete histórias e SC-001 a SC-013; pacote hostil executado em navegador real; tudo descrito como planejado | Testes listados em "Project Structure"; capturas 1280/375 no PR de entrega |
 
@@ -162,7 +162,7 @@ carregados sem build, uma migração por grupo de tabelas. Nenhum Worker, bucket
 
 | Frente | Escopo | Depende de | Pode andar junto com |
 | --- | --- | --- | --- |
-| A. Banco | as 4 migrações, RLS, gatilhos, RPCs, cópia de `custom_components`, testes PGlite | — | E (regras), I |
+| A. Banco | as 4 migrações, RLS, gatilhos, RPCs, cópia de `custom_components`, testes PGlite; cada migração recebe a versão no PR que a introduz, sempre maior que a última do `main` naquele momento (`scripts/check-migration-order.mjs`), e a ordem dos arquivos segue a ordem real de entrega | — | E (regras), I |
 | B. Host isolado | `src/html-sandbox.mjs`, rota `/embed`, CSP, cache/revalidação, token de prévia, `SANDBOX_ORIGIN` | contratos de RPC de A (pode usar a loja em memória antes) | C, D, E |
 | C. APIs de pacotes e revisão | `src/html-packages.mjs`, rotas do proprietário e do operador, plano/limite, 410 do endpoint antigo, avisos | A (assinaturas), regras de E | B, D |
 | D. Projeto externo | `src/external-project.mjs`, validação, comprovação, Cron, `public_showcase_overrides` em `readPublicSiteState`, `302`, métrica | A (tabelas 9–12) | B, C |
@@ -178,8 +178,10 @@ recebe as mesmas operações antes da migração existir.
 
 ## Ordem de entrega por fases
 
-1. **Fundação** (bloqueia tudo): migração `…0200` mínima (pacotes, versões, conteúdo, revisões,
-   controles, plano), `html-package-rules.mjs`, recurso `html_packages` nos planos, `SANDBOX_ORIGIN`.
+1. **Fundação** (bloqueia tudo): migrações `…0100` (customizações contratadas e avisos no painel,
+   usadas pelos avisos da US1 e por `site_html_enabled`) e `…0200` mínima (pacotes, versões, conteúdo,
+   revisões, controles, plano), `html-package-rules.mjs`, recurso `html_packages` nos planos,
+   `SANDBOX_ORIGIN`.
 2. **MVP — US1 (P1)**: envio com relatório, página HTML emoldurada com rota própria, prévia com
    token, envio para revisão, aprovar/recusar/pedir ajustes mínimos na aba Revisões, host isolado com
    CSP e cache, publicação recusando versão não aprovada, bloqueio por plano. Valida com o cenário A
@@ -187,16 +189,21 @@ recebe as mesmas operações antes da migração existir.
 3. **US7 + US2 (P2)**: estados de carregamento e falha, `vitrine:resize`, medidas finais em dvh,
    bloco HTML com os dois modos de altura, limite de 3 por página.
 4. **US3 (P3)**: fila completa com filtros e espera, lista de verificação, comparação com a versão
-   anterior, retirada com motivo, avisos no painel, envio pelo operador com customização.
+   anterior, retirada com motivo, avisos no painel, envio pelo operador com customização (registrada
+   pela API de Clientes, ainda sem tela; a tela chega na fase 6).
 5. **US6 (P6, adiantada por ser pequena e depender só de 2–4)**: substituir, voltar versão, excluir
    com impedimentos, retenção de 30 dias.
-6. **US4 (P4)**: migrações `…0100` e `…0300`, comprovação, Cron, ativação, `302`, métrica.
-7. **US5 (P5)**: migração `…0400`, Clientes e ficha, Ajustes em grupos, medição de SC-005/SC-008.
+6. **US4 (P4)**: migração `…0300`, comprovação, Cron, ativação, `302`, métrica e a ficha mínima do
+   cliente (grupos "Customizações contratadas" e "Projeto externo", abertos por
+   `#administracao/clientes/<chave>`), onde o operador registra a customização e configura o vínculo.
+7. **US5 (P5)**: migração `…0400`, lista "Clientes" com busca e filtros, demais grupos da ficha,
+   Ajustes em grupos, medição de SC-005/SC-008.
 8. **Acabamento**: textos legais, documentação, aceite completo do quickstart, remoção da tela
    antiga de componentes.
 
-As fases 6 e 7 podem correr em paralelo às fases 3–5 (frentes D e G), porque não tocam as mesmas
-tabelas; a fase 7 só precisa da ficha mostrar dados de pacotes quando a fase 2 já existir.
+A fase 6 pode correr em paralelo às fases 3–5 (frente D e a ficha mínima da frente G), porque não
+toca as mesmas tabelas. A fase 7 depende da ficha mínima da fase 6, que ela completa, e só mostra
+dados de pacotes na ficha quando a fase 2 já existir.
 
 ## Pendências humanas
 

@@ -64,8 +64,11 @@ Detalhe para decidir (FR-028, US3-2):
 ```
 
 `isFirstVersion = true` e `comparison.previousApproved = null` quando não há versão aprovada antes.
-A prévia usa o mesmo token de portador da prévia do proprietário e alterna 1280/375 no painel
-(largura da moldura de revisão; o conteúdo é o mesmo).
+A prévia usa o mesmo token de portador da prévia do proprietário: 120 s, uso único e emitido em
+nome do operador que abriu a revisão ([sandbox-embed-http.md](sandbox-embed-http.md)). `expiresAt` fica 120 s
+depois da resposta. Alternar 1280/375 no painel só muda a largura da moldura de revisão, sem
+recarregar; reabrir a prévia ou "Tentar novamente" pede de novo este detalhe para receber um token
+novo.
 
 ## `POST /api/admin/html-reviews/:versionId/decision`
 

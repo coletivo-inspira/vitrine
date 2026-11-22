@@ -31,10 +31,22 @@ sem cache → `502` vazio.
 
 ### Modo prévia (com `t`)
 
-Token HMAC de portador (10 minutos) emitido pela API do proprietário ou da revisão, vinculado a
-`versionId` e `sha256`. Válido → `service_read_html_version(versionId)` com `service_role`, aceita
-`ready`, `pending_review`, `changes_requested` e `approved`. Resposta com `cache-control: no-store`
-e nunca gravada no cache. Token inválido ou vencido → `404`.
+Token HMAC de portador emitido pela API do proprietário ou da revisão, válido por 120 s e de uso
+único, vinculado a `versionId`, `sha256`, `userId` de quem o pediu e a um `jti` (uuid). Este host
+não recebe sessão e não sabe quem usa o token; o `userId` serve para rastrear a emissão, que a API
+só concede a quem tem papel na vitrine ou é operador. O Worker
+grava o `jti` em `private.html_preview_grants` ao emitir o token. Na primeira carga, confere o HMAC e
+a validade e consome o `jti` com `consume_html_preview_grant(jti, versionId)` (`service_role`), que
+só devolve `true` se a linha existe, pertence à versão, não venceu e não foi usada, gravando
+`used_at` na mesma operação. Válido → `service_read_html_version(versionId)` com `service_role`,
+aceita `ready`, `pending_review`, `changes_requested` e `approved`. Resposta com
+`cache-control: no-store` e nunca gravada no cache. Token inválido, vencido, de outra versão ou já
+usado → `404`. O token nunca é registrado em log.
+
+O cookie de sessão não chega a este host (outro host, `__Host-`), por isso o token vai na URL. O
+painel pede um token novo a cada abertura da prévia e em "Tentar novamente"; alternar entre 1280 e
+375 só muda a largura da moldura, sem recarregar. Custo: uma subrequest a mais por abertura de
+prévia; visitantes não são afetados.
 
 ### Resposta "indisponível"
 
@@ -88,6 +100,6 @@ etag: "<sha256>"
 - CSP com só os hosts usados; `frame-ancestors` com domínio próprio ativo e sem domínio pendente.
 - Revalidação: depois de "Retirar do ar", acerto de cache com carimbo antigo responde
   "indisponível".
-- Token de prévia: aceita versão `pending_review`, recusa vencido, recusa outra versão, nunca grava
-  cache.
+- Token de prévia: aceita versão `pending_review`, recusa vencido (mais de 120 s), recusa outra
+  versão, recusa token reutilizado, recusa token cujo `jti` não foi emitido, nunca grava cache.
 - Pacote hostil (SC-003) executado em navegador real no aceite manual (quickstart).

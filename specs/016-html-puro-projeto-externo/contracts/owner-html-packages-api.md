@@ -125,16 +125,25 @@ Cria pacote e versão 1. Confere plano, limite, suspensão e cotas no Worker e n
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions`
 
 Nova versão de um pacote existente. Mesmo corpo sem `name`/`description`. Não conta no limite de
-pacotes (FR-058, US1-8). Respostas iguais às do envio inicial.
+pacotes (FR-058, US1-8). Respostas iguais às do envio inicial. Se o pacote ainda não está ativo, o
+limite é conferido no envio para revisão (abaixo).
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions/:versionId/submit`
 
 Envia para revisão: `ready` → `pending_review`. Corpo `{}`. `200` com a versão. A versão aprovada
 em uso continua no ar durante a revisão (US6-1).
 
+Quando o pacote ainda não está ativo (nenhuma versão `pending_review`, `approved` ou em uso), o
+envio conta como entrada de um pacote novo no limite (FR-058) e o Worker e o banco conferem de novo:
+
+| Status | Código | Quando |
+| --- | --- | --- |
+| 403 | `PLAN_FEATURE_REQUIRED` | a vitrine perdeu o recurso; `feature: "html_packages"` e `requiredPlan` |
+| 403 | `PLAN_FEATURE_REQUIRED` | a vitrine já tem o número máximo de pacotes ativos; `feature: "html_packages_limit"`, `limit`, `current`, `requiredPlan` |
+
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions/:versionId/preview-token`
 
-Token curto (10 minutos) para a prévia autenticada de versões `ready`, `pending_review`,
+Token curto (120 s, uso único) para a prévia autenticada de versões `ready`, `pending_review`,
 `changes_requested` e `approved`. `200`:
 
 ```json
@@ -142,10 +151,13 @@ Token curto (10 minutos) para a prévia autenticada de versões `ready`, `pendin
 ```
 
 O token é HMAC com `PREVIEW_HMAC_SECRET` (o segredo de `src/preview-token.mjs`) sobre o prefixo
-`html-preview`, `versionId`, `sha256` e expiração, num formato próprio para não ser aceito como
-token de prévia de rascunho. Funciona como portador: o host isolado não recebe o cookie de sessão
-(outro host), então a proteção é a validade curta, o vínculo com a versão e `no-store`. Nunca
-aparece no snapshot.
+`html-preview`, `versionId`, `sha256`, `userId`, `jti` e expiração, num formato próprio para não ser
+aceito como token de prévia de rascunho. Funciona como portador, porque o host isolado não recebe o
+cookie de sessão (outro host). A proteção é a validade de 120 s, o uso único (o `jti` fica em
+`private.html_preview_grants` e é consumido na primeira carga, ver
+[sandbox-embed-http.md](sandbox-embed-http.md)), o vínculo com a versão e com quem pediu, `no-store`
+e `referrer-policy: no-referrer`. Nunca aparece no snapshot nem em log. O painel pede um token novo a
+cada abertura da prévia e em "Tentar novamente".
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/rollback`
 

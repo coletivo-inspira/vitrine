@@ -70,6 +70,12 @@ Adotamos a **Opção 3**, mantendo tudo o que a ADR 0010 exige (origem opaca, nu
     liberar o recurso.
   - `'unsafe-inline'` em scripts dentro do host isolado é aceito porque o documento não tem origem
     utilizável; continua proibido na vitrine e no painel (`script-src 'self'`).
+  - A prévia de versões não aprovadas no host isolado usa um token na URL, porque o cookie de
+    sessão não chega a esse host. Mitigações: HMAC de 120 s, uso único (consumido na primeira
+    carga), ligado à versão e ao hash, emitido só a quem tem papel na vitrine ou é operador (com
+    registro de quem pediu), `no-store`, `referrer-policy: no-referrer` e
+    nunca registrado em log. Risco residual aceito: quem obtiver a URL antes do primeiro uso, dentro
+    dos 120 s, vê a versão ainda não aprovada.
   - Revisão humana cria fila e espera (meta de 2 dias úteis) e depende de contas de operador.
   - O conteúdo divide os 500 MB do banco gratuito; o painel do operador avisa a partir de 80%.
 - **Pendências**: rota e certificado do host isolado dependem da autenticação na Cloudflare
