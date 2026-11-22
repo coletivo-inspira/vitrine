@@ -1,7 +1,9 @@
-<!-- Sync Impact Report: template -> 0.1.0. Initial proposed principles.
-Added: security boundaries, cost constraints and workflow.
-plan-template.md and tasks-template.md updated; spec-template.md compatible.
-No templates/commands directory installed. README and AGENTS updated.
+<!-- Sync Impact Report: 0.1.0 -> 0.2.0 (minor, proposta). Delivery Constraints:
+login deixa de ser só Google; e-mail e senha, telefone e senha e código pelo WhatsApp
+iniciado pela pessoa passam a ser permitidos, sem SMS nem mensagem paga (ADR 0015,
+specs/017-login-multiplo). Princípios inalterados; templates compatíveis.
+Migração: nenhuma; métodos novos entram desligados até ratificação.
+Anterior: template -> 0.1.0, princípios iniciais propostos.
 Deferred: user ratification, auth configuration and detailed member permissions. -->
 # Vitrine Inspira Constitution
 
@@ -35,7 +37,9 @@ Funcionalidades planejadas NÃO DEVEM ser descritas como implementadas.
 ## Delivery Constraints
 MVP: pizzaria, cardápio e contato WhatsApp. Link não equivale a envio automático
 ou confirmação de pedido. Cloudflare foi escolhida para hospedagem e Supabase
-Auth/Postgres para backend. Equipe é por vitrine. Login inicial será Google via Supabase Auth. Workers Free com Static Assets adotado; configuração e
+Auth/Postgres para backend. Equipe é por vitrine. Login inicial é Google via Supabase Auth;
+proposta 0.2.0 (ADR 0015) acrescenta e-mail e senha, telefone e senha e código pelo WhatsApp
+iniciado pela pessoa, sem SMS nem mensagem paga. Workers Free com Static Assets adotado; configuração e
 permissões detalhadas seguem em docs/roadmap.md. Templates centralizados; planos gratuitos
 sem contratação automática (ADR 0005).
 Deploy permanece pendente.
@@ -50,6 +54,7 @@ aplicáveis. UI requer contexto de produto e validação desktop/mobile.
 Verificar estes princípios em cada plano e PR. Alterações DEVEM explicar motivo,
 impacto e migração: major para quebra de princípio, minor para adição e patch
 para esclarecimento. Instruções do usuário e ambiente prevalecem.
-A versão 0.1.0 organiza restrições existentes sem ratificar arquitetura final.
+A versão 0.1.0 organiza restrições existentes sem ratificar arquitetura final; a 0.2.0
+amplia os métodos de login e continua proposta até a ratificação.
 
-**Version**: 0.1.0 | **Ratified**: TODO: confirmar com usuário | **Last Amended**: 2026-11-07
+**Version**: 0.2.0 (proposta) | **Ratified**: TODO: confirmar com usuário | **Last Amended**: 2026-11-22
