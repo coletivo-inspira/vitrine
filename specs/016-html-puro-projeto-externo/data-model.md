@@ -77,11 +77,14 @@ de auditoria.
 
 - **Ativo** (FR-058): tem alguma versão `pending_review`, `approved` ou em uso. Pacotes `origin =
   'operator'` não contam no limite enquanto houver `html_bespoke` vigente.
-- **Gatilho de limite**: ao inserir pacote `origin = 'owner'`, conferir
+- **Gatilho de limite**: em dois pontos, ambos com `pg_advisory_xact_lock` por vitrine, conferir
   `'html_packages' = any(private.site_entitlements(site).features)` e
-  `count(ativos) < plans.max_html_packages` (com `pg_advisory_xact_lock` por vitrine), senão
-  `PLAN_FEATURE_REQUIRED` / `HTML_PACKAGE_LIMIT`. O Worker confere antes e responde no formato do
-  tópico 9 da pesquisa.
+  `count(ativos) < plans.max_html_packages`, senão `PLAN_FEATURE_REQUIRED` / `HTML_PACKAGE_LIMIT`:
+  (1) ao inserir pacote `origin = 'owner'`; (2) na transição `ready → pending_review` de uma versão
+  cujo pacote `origin = 'owner'` ainda não está ativo. Sem o ponto (2), pacotes em `ready` (que não
+  contam como ativos) poderiam ser criados além do limite e enviados para revisão depois. Novas
+  versões de pacotes já ativos não passam pela conferência (US1-8). O Worker confere antes e
+  responde no formato do tópico 9 da pesquisa.
 - **Exclusão** (US6-4): recusada com `HTML_PACKAGE_IN_USE` e a lista de páginas e blocos quando
   alguma versão está no rascunho ou no snapshot atual; fora de uso, apaga versões e conteúdo.
 
@@ -136,7 +139,9 @@ approved ──Retirar do ar──────────▶ withdrawn         
 | `withdrawn` | Retirada do ar | não | não ("Conteúdo indisponível") |
 
 - Transições só por RPC: `submit_html_version` (dono/admin da vitrine, ou operador para
-  `origin = 'operator'`), `decide_html_version` (`platform_admin`; para versões `origin =
+  `origin = 'operator'`; para pacote `origin = 'owner'` ainda não ativo, confere recurso e limite
+  como no gatilho de limite da seção 3 e recusa com `PLAN_FEATURE_REQUIRED`,
+  `feature: "html_packages_limit"`), `decide_html_version` (`platform_admin`; para versões `origin =
   'operator'`, `decided_by <> uploaded_by` quando existir mais de um `platform_admin`, FR-048),
   `withdraw_html_version` (`platform_admin`). Uma versão aprovada pode ser publicada, despublicada
   e republicada sem nova revisão (FR-007). Voltar a uma versão aprovada (US6-3) não muda o estado.

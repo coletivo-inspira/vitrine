@@ -51,13 +51,13 @@ Sem Supabase local, as telas autenticadas podem ser exercitadas como na auditori
 | Arquivo | Cobre |
 | --- | --- |
 | `test/html-package-rules.test.mjs` | limites, níveis do relatório, hosts com linha e coluna, `xmlns` ignorado, Orbit sem erros e com os 3 hosts |
-| `test/html-packages-api.test.mjs` | envio, reenvio idêntico, estados, plano (`403` com Essencial), limite (`html_packages_limit`), suspensão, cotas, exclusão em uso, voltar versão |
+| `test/html-packages-api.test.mjs` | envio, reenvio idêntico, estados, plano (`403` com Essencial), limite (`html_packages_limit`) na criação e no envio para revisão de pacote ainda não ativo, suspensão, cotas, exclusão em uso, voltar versão |
 | `test/html-sandbox-embed.test.mjs` | CSP por versão, `frame-ancestors`, hash divergente, retirada com revalidação de 300 s, token de prévia |
 | `test/html-framed-page.test.mjs` | rota própria, domínio próprio, metadados, medidas nas classes, perda do plano, publicação recusada com versão não aprovada |
 | `test/html-frame-controller.test.mjs` | regras de `vitrine:resize`, limite de 10/s, falha em 10 s |
 | `test/external-project.test.mjs` | validação do destino, laço, comprovação DNS e arquivo (com `fetch` simulado), Cron com orçamento, `302` com `utm_*`, `404` de JSON, menu em nova aba, métrica |
 | `test/admin-clients.test.mjs` | lista, busca por nome, endereço e código, filtros, ficha, `403` para não operador |
-| `test/database/html-packages.test.mjs` | RLS (dono A não lê pacote de B, inclusive por chamada direta), gatilhos de limite e cota, retenção |
+| `test/database/html-packages.test.mjs` | RLS (dono A não lê pacote de B, inclusive por chamada direta), gatilhos de limite (criação e envio para revisão) e cota, retenção |
 | `test/database/external-project-links.test.mjs` | RLS, máquina de estados, `public_showcase_overrides` sem dados privados, 5 configurações |
 | `test/database/admin-clients.test.mjs` | RPCs recusam não operador; projeção sem dados pessoais |
 | `test/plans.test.mjs`, `test/database/plans-subscriptions.test.mjs` | `html_packages`, `htmlPackagesPerVitrine`, coluna `max_html_packages` |
@@ -102,6 +102,9 @@ em `c29ee4c`.
    `403 PLAN_FEATURE_REQUIRED`, `requiredPlan.name = "Essencial"`.
 3. No Essencial com 1 pacote ativo, tentar um segundo pacote → recusa com o limite 1 e o plano
    Profissional; enviar nova versão do Orbit continua permitido.
+4. No Essencial sem pacote ativo, criar dois pacotes (os dois ficam em "Pronta para revisão"),
+   enviar o primeiro para revisão e depois o segundo → o segundo envio é recusado com o limite 1 e
+   o plano Profissional, pela interface e por chamada direta a `…/submit`.
 
 ### C. Revisão completa e retirada (US3)
 

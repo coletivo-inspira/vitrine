@@ -125,12 +125,21 @@ Cria pacote e versão 1. Confere plano, limite, suspensão e cotas no Worker e n
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions`
 
 Nova versão de um pacote existente. Mesmo corpo sem `name`/`description`. Não conta no limite de
-pacotes (FR-058, US1-8). Respostas iguais às do envio inicial.
+pacotes (FR-058, US1-8). Respostas iguais às do envio inicial. Se o pacote ainda não está ativo, o
+limite é conferido no envio para revisão (abaixo).
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions/:versionId/submit`
 
 Envia para revisão: `ready` → `pending_review`. Corpo `{}`. `200` com a versão. A versão aprovada
 em uso continua no ar durante a revisão (US6-1).
+
+Quando o pacote ainda não está ativo (nenhuma versão `pending_review`, `approved` ou em uso), o
+envio conta como entrada de um pacote novo no limite (FR-058) e o Worker e o banco conferem de novo:
+
+| Status | Código | Quando |
+| --- | --- | --- |
+| 403 | `PLAN_FEATURE_REQUIRED` | a vitrine perdeu o recurso; `feature: "html_packages"` e `requiredPlan` |
+| 403 | `PLAN_FEATURE_REQUIRED` | a vitrine já tem o número máximo de pacotes ativos; `feature: "html_packages_limit"`, `limit`, `current`, `requiredPlan` |
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions/:versionId/preview-token`
 
