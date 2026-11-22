@@ -7,14 +7,16 @@ qualquer `grant`, funções `security definer` com `set search_path = ''`, grava
 `private.record_audit_log` e testes em PGlite (`test/database/`). Decisões em
 [research.md](research.md).
 
-Migrações previstas, nesta ordem:
+Migrações previstas, nesta ordem. Os nomes são provisórios: cada arquivo recebe a versão no PR da
+fase que o introduz, sempre maior que a última migração do `main` naquele momento
+([plan.md](plan.md), "Ordem de entrega por fases").
 
-| Arquivo | Conteúdo |
-| --- | --- |
-| `20261121000100_client_customizations_notices.sql` | `client_customizations`, `panel_notices`, auditoria |
-| `20261121000200_html_packages.sql` | `plans.max_html_packages`, pacotes, versões, conteúdo, revisões, controles por vitrine, cotas, RPCs de envio, revisão, leitura e uso; cópia de `custom_components` |
-| `20261121000300_external_project_links.sql` | vínculos, configurações, comprovações, tentativas, `public_showcase_overrides`, métrica `external_redirect` |
-| `20261121000400_admin_clients.sql` | `admin_list_clients`, `admin_read_client`, `read_platform_overview` com uso de HTML |
+| Arquivo | Fase | Conteúdo |
+| --- | --- | --- |
+| `20261121000100_client_customizations_notices.sql` | 1 (Fundação) | `client_customizations`, `panel_notices`, auditoria |
+| `20261121000200_html_packages.sql` | 1 (Fundação, mínima) | `plans.max_html_packages`, pacotes, versões, conteúdo, revisões, controles por vitrine, cotas, RPCs de envio, revisão, leitura e uso; cópia de `custom_components` |
+| `20261121000300_external_project_links.sql` | 6 (US4) | vínculos, configurações, comprovações, tentativas, `public_showcase_overrides`, métrica `external_redirect` |
+| `20261121000400_admin_clients.sql` | 7 (US5) | `admin_list_clients`, `admin_read_client`, `read_platform_overview` com uso de HTML |
 
 ## 1. Customização contratada (`public.client_customizations`)
 

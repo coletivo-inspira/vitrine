@@ -162,7 +162,7 @@ carregados sem build, uma migração por grupo de tabelas. Nenhum Worker, bucket
 
 | Frente | Escopo | Depende de | Pode andar junto com |
 | --- | --- | --- | --- |
-| A. Banco | as 4 migrações, RLS, gatilhos, RPCs, cópia de `custom_components`, testes PGlite | — | E (regras), I |
+| A. Banco | as 4 migrações, RLS, gatilhos, RPCs, cópia de `custom_components`, testes PGlite; cada migração recebe a versão no PR que a introduz, sempre maior que a última do `main` naquele momento (`scripts/check-migration-order.mjs`), e a ordem dos arquivos segue a ordem real de entrega | — | E (regras), I |
 | B. Host isolado | `src/html-sandbox.mjs`, rota `/embed`, CSP, cache/revalidação, token de prévia, `SANDBOX_ORIGIN` | contratos de RPC de A (pode usar a loja em memória antes) | C, D, E |
 | C. APIs de pacotes e revisão | `src/html-packages.mjs`, rotas do proprietário e do operador, plano/limite, 410 do endpoint antigo, avisos | A (assinaturas), regras de E | B, D |
 | D. Projeto externo | `src/external-project.mjs`, validação, comprovação, Cron, `public_showcase_overrides` em `readPublicSiteState`, `302`, métrica | A (tabelas 9–12) | B, C |
@@ -178,8 +178,10 @@ recebe as mesmas operações antes da migração existir.
 
 ## Ordem de entrega por fases
 
-1. **Fundação** (bloqueia tudo): migração `…0200` mínima (pacotes, versões, conteúdo, revisões,
-   controles, plano), `html-package-rules.mjs`, recurso `html_packages` nos planos, `SANDBOX_ORIGIN`.
+1. **Fundação** (bloqueia tudo): migrações `…0100` (customizações contratadas e avisos no painel,
+   usadas pelos avisos da US1 e por `site_html_enabled`) e `…0200` mínima (pacotes, versões, conteúdo,
+   revisões, controles, plano), `html-package-rules.mjs`, recurso `html_packages` nos planos,
+   `SANDBOX_ORIGIN`.
 2. **MVP — US1 (P1)**: envio com relatório, página HTML emoldurada com rota própria, prévia com
    token, envio para revisão, aprovar/recusar/pedir ajustes mínimos na aba Revisões, host isolado com
    CSP e cache, publicação recusando versão não aprovada, bloqueio por plano. Valida com o cenário A
@@ -187,16 +189,21 @@ recebe as mesmas operações antes da migração existir.
 3. **US7 + US2 (P2)**: estados de carregamento e falha, `vitrine:resize`, medidas finais em dvh,
    bloco HTML com os dois modos de altura, limite de 3 por página.
 4. **US3 (P3)**: fila completa com filtros e espera, lista de verificação, comparação com a versão
-   anterior, retirada com motivo, avisos no painel, envio pelo operador com customização.
+   anterior, retirada com motivo, avisos no painel, envio pelo operador com customização (registrada
+   pela API de Clientes, ainda sem tela; a tela chega na fase 6).
 5. **US6 (P6, adiantada por ser pequena e depender só de 2–4)**: substituir, voltar versão, excluir
    com impedimentos, retenção de 30 dias.
-6. **US4 (P4)**: migrações `…0100` e `…0300`, comprovação, Cron, ativação, `302`, métrica.
-7. **US5 (P5)**: migração `…0400`, Clientes e ficha, Ajustes em grupos, medição de SC-005/SC-008.
+6. **US4 (P4)**: migração `…0300`, comprovação, Cron, ativação, `302`, métrica e a ficha mínima do
+   cliente (grupos "Customizações contratadas" e "Projeto externo", abertos por
+   `#administracao/clientes/<chave>`), onde o operador registra a customização e configura o vínculo.
+7. **US5 (P5)**: migração `…0400`, lista "Clientes" com busca e filtros, demais grupos da ficha,
+   Ajustes em grupos, medição de SC-005/SC-008.
 8. **Acabamento**: textos legais, documentação, aceite completo do quickstart, remoção da tela
    antiga de componentes.
 
-As fases 6 e 7 podem correr em paralelo às fases 3–5 (frentes D e G), porque não tocam as mesmas
-tabelas; a fase 7 só precisa da ficha mostrar dados de pacotes quando a fase 2 já existir.
+A fase 6 pode correr em paralelo às fases 3–5 (frente D e a ficha mínima da frente G), porque não
+toca as mesmas tabelas. A fase 7 depende da ficha mínima da fase 6, que ela completa, e só mostra
+dados de pacotes na ficha quando a fase 2 já existir.
 
 ## Pendências humanas
 
