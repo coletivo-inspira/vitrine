@@ -52,7 +52,7 @@ Sem Supabase local, as telas autenticadas podem ser exercitadas como na auditori
 | --- | --- |
 | `test/html-package-rules.test.mjs` | limites, níveis do relatório, hosts com linha e coluna, `xmlns` ignorado, Orbit sem erros e com os 3 hosts |
 | `test/html-packages-api.test.mjs` | envio, reenvio idêntico, estados, plano (`403` com Essencial), limite (`html_packages_limit`) na criação e no envio para revisão de pacote ainda não ativo, suspensão, cotas, exclusão em uso, voltar versão |
-| `test/html-sandbox-embed.test.mjs` | CSP por versão, `frame-ancestors`, hash divergente, retirada com revalidação de 300 s, token de prévia |
+| `test/html-sandbox-embed.test.mjs` | CSP por versão, `frame-ancestors`, hash divergente, retirada com revalidação de 300 s, token de prévia (120 s, uso único, recusa reutilizado, vencido e com `jti` não emitido) |
 | `test/html-framed-page.test.mjs` | rota própria, domínio próprio, metadados, medidas nas classes, perda do plano, publicação recusada com versão não aprovada |
 | `test/html-frame-controller.test.mjs` | regras de `vitrine:resize`, limite de 10/s, falha em 10 s |
 | `test/external-project.test.mjs` | validação do destino, laço, comprovação DNS e arquivo (com `fetch` simulado), Cron com orçamento, `302` com `utm_*`, `404` de JSON, menu em nova aba, métrica |

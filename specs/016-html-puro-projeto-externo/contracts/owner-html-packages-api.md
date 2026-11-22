@@ -143,7 +143,7 @@ envio conta como entrada de um pacote novo no limite (FR-058) e o Worker e o ban
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/versions/:versionId/preview-token`
 
-Token curto (10 minutos) para a prévia autenticada de versões `ready`, `pending_review`,
+Token curto (120 s, uso único) para a prévia autenticada de versões `ready`, `pending_review`,
 `changes_requested` e `approved`. `200`:
 
 ```json
@@ -151,10 +151,13 @@ Token curto (10 minutos) para a prévia autenticada de versões `ready`, `pendin
 ```
 
 O token é HMAC com `PREVIEW_HMAC_SECRET` (o segredo de `src/preview-token.mjs`) sobre o prefixo
-`html-preview`, `versionId`, `sha256` e expiração, num formato próprio para não ser aceito como
-token de prévia de rascunho. Funciona como portador: o host isolado não recebe o cookie de sessão
-(outro host), então a proteção é a validade curta, o vínculo com a versão e `no-store`. Nunca
-aparece no snapshot.
+`html-preview`, `versionId`, `sha256`, `userId`, `jti` e expiração, num formato próprio para não ser
+aceito como token de prévia de rascunho. Funciona como portador, porque o host isolado não recebe o
+cookie de sessão (outro host). A proteção é a validade de 120 s, o uso único (o `jti` fica em
+`private.html_preview_grants` e é consumido na primeira carga, ver
+[sandbox-embed-http.md](sandbox-embed-http.md)), o vínculo com a versão e com quem pediu, `no-store`
+e `referrer-policy: no-referrer`. Nunca aparece no snapshot nem em log. O painel pede um token novo a
+cada abertura da prévia e em "Tentar novamente".
 
 ## `POST /api/sites/:siteId/html-packages/:packageId/rollback`
 
