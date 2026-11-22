@@ -76,5 +76,18 @@ Supabase e snapshots imutáveis; sem repositório `vtr-*`, Astro ou Cloudflare P
    "Em breve", link de pagamento do próprio negócio, rodapé e o modelo
    `servicos-produtos-v1` (issues 18 a 26).
 
+## Login múltiplo no painel (`017`, ADR 0015 proposta)
+
+Pedido do Lino em 2026-11-22: tela de entrada minimalista e métodos além do Google.
+Especificação em `specs/017-login-multiplo/`; épico e 8 issues em `docs/backlog/login-multiplo/`,
+criadas com `scripts/criar-issues-estudo-mercado.sh --dir docs/backlog/login-multiplo`.
+
+1. Tela de entrada nova e ponte WhatsApp no Worker podem começar juntas.
+2. E-mail e senha; depois código pelo WhatsApp (resposta gratuita a uma mensagem enviada pela
+   pessoa, sem SMS nem modelo pago) e telefone e senha.
+3. Proteção contra abuso (Turnstile) antes de ligar os métodos em produção.
+4. Passos humanos: SMTP gratuito (`BLK-SMTP-01`), número e app WhatsApp (`BLK-WA-01`), Send SMS
+   Hook do Supabase (`BLK-HOOK-01`) e Turnstile (`BLK-TURNSTILE-01`). Nada foi configurado.
+
 As correções de UX da auditoria (`docs/auditoria-ux/`, pacotes `PB-01` a `PB-27`)
 continuam valendo e vêm antes das telas novas que dependem delas.

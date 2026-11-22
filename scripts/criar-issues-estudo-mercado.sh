@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cria no GitHub as issues de docs/backlog/estudo-mercado/NN-*.md.
+# Cria no GitHub as issues de docs/backlog/estudo-mercado/NN-*.md (ou de outra pasta com --dir).
 # Uso: scripts/criar-issues-estudo-mercado.sh [--dry-run] [--repo dono/repo] [--dir pasta]
 # Requer gh autenticado (gh auth login). Compatível com o bash 3.2 do macOS.
 set -euo pipefail
@@ -8,7 +8,6 @@ REPO="coletivo-inspira/vitrine"
 DRY_RUN=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKLOG_DIR="$SCRIPT_DIR/../docs/backlog/estudo-mercado"
-BACKLOG_PATH="docs/backlog/estudo-mercado"
 
 usage() {
   sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'
@@ -26,6 +25,9 @@ while [ $# -gt 0 ]; do
 done
 
 [ -d "$BACKLOG_DIR" ] || { echo "Pasta não encontrada: $BACKLOG_DIR" >&2; exit 1; }
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BACKLOG_ABS="$(cd "$BACKLOG_DIR" && pwd)"
+BACKLOG_PATH="${BACKLOG_ABS#"$REPO_ROOT"/}"
 
 FILES=()
 for f in "$BACKLOG_DIR"/[0-9][0-9]-*.md; do
@@ -58,6 +60,7 @@ label_meta() {
     painel) echo "c5def5|Painel administrativo" ;;
     depois) echo "bfdadc|Planejada para depois" ;;
     referencia-laurapires) echo "d4c5f9|Padrão de vitrine de serviços e produtos (docs/referencia-laurapires.md)" ;;
+    autenticacao) echo "b60205|Entrada no painel e métodos de login (specs/017-login-multiplo)" ;;
     *) echo "ededed|" ;;
   esac
 }

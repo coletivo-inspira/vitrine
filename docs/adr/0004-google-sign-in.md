@@ -8,5 +8,6 @@ Isso reduz a operação própria de senhas e emails de recuperação. Pessoas pr
 de conta Google; recuperação dessa conta segue o provedor, e suporte a perda de
 acesso ao negócio ainda requer processo próprio. Email não será usado como chave
 de propriedade: vínculos usam o identificador estável do usuário Supabase.
-Outros métodos de login ficam fora do MVP inicial. Credenciais OAuth, consentimento
+Outros métodos de login ficam fora do MVP inicial; a [ADR 0015](0015-login-multiplo-whatsapp.md)
+(proposta) os acrescenta. Credenciais OAuth, consentimento
 e URLs de retorno ainda precisam ser configurados; login não está implementado.
