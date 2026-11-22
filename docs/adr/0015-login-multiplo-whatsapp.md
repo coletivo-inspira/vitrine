@@ -64,3 +64,8 @@ Adotamos a **Opção 3** junto com e-mail e senha e telefone e senha, todos pelo
 - **Pendências**: passos humanos BLK-SMTP-01, BLK-WA-01, BLK-HOOK-01 e BLK-TURNSTILE-01
   (`specs/017-login-multiplo/quickstart.md`); ratificação desta ADR e da constituição 0.2.0.
   Nada foi implementado nem configurado.
+- **Decisões propostas (revisar no PR)**: a análise Spec Kit acrescentou as decisões de segurança
+  S1 a S8 de `specs/017-login-multiplo/research.md`. As principais: provedores Email e Phone
+  desligados no projeto Supabase de produção até a ratificação, com os passos humanos num projeto
+  de teste (BLK-AUTH-01, BLK-SBTEST-01); verificação do código pelo Worker, com 5 erros por código;
+  `wa_id` cifrado; *Confirm email* ligado; e limites do Supabase Auth a confirmar (BLK-RATE-01).
