@@ -22,7 +22,7 @@ description: "Tarefas do login múltiplo no painel"
 - [x] T001 Criar `specs/017-login-multiplo/` com spec, plan, research, data-model, contracts, quickstart, checklist e tasks.
 - [x] T002 Propor o ADR `docs/adr/0015-login-multiplo-whatsapp.md` e a emenda 0.2.0 de `.specify/memory/constitution.md`.
 - [x] T003 Atualizar `docs/roadmap.md`, `AGENTS.md` e `.specify/feature.json`.
-- [x] T004 Escrever o backlog `docs/backlog/login-multiplo/01..08-*.md` e o subagente `.cursor/agents/login-multiplo-whatsapp.md`.
+- [x] T004 Escrever o backlog `docs/backlog/login-multiplo/00..08-*.md` (épico e 8 issues) e o subagente `.cursor/agents/login-multiplo-whatsapp.md`.
 
 ---
 

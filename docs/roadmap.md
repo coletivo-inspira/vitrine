@@ -79,7 +79,7 @@ Supabase e snapshots imutáveis; sem repositório `vtr-*`, Astro ou Cloudflare P
 ## Login múltiplo no painel (`017`, ADR 0015 proposta)
 
 Pedido do Lino em 2026-11-22: tela de entrada minimalista e métodos além do Google.
-Especificação em `specs/017-login-multiplo/`; 8 issues em `docs/backlog/login-multiplo/`,
+Especificação em `specs/017-login-multiplo/`; épico e 8 issues em `docs/backlog/login-multiplo/`,
 criadas com `scripts/criar-issues-estudo-mercado.sh --dir docs/backlog/login-multiplo`.
 
 1. Tela de entrada nova e ponte WhatsApp no Worker podem começar juntas.
