@@ -25,6 +25,7 @@ erDiagram
 | `auto_reply_settings` | `site_id`, `enabled`, `message` (≤ 1000 bytes, sem caracteres de controle), `frequency` (`once`, `daily`, `weekly`), `version`, `enabled_at`, `last_sent_at`, `updated_by` | PK `site_id`; versão para concorrência otimista | Enquanto a vitrine existir; desligada em desconexão, suspensão ou reconexão necessária |
 | `auto_reply_deliveries` | `provider`, `provider_event_id`, `site_id`, `connection_id`, `recipient_hash`, `status` (`processing`, `sent`, `skipped`, `failed`, `uncertain`, `cancelled`), `reason`, `error_code`, `attempts`, `provider_message_id`, `correlation_id`, datas | `UNIQUE (provider, provider_event_id)` (RN-005); índice parcial em `processing` | 90 dias (Cron); `connection_id` vira nulo ao desconectar |
 | `auto_reply_recipient_windows` | `connection_id`, `recipient_hash`, `last_sent_at` | PK composta; cascata | Apagada na desconexão; janelas de 24 h e 7 dias vencidas há mais de 37 dias saem no Cron; "uma vez por contato" fica enquanto a conexão existir |
+| `data_deletion_requests` (migração `20261126002000`) | `code_hash` (SHA-256 do código de confirmação), `provider`, `status` (`completed`, `pending_review`), `connections_removed`, `received_at`, `completed_at` | PK `code_hash` | 365 dias (Cron) |
 | `channel_oauth_states` | `nonce_hash` (SHA-256), `site_id`, `user_id`, `provider`, `purpose`, `expires_at`, `consumed_at` | PK `nonce_hash`; prazo de 60 a 900 s | Apagado 1 dia depois de vencer |
 
 **Dados que não existem em lugar nenhum**: texto das mensagens, anexos, nome ou foto do consumidor, identificador do consumidor em claro (`recipient_hash` é HMAC da conexão com chave derivada de `AUTO_REPLY_ENCRYPTION_KEY`), token em claro, código OAuth, `state` em claro.
@@ -46,6 +47,8 @@ erDiagram
 | `service_mark_channel_connection` | Worker | `reconnect_required`/`suspended` e desliga |
 | `service_touch_channel_connection` / `service_find_channel_connection` | Worker | Verificação periódica e callbacks da Meta |
 | `service_auto_reply_maintenance` | Cron | Presas → `uncertain`, retenção, janelas, estados e lista de tokens a verificar (até 5) |
+| `service_auto_reply_credentials_to_rotate` / `service_rotate_channel_credential` | Worker e Cron | Lote com versão antiga e troca condicional (só se a cifra não mudou) |
+| `service_record_data_deletion` / `service_read_data_deletion` | Worker | Pedido de exclusão e página de acompanhamento |
 | `admin_read_auto_reply`, `admin_set_auto_reply_controls`, `admin_set_auto_reply_site_access`, `admin_suspend_channel_connection` | `platform_admin` (JWT) | Administração, métricas agregadas de 7 dias, auditoria |
 
 ## Concorrência

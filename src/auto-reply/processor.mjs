@@ -2,7 +2,7 @@
 // frequência → endereço → mensagem → releitura do estado → envio com tentativas limitadas
 // → registro. O texto do consumidor nunca chega aqui.
 import { renderAutoReplyMessage, AUTO_REPLY_MAX_BYTES } from '../../web/assets/auto-reply-message.mjs';
-import { decryptChannelToken, AUTO_REPLY_KEY_ENV } from './crypto.mjs';
+import { openChannelToken } from './crypto.mjs';
 import { resolveAutoReplyPublicUrl } from './public-url.mjs';
 import { evaluateEvent } from './rules.mjs';
 
@@ -76,9 +76,9 @@ export async function processClaimedEvent({
 
   let accessToken;
   try {
-    accessToken = await decryptChannelToken(current.tokenCiphertext, {
+    accessToken = await openChannelToken(current.tokenCiphertext, {
       siteId: current.siteId, provider, accountId: current.accountId
-    }, env[AUTO_REPLY_KEY_ENV]);
+    }, env);
   } catch {
     await release();
     return done({ status: 'failed', reason: 'credential_unreadable' });

@@ -22,6 +22,8 @@ Sessão obrigatória (`401`); só `platform_admin` (`403 FORBIDDEN_PLATFORM_ADMI
 }
 ```
 
+A resposta também traz `keys` (`currentVersion`, `previousKeyConfigured`, `stableHashKey`, sem valores), `deletionRequests` dos últimos 30 dias, `webhookSubscribed` e `keyVersion` por conexão e `alerts`: lista ordenada por gravidade (`critical`, `warning`, `info`) com `code`, `title`, `detail`, `count` e até 10 `sites`. Códigos: `auth_failures`, `high_failure_rate`, `rotation_missing_previous_key`, `hash_key_unstable`, `token_expired`, `credentials_pending_rotation`, `token_expiring`, `reconnect_required`, `webhook_not_subscribed`, `no_events`, `uncertain_sends`, `deletion_pending_review`, `connections_suspended`.
+
 ## `PUT /api/admin/auto-reply/controls`
 
 Corpo `{ "enabled": true, "instagramEnabled": true }` (campos opcionais). Desligar barra novos envios na hora (a releitura antes do envio cancela eventos em processamento). Auditado (`auto_reply_controls`).
@@ -34,6 +36,10 @@ Corpo `{ "allowed": true | false }`. `false` desliga a resposta daquela vitrine.
 
 Corpo `{}`. Conexão vai para `suspended` (`platform_suspended`) e a resposta é desligada. Para reativar, o dono reconecta. Auditado (`channel_suspend`).
 
-## Pendente
+## `POST /api/admin/auto-reply/rotate-keys`
 
-A tela de administração no painel ainda não existe: as rotas estão prontas e testadas, e a operação usa `curl` com a sessão de um `platform_admin` (`docs/integrations/auto-reply/operational-runbook.md`). Issue 07 de `docs/backlog/autoresposta/`.
+Corpo `{}`. Recifra até 10 credenciais com `key_version` menor que `AUTO_REPLY_KEY_VERSION`: abre com a chave atual ou a anterior, cifra com a atual e troca só se a cifra não mudou desde a leitura. Resposta: `rotation` (`currentVersion`, `rotated`, `failed`, `conflicts`, `remaining`) e a leitura atualizada. Com `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS` configurada e sem `AUTO_REPLY_HASH_KEY`, responde `409 AUTO_REPLY_HASH_KEY_REQUIRED`. O Cron recifra 5 por execução nas mesmas condições.
+
+## Tela
+
+Aba "Resposta automática" da Administração da plataforma (`web/portal/auto-reply-admin.mjs`).

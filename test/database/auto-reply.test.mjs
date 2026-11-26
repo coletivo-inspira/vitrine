@@ -235,3 +235,39 @@ test('auto_reply: manutenção marca execuções presas como inconclusivas e lis
   const row = (await db.query("select status from private.auto_reply_deliveries where provider_event_id = 'mid.3'")).rows[0];
   assert.equal(row.status, 'uncertain');
 });
+
+test('auto_reply: recifragem troca só credenciais de versão antiga e não sobrescreve reconexão concorrente', async () => {
+  const db = await setupDb();
+  await connect(db, siteA);
+  const conn = (await db.query('select id from private.channel_connections where site_id = $1', [siteA])).rows[0].id;
+  const pending = (await service(db, 'select * from public.service_auto_reply_credentials_to_rotate(2, 10)')).rows;
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].key_version, 1);
+  await assert.rejects(rpc(db, 'authenticated', owner, 'select * from public.service_auto_reply_credentials_to_rotate(2, 10)'), /permission denied/);
+  const stale = (await service(db, 'select public.service_rotate_channel_credential($1, $2, $3, 2) as ok', [conn, 'v1.b3V0cmE.Y2lmcmE', 'v1.bm92YQ.Y2lmcmE'])).rows[0].ok;
+  assert.equal(stale, false);
+  const ok = (await service(db, 'select public.service_rotate_channel_credential($1, $2, $3, 2) as ok', [conn, CIPHER, 'v1.bm92YQ.Y2lmcmE'])).rows[0].ok;
+  assert.equal(ok, true);
+  const row = (await db.query('select token_ciphertext, key_version from private.channel_credentials')).rows[0];
+  assert.deepEqual(row, { token_ciphertext: 'v1.bm92YQ.Y2lmcmE', key_version: 2 });
+  assert.equal((await service(db, 'select * from public.service_auto_reply_credentials_to_rotate(2, 10)')).rows.length, 0);
+  await service(db, `select public.service_save_channel_connection($1, $2, 'instagram', '17841400000000001', null,
+    'negocio.exemplo', null, $3, $4, null, true, 3)`, [siteA, owner, SCOPES, CIPHER]);
+  assert.equal((await db.query('select key_version from private.channel_credentials')).rows[0].key_version, 3);
+});
+
+test('auto_reply: pedido de exclusão guarda só o hash do código; leitura só pelo serviço', async () => {
+  const db = await setupDb();
+  await service(db, "select public.service_record_data_deletion($1, 'instagram', 1)", [HASH]);
+  await service(db, "select public.service_record_data_deletion($1, 'instagram', 0)", ['d'.repeat(64)]);
+  const done = (await service(db, 'select public.service_read_data_deletion($1) as r', [HASH])).rows[0].r;
+  assert.equal(done.status, 'completed');
+  assert.ok(done.completedAt);
+  assert.equal((await service(db, 'select public.service_read_data_deletion($1) as r', ['d'.repeat(64)])).rows[0].r.status, 'pending_review');
+  assert.equal((await service(db, 'select public.service_read_data_deletion($1) as r', ['e'.repeat(64)])).rows[0].r, null);
+  await assert.rejects(rpc(db, 'anon', null, 'select public.service_read_data_deletion($1)', [HASH]), /permission denied/);
+  await assert.rejects(rpc(db, 'authenticated', owner, 'select * from private.data_deletion_requests'), /permission denied/);
+  const overview = (await rpc(db, 'authenticated', operator, 'select public.admin_read_auto_reply() as o')).rows[0].o;
+  assert.deepEqual(overview.deletionRequests, { pendingReview: 1, completed: 1 });
+  assert.equal(overview.last7Days.processing, 0);
+});

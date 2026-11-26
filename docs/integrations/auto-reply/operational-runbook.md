@@ -4,7 +4,7 @@ Para operadores Inspira com papel `platform_admin`. Nada aqui foi exercitado em 
 
 ## Ligar e desligar
 
-As rotas exigem a sessão de um `platform_admin` e `Origin` do painel. Até existir a tela de administração (issue 07), usar o navegador logado no painel (console do DevTools) com `fetch`:
+No painel, **Administração da plataforma > Resposta automática** (só `platform_admin`): interruptores, vitrines liberadas, conexões (com "Suspender"), métricas de 7 dias, alertas e chaves. Cada ação pede confirmação e fica na auditoria. As mesmas rotas podem ser chamadas pelo console do navegador logado no painel:
 
 ```js
 await fetch('/api/admin/auto-reply').then((r) => r.json());
@@ -28,6 +28,33 @@ await fetch('/api/admin/auto-reply/sites/<siteId>', { method: 'PUT', headers: { 
 | Meta fora do ar | Nada: 3 tentativas e `failed`/`provider_unavailable`; a frequência é liberada | Próxima mensagem tenta de novo |
 
 A vitrine pública não depende de nenhuma rota da AutoResposta.
+
+## Alertas
+
+A aba mostra os alertas calculados na hora (`src/auto-reply/alerts.mjs`). O Cron escreve `auto_reply_alert` no log para `stuck_processing`, `tokens_revoked` e `rotation_failed`, para uma regra de alerta por log no Cloudflare (a configurar).
+
+| Alerta | Ação |
+| --- | --- |
+| `auth_failures`, `reconnect_required`, `token_expired` | O painel do dono já pede reconexão; avisar o dono se a vitrine estiver no piloto |
+| `high_failure_rate` | Ver `auto_reply_processed` no log; se for a Meta, esperar; se for configuração, desligar o canal |
+| `rotation_missing_previous_key`, `hash_key_unstable` | Corrigir os segredos antes de qualquer outra ação (ver Rotação) |
+| `credentials_pending_rotation` | "Recifrar agora" ou esperar o Cron |
+| `webhook_not_subscribed`, `no_events` | Pedir ao dono para reconectar; ver a limitação de contas sem Página |
+| `uncertain_sends` | Acompanhar; nada é reenviado |
+| `deletion_pending_review` | Procurar a conta pelos dados do pedido e apagar à mão o que houver |
+
+## Rotação da chave de cifragem
+
+1. Copiar o valor atual de `AUTO_REPLY_ENCRYPTION_KEY` para `AUTO_REPLY_HASH_KEY` (se ainda não existir) e publicar. A frequência por consumidor passa a usar essa chave fixa.
+2. Copiar o valor atual para `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS`, gerar um valor novo para `AUTO_REPLY_ENCRYPTION_KEY` e somar 1 em `AUTO_REPLY_KEY_VERSION`. Publicar.
+3. Na aba, "Recifrar agora" até "Credenciais na chave antiga" chegar a 0 (ou esperar o Cron, 5 por hora).
+4. Remover `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS` e publicar. Nunca apagar a chave anterior antes do passo 3: credenciais antigas deixam de abrir e os envios falham com `credential_unreadable`.
+
+Nenhum valor de chave aparece no painel, em log ou em documento.
+
+## Pedidos de exclusão
+
+A Meta mostra ao dono o link `https://vitrine.inspira.dev.br/privacidade/exclusao/?codigo=<código>`. Pedido com conexão encontrada fica "Exclusão concluída"; sem conexão, "Pedido recebido" e o alerta `deletion_pending_review` aparece na aba por 30 dias.
 
 ## Sinais a acompanhar (logs do Worker)
 

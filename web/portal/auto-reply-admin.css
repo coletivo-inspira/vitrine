@@ -1,0 +1,107 @@
+/* Aba "Resposta automática" da Administração da plataforma. */
+.auto-reply-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.auto-reply-admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.auto-reply-admin-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.auto-reply-admin-alert {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(var(--glass, 255 255 255) / .4);
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auto-reply-admin-alert p {
+  margin: 0;
+}
+
+.auto-reply-admin-alert.is-critical {
+  border-color: var(--orange);
+  background: var(--apricot);
+}
+
+.auto-reply-admin-alert-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-reply-admin-severity {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.auto-reply-admin-severity.is-critical {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.auto-reply-admin-severity.is-warning {
+  border-style: dashed;
+  color: var(--ink);
+}
+
+.auto-reply-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(var(--glass, 255 255 255) / .4);
+}
+
+.auto-reply-admin-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.auto-reply-admin-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.auto-reply-admin-form {
+  display: grid;
+  gap: 6px;
+  max-width: 32rem;
+}
+
+.auto-reply-admin .button-small,
+.auto-reply-admin .auto-reply-toggle {
+  min-height: 44px;
+}
+
+.auto-reply-admin-form .button {
+  justify-self: start;
+}

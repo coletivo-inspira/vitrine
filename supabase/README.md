@@ -19,6 +19,8 @@ Migrações:
 
 - `migrations/20261126001000_auto_reply.sql` (Spec 019, ADR 0017 proposta): AutoResposta do Instagram — conexões de canal (`private.channel_connections`, uma conta por vitrine), credencial cifrada pelo Worker (`private.channel_credentials`), configuração (`private.auto_reply_settings`), execuções sem conteúdo com idempotência por id da mensagem (`private.auto_reply_deliveries`), janela de frequência por hash do consumidor, estados OAuth de uso único, interruptores e liberação por vitrine; funções de equipe (`read_auto_reply`, `save_auto_reply_settings`), `service_*` só para `service_role` e `admin_*` só para `platform_admin`.
 
+- `migrations/20261126002000_auto_reply_rotation_deletion.sql` (Spec 019): versão da chave gravada na credencial, recifragem em lote com troca condicional (`service_auto_reply_credentials_to_rotate`, `service_rotate_channel_credential`), pedidos de exclusão da Meta só com o hash do código (`private.data_deletion_requests`) e dados para os alertas em `admin_read_auto_reply`.
+
 Nome de migração nova: `AAAAMMDDHHMMSS_descricao.sql`, com versão maior que a última
 migração da `main` no momento do merge. O deploy roda `supabase db push`, que recusa
 arquivo com versão anterior à última aplicada no remoto. `npm test` confere versões

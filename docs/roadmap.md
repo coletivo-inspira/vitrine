@@ -118,7 +118,9 @@ permissão de escrita em issues).
    Worker (painel, OAuth, webhook `messages`, desautorização, exclusão, administração e Cron) e a
    seção "Resposta automática" na aba Canais. Nada aplicado no Supabase, configurado na Meta ou
    publicado.
-2. Falta: tela de administração, alertas, teste com pessoa proprietária real.
+2. Depois do PR #183: tela de administração com alertas, rotação da chave com recifragem e página
+   `/privacidade/exclusao/` (migração `20261126002000_auto_reply_rotation_deletion.sql`). Falta o
+   teste com pessoa proprietária real e a regra de notificação por log.
 3. Passos humanos: ratificar o ADR 0017; revisão jurídica (aviso de automação, privacidade e
    termos); configuração da AutoResposta no console Meta; deploy de staging; piloto com
    testadores; Verificação da empresa; Revisão do app (`instagram_basic` e

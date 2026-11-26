@@ -7,6 +7,7 @@ import { normalizeInstagramWebhook, verifyMetaSignature, verifyWebhookChallenge 
 import { resolveAutoReplyPublicUrl } from '../src/auto-reply/public-url.mjs';
 import { evaluateEvent, frequencyAllows } from '../src/auto-reply/rules.mjs';
 import { parseSignedRequest, runAutoReplyMaintenance } from '../src/auto-reply/routes.mjs';
+import { buildAutoReplyAlerts, maintenanceAlerts } from '../src/auto-reply/alerts.mjs';
 import {
   AUTO_REPLY_DEFAULT_MESSAGE,
   autoReplyCounter,
@@ -644,4 +645,145 @@ test('logs: nenhum token, segredo, texto ou identificador de consumidor', async 
   for (const secret of [ACCESS_TOKEN, APP_SECRET, CONSUMER_ID, 'cardápio', 'codigo-ficticio']) {
     assert.ok(!all.includes(secret), secret);
   }
+});
+
+// --- Alertas, rotação de chave e acompanhamento da exclusão ---------------------------
+
+test('alertas: falhas de autorização, chave antiga, vencimento, silêncio, inconclusivos e exclusões para conferir', () => {
+  const now = Date.parse('2026-11-26T12:00:00Z');
+  const env = baseEnv({ AUTO_REPLY_KEY_VERSION: '2' });
+  const overview = {
+    connections: [
+      { slug: 'a', status: 'connected', enabled: true, webhookSubscribed: true, keyVersion: 1, connectedAt: '2026-11-01T00:00:00Z', lastEventAt: null, expiresAt: '2026-11-29T00:00:00Z' },
+      { slug: 'b', status: 'reconnect_required', enabled: false, webhookSubscribed: false, keyVersion: 2, connectedAt: '2026-11-20T00:00:00Z', expiresAt: '2026-11-20T00:00:00Z' },
+      { slug: 'c', status: 'suspended', enabled: false, keyVersion: 2 }
+    ],
+    last7Days: { received: 20, failed: 6, authFailures: 2, uncertain: 1 },
+    deletionRequests: { pendingReview: 1 }
+  };
+  const alerts = buildAutoReplyAlerts(overview, { env, now });
+  const codes = alerts.map((a) => a.code);
+  for (const code of ['auth_failures', 'high_failure_rate', 'rotation_missing_previous_key', 'token_expired', 'token_expiring',
+    'reconnect_required', 'no_events', 'uncertain_sends', 'deletion_pending_review', 'connections_suspended']) {
+    assert.ok(codes.includes(code), code);
+  }
+  assert.equal(alerts[0].severity, 'critical');
+  assert.equal(alerts.at(-1).severity, 'info');
+  const withPrevious = buildAutoReplyAlerts(overview, { env: { ...env, AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS: 'p'.repeat(40) }, now }).map((a) => a.code);
+  assert.ok(withPrevious.includes('credentials_pending_rotation'));
+  assert.ok(withPrevious.includes('hash_key_unstable'));
+  assert.deepEqual(buildAutoReplyAlerts({ connections: [], last7Days: {} }, { env: baseEnv(), now }), []);
+});
+
+test('administração: leitura traz alertas e estado das chaves, sem valores de segredo', async () => {
+  const ctx = await ready();
+  const res = await ctx.api.fetch(request('/api/admin/auto-reply', { token: 'token-stranger' }), ctx.env);
+  const text = await res.text();
+  for (const secret of [ctx.env.AUTO_REPLY_ENCRYPTION_KEY, APP_SECRET, ACCESS_TOKEN]) assert.ok(!text.includes(secret));
+  const { autoReply } = JSON.parse(text);
+  assert.deepEqual(autoReply.keys, { currentVersion: 1, previousKeyConfigured: false, stableHashKey: false });
+  assert.ok(Array.isArray(autoReply.alerts));
+  assert.equal(autoReply.connections[0].keyVersion, 1);
+  const denied = await ctx.api.fetch(request('/api/admin/auto-reply/rotate-keys', { method: 'POST', body: {} }), ctx.env);
+  assert.equal(denied.status, 403);
+});
+
+test('rotação: recifra com a chave nova, mantém a frequência com AUTO_REPLY_HASH_KEY e exige a chave do hash', async () => {
+  const ctx = await ready();
+  await ctx.deliver(fixtures.message({ mid: 'rot-1' }));
+  assert.equal(ctx.calls.sent.length, 1);
+  const oldKey = ctx.env.AUTO_REPLY_ENCRYPTION_KEY;
+  const newKey = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const rotatedEnv = { ...ctx.env, AUTO_REPLY_ENCRYPTION_KEY: newKey, AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS: oldKey, AUTO_REPLY_KEY_VERSION: '2' };
+  const refused = await ctx.api.fetch(request('/api/admin/auto-reply/rotate-keys', { method: 'POST', token: 'token-stranger', body: {} }), rotatedEnv);
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error.code, 'AUTO_REPLY_HASH_KEY_REQUIRED');
+  ctx.env = { ...rotatedEnv, AUTO_REPLY_HASH_KEY: oldKey };
+  const res = await ctx.api.fetch(request('/api/admin/auto-reply/rotate-keys', { method: 'POST', token: 'token-stranger', body: {} }), ctx.env);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual([body.rotation.rotated, body.rotation.failed, body.rotation.remaining], [1, 0, 0]);
+  const cred = [...ctx.store.autoReply.credentials.values()][0];
+  assert.equal(cred.keyVersion, 2);
+  const ctxData = { siteId: SITE_A, provider: 'instagram', accountId: BUSINESS_ID };
+  assert.equal(await decryptChannelToken(cred.tokenCiphertext, ctxData, newKey), ACCESS_TOKEN);
+  await assert.rejects(decryptChannelToken(cred.tokenCiphertext, ctxData, oldKey));
+  await ctx.deliver(fixtures.message({ mid: 'rot-2' }));
+  assert.equal(ctx.calls.sent.length, 1, 'a mesma pessoa continua dentro da frequência de 24 h');
+  assert.equal([...ctx.store.autoReply.deliveries.values()].find((d) => d.eventId === 'rot-2').reason, 'frequency');
+  ctx.store.autoReply.windows.clear();
+  await ctx.deliver(fixtures.message({ mid: 'rot-3' }));
+  assert.equal(ctx.calls.sent.length, 2);
+  assert.equal(ctx.calls.sent[1].accessToken, ACCESS_TOKEN);
+  const fresh = await ctx.api.fetch(request('/api/admin/auto-reply', { token: 'token-stranger' }), ctx.env);
+  assert.ok(!(await fresh.json()).autoReply.alerts.some((a) => a.code === 'credentials_pending_rotation'));
+});
+
+test('rotação: sem a chave anterior, a credencial antiga não abre, o envio falha sem reenvio e o alerta aparece', async () => {
+  const ctx = await ready();
+  ctx.env = { ...ctx.env, AUTO_REPLY_ENCRYPTION_KEY: `${crypto.randomUUID()}${crypto.randomUUID()}`, AUTO_REPLY_KEY_VERSION: '2' };
+  await ctx.deliver(fixtures.message({ mid: 'nokey-1' }));
+  assert.equal(ctx.calls.sent.length, 0);
+  assert.equal([...ctx.store.autoReply.deliveries.values()][0].reason, 'credential_unreadable');
+  const overview = (await (await ctx.api.fetch(request('/api/admin/auto-reply', { token: 'token-stranger' }), ctx.env)).json()).autoReply;
+  assert.ok(overview.alerts.some((a) => a.code === 'rotation_missing_previous_key' && a.severity === 'critical'));
+});
+
+test('manutenção: recifra em lote e registra alertas no log', async () => {
+  const ctx = await ready();
+  const oldKey = ctx.env.AUTO_REPLY_ENCRYPTION_KEY;
+  const env = { ...ctx.env, AUTO_REPLY_ENCRYPTION_KEY: `${crypto.randomUUID()}${crypto.randomUUID()}`,
+    AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS: oldKey, AUTO_REPLY_HASH_KEY: oldKey, AUTO_REPLY_KEY_VERSION: '3' };
+  ctx.store.autoReplyMaintenance = async () => ({ stale: 2, purged: 0, windows: 0, verify: [] });
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(String(line));
+  let result;
+  try {
+    result = await runAutoReplyMaintenance({ store: ctx.store, env, adapter: { inspectToken: async () => ({ valid: true, scopes: [] }) } });
+  } finally {
+    console.log = original;
+  }
+  assert.equal(result.rotation.rotated, 1);
+  assert.equal([...ctx.store.autoReply.credentials.values()][0].keyVersion, 3);
+  assert.ok(lines.some((line) => line.includes('"auto_reply_alert"') && line.includes('stuck_processing')));
+  assert.deepEqual(maintenanceAlerts({ revoked: 1, rotation: { failed: 2 } }).map((a) => a.code), ['tokens_revoked', 'rotation_failed']);
+});
+
+test('exclusão: o código da Meta abre a página de acompanhamento sem expor o código nem dados', async () => {
+  const ctx = await ready();
+  const payload = toBase64Url(new TextEncoder().encode(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: '900000000000001' })));
+  const signature = toBase64Url(Uint8Array.from((await hmacSha256Hex(APP_SECRET, payload)).match(/../g), (h) => parseInt(h, 16)));
+  const callbackRes = await ctx.api.fetch(new Request(`${PANEL}/api/instagram/data-deletion`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ signed_request: `${signature}.${payload}` })
+  }), ctx.env);
+  const { url, confirmation_code: code } = await callbackRes.json();
+  assert.equal(url, `https://vitrine.inspira.dev.br/privacidade/exclusao/?codigo=${code}`);
+  assert.equal(ctx.store.autoReply.deletionRequests.size, 1);
+  assert.ok(![...ctx.store.autoReply.deletionRequests.keys()].includes(code));
+  const page = await ctx.api.fetch(new Request(url), ctx.env);
+  assert.equal(page.status, 200);
+  assert.equal(page.headers.get('x-robots-tag'), 'noindex, nofollow');
+  assert.equal(page.headers.get('cache-control'), 'no-store');
+  assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
+  const html = await page.text();
+  assert.match(html, /Exclusão concluída/);
+  assert.ok(!html.includes(code));
+  assert.ok(!/<script|<style|style=/.test(html));
+
+  const unmatchedPayload = toBase64Url(new TextEncoder().encode(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: '123' })));
+  const unmatchedSig = toBase64Url(Uint8Array.from((await hmacSha256Hex(APP_SECRET, unmatchedPayload)).match(/../g), (h) => parseInt(h, 16)));
+  const second = await (await ctx.api.fetch(new Request(`${PANEL}/api/instagram/data-deletion`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ signed_request: `${unmatchedSig}.${unmatchedPayload}` })
+  }), ctx.env)).json();
+  assert.match(await (await ctx.api.fetch(new Request(second.url), ctx.env)).text(), /Pedido recebido/);
+  assert.match(await (await ctx.api.fetch(new Request('https://vitrine.inspira.dev.br/privacidade/exclusao/?codigo=AAAAAAAAAAAAAAAA'), ctx.env)).text(), /Código não encontrado/);
+  assert.match(await (await ctx.api.fetch(new Request('https://vitrine.inspira.dev.br/privacidade/exclusao/?codigo=<script>'), ctx.env)).text(), /Código não encontrado/);
+  assert.match(await (await ctx.api.fetch(new Request('https://vitrine.inspira.dev.br/privacidade/exclusao'), ctx.env)).text(), /Acompanhar um pedido/);
+  const overview = (await (await ctx.api.fetch(request('/api/admin/auto-reply', { token: 'token-stranger' }), ctx.env)).json()).autoReply;
+  assert.ok(overview.alerts.some((a) => a.code === 'deletion_pending_review'));
+  const failed = await ctx.api.fetch(new Request(url), {});
+  assert.match(await failed.text(), /Exclusão concluída|Não foi possível consultar agora/);
 });

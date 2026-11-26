@@ -105,3 +105,46 @@ export function constantTimeEqual(a, b) {
   for (let index = 0; index < length; index += 1) diff |= (left[index] ?? 0) ^ (right[index] ?? 0);
   return diff === 0;
 }
+
+// Rotação: AUTO_REPLY_ENCRYPTION_KEY é a chave atual (versão AUTO_REPLY_KEY_VERSION);
+// AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS abre cifras antigas até a recifragem terminar.
+// O hash do consumidor usa AUTO_REPLY_HASH_KEY quando existe, para não mudar na rotação.
+export const AUTO_REPLY_PREVIOUS_KEY_ENV = 'AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS';
+export const AUTO_REPLY_HASH_KEY_ENV = 'AUTO_REPLY_HASH_KEY';
+export const AUTO_REPLY_KEY_VERSION_ENV = 'AUTO_REPLY_KEY_VERSION';
+
+function validKey(value) {
+  return typeof value === 'string' && value.length >= MIN_KEY_LENGTH;
+}
+
+export function currentKeyVersion(env = {}) {
+  const version = Number(env[AUTO_REPLY_KEY_VERSION_ENV] ?? 1);
+  return Number.isInteger(version) && version >= 1 && version <= 32767 ? version : 1;
+}
+
+export function hasPreviousKey(env = {}) {
+  return validKey(env[AUTO_REPLY_PREVIOUS_KEY_ENV]);
+}
+
+export function hasStableHashKey(env = {}) {
+  return validKey(env[AUTO_REPLY_HASH_KEY_ENV]);
+}
+
+export function recipientHashKey(env = {}) {
+  return hasStableHashKey(env) ? env[AUTO_REPLY_HASH_KEY_ENV] : env[AUTO_REPLY_KEY_ENV];
+}
+
+/** Cifra com a chave atual e devolve a versão gravada junto. */
+export async function sealChannelToken(token, context, env = {}) {
+  return { ciphertext: await encryptChannelToken(token, context, env[AUTO_REPLY_KEY_ENV]), keyVersion: currentKeyVersion(env) };
+}
+
+/** Abre com a chave atual; se falhar e houver chave anterior, tenta a anterior. */
+export async function openChannelToken(ciphertext, context, env = {}) {
+  try {
+    return await decryptChannelToken(ciphertext, context, env[AUTO_REPLY_KEY_ENV]);
+  } catch (error) {
+    if (!hasPreviousKey(env)) throw error;
+    return decryptChannelToken(ciphertext, context, env[AUTO_REPLY_PREVIOUS_KEY_ENV]);
+  }
+}

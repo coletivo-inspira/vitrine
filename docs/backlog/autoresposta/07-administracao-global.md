@@ -16,8 +16,9 @@ Tela "Resposta automática" na Administração da plataforma, sobre as rotas já
 ## Escopo
 
 - [x] Rotas `GET /api/admin/auto-reply`, `PUT .../controls`, `PUT .../sites/:id`, `POST .../connections/:id/suspend` (testadas).
-- [ ] Tela no painel (aba da administração) com interruptores, vitrines liberadas, conexões e métricas de 7 dias.
-- [ ] Alertas operacionais (volume de assinaturas inválidas, falhas de autorização, `uncertain`).
+- [x] Tela no painel (aba da administração) com interruptores, vitrines liberadas, conexões, métricas de 7 dias e chaves.
+- [x] Alertas operacionais calculados na leitura e linhas `auto_reply_alert` no Cron.
+- [ ] Regra de notificação por log no Cloudflare (depende do deploy).
 
 ## Fora do escopo
 
@@ -29,8 +30,8 @@ US5; FR-016, FR-017; contrato `admin-api.md`.
 
 ## Critérios de aceite
 
-- [ ] Tela com estados de carregando, vazio, erro e sucesso; 1280 e 375 px.
-- [ ] Ações auditadas visíveis no log de auditoria existente.
+- [x] Tela com estados de carregando, vazio, erro e sucesso; capturas locais 1280 e 375 px.
+- [ ] Ações auditadas visíveis no log de auditoria existente (conferir em staging).
 
 ## Dependências
 

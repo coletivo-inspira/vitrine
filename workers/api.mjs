@@ -60,7 +60,9 @@ import {
   LEADS_PATH, QUOTE_WEBHOOK_PATH, createMemoryQuoteWebhooks, createRestQuoteWebhooks, handleLeadRequest,
   handleQuoteWebhookRequest, quoteLeadPublicationOptions
 } from '../src/quote-webhook.mjs';
-import { handleAutoReplyRoute, matchAutoReplyRoute, runAutoReplyMaintenance } from '../src/auto-reply/routes.mjs';
+import {
+  DELETION_STATUS_PATHS, handleAutoReplyRoute, handleDeletionStatusPage, matchAutoReplyRoute, runAutoReplyMaintenance
+} from '../src/auto-reply/routes.mjs';
 import { createMemoryAutoReply, createRestAutoReply } from '../src/auto-reply/store.mjs';
 import { CHANNELS_PATH, handleChannelsRequest } from '../src/channels.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
@@ -4070,6 +4072,13 @@ export function createApiHandler(deps = {}) {
       } catch {
         return new Response(null, { status: 503 });
       }
+    }
+
+    if (DELETION_STATUS_PATHS.includes(pathname)) {
+      return handleDeletionStatusPage({
+        url, method, store, env,
+        headers: { ...PUBLIC_SECURITY_HEADERS, 'content-security-policy': COMPLIANCE_CSP_HEADER }
+      });
     }
 
     const previewMatch = pathname.match(/^\/__preview\/([^/]+)\/?$/);

@@ -28,10 +28,11 @@ Resposta automática do Instagram com o link público da vitrine. Data desta rev
 | Parte | Estado |
 | --- | --- |
 | ADR 0017 | Proposta, não ratificada |
-| Migração `20261126001000_auto_reply.sql` | Implementada e testada em PGlite; **não aplicada** no Supabase |
+| Migrações `20261126001000_auto_reply.sql` e `20261126002000_auto_reply_rotation_deletion.sql` | Implementadas e testadas em PGlite; **não aplicadas** no Supabase |
 | Rotas do Worker (painel, OAuth, webhook, callbacks da Meta, administração, Cron) | Implementadas e testadas com a Meta simulada; **sem deploy** |
 | Seção "Resposta automática" no painel | Implementada; testada por módulo e capturas 1280/375 px locais com dados simulados |
-| Tela de administração no painel | **Não implementada** (rotas prontas) |
+| Tela de administração no painel | Implementada (aba "Resposta automática"), com alertas e rotação de chave; testada por módulo e capturas locais |
+| Página de acompanhamento da exclusão | Implementada em `/privacidade/exclusao/`; sem deploy |
 | Configuração no console Meta | **Não feita** (nenhuma alteração externa nesta entrega) |
 | Revisão do app, Verificação da empresa, modo Live | **Pendentes** (dependências externas) |
 | Piloto, homologação e produção | **Não iniciados** |
