@@ -61,6 +61,10 @@ import {
   LEADS_PATH, QUOTE_WEBHOOK_PATH, createMemoryQuoteWebhooks, createRestQuoteWebhooks, handleLeadRequest,
   handleQuoteWebhookRequest, quoteLeadPublicationOptions
 } from '../src/quote-webhook.mjs';
+import {
+  DELETION_STATUS_PATHS, handleAutoReplyRoute, handleDeletionStatusPage, matchAutoReplyRoute, runAutoReplyMaintenance
+} from '../src/auto-reply/routes.mjs';
+import { createMemoryAutoReply, createRestAutoReply } from '../src/auto-reply/store.mjs';
 import { CHANNELS_PATH, handleChannelsRequest } from '../src/channels.mjs';
 import { TECHNICAL_MAX_ACTIVE_ITEMS } from '../src/plans.mjs';
 import { handleBillingRoute, isBillingRoute } from '../src/billing/routes.mjs';
@@ -1244,6 +1248,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
     ...createMemoryQuoteWebhooks({ sites }),
     ...createMemoryTeamInvitations({ sites, memberships, profiles, auditLogs, roleFor: getRoleForSite }),
+    ...createMemoryAutoReply({ sites, publicationsBySlug, memberships }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -2026,6 +2031,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
     ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
     ...createRestQuoteWebhooks({ baseUrl, fetchImpl, authHeaders }),
     ...createRestTeamInvitations({ baseUrl, fetchImpl, authHeaders }),
+    ...createRestAutoReply({ baseUrl, fetchImpl, authHeaders }),
 
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
@@ -4142,6 +4148,13 @@ export function createApiHandler(deps = {}) {
       }
     }
 
+    if (DELETION_STATUS_PATHS.includes(pathname)) {
+      return handleDeletionStatusPage({
+        url, method, store, env,
+        headers: { ...PUBLIC_SECURITY_HEADERS, 'content-security-policy': COMPLIANCE_CSP_HEADER }
+      });
+    }
+
     const previewMatch = pathname.match(/^\/__preview\/([^/]+)\/?$/);
     if (previewMatch) {
       const headers = {
@@ -4393,6 +4406,23 @@ export function createApiHandler(deps = {}) {
     }
 
     try {
+      const autoReplyRoute = matchAutoReplyRoute(pathname);
+      if (autoReplyRoute) {
+        return await handleAutoReplyRoute({
+          route: autoReplyRoute, request, url, method, store, env, ctx: _ctx,
+          deps: {
+            resolveUser: () => resolveSessionUser(request, env, deps),
+            respond: jsonResponse,
+            guardMutation: validateMutationOriginAndJson,
+            readJson: parseJsonRequest,
+            portalOrigin: resolvePublicOrigins(env, deps).portalOrigin,
+            fetch: deps.fetch,
+            ...(deps.autoReplyAdapterFor ? { adapterFor: deps.autoReplyAdapterFor } : {}),
+            ...(deps.autoReplyWait ? { wait: deps.autoReplyWait } : {})
+          }
+        });
+      }
+
       if (isBillingRoute(pathname)) {
         return await handleBillingRoute(request, env, _ctx, {
           deps,
@@ -5989,6 +6019,12 @@ async function refreshPendingDomainCertificates(env) {
   }
 }
 
+async function runScheduledAutoReplyMaintenance(env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !env.SUPABASE_SERVICE_ROLE_KEY) return;
+  const store = createSupabaseRestStore({ supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY });
+  await runAutoReplyMaintenance({ store, env });
+}
+
 const defaultApiHandler = createApiHandler();
 
 export default {
@@ -6000,7 +6036,8 @@ export default {
       refreshPendingDomainCertificates(env),
       runSubscriptionLifecycle(env),
       purgeExpiredLinktreeDemos(env).catch(() => {}),
-      purgeExpiredInvitations(env).catch(() => {})
+      purgeExpiredInvitations(env).catch(() => {}),
+      runScheduledAutoReplyMaintenance(env).catch(() => {})
     ]);
     const failed = results.find((result) => result.status === 'rejected');
     if (failed) throw failed.reason;

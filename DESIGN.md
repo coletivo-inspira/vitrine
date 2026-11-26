@@ -340,7 +340,7 @@ registro substitui a orientação anterior de montar a Orb dentro do rodapé.
 - **Segurança e custo zero:** manutenção estrita de `script-src 'self'` sem scripts inline, gráficos de Insights construídos em SVG e CSS próprios e zero dependências pagas.
 - **Campos de texto:** campos de uma linha e áreas de texto usam raio de `12px`; a pílula fica para botões, abas, filtros e chips.
 
-### Estrutura no modelo Google Forms (spec 019)
+### Estrutura no modelo Google Forms (spec 020)
 - **Sem barra lateral nem barra inferior.** A barra superior tem logo (leva a `#/`), busca de vitrines (só no Início) e o botão do avatar (foto do Google ou iniciais) com o menu da conta: Perfil, Customizações, Plano e cobrança, Impacto, Administração, Tema e Sair.
 - **Início:** faixa "Começar nova vitrine" com miniaturas de modelo (topo floresta, linhas neutras; Sob medida tracejado com "+" laranja) e grade "Vitrines recentes" de cartões com capa, nome, endereço, pílula Publicada (verde suave) ou Rascunho (damasco) e menu de 3 pontos.
 - **Vitrine:** cabeçalho de vidro fixo com seta, nome editável em `Syne`, indicador "Salvando... / Salvo", ícones Personalizar e Visualizar, botão Publicar em pílula e menu de 3 pontos; abas Itens, Pedidos e Configurações em pílula, com a aba ativa em tinta (`--ink`) sobre papel. Colunas centrais de até 760 px; na aba Itens, categorias são seções com borda superior laranja e a barra flutuante fica à direita (no celular, fixa embaixo, centralizada).

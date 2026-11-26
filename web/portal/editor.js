@@ -38,6 +38,7 @@ import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
 import { mountCommentToVitrinePanel } from './comment-to-vitrine.mjs';
 import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import { mountChannelsPanel, refreshChannelsPanel } from './channels-panel.mjs';
+import { mountAutoReplyPanel } from './auto-reply-panel.mjs';
 import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import { renderItemPageFields } from './item-page-fields.mjs';
 import { renderPaymentLinkField, showPaymentLinkServerErrors } from './payment-link-field.mjs';
@@ -1217,6 +1218,7 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     onChange: () => updateDraftAndPreview(),
     openSection: openEditorSection
   });
+  void mountAutoReplyPanel({ site: currentSite, isOnline: currentIsOnline });
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;

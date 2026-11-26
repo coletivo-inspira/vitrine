@@ -406,7 +406,7 @@ async function rpcErrorMessage(response) {
   return String(body?.message ?? '');
 }
 
-/** Supabase: as funções da migração 20261126000100 com o JWT da pessoa (ou a chave de serviço na abertura). */
+/** Supabase: as funções da migração 20261126003000 com o JWT da pessoa (ou a chave de serviço na abertura). */
 export function createRestTeamInvitations({ baseUrl, fetchImpl, authHeaders }) {
   const rpc = (name, body, headers) => fetchImpl(`${baseUrl}/rest/v1/rpc/${name}`, {
     method: 'POST', headers, body: JSON.stringify(body)

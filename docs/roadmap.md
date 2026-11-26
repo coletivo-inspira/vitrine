@@ -105,5 +105,30 @@ Especificação em `specs/018-convite-demonstracao/`; épico e 7 issues em
 4. Passos humanos: ratificar o ADR 0016 e reconferir a base legal (LGPD) com o jurídico. Nada foi
    implementado.
 
+## AutoResposta do Instagram (`019`, ADR 0017 proposta)
+
+Pedido do Lino em 2026-11-26: o proprietário conecta o Instagram da vitrine pela autorização oficial
+da Meta e a Vitrine responde uma vez, com o endereço público, a quem manda mensagem; o atendimento
+continua no Instagram. Especificação em `specs/019-autoresposta/`; guias em
+`docs/integrations/auto-reply/`; épico e 10 issues em `docs/backlog/autoresposta/`, a criar com
+`scripts/criar-issues-estudo-mercado.sh --dir docs/backlog/autoresposta` (o agente não tinha
+permissão de escrita em issues).
+
+1. Feito no repositório, com Meta simulada: migração `20261126001000_auto_reply.sql`, rotas do
+   Worker (painel, OAuth, webhook `messages`, desautorização, exclusão, administração e Cron) e a
+   seção "Resposta automática" na aba Canais. Nada aplicado no Supabase, configurado na Meta ou
+   publicado.
+2. Depois do PR #183: tela de administração com alertas, rotação da chave com recifragem e página
+   `/privacidade/exclusao/` (migração `20261126002000_auto_reply_rotation_deletion.sql`). Falta o
+   teste com pessoa proprietária real e a regra de notificação por log.
+3. Passos humanos: ratificar o ADR 0017; revisão jurídica (aviso de automação, privacidade e
+   termos); configuração da AutoResposta no console Meta; deploy de staging; piloto com
+   testadores; Verificação da empresa; Revisão do app (`instagram_basic` e
+   `instagram_manage_messages`, Acesso avançado); modo Live. A Meta só entrega webhooks com o app
+   publicado e tem uma limitação temporária para contas sem Página vinculada.
+4. WhatsApp: só arquitetura preparada; viabilidade em
+   `docs/integrations/auto-reply/whatsapp-discovery.md` (PR #182: no MVP, saudação nativa do
+   WhatsApp Business assistida pelo painel).
+
 As correções de UX da auditoria (`docs/auditoria-ux/`, pacotes `PB-01` a `PB-27`)
 continuam valendo e vêm antes das telas novas que dependem delas.

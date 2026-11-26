@@ -38,7 +38,7 @@ web/portal/palette-picker.mjs|.css
 web/assets/storefront-palettes.mjs|.css
 src/showcase-structure.mjs, src/publication-engine.mjs, web/vitrine/*  # paleta na estrutura e na vitrine
 src/team-invitations.mjs, workers/api.mjs                              # convite de equipe, renomear, publishedAt
-supabase/migrations/20261126000100_site_team_invitations.sql
+supabase/migrations/20261126003000_site_team_invitations.sql
 scripts/generate-ibge-municipios.mjs
 ```
 

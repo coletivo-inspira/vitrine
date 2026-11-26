@@ -19,6 +19,8 @@
   <link rel="stylesheet" href="./comment-to-vitrine.css">
   <link rel="stylesheet" href="./quote-webhook.css">
   <link rel="stylesheet" href="./channels-panel.css">
+  <link rel="stylesheet" href="./auto-reply-panel.css">
+  <link rel="stylesheet" href="./auto-reply-admin.css">
   <link rel="stylesheet" href="./sponsor-impact.css">
   <link rel="stylesheet" href="./team-panel.css">
   <link rel="stylesheet" href="./palette-picker.css">
@@ -323,6 +325,7 @@
             <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1">Pedidos pela Mila</button>
             <button type="button" role="tab" id="platform-tab-linktree" class="admin-tab" aria-controls="platform-linktree" aria-selected="false" tabindex="-1">Importar do Linktree</button>
             <button type="button" role="tab" id="platform-tab-sponsors" class="admin-tab" aria-controls="platform-sponsors" aria-selected="false" tabindex="-1">Patrocinadores</button>
+            <button type="button" role="tab" id="platform-tab-auto-reply" class="admin-tab" aria-controls="platform-auto-reply" aria-selected="false" tabindex="-1">Resposta automática</button>
             <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1">Modelos de vitrine</button>
             <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1">Site institucional</button>
           </div>
@@ -401,6 +404,10 @@
               <h3 class="sponsor-admin-list-title">Com acesso</h3>
               <ul id="platform-sponsor-list" class="admin-list sponsor-admin-list" aria-label="Patrocinadores com acesso ao Impacto"></ul>
             </article>
+          </div>
+
+          <div id="platform-auto-reply" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-auto-reply" tabindex="0" hidden>
+            <article id="platform-auto-reply-root" class="portal-card admin-card auto-reply-admin" aria-live="polite"></article>
           </div>
 
           <div id="platform-templates" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-templates" tabindex="0" hidden>
@@ -1352,6 +1359,7 @@
               </summary>
               <div class="config-body">
                 <section id="channels-panel" class="channels-panel" aria-labelledby="channels-title"></section>
+                <section id="auto-reply-panel" class="channels-panel auto-reply-panel" aria-labelledby="auto-reply-title"></section>
               </div>
             </details>
 
