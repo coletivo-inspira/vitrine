@@ -1,4 +1,4 @@
--- Migração 20261126000100_site_team_invitations.sql
+-- Migração 20261126003000_site_team_invitations.sql
 -- Equipe da vitrine por link (spec 018, User Story 5): convite de uso único, guardado só
 -- como hash SHA-256 do token gerado no Worker, válido por 7 dias e aceito com a sessão da
 -- pessoa convidada. A tabela já aceita o tipo demo_owner da spec 018, mas aqui só o tipo

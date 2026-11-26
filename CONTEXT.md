@@ -99,3 +99,10 @@ _Evitar_: trial, período de teste.
 **Regra de Terminologia**: Use sempre o termo "vitrine" (ou "itens da vitrine"), nunca "catálogo" ou "cardápio", para qualquer conteúdo visível ao usuário nas páginas de marketing. Peças do Instagram podem nomear o modelo "Cardápio"; no site a mesma demonstração se chama "Pratos".
 
 **Demonstração de modelo**: Animação ilustrativa de 4 s de um modelo (Pratos/Cardápio, Lanches, Serviços, Portfólio), com negócio e valores fictícios, usada na página Possibilidades e na campanha do Instagram.
+
+**AutoResposta**: Resposta automática enviada uma vez pela Vitrine, pela API oficial da Meta, a quem manda mensagem para o Instagram conectado do negócio, com uma mensagem do proprietário e o endereço público da vitrine. O atendimento continua no Instagram. Não é chatbot, inbox nem campanha. Proposta na spec `019-autoresposta` (ADR 0017).
+_Evitar_: robô, bot de atendimento, disparo.
+
+**Conexão de canal**: Vínculo autorizado pelo proprietário entre uma vitrine e uma conta social (hoje só Instagram), com situação Conectada, Reconexão necessária ou Suspensa. Uma conta responde por uma única vitrine.
+
+**Frequência da AutoResposta**: Intervalo mínimo entre duas respostas à mesma pessoa: uma vez por contato, no máximo a cada 24 horas (padrão) ou a cada 7 dias. Só uma mensagem nova da pessoa dispara a resposta.

@@ -397,7 +397,7 @@ html[data-theme="dark"] .theme-moon {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .storefront-hero h1 {
@@ -2188,7 +2188,7 @@ html:has(.selection-drawer[open]) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--primary);
+  color: var(--primary-hover);
   margin-bottom: 6px;
 }
 
@@ -2514,7 +2514,7 @@ body[data-button-style="rounded"] .category-chip {
   font-size: 11px;
   font-weight: 700;
   background: var(--apricot);
-  color: var(--primary);
+  color: var(--primary-hover);
   border: 1px solid var(--primary);
   white-space: nowrap;
 }
@@ -2646,7 +2646,7 @@ body[data-button-style="rounded"] .category-chip {
 .sf-auction-status.is-open {
   border-color: var(--primary);
   background: var(--apricot);
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .sf-auction-meta {

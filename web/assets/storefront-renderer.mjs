@@ -32,6 +32,15 @@ import {
   soonBadgeText
 } from './item-availability.mjs';
 import { PAYMENT_LINK_ICON_PATH, PAYMENT_LINK_NOTICE, publicPaymentLink } from './payment-link.mjs';
+import { storefrontPaletteOf } from './storefront-palettes.mjs';
+
+/** Portal preview: mirrors the draft palette on the preview container (`.live-preview-box[data-palette]`). */
+export function applyPreviewPalette(container, menuOrDraft) {
+  const palette = storefrontPaletteOf(menuOrDraft);
+  if (palette) container.setAttribute?.('data-palette', palette);
+  else container.removeAttribute?.('data-palette');
+  return palette;
+}
 
 export function formatPriceBRL(cents) {
   if (typeof cents !== 'number' || Number.isNaN(cents) || cents < 0) {
@@ -643,6 +652,7 @@ export class StorefrontRenderer {
 
   render() {
     if (!this.container) return;
+    if (this.options.isPreview) applyPreviewPalette(this.container, this.menu);
     this.likeButtons = [];
     if (typeof this.container.replaceChildren === 'function') {
       this.container.replaceChildren();

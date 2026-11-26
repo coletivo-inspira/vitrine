@@ -1,6 +1,6 @@
 # Modelo de dados: convite de demonstração e equipe da vitrine
 
-> Nota (spec 019): a tabela `private.site_invitations`, as funções de equipe (`create_team_invitation`, `revoke_invitation`, `list_site_team`, `read_invitation`, `accept_invitation` só para `team`) e `purge_expired_invitations` já foram criadas por `supabase/migrations/20261126000100_site_team_invitations.sql`. A migração desta spec, com timestamp posterior, acrescenta só demonstração, convite de dono, cortesia e `growth_operator`, e estende `accept_invitation` para `demo_owner`.
+> Nota (spec 019): a tabela `private.site_invitations`, as funções de equipe (`create_team_invitation`, `revoke_invitation`, `list_site_team`, `read_invitation`, `accept_invitation` só para `team`) e `purge_expired_invitations` já foram criadas por `supabase/migrations/20261126003000_site_team_invitations.sql`. A migração desta spec, com timestamp posterior, acrescenta só demonstração, convite de dono, cortesia e `growth_operator`, e estende `accept_invitation` para `demo_owner`.
 
 Tudo entra numa migração nova, append-only, proposta como `supabase/migrations/20261126000100_site_invitations_courtesy.sql`. Nenhuma migração anterior é alterada. As funções seguem o padrão do projeto: `security definer`, `set search_path = ''`, `revoke all ... from public, anon` e `grant execute` explícito.
 

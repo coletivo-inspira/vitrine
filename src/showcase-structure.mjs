@@ -2,6 +2,7 @@ import {
   assertNoDangerousTextPayload, PortalValidationError, validateSafePublicHttpsUrl
 } from './portal-validation.mjs';
 import { HIGHLIGHT_ICON_PATHS } from '../web/assets/highlight-icons.mjs';
+import { DEFAULT_STOREFRONT_PALETTE, isStorefrontPaletteId } from '../web/assets/storefront-palettes.mjs';
 
 export const HIGHLIGHT_ICONS = Object.freeze(Object.keys(HIGHLIGHT_ICON_PATHS));
 export const HERO_LIMITS = Object.freeze({ eyebrow: 40, actionLabel: 28, imageAlt: 160, highlightText: 60 });
@@ -31,7 +32,7 @@ const moduleFields = {
   links_bio: { links: [{ label: 'text', href: 'link' }] },
   custom_sandbox: { widgetId: 'uuid', bundleHash: 'hash' }
 };
-const themeFields = { accentColor: 'color', fontPair: 'font', buttonStyle: 'button' };
+const themeFields = { accentColor: 'color', fontPair: 'font', buttonStyle: 'button', palette: 'palette' };
 const navFields = { header: [{ label: 'text', href: 'link' }], footer: [{ label: 'text', href: 'link' }] };
 const fonts = ['editorial-syne', 'modern-inter', 'playful-poppins', 'classic-garamond'];
 const identifier = /^[a-z0-9][a-z0-9_-]{0,39}$/;
@@ -72,6 +73,7 @@ function validateValue(value, type) {
   if (type === 'hash' && /^[a-f0-9]{64}$/.test(value)) return value;
   if (type === 'font' && fonts.includes(value)) return value;
   if (type === 'button' && ['pill', 'rounded'].includes(value)) return value;
+  if (type === 'palette' && isStorefrontPaletteId(value)) return value;
   if (type === 'color' && /^#[a-f0-9]{6}$/i.test(value)) {
     const colors = value.slice(1).match(/.{2}/g).map(part => parseInt(part, 16) / 255)
       .map(color => color <= 0.04045 ? color / 12.92 : ((color + 0.055) / 1.055) ** 2.4);
@@ -168,11 +170,13 @@ function validateSections(sections, moduleDefaults, inheritedSections = []) {
 
 export function resolveShowcaseManifest(structure, template = {}, vertical = {}, moduleDefaults = {}) {
   if (!structure || typeof structure !== 'object' || Array.isArray(structure)) throw invalid();
-  const theme = {
-    ...validateValue(template.defaultTokens ?? {}, themeFields),
-    ...validateValue(vertical.theme ?? {}, themeFields),
-    ...validateValue(structure.themeOverrides ?? {}, themeFields)
-  };
+  const theme = {};
+  for (const layer of [template.defaultTokens, vertical.theme, structure.themeOverrides]) {
+    const tokens = validateValue(layer ?? {}, themeFields);
+    // Paleta escolhida numa camada vence a cor de destaque herdada do modelo; a cor definida na mesma camada continua valendo.
+    if (tokens.palette && !tokens.accentColor) delete theme.accentColor;
+    Object.assign(theme, tokens);
+  }
   const navigation = validateValue(structure.navigationMenus ?? {}, navFields);
   const inheritedSections = vertical.sections ?? template.defaultSections ?? [];
   // Páginas extras do modelo (ex.: "Para empresas"), herdadas como a home: só o que muda fica no rascunho.
@@ -224,9 +228,11 @@ export function extractShowcaseOverrides(resolved, template, vertical, moduleDef
 }
 
 export function projectShowcaseManifest(structure) {
-  const { theme, navigation, pages } = resolveShowcaseManifest(structure);
+  const { theme: { palette, ...theme }, navigation, pages } = resolveShowcaseManifest(structure);
   return {
-    theme, navigation,
+    // A paleta padrão fica implícita: artefatos sem paleta mantêm os mesmos bytes e hash.
+    theme: palette && palette !== DEFAULT_STOREFRONT_PALETTE ? { ...theme, palette } : theme,
+    navigation,
     pages: pages.filter(page => page.active).map(({ slug, title, sections }) => ({
       slug, title,
       sections: sections.filter(section => section.active)

@@ -19,7 +19,7 @@ Dono entra no painel → seleciona sua vitrine → conecta e autoriza o Instagra
 
 ## Premissas e limites
 
-Uma conta Instagram por vitrine; leitura de perfil/feed; autorização oficial pelo dono; sincronização periódica sem promessa de tempo real. Informar o link do perfil não substitui a autorização. “Todas as fotos” significa todo conteúdo acessível pela API, consultado com paginação. Mensagens ficam fora da primeira entrega (Ver [Mensagens futuro](instagram/mensagens-futuro.md)). O login no painel continua sendo exclusivamente via Google (Ver análise de opções para [Login Meta](instagram/login-meta.md)). Nenhum segredo deve entrar em documentos, frontend ou logs.
+Uma conta Instagram por vitrine; leitura de perfil/feed; autorização oficial pelo dono; sincronização periódica sem promessa de tempo real. Informar o link do perfil não substitui a autorização. “Todas as fotos” significa todo conteúdo acessível pela API, consultado com paginação. Mensagens ficam fora da primeira entrega (Ver [Mensagens futuro](instagram/mensagens-futuro.md)); a única exceção proposta é a AutoResposta, com configuração e consentimento próprios ([`specs/019-autoresposta`](../specs/019-autoresposta/spec.md), [ADR 0017](adr/0017-autoresposta-canais-sociais.md)). O login no painel continua sendo exclusivamente via Google (Ver análise de opções para [Login Meta](instagram/login-meta.md)). Nenhum segredo deve entrar em documentos, frontend ou logs.
 
 ## Tarefas e dependências
 
@@ -61,6 +61,7 @@ O planejamento completo desta integração está distribuído em documentos dedi
 - **Sincronização periódica**: [Mecanismo de sincronização do feed e perfil na infraestrutura gratuita](instagram/sincronizacao.md) (associado à issue #50).
 - **Interface Pública e Webhook**: [Contrato da API de leitura e notificação por webhook para sites conectados](instagram/interface-publica-feed.md) (associado à issue #51).
 - **Mensagens (Evolução Futura)**: [Backlog de perguntas e regras para integração futura de mensagens](instagram/mensagens-futuro.md) (associado à issue #52).
+- **AutoResposta (proposta, 2026-11-26)**: [guias em `docs/integrations/auto-reply/`](integrations/auto-reply/README.md); resposta única com o link da vitrine, sem inbox.
 - **Login Alternativo**: [Estudo e análise de viabilidade do login com Instagram/Meta no painel](instagram/login-meta.md).
 
 ## Referências
