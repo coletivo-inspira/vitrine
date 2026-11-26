@@ -18,11 +18,12 @@ saudação nativa do aplicativo WhatsApp Business.
 - **Não é de custo zero como as ADRs 0012 e 0015 pressupõem.** Desde 1º/10/2026 a Meta cobra
   mensagens de serviço: cada número tem **1.000 grátis por mês**; a partir da 1.001ª, **R$ 0,035**
   por mensagem entregue a número do Brasil. A cobrança vai para a conta de mensagens do próprio
-  negócio, que precisa cadastrar meio de pagamento na Meta.
+  negócio. Por decisão do Lino, o dono **não cadastra cartão**: a Vitrine limita as respostas à
+  franquia gratuita (ver "Decisões e recomendações").
 - **O custo maior é de produto, não de dinheiro.** Para o dono, conectar o número à Cloud API
   desliga as listas de transmissão, as mensagens temporárias e de visualização única, desconecta
-  os aparelhos vinculados e exige conta no Facebook ou na Meta, portfólio empresarial e cartão
-  na Meta. Para a Inspira, exige virar *Tech Provider* (verificação da empresa e App Review de
+  os aparelhos vinculados e exige autorizar a Vitrine numa janela da Meta (login com Facebook ou
+  conta Meta). Para a Inspira, exige virar *Tech Provider* (verificação da empresa e App Review de
   duas permissões avançadas).
 - **A saudação nativa do WhatsApp Business já resolve quase todo o caso de uso**, sem custo, sem
   app Meta e sem webhook: envia um texto fixo no primeiro contato e depois de 14 dias sem
@@ -30,12 +31,17 @@ saudação nativa do aplicativo WhatsApp Business.
 - **Recomendação:** no MVP, o WhatsApp entra como **saudação nativa assistida pelo painel** (texto
   pronto com a URL da vitrine, botão copiar e passo a passo). A Cloud API fica para uma fase
   posterior, com gatilhos claros, um *spike* só com conta *sandbox* e uma ADR nova.
+- **Decisões de 26/11/2026** (seção própria): sem cartão do dono na Meta e teto de 900 respostas
+  por número por mês; sem sincronização de histórico; só os webhooks `messages` e
+  `account_update`; uma verificação de empresa (Coletivo Inspira); um app Meta de produção para
+  tudo e um app separado de testes; avisar (sem bloquear) sobre a saudação nativa ligada e sobre
+  outra ferramenta no mesmo número; frequência padrão de 7 dias no WhatsApp.
 
 ## O que já existe no repositório
 
 | Onde | O que diz | Relação com este discovery |
 | --- | --- | --- |
-| [ADR 0005](../../adr/0005-zero-cost-mvp.md) | Piloto sem "API WhatsApp paga". | Vale para a Inspira. No modelo *Tech Provider* quem paga é o negócio, mas o cartão dele na Meta passa a ser requisito. |
+| [ADR 0005](../../adr/0005-zero-cost-mvp.md) | Piloto sem "API WhatsApp paga". | Vale para a Inspira. No modelo *Tech Provider* quem paga é o negócio. Com a decisão de não pedir cartão, a AutoResposta fica limitada à franquia gratuita. |
 | [ADR 0012](../../adr/0012-pedidos-pela-mila.md) | Mila é pessoa no app WhatsApp Business; o robô na Cloud API foi descartado porque o repasse ao dono exigiria modelo pago. | Continua válido. A frase "a resposta dentro da janela de 24 horas é gratuita" ficou desatualizada em 1º/10/2026. |
 | [ADR 0015](../../adr/0015-login-multiplo-whatsapp.md) e [`specs/017-login-multiplo`](../../../specs/017-login-multiplo/plan.md) | Código de login enviado como resposta de serviço pelo número da Vitrine; "custo de mensagens zero"; rota planejada `/api/whatsapp/webhook`, ainda não implementada. | Mesmo app Meta e mesma rota de webhook podem ser compartilhados. Ver o achado lateral sobre custo mais abaixo. |
 | [`docs/instagram/mensagens-futuro.md`](../../instagram/mensagens-futuro.md) | Regras de janela de 24 horas e de App Review para mensagens no Instagram. | Mesma lógica de "só responder", com regras e tokens diferentes. |
@@ -103,8 +109,9 @@ Requisitos e passos documentados para *Tech Provider*:
    - assina os webhooks da conta de mensagens (`POST /<WABA_ID>/subscribed_apps`);
    - registra o número na Cloud API (`POST /<PHONE_NUMBER_ID>/register`), **exceto na
      coexistência**, em que o número já está registrado.
-4. O dono **cadastra um meio de pagamento** na conta de mensagens pelo WhatsApp Manager. O guia de
-   onboarding diz que só depois disso o cliente pode começar a enviar.
+4. Pelo guia, o dono **cadastra um meio de pagamento** na conta de mensagens pelo WhatsApp
+   Manager, e só depois disso pode começar a enviar. A página de preços contradiz isso para a
+   franquia gratuita; a Vitrine decidiu não pedir cartão e validar esse ponto no spike (decisão 1).
 
 O dono passa a ter acesso total ao WhatsApp Manager desses ativos, e a Inspira não pode
 restringir esse acesso.
@@ -119,10 +126,10 @@ que pesam na AutoResposta:
 | --- | --- | --- |
 | Quem pode | Só números do **aplicativo WhatsApp Business** (versão 2.24.17 ou mais nova). A Inspira precisa já ser *Tech Provider* e usar Embedded Signup com registro de sessão. | Quem usa o WhatsApp comum não tem coexistência; migrar o número para a Cloud API tiraria o app dele. Fora de questão sem autorização expressa. |
 | Recursos que o dono perde no app | Listas de transmissão desligadas (as existentes ficam só leitura); mensagens temporárias, de visualização única e localização em tempo real desligadas nas conversas individuais; aparelhos vinculados desconectados (é preciso vincular de novo; WhatsApp para Windows e WearOS não são aceitos). | Custo alto para pequenos negócios que usam listas de transmissão. Precisa de aviso claro antes de conectar. |
-| Recursos que continuam no app | Saudação, ausência, respostas rápidas, etiquetas, catálogo e perfil seguem funcionando no app ("sem mudança"), mas não existem na Cloud API. | **Risco de duas saudações** (a nativa e a da Vitrine). O painel deveria pedir para desligar a saudação nativa ao ativar a AutoResposta. |
+| Recursos que continuam no app | Saudação, ausência, respostas rápidas, etiquetas, catálogo e perfil seguem funcionando no app ("sem mudança"), mas não existem na Cloud API. | **Risco de duas saudações** (a nativa e a da Vitrine). O painel avisa e pede confirmação ao ativar a AutoResposta (decisão 7). |
 | Janela de atendimento | Só abre com mensagem recebida **depois** da conexão. Mensagens enviadas pelo app não abrem, não estendem e não afetam a janela nem a cobrança da Cloud API. | Respostas do dono pelo app continuam grátis. Mensagens anteriores à conexão não são respondidas (coerente com "não reprocessar eventos antigos"). |
 | Vazão | 20 mensagens por segundo por número em coexistência. | Irrelevante para uma resposta por contato. |
-| Webhooks exigidos | O guia manda assinar `account_update`, `history`, `smb_app_state_sync` e `smb_message_echoes`. | `smb_message_echoes` chega a cada mensagem que o dono envia pelo app: mais volume no Worker e um tipo de evento que precisa ser ignorado (RN-007). |
+| Webhooks exigidos | O guia manda assinar `account_update`, `history`, `smb_app_state_sync` e `smb_message_echoes`. | `smb_message_echoes` chegaria a cada mensagem que o dono envia pelo app. Recomendação: assinar só `messages` e `account_update` e confirmar no spike que basta (decisão 3). |
 | Sincronização | Contatos e histórico de 6 meses podem ser sincronizados uma única vez, em até 24 horas depois do onboarding; o dono escolhe se compartilha o histórico. | A AutoResposta **não deve pedir** essa sincronização (RN-013: não guardar conversas). A confirmar que pular a sincronização não causa desligamento (ver dúvidas). |
 | Desconexão | Não dá para descadastrar pela API. O dono desconecta no app em Configurações > Conta > Plataforma comercial; chega `account_update` com `PARTNER_REMOVED`. | RN-011 precisa tratar esse evento e explicar ao dono onde desconectar. |
 | Erro esperado | Webhook `unsupported` com código `131060` na primeira mensagem de um contato ou vinda de aparelho vinculado não aceito. | Tratar como "não elegível" sem alerta. |
@@ -218,8 +225,8 @@ automaticamente se o Meta Business Agent estiver conectado ao número.
 | Critério | Saudação nativa | AutoResposta pela Cloud API |
 | --- | --- | --- |
 | Custo para a Inspira | Zero | Zero em mensagens; cota do Workers Free e do Supabase Free; esforço de *Tech Provider* |
-| Custo para o negócio | Zero | Zero até 1.000 respostas por mês por número; R$ 0,035 por resposta acima disso; cartão na Meta |
-| O que o dono precisa | App WhatsApp Business | App WhatsApp Business (para coexistência), conta Facebook ou Meta, portfólio empresarial, cartão na Meta |
+| Custo para o negócio | Zero | Zero, com teto de 900 respostas por mês por número e sem cartão (decisão 1) |
+| O que o dono precisa | App WhatsApp Business | App WhatsApp Business (para coexistência) e autorizar a Vitrine na janela da Meta com Facebook ou conta Meta |
 | O que o dono perde | Nada | Listas de transmissão, mensagens temporárias, de visualização única e localização em tempo real; precisa vincular os aparelhos de novo |
 | Aprovação da Meta | Nenhuma | Verificação da empresa e App Review (duas permissões) |
 | Gatilho | Primeira mensagem ou 14 dias sem conversa | Cada mensagem elegível, com intervalo configurável (uma vez, 24 horas, 7 dias) |
@@ -250,25 +257,28 @@ próprio ativo) existe.
   número.
 - Modelo *Tech Provider*: a cobrança da Meta vai para a conta de mensagens de cada negócio; a
   Inspira não paga mensagens.
+- Decisão de 26/11/2026: sem cartão do dono na Meta e **teto de 900 respostas por número por
+  mês** na Vitrine.
 - Uma resposta automática por mensagem elegível, respeitando a frequência. Mensagens do dono pelo
   app não são cobradas e não contam na franquia.
-- Webhooks por mês, por vitrine = mensagens de consumidores + ecos das mensagens do dono pelo app
-  (coexistência) + 3 status por resposta (`sent`, `delivered`, `read`). Sem sincronização de
-  histórico.
+- Webhooks por mês, por vitrine = mensagens de consumidores + 3 status por resposta (`sent`,
+  `delivered`, `read`). Sem sincronização de histórico e sem assinar `smb_message_echoes`
+  (decisões 2 e 3). Se a Meta exigir os ecos, some as mensagens do dono pelo app.
 - Uma linha de entrega por resposta, cerca de 250 bytes com índices (estimativa).
 - Workers Free: 100.000 requisições por dia, divididas com a vitrine pública, o painel e os
   webhooks do Instagram. Supabase Free: 500 MB de banco.
 
 Três perfis por vitrine por mês:
 
-| Perfil | Mensagens de consumidores | Respostas automáticas | Mensagens do dono pelo app | Webhooks recebidos |
+| Perfil | Mensagens de consumidores | Respostas desejadas | Respostas enviadas (teto 900) | Webhooks recebidos |
 | --- | --- | --- | --- | --- |
-| Baixo | 60 | 30 | 60 | 210 |
-| Médio | 400 | 150 | 400 | 1.250 |
-| Alto | 2.500 | 1.100 | 2.500 | 8.300 |
+| Baixo | 60 | 30 | 30 | 150 |
+| Médio | 400 | 150 | 150 | 850 |
+| Alto | 2.500 | 1.100 | 900 | 5.200 |
 
 **Eventos recebidos não são mensagens enviadas:** no perfil alto, cada resposta enviada gera em
-média 7,5 webhooks.
+média 5,8 webhooks. A frequência padrão de 7 dias tende a reduzir as respostas desejadas em
+relação a estes perfis.
 
 ### Custo da Meta (pago por cada negócio)
 
@@ -276,11 +286,12 @@ média 7,5 webhooks.
 | --- | --- | --- | --- | --- |
 | Baixo (30 respostas) | R$ 0,00 | R$ 0,00 | R$ 0,00 | R$ 0,00 |
 | Médio (150 respostas) | R$ 0,00 | R$ 0,00 | R$ 0,00 | R$ 0,00 |
-| Alto (1.100 respostas) | R$ 3,50 (100 × R$ 0,035) | R$ 35 | R$ 350 | R$ 3.500 |
+| Alto, com teto de 900 | R$ 0,00 (200 contatos ficam sem resposta automática no mês) | R$ 0,00 | R$ 0,00 | R$ 0,00 |
+| Alto, sem teto e com cartão (referência) | R$ 3,50 (100 × R$ 0,035) | R$ 35 | R$ 350 | R$ 3.500 |
 
 Custo da Meta para a Inspira: **R$ 0** no modelo *Tech Provider*. Se a Inspira pagasse as
-mensagens (modelo *Solution Partner*), os mesmos valores cairiam na conta dela, o que a ADR 0005
-proíbe.
+mensagens (modelo *Solution Partner*), os valores da última linha cairiam na conta dela, o que a
+ADR 0005 proíbe.
 
 ### Infraestrutura da Inspira (planos gratuitos)
 
@@ -288,13 +299,13 @@ Webhooks por dia (média de 30 dias), só da AutoResposta no WhatsApp:
 
 | Perfil | 10 vitrines | 100 vitrines | 1.000 vitrines |
 | --- | --- | --- | --- |
-| Baixo | 70 | 700 | 7.000 |
-| Médio | 420 | 4.200 | 42.000 |
-| Alto | 2.770 | 27.700 | 277.000 (acima das 100.000 do Workers Free) |
+| Baixo | 50 | 500 | 5.000 |
+| Médio | 280 | 2.800 | 28.000 |
+| Alto | 1.730 | 17.300 | 173.000 (acima das 100.000 do Workers Free) |
 
 Linhas de entrega por mês no Supabase: médio com 1.000 vitrines dá 150 mil linhas (cerca de
-38 MB por mês, cabe com retenção de 90 dias); alto com 1.000 vitrines dá 1,1 milhão de linhas
-(cerca de 275 MB por mês, exige retenção de até 30 dias e contadores agregados).
+38 MB por mês, cabe com retenção de 90 dias); alto com 1.000 vitrines dá 900 mil linhas (cerca
+de 225 MB por mês, exige retenção de até 30 dias e contadores agregados).
 
 Cada webhook custa pouca CPU (HMAC-SHA256 pelo WebCrypto e parsing de JSON) e no máximo três
 subrequisições (Supabase e envio na Meta), dentro dos limites por invocação do Workers Free.
@@ -305,13 +316,14 @@ Proteções contra crescimento de custo:
 
 1. Teto de conexões WhatsApp ativas por *feature flag* (por exemplo 10 no piloto), além do teto
    global da AutoResposta.
-2. Não gravar nada em webhooks de status e de eco; responder `200` e descartar.
-3. Não pedir sincronização de histórico nem de contatos.
+2. Não gravar nada em webhooks de status; responder `200` e descartar.
+3. Não pedir sincronização de histórico nem de contatos, e não assinar `history`,
+   `smb_app_state_sync` nem `smb_message_echoes`.
 4. Contador diário de webhooks com alerta a 50% da cota do Workers e desligamento automático da
    AutoResposta antes de afetar a vitrine pública.
-5. Painel avisa o dono quando ele se aproxima das 1.000 respostas do mês, lendo o objeto
-   `pricing` dos webhooks de status (`billable`, `type`, `subtype: free_tier`), sem gravar o
-   conteúdo.
+5. Teto de 900 respostas por número por mês, com aviso ao dono a partir de 80%. Se um webhook de
+   status vier com `pricing.billable: true` (a franquia acabou antes, por exemplo por outra
+   ferramenta no número), a Vitrine pausa na hora até o mês seguinte.
 6. Retenção curta das entregas e do controle de frequência.
 
 ### Saudação nativa
@@ -343,17 +355,18 @@ tabela de preços (que já tem a coluna "Service") são as fontes mais recentes.
    contatos". Não precisa de API, permissão, banco nem custo. Mede o interesse pelas visitas com
    origem WhatsApp.
 2. **Gatilhos para estudar a Cloud API:** AutoResposta do Instagram estável em produção; pedidos
-   reais de donos por controles que a saudação nativa não tem; decisão de produto aceitando cartão
-   na Meta e perda das listas de transmissão; verificação da empresa Coletivo Inspira concluída
-   (já necessária para o Instagram).
+   reais de donos por controles que a saudação nativa não tem; decisão de produto aceitando a
+   perda das listas de transmissão; verificação da empresa Coletivo Inspira concluída (já
+   necessária para o Instagram).
 3. **Spike técnico só com sandbox.** Conta *sandbox* do Embedded Signup (dura 90 dias e envia
    para até 5 destinatários de teste), app em modo de desenvolvimento, sem números de clientes.
-   Responde às dúvidas abaixo, mede volume de webhooks e testa coexistência num número do próprio
-   Coletivo, só com autorização expressa do responsável pelo número.
-4. **ADR nova antes de implementar**, decidindo: *Tech Provider* sim ou não; app Meta único para
-   Instagram, WhatsApp e login (ADR 0015) ou apps separados; cartão do cliente na Meta como
-   requisito; teto de conexões. Só então App Review das duas permissões e piloto com contas do
-   Coletivo.
+   Confirma as validações pendentes da seção seguinte (envio sem cartão, onboarding sem
+   sincronização e sem os webhooks extras, detecção de outros apps), mede o volume de webhooks e
+   testa coexistência num número do próprio Coletivo, só com autorização expressa do responsável
+   pelo número.
+4. **ADR nova antes de implementar**, registrando as decisões de 26/11/2026 (sem cartão do cliente,
+   teto na franquia gratuita, app Meta único para produção, sem sincronização) e o resultado do
+   spike. Só então App Review das duas permissões e piloto com contas do Coletivo.
 5. **Não fazer:** modelo *Solution Partner* com linha de crédito da Inspira; um número da Inspira
    respondendo em nome das vitrines; automação não oficial (WhatsApp Web, emuladores); migrar
    número de cliente para a Cloud API sem coexistência; pedir sincronização de histórico; usar
@@ -367,30 +380,125 @@ tabela de preços (que já tem a coluna "Service") são as fontes mais recentes.
 | Atualizar ADR 0015 e `specs/017-login-multiplo/research.md` com a cobrança de serviço desde 1º/10/2026 | Técnica | — |
 | Confirmar se o endereço padrão redireciona para o domínio próprio ativo | Técnica | — |
 | Spike com conta *sandbox* do Embedded Signup (`v5`, coexistência) | Técnica | Verificação da empresa; Facebook Login for Business no app |
-| ADR "AutoResposta no WhatsApp" (*Tech Provider*, app Meta, cartão do cliente, teto) | Produto e técnica | Spike |
+| ADR "AutoResposta no WhatsApp" (*Tech Provider*, app Meta, sem cartão, teto na franquia) | Produto e técnica | Spike |
+| Aviso de outra ferramenta no mesmo número e de saudação nativa ligada | Produto | Spike |
+| Pergunta "Qual WhatsApp você usa?" no cartão do WhatsApp, para medir o público | Produto | — |
 | App Review de `whatsapp_business_messaging` e `whatsapp_business_management` | Pendência externa | ADR aprovada |
 
-## Dúvidas em aberto
+## Boas práticas de mercado para mensagem de boas-vindas
 
-1. **Cartão antes do primeiro envio?** O guia de onboarding de *Tech Provider* diz que o cliente
-   precisa cadastrar meio de pagamento antes de enviar. A página de preços diz que, sem meio de
-   pagamento, a Meta entrega dentro da franquia de 1.000. Só um teste confirma qual regra vale
-   para um cliente novo.
-2. **Pular a sincronização é aceito?** O guia de coexistência diz que, sem sincronizar em
-   24 horas, o cliente "precisa ser desligado e refazer o fluxo". Não está claro se isso vale
-   quando o parceiro simplesmente não pede histórico nem contatos.
-3. **Assinatura obrigatória de `history`, `smb_app_state_sync` e `smb_message_echoes`?** Se for,
-   o volume de webhooks inclui todas as mensagens do dono, como na estimativa acima.
-4. **Situação da verificação da empresa Coletivo Inspira na Meta.** A issue #48 não registra.
-5. **Um app Meta ou vários?** O app "ColetivoInspira" teria Instagram, WhatsApp de clientes e o
-   número de login da spec 017 juntos. Isso divide App Review, segredo de webhook e risco de
-   bloqueio.
-6. **Aceitação pelo dono:** quantos donos de vitrine usam o app WhatsApp Business (e não o
-   comum)? Quantos usam listas de transmissão? Aceitam cadastrar cartão na Meta?
-7. **Saudação dupla:** a Vitrine deve exigir que o dono desligue a saudação nativa ao ativar a
-   AutoResposta, ou só avisar?
-8. **Outros parceiros no número:** com um chatbot de terceiros já conectado e sem roteamento
-   configurado, a Vitrine deve recusar a conexão ou apenas não responder?
+O que ferramentas de atendimento (Manychat, BotConversa e os parceiros oficiais da Meta) e a
+própria saudação do WhatsApp Business fazem, e que a AutoResposta deve seguir no WhatsApp:
+
+1. **Só responder, nunca iniciar.** Boas-vindas são reação a uma mensagem do cliente, dentro da
+   janela de 24 horas, sem modelo pago. Nada de campanha, lembrete ou "volte a falar com a gente".
+2. **Mensagem curta e honesta.** Nome do negócio, um único link (a vitrine) e a promessa de que uma
+   pessoa responde na mesma conversa. Sem promoção agressiva, sem fingir ser humano. A política da
+   Meta exige caminho claro para atendimento humano quando há automação.
+3. **Frequência por inatividade, não por dia.** A saudação nativa repete só depois de 14 dias sem
+   conversa; ferramentas de mercado costumam mandar boas-vindas na primeira mensagem e de novo só
+   depois de dias de silêncio. Repetir a cada 24 horas incomoda clientes frequentes, aumenta o
+   risco de bloqueio (que derruba a qualidade do número) e gasta a franquia. **Recomendação para o
+   WhatsApp: padrão "a cada 7 dias"**, com as opções "uma vez por contato" e "a cada 24 horas".
+   Isso diverge do padrão de 24 horas sugerido na RN-006 para o Instagram e precisa ser
+   confirmado na spec.
+4. **Não responder quando uma pessoa já está atendendo.** Uma resposta automática no meio de uma
+   conversa em andamento parece erro. Na Cloud API, a janela de atendimento aberta pelo cliente é o
+   sinal disponível: com a frequência acima, quem conversou há pouco não recebe nada.
+5. **Uma automação por número.** Duas ferramentas respondendo geram mensagens duplicadas; o padrão
+   de mercado é avisar o dono e deixar a decisão com ele (ver decisão 8 abaixo).
+6. **Desligar fácil e na hora**, pelo painel, sem depender do app (RN-010).
+7. **Prévia antes de ativar**, exatamente como o cliente vai ver, com a URL já resolvida.
+
+Texto padrão sugerido para o WhatsApp (dentro do limite de 4.096 caracteres):
+
+```text
+Olá! Aqui é {{vitrine.nome}}. Obrigado pelo contato!
+Nossos produtos, serviços e informações estão na nossa vitrine:
+
+{{vitrine.url}}
+
+Se preferir, continue por aqui que respondemos em seguida.
+```
+
+## Decisões e recomendações (respostas do Lino em 26/11/2026)
+
+As respostas abaixo valem para uma futura AutoResposta pela Cloud API. Até lá, o MVP segue com a
+saudação nativa assistida.
+
+1. **Cartão: o dono não cadastra cartão na Meta.** Ele só se cadastra na Vitrine.
+   - O que é possível: as primeiras 1.000 respostas de serviço por número por mês são grátis, e a
+     página de preços diz que, sem meio de pagamento, a Meta entrega dentro da franquia e para de
+     entregar acima dela. A Vitrine então **limita a AutoResposta a 900 respostas por número por
+     mês** (margem para outras ferramentas e para a contagem da Meta, que pode diferir da nossa). Ao
+     chegar no teto, pausa até o mês seguinte, avisa o dono e sugere ligar a saudação nativa nesse
+     intervalo. Com a frequência de 7 dias, só negócios com muito movimento chegam perto do teto.
+   - O que não dá para evitar: o dono precisa **autorizar a Vitrine numa janela oficial da Meta**
+     (Embedded Signup), entrando com Facebook ou conta Meta. A Meta cria o portfólio empresarial
+     dele ali mesmo, se não existir. É assim em todas as ferramentas oficiais (o "Conectar
+     WhatsApp" do Manychat é a mesma janela). Não existe caminho oficial para operar o número do
+     dono sem essa autorização. O jeito de mercado de "só cadastrar na plataforma" é o parceiro
+     pagar a Meta e cobrar o cliente (*Solution Partner* com linha de crédito), o que fere a ADR
+     0005.
+   - A validar no spike: o guia de onboarding de *Tech Provider* diz que o cliente precisa de meio
+     de pagamento para começar a enviar, o que contradiz a página de preços. Se o teste mostrar que
+     sem cartão nada é entregue, a decisão volta para o Lino: aceitar cartão do dono na Meta ou
+     manter o WhatsApp só com a saudação nativa.
+2. **Sincronização: não sincronizar histórico nem contatos.** Pedir a sincronização gera uma
+   rajada de webhooks com até 6 meses de conversas, que a Vitrine teria de receber e descartar
+   (RN-013), gastando a cota do Workers sem benefício. Como a sincronização é uma ação do parceiro
+   (`POST /<PHONE_NUMBER_ID>/smb_app_data`), basta não chamá-la. A confirmar no spike que o número
+   continua conectado depois das 24 horas sem sincronizar.
+3. **Webhooks: assinar só o necessário.** Recomendação: `messages` (mensagens recebidas e status)
+   e `account_update` (desconexão, `PARTNER_REMOVED`, problemas da conta). **Não assinar**
+   `history`, `smb_app_state_sync` nem `smb_message_echoes`: eles só servem para espelhar
+   conversas num painel de atendimento, que está fora do escopo. Sem `smb_message_echoes`, o volume
+   da estimativa cai quase pela metade nos perfis médio e alto. O guia de coexistência manda
+   assinar os quatro, então o spike precisa confirmar que o onboarding funciona sem eles. A
+   assinatura de campos é por app; se a Meta exigir, o Worker responde `200` e descarta, sem tocar
+   no banco.
+4. **Verificação da empresa: uma empresa só, o Coletivo Inspira.** É o que a Meta pede: o *Tech
+   Provider* verifica a própria empresa uma vez, e os donos não passam por verificação para usar a
+   AutoResposta (a verificação deles só aumenta limites de mensagens iniciadas pela empresa, que a
+   Vitrine não usa). A mesma verificação serve ao Instagram (issue #48) e ao número de login (ADR
+   0015). Fica como pendência externa até o Lino concluir.
+5. **App Meta: um app de produção para tudo, mais um app de teste.** O app "ColetivoInspira" junta
+   Instagram, WhatsApp dos clientes e o número de login: uma verificação, uma política de
+   privacidade, um segredo de webhook e um App Review. O risco é que uma restrição da Meta no app
+   pare todos os canais de uma vez; as vitrines públicas não dependem dele, e cada canal tem
+   desligamento próprio. Prática comum que vale adotar desde já: **um app separado para
+   desenvolvimento e testes**, sem dados reais, para não arriscar o app de produção com
+   experimentos (o que também cumpre a RN-016). No mesmo app, o webhook do WhatsApp precisa separar
+   o número de login da Vitrine dos números dos clientes pelo `phone_number_id`.
+6. **Quantos donos usam o app WhatsApp Business: não se sabe.** Proposta para medir sem custo: no
+   cartão do WhatsApp da saudação assistida, perguntar "Qual WhatsApp você usa no negócio?"
+   (WhatsApp Business, WhatsApp comum, não sei) e "Você usa listas de transmissão?". Guardar só a
+   resposta agregada. Quem usa o WhatsApp comum não tem coexistência; o painel deve explicar que é
+   preciso migrar para o WhatsApp Business no próprio celular (sem perder conversas) antes de
+   conectar. Depois de conectado, o campo `is_on_biz_app` confirma.
+7. **Saudação nativa: avisar, não exigir.** A saudação do WhatsApp Business é uma mensagem só: ao
+   personalizar o texto, o personalizado substitui o padrão; não saem duas saudações do app. Mas,
+   se a saudação do app estiver ligada **e** a AutoResposta da Vitrine também, o cliente recebe
+   duas mensagens (a do app e a da Vitrine). A Cloud API não lê as configurações do app, então a
+   Vitrine não consegue detectar isso. Recomendação: ao ativar a AutoResposta, mostrar um passo
+   "Desligue a saudação no app WhatsApp Business (Ferramentas > Mensagem de saudação)" com
+   confirmação "Já desliguei" ou "Quero manter as duas". Ao desativar ou ao bater o teto mensal,
+   sugerir religar a saudação do app.
+8. **Outra ferramenta no mesmo número: alertar e deixar ativo, se o dono quiser.** Na conexão e
+   numa verificação periódica (o Cron existente), listar os apps assinados na conta de mensagens
+   (`GET /<WABA_ID>/subscribed_apps`, a validar no spike) e os papéis de roteamento do número. Se
+   houver outro app, mostrar: "Outra ferramenta também recebe as mensagens deste WhatsApp. Seus
+   clientes podem receber duas respostas automáticas." com "Manter ativa" e "Desativar". A
+   AutoResposta continua ligada se o dono escolher. Uma exceção não é escolha do dono: se o negócio
+   configurou o roteamento de conversas e a Vitrine estiver só como *standby*, a política da Meta
+   proíbe responder, e a Vitrine não envia.
+
+### Validações que ficam para o spike
+
+- Envio sem meio de pagamento dentro da franquia (decisão 1).
+- Número continua conectado sem sincronização (decisão 2) e sem os webhooks extras (decisão 3).
+- Detecção de outros apps pela lista de `subscribed_apps` (decisão 8).
+- Volume real de webhooks por resposta, para refazer a estimativa de custos.
 
 ## Fontes oficiais (acessadas em 26/11/2026)
 
