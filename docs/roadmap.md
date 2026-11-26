@@ -9,7 +9,7 @@
 ## Entrevista de decisões — uma por vez
 
 1. Resolvida em 2026-11-07: Cloudflare escolhida para hospedagem; GitHub para código e automações. Workers Free com Static Assets adotado para o piloto; configuração e roteamento ainda serão implementados.
-2. Resolvida em 2026-11-07: uma pessoa pode administrar várias vitrines; cada vitrine pode ter sua própria equipe. Acesso a uma não concede acesso às demais. Fluxo de convites e permissões detalhadas ainda será definido.
+2. Resolvida em 2026-11-07: uma pessoa pode administrar várias vitrines; cada vitrine pode ter sua própria equipe. Acesso a uma não concede acesso às demais. Fluxo de convites e papéis visíveis propostos em 2026-11-26 na spec `018-convite-demonstracao` (ADR 0016, proposta; não implementado).
 3. Resolvida em 2026-11-07: Supabase Auth + Postgres aprovados para o MVP. Login inicial aprovado: Google via Supabase Auth. Recuperação de acesso ao negócio e configuração continuam pendentes.
 4. Resolvida por autorização geral em 2026-11-07: templates centralizados e artefatos separados, sem repositório por cliente (ADR 0005).
 5. Definida por autorização geral: piloto de até 10 vitrines, 100 itens cada e sem uploads; usar vitrine.inspira.dev.br para divulgação, caminhos /loja1 para negócios e painel.inspira.dev.br para administração (ADR 0006). Confirmar controle da zona antes de publicar; nenhum domínio será comprado. Limites serão aplicados ao implementar cadastro/publicação.
@@ -88,6 +88,22 @@ criadas com `scripts/criar-issues-estudo-mercado.sh --dir docs/backlog/login-mul
 3. Proteção contra abuso (Turnstile) antes de ligar os métodos em produção.
 4. Passos humanos: SMTP gratuito (`BLK-SMTP-01`), número e app WhatsApp (`BLK-WA-01`), Send SMS
    Hook do Supabase (`BLK-HOOK-01`) e Turnstile (`BLK-TURNSTILE-01`). Nada foi configurado.
+
+## Convite de demonstração e equipe da vitrine (`018`, ADR 0016 proposta)
+
+Pedido do Lino em 2026-11-26: montar uma vitrine para um negócio (por exemplo, a partir do
+catálogo que ele mostra no WhatsApp), mandar um convite ao dono com 3 meses do Profissional e
+deixar o dono chamar a equipe. Decisões do Lino: só especificação por enquanto; prévia `noindex`
+aberta só pelo link do convite; no fim da cortesia, volta ao Gratuito sem apagar nada.
+Especificação em `specs/018-convite-demonstracao/`; épico e 7 issues em
+`docs/backlog/convite-demonstracao/`, a criar com
+`scripts/criar-issues-estudo-mercado.sh --dir docs/backlog/convite-demonstracao`.
+
+1. Banco: convites com hash, cortesia separada da assinatura e papel `growth_operator`.
+2. Área "Demonstrações" do operador; depois convite com prévia sem login; depois aceite e recusa.
+3. Fim da cortesia e escolha dos itens ao publicar; aba "Equipe" com convites por link.
+4. Passos humanos: ratificar o ADR 0016 e reconferir a base legal (LGPD) com o jurídico. Nada foi
+   implementado.
 
 As correções de UX da auditoria (`docs/auditoria-ux/`, pacotes `PB-01` a `PB-27`)
 continuam valendo e vêm antes das telas novas que dependem delas.
