@@ -68,8 +68,10 @@ description: "Tarefas da AutoResposta (resposta automática do Instagram com o l
 
 - [x] T027 [US5] Rotas `/api/admin/auto-reply*` e funções `admin_*`; testes US5 e CT-030.
 - [x] T028 [US5] Manutenção no Cron (`runAutoReplyMaintenance`) e teste.
-- [ ] T029 [US5] Tela de administração no painel.
-- [ ] T030 [US5] Alertas operacionais.
+- [x] T029 [US5] Tela de administração no painel: aba "Resposta automática" (`web/portal/auto-reply-admin.mjs` e `.css`), só para `platform_admin`, com interruptores, vitrines liberadas, conexões, métricas e chaves; `test/auto-reply-admin.test.mjs`.
+- [x] T030 [US5] Alertas operacionais (`src/auto-reply/alerts.mjs`): na leitura da administração e em linhas `auto_reply_alert` do Cron; testes de alertas.
+- [x] T040 Rotação da chave com recifragem: `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS`, `AUTO_REPLY_KEY_VERSION` e `AUTO_REPLY_HASH_KEY`; `POST /api/admin/auto-reply/rotate-keys` e lote no Cron com troca condicional; migração `20261126002000_auto_reply_rotation_deletion.sql`; testes de banco e de rota.
+- [x] T041 Página de acompanhamento do pedido de exclusão (`/privacidade/exclusao/?codigo=`), com o código guardado só como SHA-256 (`private.data_deletion_requests`); testes.
 
 ## Phase 9: US6 - Preparar o WhatsApp (P3) [10-discovery-whatsapp]
 

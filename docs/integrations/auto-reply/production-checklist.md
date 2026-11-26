@@ -33,8 +33,8 @@ Nenhum item abaixo está concluído em ambiente real. Marcar só com evidência 
 - [ ] Callbacks de exclusão e desautorização cadastrados.
 - [ ] Revisão do app aprovada para `instagram_basic` e `instagram_manage_messages` (Acesso avançado).
 - [ ] Verificação da empresa concluída; app em modo Live.
-- [ ] Tela de administração (issue 07) ou procedimento por `curl` treinado.
-- [ ] Alertas: `auto_reply_webhook_rejected` em volume, `auth_failures` > 0, execuções `uncertain`.
+- [ ] Equipe treinada na aba "Resposta automática" da administração (implementada).
+- [ ] Regras de alerta por log no Cloudflare para `auto_reply_alert` (Cron) e `auto_reply_webhook_rejected` em volume; os alertas da aba já são calculados.
 - [ ] Plano de contingência testado (`operational-runbook.md`).
 
 ## Critérios de aceite do MVP (estado em 2026-11-26)
@@ -53,7 +53,7 @@ Nenhum item abaixo está concluído em ambiente real. Marcar só com evidência 
 | Token inválido interrompe; reconexão; desconexão | Testado |
 | Isolamento validado | Testado em PGlite e rotas; falta Data API |
 | Conversas não armazenadas | Testado (banco e logs) |
-| Falhas monitoradas | Logs e métricas agregadas; sem alertas configurados |
+| Falhas monitoradas | Logs, métricas e alertas na administração e no Cron; sem regra de notificação externa configurada |
 | Docs atualizadas | Este PR |
 | Issues com evidências | Backlog em markdown (sem permissão de escrita no GitHub) |
 | Piloto executado | **Não** |

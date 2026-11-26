@@ -10,9 +10,12 @@ import {
   validateAutoReplyTemplate
 } from '../../web/assets/auto-reply-message.mjs';
 import {
-  AUTO_REPLY_KEY_ENV,
-  decryptChannelToken,
-  encryptChannelToken,
+  currentKeyVersion,
+  hasPreviousKey,
+  hasStableHashKey,
+  openChannelToken,
+  recipientHashKey,
+  sealChannelToken,
   fromBase64Url,
   hasAutoReplyKey,
   randomToken,
@@ -29,6 +32,7 @@ import {
   verifyMetaSignature,
   verifyWebhookChallenge
 } from './instagram-webhook.mjs';
+import { buildAutoReplyAlerts, maintenanceAlerts } from './alerts.mjs';
 import { logAutoReply, processClaimedEvent } from './processor.mjs';
 import { resolveAutoReplyPublicUrl } from './public-url.mjs';
 import { blockingReason } from './rules.mjs';
@@ -44,7 +48,10 @@ export const OAUTH_STATE_TTL_SECONDS = 600;
 export const MAX_EVENTS_PER_REQUEST = 5;
 export const MAX_CLAIM_ATTEMPTS_PER_REQUEST = 12;
 const SITE_PATH = /^\/api\/sites\/([^/]+)\/auto-reply(?:\/instagram\/(connect|connection))?\/?$/;
-const ADMIN_PATH = /^\/api\/admin\/auto-reply(?:\/(controls|sites\/([^/]+)|connections\/([^/]+)\/suspend))?\/?$/;
+const ADMIN_PATH = /^\/api\/admin\/auto-reply(?:\/(controls|rotate-keys|sites\/([^/]+)|connections\/([^/]+)\/suspend))?\/?$/;
+export const DELETION_STATUS_PATHS = Object.freeze(['/privacidade/exclusao', '/privacidade/exclusao/']);
+export const ROTATION_BATCH = 10;
+const CONFIRMATION_CODE = /^[A-Za-z0-9_-]{16}$/;
 const NO_STORE = Object.freeze({ 'cache-control': 'no-store' });
 const PROVIDER = 'instagram';
 
@@ -59,6 +66,7 @@ export function matchAutoReplyRoute(pathname) {
   if (admin) {
     if (!admin[1]) return { kind: 'admin', action: 'overview' };
     if (admin[1] === 'controls') return { kind: 'admin', action: 'controls' };
+    if (admin[1] === 'rotate-keys') return { kind: 'admin', action: 'rotate' };
     if (admin[2]) return { kind: 'admin', action: 'site', siteId: decodeURIComponent(admin[2]) };
     return { kind: 'admin', action: 'suspend', connectionId: decodeURIComponent(admin[3]) };
   }
@@ -232,9 +240,9 @@ async function handleSite({ route, request, url, method, store, env, deps }) {
   let webhookRemoved = null;
   if (credential && hasMetaConfig(env) && hasAutoReplyKey(env)) {
     try {
-      const token = await decryptChannelToken(credential.tokenCiphertext, {
+      const token = await openChannelToken(credential.tokenCiphertext, {
         siteId, provider: PROVIDER, accountId: credential.accountId
-      }, env[AUTO_REPLY_KEY_ENV]);
+      }, env);
       webhookRemoved = await deps.adapterFor(env).unsubscribeWebhooks(credential.accountId, token);
     } catch {
       webhookRemoved = false;
@@ -300,6 +308,7 @@ async function handleOAuthCallback({ url, method, store, env, deps }) {
   } catch {
     webhookSubscribed = false;
   }
+  const sealed = await sealChannelToken(accessToken, { siteId: row.siteId, provider: PROVIDER, accountId: picked.account.id }, env);
   try {
     await store.saveChannelConnection({
       siteId: row.siteId,
@@ -310,9 +319,8 @@ async function handleOAuthCallback({ url, method, store, env, deps }) {
       username: picked.account.username,
       displayName: picked.account.name,
       scopes: inspection.scopes,
-      tokenCiphertext: await encryptChannelToken(accessToken, {
-        siteId: row.siteId, provider: PROVIDER, accountId: picked.account.id
-      }, env[AUTO_REPLY_KEY_ENV]),
+      tokenCiphertext: sealed.ciphertext,
+      keyVersion: sealed.keyVersion,
       expiresAt: inspection.expiresAt,
       webhookSubscribed
     }, { env });
@@ -375,7 +383,7 @@ async function handleWebhook({ request, url, method, store, env, ctx, deps }) {
         unknownAccounts += 1;
         continue;
       }
-      const hash = await recipientHash(target.connectionId, event.senderId, env[AUTO_REPLY_KEY_ENV]);
+      const hash = await recipientHash(target.connectionId, event.senderId, recipientHashKey(env));
       const deliveryId = await store.claimAutoReplyEvent({
         provider: PROVIDER, eventId: event.eventId, siteId: target.siteId, connectionId: target.connectionId,
         recipientHash: hash, eventAt: event.eventAt, correlationId
@@ -441,14 +449,21 @@ async function handleMetaCallback({ route, request, method, store, env, deps }) 
   logAutoReply('auto_reply_meta_callback', { kind: route.kind, matched });
   if (route.kind === 'deauthorize') return deps.respond(200, { ok: true }, NO_STORE);
   const confirmationCode = randomToken(12);
+  if (typeof store.recordDataDeletion === 'function' && (usesMemoryStore(store) || env.SUPABASE_SERVICE_ROLE_KEY)) {
+    try {
+      await store.recordDataDeletion(await sha256Hex(confirmationCode), PROVIDER, matched, { env });
+    } catch {
+      logAutoReply('auto_reply_deletion_record_failed', { matched });
+    }
+  }
   const publicOrigin = String(env.PUBLIC_SITE_ORIGIN ?? 'https://vitrine.inspira.dev.br').replace(/\/+$/, '');
   return deps.respond(200, {
-    url: `${publicOrigin}/privacidade/?codigo=${confirmationCode}#exclusao-dados`,
+    url: `${publicOrigin}/privacidade/exclusao/?codigo=${confirmationCode}`,
     confirmation_code: confirmationCode
   }, NO_STORE);
 }
 
-async function handleAdmin({ route, request, url, method, store, deps }) {
+async function handleAdmin({ route, request, url, method, store, env, deps }) {
   const user = await deps.resolveUser();
   if (!user) throw new PortalValidationError(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
   const options = { token: user.token };
@@ -457,13 +472,26 @@ async function handleAdmin({ route, request, url, method, store, deps }) {
   }
   if (route.action === 'overview') {
     if (method !== 'GET') throw new PortalValidationError(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
-    return deps.respond(200, { autoReply: await store.readAutoReplyAdmin(options) }, NO_STORE);
+    const overview = await store.readAutoReplyAdmin(options);
+    return deps.respond(200, { autoReply: presentAdminOverview(overview, env) }, NO_STORE);
   }
-  const expected = route.action === 'suspend' ? 'POST' : 'PUT';
+  const expected = route.action === 'suspend' || route.action === 'rotate' ? 'POST' : 'PUT';
   if (method !== expected) throw new PortalValidationError(405, 'METHOD_NOT_ALLOWED', `Use ${expected}.`);
   const guard = deps.guardMutation(request, url, { requireOrigin: true, requireJson: true });
   if (guard) return guard;
   const { parsed } = await deps.readJson(request);
+  if (route.action === 'rotate') {
+    if (!hasStableHashKey(env) && hasPreviousKey(env)) {
+      throw new PortalValidationError(409, 'AUTO_REPLY_HASH_KEY_REQUIRED',
+        'Configure AUTO_REPLY_HASH_KEY antes de recifrar, para a frequência por consumidor não recomeçar.');
+    }
+    if (!usesMemoryStore(store) && !env.SUPABASE_SERVICE_ROLE_KEY) throw autoReplyUnavailableError();
+    const rotation = await rotateAutoReplyCredentials({ store, env });
+    logAutoReply('auto_reply_admin_action', { action: 'rotate', rotated: rotation.rotated, failed: rotation.failed });
+    return deps.respond(200, {
+      rotation, autoReply: presentAdminOverview(await store.readAutoReplyAdmin(options), env)
+    }, NO_STORE);
+  }
   let result;
   if (route.action === 'controls') {
     result = await store.setAutoReplyControls({
@@ -479,7 +507,153 @@ async function handleAdmin({ route, request, url, method, store, deps }) {
     result = await store.suspendChannelConnection(route.connectionId, options);
   }
   logAutoReply('auto_reply_admin_action', { action: route.action });
-  return deps.respond(200, { autoReply: result }, NO_STORE);
+  return deps.respond(200, { autoReply: presentAdminOverview(result, env) }, NO_STORE);
+}
+
+/** Leitura da administração com alertas e o estado da chave (sem valores). */
+export function presentAdminOverview(overview, env = {}, now = Date.now()) {
+  return {
+    ...overview,
+    keys: {
+      currentVersion: currentKeyVersion(env),
+      previousKeyConfigured: hasPreviousKey(env),
+      stableHashKey: hasStableHashKey(env)
+    },
+    alerts: buildAutoReplyAlerts(overview, { env, now })
+  };
+}
+
+/**
+ * Recifra um lote de credenciais com versão anterior à atual: abre com a chave atual ou a
+ * anterior, cifra com a atual e troca só se a cifra não mudou desde a leitura.
+ */
+export async function rotateAutoReplyCredentials({ store, env = {}, batch = ROTATION_BATCH } = {}) {
+  const version = currentKeyVersion(env);
+  const result = { currentVersion: version, rotated: 0, failed: 0, conflicts: 0, remaining: 0 };
+  if (version <= 1 || typeof store?.listCredentialsToRotate !== 'function') return result;
+  const items = await store.listCredentialsToRotate(version, batch, { env });
+  for (const item of items) {
+    const context = { siteId: item.siteId, provider: item.provider ?? PROVIDER, accountId: item.accountId };
+    try {
+      const token = await openChannelToken(item.tokenCiphertext, context, env);
+      const sealed = await sealChannelToken(token, context, env);
+      const swapped = await store.rotateChannelCredential(item.connectionId, item.tokenCiphertext, sealed.ciphertext, sealed.keyVersion, { env });
+      if (swapped) result.rotated += 1;
+      else result.conflicts += 1;
+    } catch {
+      result.failed += 1;
+    }
+  }
+  result.remaining = items.length === batch ? (await store.listCredentialsToRotate(version, 1, { env })).length : 0;
+  return result;
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
+const pageDate = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
+});
+
+function formatPageDate(iso) {
+  const date = new Date(iso ?? '');
+  return Number.isNaN(date.getTime()) ? '' : pageDate.format(date).replace(', ', ' às ');
+}
+
+/** Texto da página de acompanhamento para cada situação. */
+export function describeDeletionStatus(record, { lookupFailed = false, hasCode = false } = {}) {
+  if (lookupFailed) {
+    return { title: 'Não foi possível consultar agora', lines: ['Tente de novo em alguns minutos.'] };
+  }
+  if (!hasCode) {
+    return {
+      title: 'Acompanhar um pedido de exclusão',
+      lines: [
+        'Quando você remove a Vitrine Inspira nas configurações da Meta, a Meta nos envia um pedido de exclusão e mostra um código de confirmação com um link para esta página.',
+        'Abra o link que a Meta mostrou para ver a situação do seu pedido.'
+      ]
+    };
+  }
+  if (!record) {
+    return {
+      title: 'Código não encontrado',
+      lines: ['Confira se o endereço está completo, como a Meta mostrou. Pedidos com mais de um ano não ficam guardados.']
+    };
+  }
+  const received = formatPageDate(record.receivedAt);
+  if (record.status === 'completed') {
+    return {
+      title: 'Exclusão concluída',
+      lines: [
+        `Pedido recebido em ${received}.`,
+        'A autorização do Instagram, a configuração da resposta automática e os registros de frequência ligados à conta foram apagados.',
+        'A Vitrine Inspira não guarda o texto das conversas nem dados de quem mandou mensagem.'
+      ]
+    };
+  }
+  return {
+    title: 'Pedido recebido',
+    lines: [
+      `Pedido recebido em ${received}.`,
+      'Não encontramos uma conexão ativa ligada a essa conta; a equipe Vitrine Inspira vai conferir e apagar o que houver.',
+      'A Vitrine Inspira não guarda o texto das conversas nem dados de quem mandou mensagem.'
+    ]
+  };
+}
+
+export function renderDeletionStatusHtml(view) {
+  const lines = view.lines.map((line) => `      <p>${escapeHtml(line)}</p>`).join('\n');
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>${escapeHtml(view.title)} — Vitrine Inspira</title>
+  <link rel="icon" href="/assets/brand/vitrine-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-static-institutional-page>
+  <main id="conteudo" class="wrap section-space">
+    <article class="institutional-copy">
+      <h1>${escapeHtml(view.title)}</h1>
+${lines}
+      <p><a href="/privacidade/#exclusao-dados">Ler a política de privacidade</a></p>
+    </article>
+  </main>
+</body>
+</html>
+`;
+}
+
+/** `GET /privacidade/exclusao/?codigo=` — situação do pedido de exclusão, sem expor o código. */
+export async function handleDeletionStatusPage({ url, method, store, env = {}, headers = {} }) {
+  const baseHeaders = {
+    ...headers,
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-robots-tag': 'noindex, nofollow',
+    'referrer-policy': 'no-referrer'
+  };
+  if (method !== 'GET' && method !== 'HEAD') return new Response(null, { status: 405, headers: baseHeaders });
+  const code = url.searchParams.get('codigo') ?? '';
+  const hasCode = code.length > 0;
+  let record = null;
+  let lookupFailed = false;
+  if (hasCode && CONFIRMATION_CODE.test(code)) {
+    if (typeof store?.readDataDeletion !== 'function' || (!usesMemoryStore(store) && !env.SUPABASE_SERVICE_ROLE_KEY)) {
+      lookupFailed = true;
+    } else {
+      try {
+        record = await store.readDataDeletion(await sha256Hex(code), { env });
+      } catch {
+        lookupFailed = true;
+      }
+    }
+  }
+  const html = renderDeletionStatusHtml(describeDeletionStatus(record, { lookupFailed, hasCode }));
+  return new Response(method === 'HEAD' ? null : html, { status: 200, headers: baseHeaders });
 }
 
 /**
@@ -501,7 +675,7 @@ export async function handleAutoReplyRoute({ route, request, url, method, store,
   if (route.kind === 'deauthorize' || route.kind === 'data_deletion') {
     return handleMetaCallback({ route, request, method, store, env, deps: full });
   }
-  return handleAdmin({ route, request, url, method, store, deps: full });
+  return handleAdmin({ route, request, url, method, store, env, deps: full });
 }
 
 /** Cron: execuções presas → inconclusivas, retenção e verificação de tokens em lote pequeno. */
@@ -513,9 +687,9 @@ export async function runAutoReplyMaintenance({ store, env = {}, fetch: fetchImp
   let revoked = 0;
   for (const item of Array.isArray(result?.verify) ? result.verify : []) {
     try {
-      const token = await decryptChannelToken(item.tokenCiphertext, {
+      const token = await openChannelToken(item.tokenCiphertext, {
         siteId: item.siteId, provider: item.provider ?? PROVIDER, accountId: item.accountId
-      }, env[AUTO_REPLY_KEY_ENV]);
+      }, env);
       const inspection = await provider.inspectToken(token);
       if (!inspection.valid) {
         await store.markChannelConnection(item.connectionId, 'reconnect_required', 'token_invalid', { env });
@@ -531,6 +705,17 @@ export async function runAutoReplyMaintenance({ store, env = {}, fetch: fetchImp
       // A próxima execução tenta de novo.
     }
   }
-  logAutoReply('auto_reply_maintenance', { stale: result?.stale ?? 0, purged: result?.purged ?? 0, verified, revoked });
-  return { ...result, verify: undefined, verified, revoked };
+  let rotation = null;
+  if (currentKeyVersion(env) > 1 && (hasStableHashKey(env) || !hasPreviousKey(env))) {
+    try {
+      rotation = await rotateAutoReplyCredentials({ store, env, batch: 5 });
+    } catch {
+      rotation = { failed: 1 };
+    }
+  }
+  const summary = { stale: result?.stale ?? 0, purged: result?.purged ?? 0, verified, revoked, rotation };
+  logAutoReply('auto_reply_maintenance', { stale: summary.stale, purged: summary.purged, verified, revoked,
+    rotated: rotation?.rotated ?? 0 });
+  for (const item of maintenanceAlerts(summary)) logAutoReply('auto_reply_alert', item);
+  return { ...result, verify: undefined, verified, revoked, rotation };
 }

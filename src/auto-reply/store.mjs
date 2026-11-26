@@ -39,6 +39,7 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
     windows: new Map(),
     oauthStates: new Map(),
     customDomains: new Map(),
+    deletionRequests: new Map(),
     audit: []
   };
   let sequence = 0;
@@ -159,7 +160,7 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
     },
 
     async saveChannelConnection({ siteId, actor, provider, accountId, businessId, username, displayName, scopes,
-      tokenCiphertext, expiresAt, webhookSubscribed }) {
+      tokenCiphertext, expiresAt, webhookSubscribed, keyVersion = 1 }) {
       const other = [...state.connections.values()].find((c) => c.provider === provider && c.accountId === accountId && c.siteId !== siteId);
       if (other) throw autoReplyDomainError('CHANNEL_ACCOUNT_IN_USE');
       const existing = connectionOf(siteId, provider);
@@ -172,7 +173,7 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
         connectedBy: actor, lastVerifiedAt: at, expiresAt: iso(expiresAt)
       });
       state.connections.set(conn.id, conn);
-      state.credentials.set(conn.id, { tokenCiphertext, expiresAt: iso(expiresAt) });
+      state.credentials.set(conn.id, { tokenCiphertext, expiresAt: iso(expiresAt), keyVersion });
       state.audit.push({ siteId, actor, action: existing ? 'channel_reconnect' : 'channel_connect' });
       return status(siteId);
     },
@@ -262,6 +263,39 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
         .map((c) => ({ siteId: c.siteId, connectionId: c.id }));
     },
 
+    async listCredentialsToRotate(currentVersion, batch = 10) {
+      return [...state.credentials.entries()]
+        .filter(([, cred]) => (cred.keyVersion ?? 1) < currentVersion)
+        .slice(0, batch)
+        .map(([connectionId, cred]) => {
+          const conn = state.connections.get(connectionId);
+          return {
+            connectionId, siteId: conn.siteId, provider: conn.provider, accountId: conn.accountId,
+            tokenCiphertext: cred.tokenCiphertext, keyVersion: cred.keyVersion ?? 1
+          };
+        });
+    },
+
+    async rotateChannelCredential(connectionId, oldCiphertext, newCiphertext, newVersion) {
+      const cred = state.credentials.get(connectionId);
+      if (!cred || cred.tokenCiphertext !== oldCiphertext || (cred.keyVersion ?? 1) >= newVersion) return false;
+      Object.assign(cred, { tokenCiphertext: newCiphertext, keyVersion: newVersion });
+      return true;
+    },
+
+    async recordDataDeletion(codeHash, provider, removed) {
+      if (state.deletionRequests.has(codeHash)) return;
+      const at = new Date(now()).toISOString();
+      state.deletionRequests.set(codeHash, {
+        provider, status: removed > 0 ? 'completed' : 'pending_review', receivedAt: at, completedAt: removed > 0 ? at : null
+      });
+    },
+
+    async readDataDeletion(codeHash) {
+      const row = state.deletionRequests.get(codeHash);
+      return row ? { status: row.status, receivedAt: row.receivedAt, completedAt: row.completedAt } : null;
+    },
+
     async autoReplyMaintenance() {
       let stale = 0;
       for (const delivery of state.deliveries.values()) {
@@ -283,7 +317,8 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
           connectionId: c.id, siteId: c.siteId, slug: sites.get(c.siteId)?.slug ?? null, provider: c.provider,
           username: c.username, status: c.status, statusReason: c.statusReason,
           enabled: state.settings.get(c.siteId)?.enabled === true, connectedAt: c.connectedAt,
-          lastEventAt: c.lastEventAt, expiresAt: c.expiresAt
+          lastEventAt: c.lastEventAt, expiresAt: c.expiresAt, webhookSubscribed: c.webhookSubscribed,
+          keyVersion: state.credentials.get(c.id)?.keyVersion ?? null
         })),
         last7Days: {
           received: deliveries.length,
@@ -293,7 +328,12 @@ export function createMemoryAutoReply({ sites, publicationsBySlug = new Map(), m
           failed: deliveries.filter((d) => d.status === 'failed').length,
           authFailures: deliveries.filter((d) => ['token_invalid', 'permission_missing'].includes(d.reason)).length,
           uncertain: deliveries.filter((d) => d.status === 'uncertain').length,
-          cancelled: deliveries.filter((d) => d.status === 'cancelled').length
+          cancelled: deliveries.filter((d) => d.status === 'cancelled').length,
+          processing: deliveries.filter((d) => d.status === 'processing').length
+        },
+        deletionRequests: {
+          pendingReview: [...state.deletionRequests.values()].filter((r) => r.status === 'pending_review').length,
+          completed: [...state.deletionRequests.values()].filter((r) => r.status === 'completed').length
         }
       });
     },
@@ -374,8 +414,25 @@ export function createRestAutoReply({ baseUrl, fetchImpl, authHeaders }) {
       target_account_id: record.accountId, target_business_id: record.businessId ?? null,
       target_username: record.username ?? null, target_display_name: record.displayName ?? null,
       target_scopes: record.scopes ?? [], target_token_ciphertext: record.tokenCiphertext,
-      target_expires_at: record.expiresAt ?? null, target_webhook_subscribed: Boolean(record.webhookSubscribed)
+      target_expires_at: record.expiresAt ?? null, target_webhook_subscribed: Boolean(record.webhookSubscribed),
+      target_key_version: record.keyVersion ?? 1
     }, svc(env)),
+    async listCredentialsToRotate(currentVersion, batch = 10, { env } = {}) {
+      const rows = await call('service_auto_reply_credentials_to_rotate', { current_version: currentVersion, batch }, svc(env));
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
+        connectionId: row.connection_id, siteId: row.site_id, provider: row.provider, accountId: row.provider_account_id,
+        tokenCiphertext: row.token_ciphertext, keyVersion: row.key_version
+      }));
+    },
+    async rotateChannelCredential(connectionId, oldCiphertext, newCiphertext, newVersion, { env } = {}) {
+      return (await call('service_rotate_channel_credential', {
+        target_connection: connectionId, old_ciphertext: oldCiphertext, new_ciphertext: newCiphertext, new_version: newVersion
+      }, svc(env))) === true;
+    },
+    recordDataDeletion: (codeHash, provider, removed, { env } = {}) => call('service_record_data_deletion', {
+      target_code_hash: codeHash, target_provider: provider, target_removed: removed
+    }, svc(env)),
+    readDataDeletion: (codeHash, { env } = {}) => call('service_read_data_deletion', { target_code_hash: codeHash }, svc(env)),
     async getChannelCredential(siteId, provider, { env } = {}) {
       const rows = await call('service_channel_credential', { target_site: siteId, target_provider: provider }, svc(env));
       const row = Array.isArray(rows) ? rows[0] : null;

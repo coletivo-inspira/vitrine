@@ -30,7 +30,10 @@ npm run build
 | `META_IG_AUTOREPLY_CONFIG_ID` | Configuração do login unificado da AutoResposta |
 | `META_GRAPH_VERSION` | Opcional; padrão `v27.0` |
 | `META_WEBHOOK_VERIFY_TOKEN` | Token de verificação do webhook (texto aleatório escolhido pela equipe) |
-| `AUTO_REPLY_ENCRYPTION_KEY` | Chave de cifragem do token e do hash do consumidor (32+ caracteres) |
+| `AUTO_REPLY_ENCRYPTION_KEY` | Chave atual de cifragem do token (32+ caracteres); também chave do hash do consumidor se `AUTO_REPLY_HASH_KEY` não existir |
+| `AUTO_REPLY_KEY_VERSION` | Versão da chave atual (padrão 1) |
+| `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS` | Chave anterior, só durante a rotação |
+| `AUTO_REPLY_HASH_KEY` | Chave fixa do hash do consumidor; obrigatória para recifrar |
 | `SUPABASE_SERVICE_ROLE_KEY` | Já existente; funções `service_*` |
 | `PORTAL_ORIGIN`, `PUBLIC_SITE_ORIGIN` | Já existentes em `wrangler.jsonc` |
 

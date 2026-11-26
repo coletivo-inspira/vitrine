@@ -19,7 +19,7 @@ Estado: controles implementados no código e testados com a Meta simulada; base 
 | Logs | Só `event`, `correlationId`, motivos, contagens e códigos de erro | Teste "logs" |
 | Auditoria | Conectar, reconectar, configurar, desconectar, controles, liberação e suspensão em `audit_logs` (sem token nem texto) | Testes de banco |
 | Revogação e exclusão | Desconexão, desautorização e exclusão apagam credencial e janelas | CT-023 e teste dos callbacks |
-| Rotação de chave | `key_version` na credencial; rotação = nova chave + reconexão (sem recifragem automática no MVP) | Pendência registrada |
+| Rotação de chave | Chave atual + `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS`; recifragem em lote (rota da administração e Cron) com troca condicional e `key_version`; hash do consumidor com `AUTO_REPLY_HASH_KEY` fixa | Testes de rotação (banco e rota) |
 
 ## Dados pessoais
 
@@ -44,6 +44,6 @@ Base legal proposta (a confirmar com o jurídico): execução do contrato com o 
 ## Pendências
 
 - [ ] Revisão jurídica da base legal, dos textos acima e do aviso de automação (Meta recomenda informar; lei exige em alguns mercados).
-- [ ] Página de acompanhamento do pedido de exclusão por código (hoje a URL leva à seção de exclusão da política).
-- [ ] Procedimento de rotação de `AUTO_REPLY_ENCRYPTION_KEY` com recifragem.
+- [x] Página de acompanhamento do pedido de exclusão por código: `/privacidade/exclusao/?codigo=` (código guardado só como SHA-256, 1 ano; `noindex`, `no-store`, sem eco do código).
+- [x] Rotação de `AUTO_REPLY_ENCRYPTION_KEY` com recifragem (procedimento em `operational-runbook.md`).
 - [ ] Teste integrado de RLS na Data API do Supabase (como as demais migrações).

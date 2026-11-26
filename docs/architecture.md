@@ -218,6 +218,10 @@ Nada do consumidor fica guardado além de um HMAC por conexão. Interruptores e 
 vitrine pelo `platform_admin`; o Cron marca execuções presas como inconclusivas, aplica 90 dias
 de retenção e verifica tokens. Nenhuma rota participa da vitrine pública. Testado com Meta
 simulada; sem configuração no console nem deploy. Guias em `docs/integrations/auto-reply/`.
+A administração tem a aba "Resposta automática" com alertas calculados (`src/auto-reply/alerts.mjs`);
+a chave de cifragem roda com `AUTO_REPLY_ENCRYPTION_KEY_PREVIOUS`, `AUTO_REPLY_KEY_VERSION` e
+`AUTO_REPLY_HASH_KEY`, com recifragem em lote; a página `/privacidade/exclusao/?codigo=` mostra a
+situação do pedido de exclusão da Meta a partir do hash do código.
 
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 

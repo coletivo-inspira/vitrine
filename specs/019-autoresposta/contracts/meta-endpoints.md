@@ -43,6 +43,10 @@ Corpo `application/x-www-form-urlencoded` com `signed_request` (`<assinatura>.<p
 O `user_id` é comparado com a conta e o portfólio guardados (`service_find_channel_connection`); cada conexão encontrada é desconectada como na desconexão pelo painel (motivo `meta_deauthorize` ou `meta_data_deletion`, sem autor na auditoria).
 
 - Desautorização: `200 {"ok": true}`.
-- Exclusão: `200 {"url": "https://vitrine.inspira.dev.br/privacidade/?codigo=<código>#exclusao-dados", "confirmation_code": "<código>"}`, mesmo sem conexão encontrada. Não há página de acompanhamento por código: a página de privacidade explica a exclusão (pendência registrada em `docs/integrations/auto-reply/security-privacy.md`).
+- Exclusão: `200 {"url": "https://vitrine.inspira.dev.br/privacidade/exclusao/?codigo=<código>", "confirmation_code": "<código>"}`, mesmo sem conexão encontrada. O SHA-256 do código vai para `private.data_deletion_requests` com a situação `completed` (conexão apagada) ou `pending_review` (nenhuma conexão encontrada; a equipe confere).
+
+## `GET /privacidade/exclusao/?codigo=<código>`
+
+Página pública de acompanhamento, gerada no Worker com a CSP das páginas de conformidade, `noindex, nofollow`, `no-store` e `no-referrer`. Mostra "Exclusão concluída", "Pedido recebido" (em conferência), "Código não encontrado" ou, sem código, como chegar à página. O código não aparece no HTML; formatos inválidos não consultam o banco.
 
 Estes callbacks só devem ser cadastrados no console depois do teste em modo desenvolvimento (item 16 de #48: confirmar qual identificador chega com o token de usuário do sistema).
