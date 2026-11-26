@@ -38,7 +38,8 @@ import {
   validateItemLikePayload,
   validateProfileInput,
   validateRevision,
-  validateSiteInput
+  validateSiteInput,
+  validateSiteName
 } from '../src/portal-validation.mjs';
 import {
   compilePublicStorefront,
@@ -98,6 +99,10 @@ import {
 import {
   handleVitrineJsonRequest, matchVitrineJsonPath, vitrineJsonGone, vitrineJsonPublicationOptions
 } from '../src/vitrine-json.mjs';
+import {
+  INVITATION_PAGE_PATH, createMemoryTeamInvitations, createRestTeamInvitations, handleInvitationPage,
+  handleInvitationRoutes, purgeExpiredInvitations
+} from '../src/team-invitations.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1220,6 +1225,12 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     };
   }
 
+  function memoryPublishedAt(site) {
+    const publication = publicationsBySlug.get(site.slug);
+    if (!publication || (publication.siteId && publication.siteId !== site.id)) return null;
+    return typeof publication.publishedAt === 'string' ? publication.publishedAt : null;
+  }
+
   return {
     sites,
     drafts,
@@ -1232,6 +1243,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     itemLikes,
     ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
     ...createMemoryQuoteWebhooks({ sites }),
+    ...createMemoryTeamInvitations({ sites, memberships, profiles, auditLogs, roleFor: getRoleForSite }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -1483,10 +1495,24 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
       for (const site of sites.values()) {
         const role = getRoleForSite(site, userId);
         if (role) {
-          result.push(formatSiteSummary(site, role));
+          result.push({ ...formatSiteSummary(site, role), publishedAt: memoryPublishedAt(site) });
         }
       }
       return result;
+    },
+
+    async getSitePublishedAt(siteId) {
+      const site = sites.get(siteId);
+      return site ? memoryPublishedAt(site) : null;
+    },
+
+    async renameSite(siteId, userId, name) {
+      const site = sites.get(siteId);
+      const role = getRoleForSite(site, userId);
+      if (!role) return null;
+      site.name = name;
+      site.updatedAt = new Date().toISOString();
+      return formatSiteSummary(site, role);
     },
 
     async lookupMilaRelay(code) {
@@ -1999,6 +2025,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
   return {
     ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
     ...createRestQuoteWebhooks({ baseUrl, fetchImpl, authHeaders }),
+    ...createRestTeamInvitations({ baseUrl, fetchImpl, authHeaders }),
 
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
@@ -2589,7 +2616,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async listSites(userId, { token } = {}) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)&order=created_at.asc`,
+        `${baseUrl}/rest/v1/sites?select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role),publications(published_at)&order=created_at.asc`,
         {
           method: 'GET',
           headers: authHeaders(token)
@@ -2599,7 +2626,54 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
         throw new Error(`Supabase listSites error: ${response.status}`);
       }
       const rows = await response.json();
-      return rows.map(row => ({
+      return rows.map(row => {
+        // publications.site_id é a chave primária: o PostgREST embute objeto (ou array em versões antigas).
+        const publication = Array.isArray(row.publications) ? row.publications[0] : row.publications;
+        return {
+          id: row.id,
+          slug: row.slug,
+          name: row.name,
+          storefrontType: row.storefront_type ?? DEFAULT_STOREFRONT_TYPE,
+          template: row.template ?? DEFAULT_TEMPLATE,
+          role: row.owner_user_id === userId ? 'owner' :
+            row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
+          updatedAt: row.updated_at ?? row.created_at,
+          ...siteLifecycleFields(row),
+          publishedAt: typeof publication?.published_at === 'string' ? publication.published_at : null
+        };
+      });
+    },
+
+    async getSitePublishedAt(siteId, { token } = {}) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/publications?site_id=eq.${encodeURIComponent(siteId)}&select=published_at&limit=1`,
+        { headers: authHeaders(token) }
+      );
+      if (!response.ok) throw new Error('Falha ao consultar a publicação da vitrine.');
+      const [row] = await response.json();
+      return typeof row?.published_at === 'string' ? row.published_at : null;
+    },
+
+    async renameSite(siteId, userId, name, { token } = {}) {
+      const response = await fetchImpl(
+        `${baseUrl}/rest/v1/sites?id=eq.${encodeURIComponent(siteId)}&select=id,owner_user_id,slug,name,storefront_type,template,created_at,updated_at,paused_at,archived_at,site_memberships(user_id,role)`,
+        {
+          method: 'PATCH',
+          headers: authHeaders(token, { prefer: 'return=representation' }),
+          body: JSON.stringify({ name })
+        }
+      );
+      if (!response.ok) {
+        const errInfo = await readUpstreamErrorDetails(response);
+        if (errInfo.code === '23514') {
+          throw new PortalValidationError(400, 'INVALID_NAME', 'O nome da vitrine deve ter entre 1 e 160 caracteres.');
+        }
+        logUpstreamError('renameSite', errInfo);
+        throw createUpstreamStoreError('renameSite', errInfo);
+      }
+      const [row] = await response.json().catch(() => []);
+      if (!row) return null;
+      return {
         id: row.id,
         slug: row.slug,
         name: row.name,
@@ -2609,7 +2683,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
           row.site_memberships?.find(member => member.user_id === userId)?.role ?? 'collaborator',
         updatedAt: row.updated_at ?? row.created_at,
         ...siteLifecycleFields(row)
-      }));
+      };
     },
 
     async getSite(siteId, userId, { token } = {}) {
@@ -4113,6 +4187,27 @@ export function createApiHandler(deps = {}) {
       const isPublicSiteHost = hostname === publicSiteHost;
       const isWorkersDevHost = hostname.endsWith('.workers.dev');
 
+      const invitationPageMatch = pathname.match(INVITATION_PAGE_PATH);
+      if (invitationPageMatch && isPublicSiteHost) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...PUBLIC_SECURITY_HEADERS,
+            'cache-control': 'private, no-store',
+            'x-robots-tag': 'noindex, nofollow',
+            'referrer-policy': 'no-referrer',
+            location: `${portalOrigin}${pathname}`
+          }
+        });
+      }
+      if (invitationPageMatch) {
+        return handleInvitationPage({
+          request, method, token: invitationPageMatch[1], store, env,
+          portalBase: isPortalHost ? '/' : '/portal/',
+          rateLimiter: deps.invitationRateLimiter
+        });
+      }
+
       if (isWorkersDevHost) {
         if (pathname === '/portal' || pathname.startsWith('/portal/')) {
           return redirectResponse(`${portalOrigin}/${url.search}`, 301);
@@ -5073,6 +5168,43 @@ export function createApiHandler(deps = {}) {
         return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Método não permitido para /api/sites.');
       }
 
+      const siteRootMatch = pathname.match(/^\/api\/sites\/([^/]+)\/?$/);
+      if (siteRootMatch) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        if (method !== 'GET' && method !== 'PATCH') {
+          return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Use GET para consultar ou PATCH para renomear a vitrine.');
+        }
+        if (method === 'PATCH') {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: true });
+          if (guardError) return guardError;
+        }
+        const siteId = decodeURIComponent(siteRootMatch[1]);
+        const options = { token: user.token, env };
+        const site = UUID_PATTERN.test(siteId) ? await store.getSite(siteId, user.id, options) : null;
+        if (!site) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        if (method === 'GET') {
+          const publishedAt = typeof store.getSitePublishedAt === 'function'
+            ? await store.getSitePublishedAt(siteId, options)
+            : null;
+          return jsonResponse(200, { site: { ...site, publishedAt } });
+        }
+        const { parsed } = await parseJsonRequest(request);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return errorResponse(400, 'INVALID_PAYLOAD', 'Corpo da requisição inválido.');
+        }
+        const name = validateSiteName(parsed.name, 400);
+        if (!TEAM_ROLES.includes(site.role)) {
+          return errorResponse(403, 'FORBIDDEN', 'Só o proprietário e a administração da vitrine mudam o nome.');
+        }
+        if (typeof store.renameSite !== 'function') {
+          return errorResponse(503, 'RENAME_UNAVAILABLE', 'Renomear a vitrine não está disponível neste ambiente.');
+        }
+        const renamed = await store.renameSite(siteId, user.id, name, options);
+        if (!renamed) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
+        return jsonResponse(200, { site: renamed });
+      }
+
       const lifecycleMatch = pathname.match(SITE_LIFECYCLE_PATH);
       if (lifecycleMatch) {
         const user = await resolveSessionUser(request, env, deps);
@@ -5389,6 +5521,16 @@ export function createApiHandler(deps = {}) {
         if (!site) return errorResponse(404, 'SITE_NOT_FOUND', 'Vitrine não encontrada.');
         return jsonResponse(200, { logs: await store.listAuditLogs(siteId, options) });
       }
+
+      const invitationResponse = await handleInvitationRoutes({
+        request, url, pathname, method, store, env,
+        resolveUser: () => resolveSessionUser(request, env, deps),
+        respond: jsonResponse,
+        guardMutation: validateMutationOriginAndJson,
+        readJson: parseJsonRequest,
+        rateLimiter: deps.invitationRateLimiter
+      });
+      if (invitationResponse) return invitationResponse;
 
       const membersMatch = pathname.match(/^\/api\/sites\/([^/]+)\/members(?:\/([^/]+))?\/?$/);
       if (membersMatch) {
@@ -5857,7 +5999,8 @@ export default {
     const results = await Promise.allSettled([
       refreshPendingDomainCertificates(env),
       runSubscriptionLifecycle(env),
-      purgeExpiredLinktreeDemos(env).catch(() => {})
+      purgeExpiredLinktreeDemos(env).catch(() => {}),
+      purgeExpiredInvitations(env).catch(() => {})
     ]);
     const failed = results.find((result) => result.status === 'rejected');
     if (failed) throw failed.reason;

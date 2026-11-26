@@ -23,6 +23,7 @@ import {
   normalizeMetricSource
 } from '../web/assets/metrics-source.mjs';
 import { SERVICES_PRODUCTS_TEMPLATE_CODE } from './servicos-produtos-template.mjs';
+import { isStorefrontPaletteId } from '../web/assets/storefront-palettes.mjs';
 import {
   PAYMENT_LINK_CLICK_METRIC,
   PAYMENT_LINK_LABEL_MAX,
@@ -1457,6 +1458,13 @@ export function extractDraftItems(content) {
   return collected;
 }
 
+/** `structure.themeOverrides.palette` is optional; when present it must be one of STOREFRONT_PALETTE_IDS. */
+export function validateStructurePalette(structure) {
+  const palette = structure?.themeOverrides?.palette;
+  if (palette === undefined || isStorefrontPaletteId(palette)) return palette;
+  throw new PortalValidationError(422, 'INVALID_PALETTE', 'Escolha uma das paletas de cores disponíveis.');
+}
+
 export function validateDraftContent(content, options = {}) {
   if (!content || typeof content !== 'object' || Array.isArray(content)) {
     throw new PortalValidationError(
@@ -1508,6 +1516,8 @@ export function validateDraftContent(content, options = {}) {
       throw new PortalValidationError(422, 'INVALID_SLUG', 'Slug do rascunho inválido.');
     }
   }
+
+  validateStructurePalette(content.structure);
 
   const rawBusinessName = content.businessName ?? content.name;
   if (rawBusinessName !== undefined) {

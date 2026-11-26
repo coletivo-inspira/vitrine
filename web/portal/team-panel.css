@@ -1,0 +1,285 @@
+/* Aba Equipe, confirmação do convite no painel e página /convite/<token>.
+   Usa só os tokens de portal.css; campos e seletores mantêm o raio de 12px do painel. */
+
+.team-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.team-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-title {
+  margin: 0;
+}
+
+.team-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.team-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.team-status:empty {
+  min-height: 0;
+}
+
+.team-status.is-error {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .team-status.is-error {
+  color: #ff8a95;
+}
+
+.team-role-note {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--apricot);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.team-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team-section-title,
+.team-result-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.team-section-title:focus,
+.team-result-title:focus,
+.invite-confirm-title:focus {
+  outline: 3px solid var(--orange);
+  outline-offset: 4px;
+}
+
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-compact);
+  background: var(--white);
+  color: var(--ink);
+}
+
+.team-person {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-name {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.team-role-label {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-select,
+.team-panel .select-styled,
+.team-link-input {
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+.team-select {
+  width: auto;
+  min-width: 180px;
+}
+
+.team-confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--orange);
+  border-radius: 14px;
+  background: var(--apricot);
+}
+
+.team-confirm-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.button.team-danger {
+  background: #b42318;
+  color: #fff;
+}
+
+.button.team-danger:hover {
+  background: #912018;
+}
+
+[data-theme="dark"] .button.team-danger {
+  background: #ff8a95;
+  color: #231b15;
+}
+
+.team-invite-group {
+  max-width: 420px;
+  margin-bottom: 4px;
+}
+
+.team-invite-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-compact);
+  background: var(--paper);
+}
+
+.team-link-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+}
+
+.team-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.invite-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.invite-confirm-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Página /convite/<token>: sem script, então o tema escuro segue o sistema. */
+@media (prefers-color-scheme: dark) {
+  .invite-page {
+    --paper: #171e1a;
+    --ink: #f7f7f4;
+    --ink-soft: #b9c5bd;
+    --orange: #ffb18a;
+    --orange-hover: #ffc4a7;
+    --apricot: #33291f;
+    --line: #45544a;
+    --white: #202a23;
+    color-scheme: dark;
+  }
+
+  .invite-page .button:not(.button-secondary) {
+    color: #231b15;
+  }
+}
+
+.invite-page {
+  display: grid;
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.invite-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  padding: 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--white);
+}
+
+.invite-brand {
+  margin: 0;
+  color: var(--orange);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.invite-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.invite-text {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.invite-actions {
+  margin: 8px 0 0;
+}
