@@ -54,6 +54,18 @@ _Evitar_: carência, bloqueio da vitrine.
 
 **Operador Inspira**: Pessoa da equipe responsável por portfólio, atendimento, CMS institucional e benefícios comerciais; não se confunde com proprietário de vitrine.
 
+**Operador de captação**: Operador Inspira que só cria demonstrações e convites de dono (`growth_operator`); não vê cobrança, CMS institucional nem vitrines com dono. Proposto na spec `018-convite-demonstracao`.
+
+**Demonstração**: Vitrine sem dono montada por um Operador Inspira com o conteúdo público de um negócio, só em rascunho, nunca publicada antes do aceite e apagada em 30 dias (prorrogável até 90) se ninguém aceitar.
+_Evitar_: vitrine temporária publicada, teste grátis.
+
+**Convite**: Link de uso único e com prazo que dá a quem o aceita a propriedade de uma demonstração ou um papel na equipe de uma vitrine. O convite de dono abre uma prévia fora dos buscadores, sem login.
+
+**Cortesia**: Concessão sem cobrança do plano Profissional por 90 dias, dada no aceite de uma demonstração, no máximo uma por conta. Não é assinatura; ao fim, a vitrine volta ao Gratuito sem perder nada.
+_Evitar_: trial, período de teste.
+
+**Funcionário**: Nome no painel do papel `editor` da equipe da vitrine: edita itens, blocos, fotos e rascunho, mas não publica nem mexe em configurações, equipe ou cobrança. Os outros papéis aparecem como Administrador (`admin`) e Somente leitura (`viewer`).
+
 **Patrocinador**: Pessoa ou entidade que financia o plano Gratuito/Social por cota negociada fora do sistema. No painel tem só a tela Impacto, atribuída por um Operador Inspira; não abre vitrines, rascunhos nem a administração.
 
 **Impacto**: Tela somente leitura do patrocinador com o número de vitrines sociais ativas (plano Gratuito/Social, não arquivadas) e suas visitas e cliques para enviar no WhatsApp somados por mês e por cidade, sem nome de negócio nem itens. Cidade com menos de 5 vitrines entra em "Outras cidades".
