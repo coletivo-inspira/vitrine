@@ -4,6 +4,8 @@ Este documento mapeia o tratamento de mensagens no Instagram como uma evolução
 
 Closes #52
 
+> **Atualização de 2026-11-26.** A primeira trilha de mensagens foi especificada como **AutoResposta** (resposta única com o link da vitrine, sem inbox nem encaminhamento): [`specs/019-autoresposta`](../../specs/019-autoresposta/spec.md), [ADR 0017](../adr/0017-autoresposta-canais-sociais.md) (proposta) e [`docs/integrations/auto-reply/`](../integrations/auto-reply/README.md). As respostas às perguntas abaixo para esse escopo: o destinatário continua sendo o Instagram do negócio (sem inbox na Vitrine); a Vitrine só responde a quem escreveu; mídias recebidas não são lidas nem guardadas; não há visualização de mensagens para a equipe; o roteamento por vitrine usa a conta do webhook (`entry.id`) com uma conta por vitrine. O consentimento de mensagens fica separado da leitura do feed, como pedido aqui.
+
 ## Objetivo
 
 Mapear as necessidades, limites, restrições e regras da API de mensagens do Instagram (Instagram Messaging API) para uma futura integração com a Vitrine, garantindo que esta trilha permaneça isolada do fluxo inicial de leitura de perfil e mídias, sem solicitar permissões ou realizar implementações neste momento.
