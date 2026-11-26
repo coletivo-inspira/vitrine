@@ -6,6 +6,8 @@ Este documento detalha a etapa 1 do roteiro [`docs/instagram-integration-roadmap
 
 > **O que pode e o que não pode ser registrado aqui.** O ID do app Meta (`1358511666092768`) e o ID do portfólio que aparece nos links do console são identificadores públicos (aparecem na URL de login que qualquer pessoa vê) e já constam na issue #48; por isso podem ser citados. **Nunca registre** neste repositório a chave secreta do app, a chave secreta do app do Instagram, o `config_id`, a URL de login gerada pelo painel, tokens gerados ou capturas de tela que mostrem esses valores. Os campos abaixo usam marcadores como `<META_APP_SECRET>`.
 
+> **Atualização de 2026-11-26 (proposta, ADR 0017).** A AutoResposta ([`docs/integrations/auto-reply/meta-setup.md`](../integrations/auto-reply/meta-setup.md)) pede `instagram_manage_messages` numa configuração própria do login unificado, separada desta. As decisões 2 e 6 abaixo continuam valendo para a leitura do feed; para a AutoResposta, valem as decisões D1 e D9 do ADR 0017 (webhook `messages`).
+
 ## Modelo: aplicativo Meta único da Vitrine
 
 - **Propriedade centralizada da equipe**: a Vitrine Inspira mantém **um único aplicativo Meta**, administrado pela equipe Inspira no console Meta for Developers e vinculado ao portfólio empresarial **Coletivo Inspira**, que atende todas as vitrines da plataforma.

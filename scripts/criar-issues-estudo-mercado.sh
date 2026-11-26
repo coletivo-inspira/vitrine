@@ -61,6 +61,9 @@ label_meta() {
     depois) echo "bfdadc|Planejada para depois" ;;
     referencia-laurapires) echo "d4c5f9|Padrão de vitrine de serviços e produtos (docs/referencia-laurapires.md)" ;;
     autenticacao) echo "b60205|Entrada no painel e métodos de login (specs/017-login-multiplo)" ;;
+    autoresposta) echo "0052cc|Resposta automática do Instagram com o link da vitrine (specs/019-autoresposta)" ;;
+    pendencia-externa) echo "e99695|Depende de ação humana ou de terceiros (Meta, jurídico, deploy)" ;;
+    produto) echo "fef2c0|Decisão ou validação de produto" ;;
     *) echo "ededed|" ;;
   esac
 }
