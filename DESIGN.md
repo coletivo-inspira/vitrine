@@ -179,9 +179,10 @@ de navegação no rodapé e de três categorias por formato.
 ### Trilha do ponteiro
 
 Rastro decorativo derivado do DotTrail oficial do brandbook, carregado localmente.
-Grade de 22 px, nós de até 8 px e conexões ortogonais de até 3 px, até 40 segmentos,
-desaparecimento em 700 ms. Menta #A3E5C2 com multiply no claro e lima #BAFF29 com
-screen no escuro. Canvas fixo, sem eventos de clique e oculto da acessibilidade.
+Grade de 22 px, nós de até 5 px e conexões ortogonais de até 1,5 px, até 24 segmentos,
+desaparecimento em 500 ms. Menta #A3E5C2 com multiply e opacidade 0,28 no claro; lima
+#BAFF29 com screen e opacidade 0,16 no escuro. Canvas fixo, sem eventos de clique e
+oculto da acessibilidade.
 Desativado com movimento reduzido, toque e caneta; limpa ao sair da janela,
 perder foco, ocultar aba e redimensionar. Densidade do canvas limitada a DPR 2.
 Sem loop de renderização quando vazio.
