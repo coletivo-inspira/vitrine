@@ -1,0 +1,235 @@
+/* Paletas das vitrines públicas (Personalizar > Cores da vitrine). A vitrine publicada só carrega
+   este arquivo quando tem paleta (data-palette no body); o portal o importa em
+   web/portal/palette-picker.css para as amostras e a prévia. Valores espelham
+   web/assets/storefront-palettes.mjs; test/storefront-palettes.test.mjs confere a sincronia
+   e o contraste WCAG AA. A cor de destaque própria (--storefront-custom-accent) continua
+   valendo por cima da paleta. */
+
+body[data-palette] {
+  --paper: var(--sf-paper);
+  --surface: var(--sf-surface);
+  --offer-surface: var(--sf-offer-surface);
+  --apricot: var(--sf-apricot);
+  --ink: var(--sf-ink);
+  --ink-soft: var(--sf-ink-soft);
+  --line: var(--sf-line);
+  --primary: var(--sf-primary);
+  --primary-hover: var(--sf-primary-hover);
+  --action-text: var(--sf-action-text);
+}
+
+[data-palette="inspira"] {
+  --sf-paper: #F7F7F4;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #F0EFE9;
+  --sf-apricot: #FBEDE5;
+  --sf-ink: #27322E;
+  --sf-ink-soft: #56615B;
+  --sf-line: #DDDCD6;
+  --sf-primary: #C74414;
+  --sf-primary-hover: #A9360E;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="inspira"],
+[data-theme="dark"] [data-palette="inspira"] {
+  --sf-paper: #171E1A;
+  --sf-surface: #202A23;
+  --sf-offer-surface: #202A23;
+  --sf-apricot: #33291F;
+  --sf-ink: #F7F7F4;
+  --sf-ink-soft: #B9C5BD;
+  --sf-line: #45544A;
+  --sf-primary: #FFB18A;
+  --sf-primary-hover: #FFC4A7;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="vinho"] {
+  --sf-paper: #F8F4F5;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #F1EAEC;
+  --sf-apricot: #F6E6EA;
+  --sf-ink: #2E2226;
+  --sf-ink-soft: #5E4E54;
+  --sf-line: #E2D6DA;
+  --sf-primary: #8E1F3F;
+  --sf-primary-hover: #741832;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="vinho"],
+[data-theme="dark"] [data-palette="vinho"] {
+  --sf-paper: #1D1517;
+  --sf-surface: #2A1E22;
+  --sf-offer-surface: #2A1E22;
+  --sf-apricot: #3A2229;
+  --sf-ink: #F8F1F3;
+  --sf-ink-soft: #CDB8BF;
+  --sf-line: #554047;
+  --sf-primary: #F4A7BB;
+  --sf-primary-hover: #F8C2D0;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="oceano"] {
+  --sf-paper: #F3F6F8;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #E9EFF3;
+  --sf-apricot: #E2EEF6;
+  --sf-ink: #1F2B35;
+  --sf-ink-soft: #4C5B67;
+  --sf-line: #D3DEE6;
+  --sf-primary: #0B5C8E;
+  --sf-primary-hover: #084A73;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="oceano"],
+[data-theme="dark"] [data-palette="oceano"] {
+  --sf-paper: #121A21;
+  --sf-surface: #1B2630;
+  --sf-offer-surface: #1B2630;
+  --sf-apricot: #1C3140;
+  --sf-ink: #F1F5F8;
+  --sf-ink-soft: #B3C3CF;
+  --sf-line: #3C4E5C;
+  --sf-primary: #8CC8F0;
+  --sf-primary-hover: #AED8F5;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="floresta"] {
+  --sf-paper: #F4F7F4;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #EAF0EB;
+  --sf-apricot: #E3EFE6;
+  --sf-ink: #1F2D25;
+  --sf-ink-soft: #4D5D53;
+  --sf-line: #D5E0D8;
+  --sf-primary: #1E6B43;
+  --sf-primary-hover: #165535;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="floresta"],
+[data-theme="dark"] [data-palette="floresta"] {
+  --sf-paper: #131C17;
+  --sf-surface: #1C2921;
+  --sf-offer-surface: #1C2921;
+  --sf-apricot: #1F3527;
+  --sf-ink: #F1F6F2;
+  --sf-ink-soft: #B5C7BB;
+  --sf-line: #3D5245;
+  --sf-primary: #8FD6AC;
+  --sf-primary-hover: #AEE3C3;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="terracota"] {
+  --sf-paper: #F8F5F2;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #F1EBE5;
+  --sf-apricot: #F5E8DF;
+  --sf-ink: #2F2621;
+  --sf-ink-soft: #5F5249;
+  --sf-line: #E2D8CF;
+  --sf-primary: #9C4A2F;
+  --sf-primary-hover: #803B25;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="terracota"],
+[data-theme="dark"] [data-palette="terracota"] {
+  --sf-paper: #1C1714;
+  --sf-surface: #29211C;
+  --sf-offer-surface: #29211C;
+  --sf-apricot: #3A2A21;
+  --sf-ink: #F7F2EE;
+  --sf-ink-soft: #CBBBAF;
+  --sf-line: #54453B;
+  --sf-primary: #F0AE8F;
+  --sf-primary-hover: #F5C6AF;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="lavanda"] {
+  --sf-paper: #F6F5F9;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #EEECF4;
+  --sf-apricot: #ECE8F6;
+  --sf-ink: #29253A;
+  --sf-ink-soft: #57526B;
+  --sf-line: #DCD8E6;
+  --sf-primary: #5B3FA0;
+  --sf-primary-hover: #4A3285;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="lavanda"],
+[data-theme="dark"] [data-palette="lavanda"] {
+  --sf-paper: #18161F;
+  --sf-surface: #23202D;
+  --sf-offer-surface: #23202D;
+  --sf-apricot: #2E2840;
+  --sf-ink: #F4F2F8;
+  --sf-ink-soft: #C1BBD2;
+  --sf-line: #48425A;
+  --sf-primary: #C4B2F2;
+  --sf-primary-hover: #D6CAF6;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="grafite"] {
+  --sf-paper: #F5F5F5;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #ECECEC;
+  --sf-apricot: #E9E9EA;
+  --sf-ink: #1F2022;
+  --sf-ink-soft: #505257;
+  --sf-line: #D9D9DB;
+  --sf-primary: #2F3237;
+  --sf-primary-hover: #1C1E21;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="grafite"],
+[data-theme="dark"] [data-palette="grafite"] {
+  --sf-paper: #151617;
+  --sf-surface: #202124;
+  --sf-offer-surface: #202124;
+  --sf-apricot: #2A2C30;
+  --sf-ink: #F4F4F5;
+  --sf-ink-soft: #BDBFC4;
+  --sf-line: #45474C;
+  --sf-primary: #E4E5E7;
+  --sf-primary-hover: #FFFFFF;
+  --sf-action-text: #171E1A;
+}
+
+[data-palette="mostarda"] {
+  --sf-paper: #F9F7F0;
+  --sf-surface: #FFFFFF;
+  --sf-offer-surface: #F2EEE0;
+  --sf-apricot: #F6EED3;
+  --sf-ink: #2B2718;
+  --sf-ink-soft: #5B5540;
+  --sf-line: #E3DCC6;
+  --sf-primary: #8A6200;
+  --sf-primary-hover: #6F4F00;
+  --sf-action-text: #FFFFFF;
+}
+
+[data-theme="dark"][data-palette="mostarda"],
+[data-theme="dark"] [data-palette="mostarda"] {
+  --sf-paper: #1B1912;
+  --sf-surface: #27241A;
+  --sf-offer-surface: #27241A;
+  --sf-apricot: #383121;
+  --sf-ink: #F8F5EB;
+  --sf-ink-soft: #CFC7AE;
+  --sf-line: #514A35;
+  --sf-primary: #F2C14E;
+  --sf-primary-hover: #F6D27E;
+  --sf-action-text: #171E1A;
+}

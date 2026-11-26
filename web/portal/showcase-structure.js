@@ -1,6 +1,32 @@
 import { HIGHLIGHT_ICON_LABELS, highlightIconSvg } from '../assets/highlight-icons.mjs';
 import { FAQ_DEFAULT_TITLE, FAQ_SERVICE_SUGGESTIONS } from '../assets/faq-block.mjs';
 import { lockAction, unlockAction } from './plan-gate.mjs';
+import { isStorefrontPaletteId } from '../assets/storefront-palettes.mjs';
+
+/** Paleta salva no rascunho (`structure.themeOverrides.palette`) ou `null`. */
+export function getStructurePalette(content) {
+  const palette = content?.structure?.themeOverrides?.palette;
+  return isStorefrontPaletteId(palette) ? palette : null;
+}
+
+/** Só vitrines com estrutura publicam tema; sem ela, a paleta não teria efeito. */
+export function canChooseStructurePalette(content) {
+  const structure = content?.structure;
+  return Boolean(structure && typeof structure === 'object' && !Array.isArray(structure));
+}
+
+/**
+ * Novo conteúdo do rascunho com a paleta em `structure.themeOverrides.palette`
+ * (id vazio ou inválido remove a escolha). Sem estrutura, devolve o mesmo objeto.
+ */
+export function setStructurePalette(content, id) {
+  if (!canChooseStructurePalette(content)) return content;
+  const structure = { ...content.structure, themeOverrides: { ...content.structure.themeOverrides } };
+  delete structure.themeOverrides.palette;
+  if (isStorefrontPaletteId(id)) structure.themeOverrides.palette = id;
+  else if (!content.structure.themeOverrides) delete structure.themeOverrides;
+  return { ...content, structure };
+}
 
 const modules = {
   hero: ['Cabeçalho', { headline: 'Título', subtitle: 'Subtítulo' }],
@@ -1263,7 +1289,9 @@ export function renderStructureFields(root, structure, onSave, widgets = [], tem
           Object.entries({
             accentColor: accent.value.trim(),
             fontPair: font.value,
-            buttonStyle: selectedShape
+            buttonStyle: selectedShape,
+            // A paleta é escolhida no Personalizar do editor e pode mudar com este painel aberto.
+            palette: typeof choices?.readPalette === 'function' ? choices.readPalette() : structure.theme?.palette
           }).filter(([, value]) => value)
         ),
         navigationMenus: Object.fromEntries(
