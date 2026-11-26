@@ -202,6 +202,23 @@ fora do total e da mensagem do WhatsApp. Os cliques contam em `payment_link_clic
 (migração `20261116001700_metric_payment_link_click.sql`). O pagamento é do negócio e do
 provedor dele (ADR 0013, item 8; seção "Vendas do seu negócio" dos termos).
 
+## AutoResposta do Instagram (specs/019, ADR 0017 proposta)
+
+`src/auto-reply/` (adaptador do Instagram, webhook, regras, processador, armazenamento e rotas),
+`web/assets/auto-reply-message.mjs`, `web/portal/auto-reply-panel.mjs` e a migração
+`20261126001000_auto_reply.sql`. Login unificado da Meta com configuração própria
+(`instagram_basic` + `instagram_manage_messages`, `META_IG_AUTOREPLY_CONFIG_ID`); o token de
+usuário do sistema do portfólio do cliente é cifrado no Worker (AES-GCM,
+`AUTO_REPLY_ENCRYPTION_KEY`, dados associados vitrine + canal + conta) e só funções `service_*`
+o leem. `POST /api/webhooks/meta/instagram` confere `X-Hub-Signature-256`, grava o evento com
+restrição única, responde `200` (ou `500` para a Meta reentregar) e processa em `ctx.waitUntil`:
+regras, vaga de frequência atômica, endereço resolvido no envio (domínio próprio ativo com o
+recurso `custom_domain`, senão `vitrine.inspira.dev.br/<endereço>`), releitura do estado e envio.
+Nada do consumidor fica guardado além de um HMAC por conexão. Interruptores e liberação por
+vitrine pelo `platform_admin`; o Cron marca execuções presas como inconclusivas, aplica 90 dias
+de retenção e verifica tokens. Nenhuma rota participa da vitrine pública. Testado com Meta
+simulada; sem configuração no console nem deploy. Guias em `docs/integrations/auto-reply/`.
+
 ## Evolução para plataforma modular e multi-inquilino (Spec 008 e Spec 009)
 
 Estudo arquitetural completo em `docs/modular-admin-architecture.md` e especificações em `specs/008-portal-redesign/` e `specs/009-modular-admin-platform/`:

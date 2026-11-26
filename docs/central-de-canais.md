@@ -10,6 +10,8 @@ A aba **Canais** do editor separa dois grupos:
   estado, plano necessário, titular, permissões pedidas, pré-requisitos, último
   diagnóstico e o próximo passo em texto.
 
+Abaixo da central, a mesma aba tem a seção **Resposta automática** (AutoResposta do Instagram, `web/portal/auto-reply-panel.mjs`, spec 019, proposta): ela tem estado e rotas próprios (`/api/sites/:id/auto-reply`) e não entra na lista de integrações desta central.
+
 Regras puras em `web/assets/channels.mjs` (servidor e navegador), rota e projeção em
 `src/channels.mjs`, painel em `web/portal/channels-panel.mjs` e `channels-panel.css`.
 
