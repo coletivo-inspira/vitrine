@@ -98,6 +98,10 @@ import {
 import {
   handleVitrineJsonRequest, matchVitrineJsonPath, vitrineJsonGone, vitrineJsonPublicationOptions
 } from '../src/vitrine-json.mjs';
+import {
+  INVITATION_PAGE_PATH, createMemoryTeamInvitations, createRestTeamInvitations, handleInvitationPage,
+  handleInvitationRoutes, purgeExpiredInvitations
+} from '../src/team-invitations.mjs';
 
 const TEMPLATE_CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
@@ -1232,6 +1236,7 @@ export function createMemoryStore(initial = DEFAULT_MEMORY_SEED) {
     itemLikes,
     ...createMemorySiteLifecycle({ sites, drafts, memberships, auditLogs, publicationsBySlug, publicationsByHash }),
     ...createMemoryQuoteWebhooks({ sites }),
+    ...createMemoryTeamInvitations({ sites, memberships, profiles, auditLogs, roleFor: getRoleForSite }),
 
     async getItemLikes(slug, visitorHash = null) {
       const { siteId, itemIds } = await resolveLikeTarget(this, slug);
@@ -1999,6 +2004,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
   return {
     ...createRestSiteLifecycle({ baseUrl, fetchImpl, authHeaders, anonHeaders }),
     ...createRestQuoteWebhooks({ baseUrl, fetchImpl, authHeaders }),
+    ...createRestTeamInvitations({ baseUrl, fetchImpl, authHeaders }),
 
     async getProfile(userId, { token } = {}) {
       const [profileRes, interestsRes] = await Promise.all([
@@ -4113,6 +4119,27 @@ export function createApiHandler(deps = {}) {
       const isPublicSiteHost = hostname === publicSiteHost;
       const isWorkersDevHost = hostname.endsWith('.workers.dev');
 
+      const invitationPageMatch = pathname.match(INVITATION_PAGE_PATH);
+      if (invitationPageMatch && isPublicSiteHost) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...PUBLIC_SECURITY_HEADERS,
+            'cache-control': 'private, no-store',
+            'x-robots-tag': 'noindex, nofollow',
+            'referrer-policy': 'no-referrer',
+            location: `${portalOrigin}${pathname}`
+          }
+        });
+      }
+      if (invitationPageMatch) {
+        return handleInvitationPage({
+          request, method, token: invitationPageMatch[1], store, env,
+          portalBase: isPortalHost ? '/' : '/portal/',
+          rateLimiter: deps.invitationRateLimiter
+        });
+      }
+
       if (isWorkersDevHost) {
         if (pathname === '/portal' || pathname.startsWith('/portal/')) {
           return redirectResponse(`${portalOrigin}/${url.search}`, 301);
@@ -5390,6 +5417,16 @@ export function createApiHandler(deps = {}) {
         return jsonResponse(200, { logs: await store.listAuditLogs(siteId, options) });
       }
 
+      const invitationResponse = await handleInvitationRoutes({
+        request, url, pathname, method, store, env,
+        resolveUser: () => resolveSessionUser(request, env, deps),
+        respond: jsonResponse,
+        guardMutation: validateMutationOriginAndJson,
+        readJson: parseJsonRequest,
+        rateLimiter: deps.invitationRateLimiter
+      });
+      if (invitationResponse) return invitationResponse;
+
       const membersMatch = pathname.match(/^\/api\/sites\/([^/]+)\/members(?:\/([^/]+))?\/?$/);
       if (membersMatch) {
         const user = await resolveSessionUser(request, env, deps);
@@ -5857,7 +5894,8 @@ export default {
     const results = await Promise.allSettled([
       refreshPendingDomainCertificates(env),
       runSubscriptionLifecycle(env),
-      purgeExpiredLinktreeDemos(env).catch(() => {})
+      purgeExpiredLinktreeDemos(env).catch(() => {}),
+      purgeExpiredInvitations(env).catch(() => {})
     ]);
     const failed = results.find((result) => result.status === 'rejected');
     if (failed) throw failed.reason;
