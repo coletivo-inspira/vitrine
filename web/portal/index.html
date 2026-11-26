@@ -20,6 +20,8 @@
   <link rel="stylesheet" href="./quote-webhook.css">
   <link rel="stylesheet" href="./channels-panel.css">
   <link rel="stylesheet" href="./sponsor-impact.css">
+  <link rel="stylesheet" href="./team-panel.css">
+  <link rel="stylesheet" href="./palette-picker.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo-portal">Pular para o conteúdo</a>
@@ -131,105 +133,58 @@
 
   <!-- Authenticated Application Shell -->
   <div id="authenticated-app" class="app-shell-container" hidden>
-    <!-- Glass Sidebar on Desktop -->
-    <aside class="app-sidebar">
-      <div class="sidebar-brand">
-        <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
-          <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="150" height="46" alt="vitrine — coletivo inspira">
-          <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="150" height="46" alt="vitrine — coletivo inspira">
-        </a>
-      </div>
-      <nav class="sidebar-nav" aria-label="Menu principal">
-        <ul>
-          <li>
-            <a href="#inicio" class="nav-link active" data-section="inicio">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              Início
-            </a>
-          </li>
-          <li>
-            <a href="#vitrines" class="nav-link" data-section="vitrines">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-              Minhas Vitrines
-            </a>
-          </li>
-          <li>
-            <a href="#insights" class="nav-link" data-section="insights">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              Insights
-            </a>
-          </li>
-          <li>
-            <a href="#leiloes" class="nav-link" data-section="leiloes">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><path d="m21 11-8-8"/></svg>
-              Leilões
-            </a>
-          </li>
-          <li>
-            <a href="#pedidos" class="nav-link" data-section="pedidos">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Customizações
-            </a>
-          </li>
-          <li class="nav-sponsor-item" hidden>
-            <a href="#impacto" class="nav-link" data-section="impacto">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg>
-              Impacto
-            </a>
-          </li>
-          <li>
-            <a href="#plano" class="nav-link" data-section="plano">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-              Plano e cobrança
-            </a>
-          </li>
-          <li class="nav-admin-item" hidden>
-            <a id="platform-cms-open" href="#administracao" class="nav-link" data-section="platform-cms">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              Administração
-            </a>
-          </li>
-        </ul>
-      </nav>
-    </aside>
-
     <div class="app-main-layout">
-      <!-- Top bar for brand, theme toggle, accounts -->
-      <header class="app-top-bar">
-        <!-- Compact brand for mobile only -->
-        <div class="mobile-brand">
-          <a class="brand panel-home-link" href="#inicio" aria-label="Ir para o Início do painel">
-            <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="120" height="37" alt="vitrine">
-            <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="120" height="37" alt="vitrine">
-          </a>
+      <header id="app-top-bar" class="app-top-bar">
+        <a class="brand panel-home-link" href="#/" aria-label="Ir para o Início do painel">
+          <img class="brand-logo brand-logo-light" src="../assets/brand/vitrine-animated.svg" width="132" height="41" alt="vitrine — coletivo inspira">
+          <img class="brand-logo brand-logo-dark" src="../assets/brand/vitrine-animated-inverse.svg" width="132" height="41" alt="vitrine — coletivo inspira">
+        </a>
+
+        <div id="home-search" class="home-search" role="search">
+          <label class="visually-hidden" for="home-search-input">Buscar vitrines</label>
+          <svg class="home-search-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="home-search-input" class="home-search-input" type="search" placeholder="Buscar vitrines" autocomplete="off" enterkeyhint="search">
         </div>
-        
-        <div class="top-bar-middle">
-          <!-- Mode indicator for local evaluation in top bar -->
+
+        <div class="top-bar-controls">
           <div id="demo-mode-badge" class="demo-badge shell-demo-badge" hidden aria-label="Modo Local de Demonstração">
             <span class="badge-dot"></span>
             <span class="badge-text">Modo Local</span>
           </div>
-        </div>
-
-        <div class="top-bar-controls">
-          <button class="theme-toggle" type="button" aria-label="Ativar modo escuro" hidden>
-            <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
-            <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
-          </button>
-          <a id="top-bar-profile" href="#perfil" class="top-bar-profile" data-section="perfil" aria-label="Perfil e interesses">
-            <img id="top-bar-avatar" class="top-bar-avatar" src="" alt="" width="28" height="28" hidden>
-            <span id="top-bar-avatar-placeholder" class="top-bar-avatar top-bar-avatar-placeholder" aria-hidden="true">U</span>
-            <span class="top-bar-profile-label">Perfil</span>
-          </a>
-          <button id="logout-button" class="button button-small button-secondary button-pill" type="button">Sair</button>
+          <div class="menu-anchor">
+            <button id="account-menu-button" class="avatar-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" aria-label="Menu da conta">
+              <img id="top-bar-avatar" class="top-bar-avatar" src="" alt="" width="40" height="40" referrerpolicy="no-referrer" decoding="async" hidden>
+              <span id="top-bar-avatar-placeholder" class="top-bar-avatar top-bar-avatar-placeholder" aria-hidden="true">U</span>
+            </button>
+            <div id="account-menu" class="menu-popup menu-popup-end" hidden>
+              <p id="account-menu-name" class="menu-caption">Sua conta</p>
+              <div class="menu-list" role="menu" aria-label="Conta">
+                <a class="menu-item" role="menuitem" href="#/perfil">Perfil</a>
+                <a class="menu-item" role="menuitem" href="#/customizacoes">Customizações</a>
+                <a class="menu-item" role="menuitem" href="#/plano">Plano e cobrança</a>
+                <div class="nav-sponsor-item" role="none" hidden>
+                  <a class="menu-item" role="menuitem" href="#/impacto">Impacto</a>
+                </div>
+                <div class="nav-admin-item" role="none" hidden>
+                  <a id="platform-cms-open" class="menu-item" role="menuitem" href="#/administracao">Administração</a>
+                </div>
+                <button class="menu-item theme-toggle" role="menuitem" type="button" aria-label="Ativar modo escuro" hidden>
+                  <svg class="theme-moon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+                  <svg class="theme-sun" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+                  <span class="theme-label-light">Tema escuro</span>
+                  <span class="theme-label-dark">Tema claro</span>
+                </button>
+                <button id="logout-button" class="menu-item" role="menuitem" type="button">Sair</button>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
       <!-- Main app content pane -->
-      <main id="conteudo-portal" class="app-content-pane">
+      <main id="conteudo-portal" class="app-content-pane" tabindex="-1">
         <!-- Global Feedback banner inside shell -->
-        <div id="global-feedback" class="feedback-banner" aria-live="polite" hidden></div>
+        <div id="global-feedback" class="feedback-banner" role="status" aria-live="polite" hidden></div>
 
         <!-- Section: Profile Gate (First Access Screen) -->
         <section id="profile-gate-section" class="portal-card portal-card-narrow" hidden>
@@ -240,8 +195,8 @@
 
           <!-- Read-only account card -->
           <div class="read-only-account-card">
-            <img id="gate-avatar" class="gate-avatar" src="" alt="Avatar" hidden>
-            <div id="gate-avatar-placeholder" class="gate-avatar-placeholder">U</div>
+            <img id="gate-avatar" class="gate-avatar" src="" alt="" width="64" height="64" referrerpolicy="no-referrer" decoding="async" hidden>
+            <div id="gate-avatar-placeholder" class="gate-avatar-placeholder" aria-hidden="true">U</div>
             <div class="account-card-info">
               <span class="account-card-title">Conta Google Conectada</span>
               <span id="gate-email" class="account-card-email">Conta Google conectada</span>
@@ -280,91 +235,62 @@
           </form>
         </section>
 
-        <!-- Section 1: Início (Home Dashboard) -->
-        <section id="inicio-section" class="shell-section">
-          <div class="section-header">
-            <h1 class="display-title">Painel Inicial</h1>
-            <p class="section-desc">Bem-vindo à Vitrine Inspira. Acompanhe suas vitrines, métricas e solicitações.</p>
-          </div>
-
+        <!-- Início: Começar nova vitrine + Vitrines recentes -->
+        <section id="inicio-section" class="shell-section home-section" aria-labelledby="home-start-title">
           <div id="billing-notice" class="billing-notice" role="status" aria-live="polite" hidden></div>
 
-          <!-- Onboarding Checklist -->
-          <div id="onboarding-checklist-card" class="portal-card onboarding-checklist-card" hidden>
-            <h3>Sua jornada para o lançamento 🚀</h3>
-            <p class="soft-text">Siga os 3 passos simples abaixo para colocar sua vitrine online:</p>
-            <ul class="checklist-items">
-              <li id="checklist-item-profile" class="checklist-item">
-                <span class="checklist-status-icon">○</span>
-                <a href="#perfil" class="checklist-link">Complete seu perfil</a>
-                <span class="checklist-item-desc">- Dados básicos do negócio</span>
-              </li>
-              <li id="checklist-item-create" class="checklist-item">
-                <span class="checklist-status-icon">○</span>
-                <a href="#wizard" class="checklist-link">Crie sua vitrine</a>
-                <span class="checklist-item-desc">- Escolha o modelo e endereço</span>
-              </li>
-              <li id="checklist-item-publish" class="checklist-item">
-                <span class="checklist-status-icon">○</span>
-                <a href="#vitrines" class="checklist-link">Publique</a>
-                <span class="checklist-item-desc">- Adicione os itens e coloque no ar</span>
-              </li>
-            </ul>
-          </div>
-          
-          <div class="dashboard-hub-grid">
-            <!-- Vitrines Summary Card -->
-            <div class="portal-card hub-card vitrines-summary-card">
-              <div class="card-eyebrow">Meus Projetos</div>
-              <h3>Suas Vitrines</h3>
-              <p id="vitrines-summary-text" class="summary-text-spaced">Carregando vitrines...</p>
-              <div id="hub-vitrines-list" class="hub-list">
-                <!-- Short list of sites -->
-              </div>
-              <button id="hub-create-site-btn" class="button button-small button-pill hub-btn-spaced" type="button">Criar Nova Vitrine</button>
-            </div>
-
-            <!-- Customization Summary Card -->
-            <div class="portal-card hub-card custom-summary-card">
-              <div class="card-eyebrow">Sob Medida</div>
-              <h3>Pedidos de Customização</h3>
-              <p id="custom-requests-summary-text" class="summary-text-spaced">Nenhuma solicitação em andamento.</p>
-              <div id="hub-requests-list" class="hub-list">
-                <!-- Short list of requests -->
-              </div>
-              <button id="hub-new-request-btn" class="button button-small button-secondary button-pill hub-btn-spaced" type="button">Fazer Solicitação</button>
-            </div>
-
-            <!-- Insights Summary Card -->
-            <div class="portal-card hub-card insights-highlight-card">
-              <div class="card-eyebrow">Inteligência</div>
-              <h3>Destaques da Semana</h3>
-              <p id="hub-insights-highlight-text" class="summary-text-spaced">Acompanhe visitas, pedidos no WhatsApp e itens mais escolhidos da sua vitrine.</p>
-              <div id="hub-insights-stats-list" class="hub-list">
-                <!-- Populated dynamically via JS -->
-              </div>
-              <button id="hub-open-insights-btn" class="button button-small button-secondary button-pill hub-btn-spaced" type="button">Ver Painel de Insights</button>
+          <div class="home-start-band">
+            <div class="home-band-inner">
+              <h1 id="home-start-title" class="home-band-title">Começar nova vitrine</h1>
+              <ul class="template-row" aria-label="Modelos de vitrine">
+                <li>
+                  <button type="button" class="template-card" data-template="products">
+                    <span class="template-thumb thumb-products" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="template-name">Produtos</span>
+                    <span class="template-desc">Itens com preço e carrinho para o WhatsApp</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="template-card" data-template="services">
+                    <span class="template-thumb thumb-services" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="template-name">Serviços e produtos</span>
+                    <span class="template-desc">Página completa com destaques e perguntas</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="template-card" data-template="booking">
+                    <span class="template-thumb thumb-booking" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="template-name">Agendamento</span>
+                    <span class="template-desc">Serviço, dia e horário</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="template-card" data-template="quote">
+                    <span class="template-thumb thumb-quote" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="template-name">Orçamento</span>
+                    <span class="template-desc">Lista de interesse, preço opcional</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="template-card" data-template="custom">
+                    <span class="template-thumb thumb-custom" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="template-name">Sob medida</span>
+                    <span class="template-desc">Pedido ao Coletivo Inspira</span>
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
-        </section>
 
-        <!-- Section 2: Minhas Vitrines -->
-        <section id="vitrines-section" class="shell-section" hidden>
-          <div class="section-header vitrines-list-header-flex">
-            <div>
-              <h1 class="display-title">Minhas Vitrines</h1>
-              <p class="section-desc">Selecione uma vitrine para editar os itens ou crie uma nova.</p>
-            </div>
-            <button id="wizard-open-btn" class="button button-small button-pill wizard-open-flex-btn" type="button">+ Nova Vitrine</button>
-          </div>
-          
           <div id="linktree-invitations" class="linktree-invitations" hidden></div>
 
-          <div class="portal-card portal-card-padded">
-            <h2>Suas vitrines</h2>
-            <div id="sites-list-container" class="sites-list">
-              <p class="loading-msg">Carregando vitrines...</p>
+          <div class="home-recent">
+            <div class="home-recent-head">
+              <h2 id="home-recent-title" class="home-recent-title">Vitrines recentes</h2>
+              <div id="sites-view-filter-slot" class="sites-view-filter-slot"></div>
             </div>
+            <p id="sites-list-status" class="empty-msg" role="status" aria-live="polite">Carregando vitrines...</p>
+            <ul id="sites-list-container" class="vitrine-grid" aria-labelledby="home-recent-title"></ul>
           </div>
         </section>
 
@@ -569,163 +495,11 @@
           </div>
         </section>
 
-        <section id="insights-section" class="shell-section" hidden>
-          <div class="section-header insights-header-flex">
-            <div>
-              <h1 class="display-title">Painel de Insights</h1>
-              <p class="section-desc">Métricas agregadas de visitas, escolhas de itens, curtidas e pedidos enviados ao WhatsApp, sem coleta de IP ou de dados pessoais.</p>
-            </div>
-            <div class="insights-toolbar" role="group" aria-label="Filtros de insights">
-              <div class="form-group-inline">
-                <label for="insights-site-select">Vitrine:</label>
-                <select id="insights-site-select" class="select-styled compact-select">
-                  <!-- Populated via JS -->
-                </select>
-              </div>
-              <div class="insights-period-pills" role="group" aria-label="Período de análise">
-                <button type="button" class="chip-btn insights-period-btn active" data-period="7d" aria-pressed="true">7 dias</button>
-                <button type="button" class="chip-btn insights-period-btn" data-period="30d" aria-pressed="false">30 dias</button>
-                <button type="button" class="chip-btn insights-period-btn" data-period="90d" aria-pressed="false">90 dias</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Automatic Weekly Highlight Sentences -->
-          <div class="portal-card insights-highlights-banner">
-            <div class="card-eyebrow">Leitura Automática do Período</div>
-            <ul id="insights-highlights-list" class="insights-highlights-list">
-              <li>Carregando destaques do período...</li>
-            </ul>
-          </div>
-
-          <!-- 4 KPI Summary Cards -->
-          <div class="insights-kpi-grid" aria-label="Resumo do período">
-            <article class="portal-card insights-kpi-card">
-              <span class="card-eyebrow">Alcance</span>
-              <span class="insights-kpi-label">Visitas à vitrine</span>
-              <strong id="insights-kpi-visits" class="insights-kpi-value">0</strong>
-              <span id="insights-kpi-visits-delta" class="insights-kpi-delta">Período anterior: 0</span>
-            </article>
-
-            <article class="portal-card insights-kpi-card">
-              <span class="card-eyebrow">Intenção</span>
-              <span class="insights-kpi-label">Pedidos no WhatsApp</span>
-              <strong id="insights-kpi-orders" class="insights-kpi-value">0</strong>
-              <span id="insights-kpi-orders-delta" class="insights-kpi-delta">Período anterior: 0</span>
-            </article>
-
-            <article class="portal-card insights-kpi-card">
-              <span class="card-eyebrow">Eficiência</span>
-              <span class="insights-kpi-label">Taxa de conversão</span>
-              <strong id="insights-kpi-conversion" class="insights-kpi-value">0,0%</strong>
-              <span id="insights-kpi-conversion-delta" class="insights-kpi-delta">Pedidos sobre visitas</span>
-            </article>
-
-            <article class="portal-card insights-kpi-card">
-              <span class="card-eyebrow">Receita Estimada</span>
-              <span class="insights-kpi-label">Valor estimado em pedidos</span>
-              <strong id="insights-kpi-estimated" class="insights-kpi-value">R$ 0,00</strong>
-              <span id="insights-kpi-estimated-delta" class="insights-kpi-delta">Período anterior: R$ 0,00</span>
-            </article>
-          </div>
-
-          <section id="insights-origin-card" class="portal-card insights-origin-card" aria-labelledby="insights-origin-title">
-            <!-- Populated via insights-origin.mjs -->
-          </section>
-
-          <!-- Charts Row: By Day & By Hour (Plain SVG/CSS) -->
-          <div class="insights-charts-grid">
-            <section class="portal-card insights-chart-card" aria-labelledby="insights-day-chart-title">
-              <div class="insights-card-header">
-                <div>
-                  <span class="card-eyebrow">Evolução Diária</span>
-                  <h2 id="insights-day-chart-title">Visitas e pedidos por dia</h2>
-                </div>
-                <div class="insights-chart-legend" aria-hidden="true">
-                  <span class="legend-item"><span class="legend-swatch swatch-visits"></span> Visitas</span>
-                  <span class="legend-item"><span class="legend-swatch swatch-orders"></span> Pedidos</span>
-                </div>
-              </div>
-              <div id="insights-day-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de visitas e pedidos por dia">
-                <!-- Rendered via plain SVG -->
-              </div>
-            </section>
-
-            <section class="portal-card insights-chart-card" aria-labelledby="insights-hour-chart-title">
-              <div class="insights-card-header">
-                <div>
-                  <span class="card-eyebrow">Concentração de Horário</span>
-                  <h2 id="insights-hour-chart-title">Acessos e pedidos por faixa de hora</h2>
-                </div>
-                <span class="insights-chart-unit">0h às 23h</span>
-              </div>
-              <div id="insights-hour-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de atividade por hora do dia">
-                <!-- Rendered via plain SVG -->
-              </div>
-            </section>
-          </div>
-
-          <!-- Rankings Row: Top Items & Top Categories -->
-          <div class="insights-rankings-grid">
-            <section class="portal-card insights-ranking-card" aria-labelledby="insights-top-items-title">
-              <span class="card-eyebrow">Preferência da Clientela</span>
-              <h2 id="insights-top-items-title">Itens mais escolhidos e vistos</h2>
-              <div id="insights-top-items-list" class="insights-ranking-list">
-                <!-- Populated via JS -->
-              </div>
-            </section>
-
-            <section class="portal-card insights-ranking-card" aria-labelledby="insights-top-categories-title">
-              <span class="card-eyebrow">Distribuição por Seção</span>
-              <h2 id="insights-top-categories-title">Categorias em destaque</h2>
-              <div id="insights-top-categories-list" class="insights-ranking-list">
-                <!-- Populated via JS -->
-              </div>
-              <p class="insights-privacy-footnote">
-                Contadores diários agregados com retenção de 13 meses. Nenhum IP, cookie ou dado pessoal é armazenado.
-              </p>
-            </section>
-          </div>
-
-          <section class="portal-card insights-ranking-card insights-likes-card" aria-labelledby="insights-likes-title">
-            <div class="insights-card-header">
-              <div>
-                <span class="card-eyebrow">Curtidas na Vitrine</span>
-                <h2 id="insights-likes-title">Itens mais curtidos</h2>
-              </div>
-              <div class="insights-likes-summary">
-                <span class="insights-metric-pill"><strong id="insights-likes-total">0</strong> no total</span>
-                <span class="insights-delta-pill"><strong id="insights-likes-period">0</strong> novas no período</span>
-              </div>
-            </div>
-            <div id="insights-likes-list" class="insights-ranking-list">
-              <!-- Populated via JS -->
-            </div>
-            <p class="insights-privacy-footnote">
-              Cada visitante curte um item uma única vez, lembrado por um cookie funcional e anônimo. Nenhum IP ou dado pessoal é armazenado.
-            </p>
-          </section>
-        </section>
-
-        <section id="leiloes-section" class="shell-section" hidden>
-          <div class="section-header insights-header-flex">
-            <div>
-              <h1 class="display-title">Leilões</h1>
-              <p class="section-desc">Acompanhe os lances, o encerramento e quem venceu cada item em leilão. Nome e WhatsApp de quem deu lance aparecem só para proprietário e administradores.</p>
-            </div>
-            <div class="auctions-toolbar">
-              <div class="form-group-inline">
-                <label for="auctions-site-select">Vitrine:</label>
-                <select id="auctions-site-select" class="select-styled compact-select"></select>
-              </div>
-              <button id="auctions-refresh" type="button" class="button button-small button-secondary button-pill">Atualizar</button>
-            </div>
-          </div>
-          <p id="auctions-status" class="auction-empty" role="status"></p>
-          <div id="auctions-list" class="auctions-list"></div>
-        </section>
-
         <section id="plano-section" class="shell-section" aria-labelledby="plano-title" hidden>
+          <a class="back-link" href="#/">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+            Início
+          </a>
           <div class="section-header">
             <h1 id="plano-title" class="display-title">Plano e cobrança</h1>
             <p class="section-desc">O plano de cada vitrine, a situação da assinatura e as faturas do Asaas. Recursos pagos mostram no próprio botão o plano que os libera.</p>
@@ -782,11 +556,15 @@
         </section>
 
         <!-- Section 3: Perfil e Interesses -->
-        <section id="perfil-section" class="shell-section" hidden>
+        <section id="perfil-section" class="shell-section page-narrow" hidden aria-labelledby="perfil-title">
+          <a class="back-link" href="#/">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+            Início
+          </a>
           <div class="section-header">
-            <h1 class="display-title">Perfil e Interesses</h1>
+            <h1 id="perfil-title" class="display-title">Perfil e Interesses</h1>
             <p class="section-desc">Personalize as informações da sua conta e selecione seus interesses de negócio.</p>
-            <p class="billing-profile-link"><a class="text-link" href="#plano">Plano e cobrança <span aria-hidden="true">→</span></a></p>
+            <p class="billing-profile-link"><a class="text-link" href="#/plano">Plano e cobrança <span aria-hidden="true">→</span></a></p>
           </div>
 
           <div class="portal-card portal-card-narrow">
@@ -794,8 +572,8 @@
 
             <!-- Read-only account card -->
             <div class="read-only-account-card">
-              <img id="profile-avatar" class="gate-avatar" src="" alt="Avatar" hidden>
-              <div id="profile-avatar-placeholder" class="gate-avatar-placeholder">U</div>
+              <img id="profile-avatar" class="gate-avatar" src="" alt="" width="64" height="64" referrerpolicy="no-referrer" decoding="async" hidden>
+              <div id="profile-avatar-placeholder" class="gate-avatar-placeholder" aria-hidden="true">U</div>
               <div class="account-card-info">
                 <span class="account-card-title">Conta Google Conectada</span>
                 <span id="profile-email" class="account-card-email">Conta Google conectada</span>
@@ -835,10 +613,14 @@
           </div>
         </section>
 
-        <!-- Section 4: Pedidos de Customização -->
-        <section id="pedidos-section" class="shell-section" hidden>
+        <!-- Customizações (pedidos sob medida ao Coletivo Inspira) -->
+        <section id="customizacoes-section" class="shell-section" hidden aria-labelledby="customizacoes-title">
+          <a class="back-link" href="#/">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+            Início
+          </a>
           <div class="section-header">
-            <h1 class="display-title">Customizações</h1>
+            <h1 id="customizacoes-title" class="display-title">Customizações</h1>
             <p class="section-desc">Solicite modificações personalizadas ou novos recursos sob medida desenvolvidos pelo Coletivo Inspira.</p>
           </div>
 
@@ -896,236 +678,81 @@
           </div>
         </section>
 
-        <!-- Section 5: Assistente 3 Passos (Wizard Nova Vitrine) -->
-        <section id="wizard-section" class="shell-section" hidden>
-          <div class="section-header">
-            <h1 class="display-title">Nova Vitrine</h1>
-            <p class="section-desc">Crie sua vitrine em minutos seguindo os 3 passos simples abaixo.</p>
-          </div>
-
-          <div class="portal-card wizard-card-styled">
-            <!-- Progress indicator steps -->
-            <div class="wizard-steps-indicator">
-              <div class="step-ind active" id="step-ind-1"><span class="step-num">1</span> <span class="step-label">Área</span></div>
-              <div class="step-line"></div>
-              <div class="step-ind" id="step-ind-2"><span class="step-num">2</span> <span class="step-label">Modelo</span></div>
-              <div class="step-line"></div>
-              <div class="step-ind" id="step-ind-3"><span class="step-num">3</span> <span class="step-label">Endereço</span></div>
-            </div>
-
-            <form id="wizard-form" novalidate class="form-wizard-spaced">
-              <!-- Step 1: Área de atuação -->
-              <div id="wizard-step-1" class="wizard-step-pane">
-                <h2>Selecione a Área de Atuação do seu Negócio</h2>
-                <p class="p-spaced">Abaixo estão as áreas oficiais da Vitrine Inspira. Escolha a que melhor se adapta:</p>
-                
-                <div class="wizard-grid-cards">
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-area" value="food" checked>
-                    <div class="card-content">
-                      <div class="v-bicolor food-color"></div>
-                      <h3>Alimentação</h3>
-                      <p>Vitrines para restaurantes, lanchonetes, padarias e docerias com pedidos diretos.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-area" value="art">
-                    <div class="card-content">
-                      <div class="v-bicolor art-color"></div>
-                      <h3>Arte & design</h3>
-                      <p>Portfólios para designers, artesãos, estilistas e estúdios criativos.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-area" value="photo">
-                    <div class="card-content">
-                      <div class="v-bicolor photo-color"></div>
-                      <h3>Fotografia & mídia</h3>
-                      <p>Vitrines para fotógrafos, produtores de conteúdo e estúdios de gravação.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-area" value="health">
-                    <div class="card-content">
-                      <div class="v-bicolor health-color"></div>
-                      <h3>Saúde</h3>
-                      <p>Apresentação e serviços para profissionais, clínicas, terapeutas e bem-estar.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-area" value="tech">
-                    <div class="card-content">
-                      <div class="v-bicolor tech-color"></div>
-                      <h3>Tecnologia</h3>
-                      <p>Vitrinas para consultorias de software, integradores e startups de serviços.</p>
-                    </div>
-                  </label>
-                </div>
-                
-                <div class="wizard-actions-spaced">
-                  <button type="button" class="button button-secondary button-pill wizard-cancel-btn">Cancelar</button>
-                  <button type="button" class="button button-pill wizard-next-btn">Continuar →</button>
-                </div>
-              </div>
-
-              <!-- Step 2: Modelo/Vitrine -->
-              <div id="wizard-step-2" class="wizard-step-pane" hidden>
-                <h2>Selecione o Modelo de Vitrine</h2>
-                <p class="p-spaced">Os modelos ativos criam sua vitrine instantaneamente. Modelos sob customização abrem um pedido estruturado:</p>
-                
-                <div class="wizard-grid-cards">
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-model" value="products" checked>
-                    <div class="card-content">
-                      <span class="badge-status-available">Disponível</span>
-                      <h3>Vitrine / Produtos</h3>
-                      <p>Lista clássica com categorias, preços, imagens e carrinho para WhatsApp.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-model" value="services">
-                    <div class="card-content">
-                      <span class="badge-status-available">Disponível</span>
-                      <h3>Serviços e produtos</h3>
-                      <p>Página completa: abertura com foto, destaques, itens, sobre, depoimentos, perguntas e convite final. Página “Para empresas” opcional.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-model" value="booking">
-                    <div class="card-content">
-                      <span class="badge-status-available">Disponível</span>
-                      <h3>Agendamento de Serviços</h3>
-                      <p>Exibição de serviços com duração, preços e formulário de data e horário.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card">
-                    <input type="radio" name="wizard-model" value="quote">
-                    <div class="card-content">
-                      <span class="badge-status-available">Disponível</span>
-                      <h3>Lista de Interesse / Orçamento</h3>
-                      <p>Clientes selecionam itens para solicitar um orçamento customizado.</p>
-                    </div>
-                  </label>
-
-                  <label class="wizard-select-card wizard-select-card-custom">
-                    <input type="radio" name="wizard-model" value="custom">
-                    <div class="card-content">
-                      <span class="badge-status-custom">Sob Customização</span>
-                      <h3>Modelo Sob Medida</h3>
-                      <p>Design exclusivo e recursos avançados. Encaminha para o formulário de Pedido.</p>
-                    </div>
-                  </label>
-                </div>
-
-                <div class="wizard-actions-spaced">
-                  <button type="button" class="button button-secondary button-pill wizard-prev-btn">← Voltar</button>
-                  <button type="button" class="button button-pill wizard-next-btn">Continuar →</button>
-                </div>
-              </div>
-
-              <!-- Step 3: Nome do negócio e Endereço/slug -->
-              <div id="wizard-step-3" class="wizard-step-pane" hidden>
-                <h2>Dê Nome e Endereço à sua Vitrine</h2>
-                <p class="p-spaced">Configure os detalhes finais de identificação na plataforma:</p>
-                
-                <div class="wizard-step3-container">
-                  <div class="form-group">
-                    <label for="wizard-site-name">Nome do seu Negócio</label>
-                    <input type="text" id="wizard-site-name" name="name" required placeholder="Ex: Pizzaria Bella Itália" class="item-input input-styled-height">
-                  </div>
-
-                  <div class="form-group">
-                    <label for="wizard-site-slug">Endereço Público (slug na url)</label>
-                    <input type="text" id="wizard-site-slug" name="slug" required placeholder="pizzaria-bella" class="item-input input-styled-height">
-                    <span id="wizard-slug-preview" class="form-help">Endereço: vitrine.inspira.dev.br/sua-loja</span>
-                    <span id="wizard-slug-validation-error" class="form-error-msg" hidden>Endereço inválido. Use letras minúsculas, números e hífens.</span>
-                  </div>
-                </div>
-
-                <div class="wizard-actions-spaced">
-                  <button type="button" class="button button-secondary button-pill wizard-prev-btn">← Voltar</button>
-                  <button type="submit" class="button button-pill">Criar Vitrine 🎉</button>
-                </div>
-              </div>
-            </form>
+        <!-- Convite para a equipe de uma vitrine -->
+        <section id="convite-section" class="shell-section page-narrow" hidden aria-labelledby="convite-title">
+          <a class="back-link" href="#/">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+            Início
+          </a>
+          <div class="portal-card">
+            <h1 id="convite-title" class="page-title">Convite para a equipe</h1>
+            <div id="invite-confirmation" class="invite-confirmation"></div>
           </div>
         </section>
 
-        <!-- Section 6: Editor (Keep inside shell content container) -->
-        <section id="editor-section" class="shell-section" hidden>
-          <!-- Fixed/Sticky Liquid Glass Action Bar (AUD-005 / FR-008) -->
-          <div class="editor-action-bar glass-surface">
-            <div class="editor-action-main">
-              <div class="editor-action-identity">
-                <button id="back-to-dashboard" class="button button-small button-secondary button-pill" type="button">Voltar</button>
-                <div class="editor-title-group">
-                  <div class="editor-title-row">
-                    <h1 id="editor-site-title">Pizzaria Bella</h1>
-                    <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span>
-                  </div>
-                  <p id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/pizzaria-bella</p>
-                  <div class="editor-status-line">
-                    <span id="autosave-indicator" class="autosave-indicator saved" role="status" aria-live="polite">Todas as alterações foram salvas</span>
-                  </div>
-                </div>
-                <div class="editor-type-inline-group">
-                  <label for="editor-catalog-type" class="editor-type-inline-label">Tipo de vitrine</label>
-                  <select id="editor-catalog-type" name="catalogType" class="select-styled editor-type-select-compact">
-                    <option value="products">Produtos (com carrinho)</option>
-                    <option value="booking">Agendamento de Serviços</option>
-                    <option value="quote">Lista de Interesse / Orçamento</option>
-                  </select>
+        <!-- Vitrine: Itens | Pedidos | Configurações -->
+        <section id="editor-section" class="shell-section vitrine-view" hidden aria-labelledby="vitrine-name-label">
+          <header class="vitrine-header">
+            <div class="vitrine-header-row">
+              <a id="back-to-dashboard" class="icon-button" href="#/" aria-label="Voltar para o início" title="Voltar para o início">
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+              </a>
+              <div class="vitrine-title-wrap">
+                <label id="vitrine-name-label" class="visually-hidden" for="vitrine-name-input">Nome da vitrine</label>
+                <input id="vitrine-name-input" class="vitrine-name-input" type="text" maxlength="160" autocomplete="off" spellcheck="false">
+                <div class="vitrine-title-meta">
+                  <span id="autosave-indicator" class="autosave-indicator saved" role="status" aria-live="polite">Salvo</span>
+                  <span id="editor-site-slug" class="editor-slug-text">vitrine.inspira.dev.br/sua-vitrine</span>
                 </div>
               </div>
-
-              <div class="editor-save-container">
-                <div class="dropdown-wrapper editor-view-menu-wrapper">
-                  <button id="editor-view-menu-btn" class="button button-small button-secondary button-pill editor-action-btn-view" type="button" aria-haspopup="menu" aria-expanded="false">
-                    <svg width="16" height="16" aria-hidden="true"><use href="#icon-eye"/></svg>
-                    <span>Ver</span>
+              <div class="vitrine-actions">
+                <button id="customize-open-btn" class="icon-button" type="button" aria-haspopup="dialog" aria-controls="customize-dialog" aria-label="Personalizar" title="Personalizar">
+                  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.6-9-7.6Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>
+                </button>
+                <button id="preview-open-btn" class="icon-button" type="button" aria-haspopup="dialog" aria-controls="preview-dialog" aria-label="Visualizar" title="Visualizar">
+                  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button id="publish-site-button" class="button button-small button-pill" type="button">Publicar</button>
+                <div class="menu-anchor">
+                  <button id="vitrine-more-btn" class="icon-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="vitrine-more-menu" aria-label="Mais ações" title="Mais ações">
+                    <svg class="icon-dots" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
                   </button>
-                  <div id="editor-view-menu" class="dropdown-menu editor-view-dropdown" hidden role="menu" aria-label="Visualizar vitrine">
-                    <a id="editor-open-public-link" role="menuitem" class="dropdown-item" href="/loja1" target="_blank" rel="noopener noreferrer">
-                      <strong>Abrir vitrine</strong>
-                      <span>Ver página publicada</span>
-                    </a>
-                    <button id="secure-preview-button" role="menuitem" class="dropdown-item" type="button" hidden>
-                      <strong>Abrir prévia salva</strong>
-                      <span>Link privado temporário</span>
-                    </button>
+                  <div id="vitrine-more-menu" class="menu-popup menu-popup-end" role="menu" aria-label="Mais ações" hidden>
+                    <button id="csv-upload-menu-item" class="menu-item" role="menuitem" type="button">Importar planilha</button>
+                    <button id="csv-export-btn" class="menu-item" role="menuitem" type="button">Exportar planilha</button>
+                    <a class="menu-item" role="menuitem" href="./modelo-produtos.csv" download="modelo-produtos.csv">Baixar modelo (produtos)</a>
+                    <a class="menu-item" role="menuitem" href="./modelo-servicos.csv" download="modelo-servicos.csv">Baixar modelo (serviços)</a>
+                    <a id="editor-open-public-link" class="menu-item" role="menuitem" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir vitrine publicada</a>
+                    <button id="secure-preview-button" class="menu-item" role="menuitem" type="button" hidden>Abrir prévia salva (link privado)</button>
                   </div>
                 </div>
-                <button id="save-draft-button" class="button button-small button-secondary button-pill editor-equal-action-btn" type="button">Salvar rascunho</button>
-                <button id="publish-site-button" class="button button-small button-pill editor-equal-action-btn" type="button">Publicar vitrine</button>
               </div>
             </div>
 
-            <!-- Compact inline meters -->
-            <div class="editor-compact-meters" aria-label="Limites do rascunho">
-              <div class="compact-meter-item">
-                <span class="stat-label">Ativos</span>
-                <span id="active-items-count" class="stat-value">0 / 20</span>
-                <progress id="active-items-progress" max="20" value="0"></progress>
-              </div>
-              <div class="compact-meter-item">
-                <span class="stat-label">Total</span>
-                <span id="total-items-count" class="stat-value">0 / 100</span>
-                <progress id="total-items-progress" max="100" value="0"></progress>
-              </div>
-              <div class="compact-meter-item">
-                <span class="stat-label">Rascunho</span>
-                <span id="draft-size-count" class="stat-value">0 KiB / 256 KiB</span>
-                <progress id="draft-size-progress" max="262144" value="0"></progress>
-              </div>
+            <div class="vitrine-tabs" role="tablist" aria-label="Seções da vitrine">
+              <button id="tab-itens" class="vitrine-tab" type="button" role="tab" data-tab="itens" aria-controls="panel-itens" aria-selected="true">Itens</button>
+              <button id="tab-pedidos" class="vitrine-tab" type="button" role="tab" data-tab="pedidos" aria-controls="panel-pedidos" aria-selected="false" tabindex="-1">Pedidos</button>
+              <button id="tab-config" class="vitrine-tab" type="button" role="tab" data-tab="config" aria-controls="panel-config" aria-selected="false" tabindex="-1">Configurações</button>
             </div>
+          </header>
 
+          <!-- Limites: aparecem só acima de 80% ou quando um limite é ultrapassado -->
+          <div id="editor-limits" class="editor-limits" aria-label="Limites do rascunho" hidden>
+            <div class="compact-meter-item">
+              <span class="stat-label">Ativos</span>
+              <span id="active-items-count" class="stat-value">0 / 20</span>
+              <progress id="active-items-progress" max="20" value="0"></progress>
+            </div>
+            <div class="compact-meter-item">
+              <span class="stat-label">Total</span>
+              <span id="total-items-count" class="stat-value">0 / 100</span>
+              <progress id="total-items-progress" max="100" value="0"></progress>
+            </div>
+            <div class="compact-meter-item">
+              <span class="stat-label">Rascunho</span>
+              <span id="draft-size-count" class="stat-value">0 KiB / 256 KiB</span>
+              <progress id="draft-size-progress" max="262144" value="0"></progress>
+            </div>
             <div class="editor-meter-warnings">
               <span id="active-items-warning" class="stat-warning" hidden>Limite de 20 itens ativos excedido no plano gratuito.</span>
               <span id="total-items-warning" class="stat-warning" hidden>Limite técnico de 100 itens totais excedido.</span>
@@ -1133,20 +760,11 @@
             </div>
           </div>
 
-          <!-- Publication Status Banner -->
-          <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
-            <div class="publication-status-info">
-              <span class="publication-badge">Publicada</span>
-              <span id="publication-status-text">Vitrine publicada com sucesso.</span>
-            </div>
-            <a id="publication-view-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir Vitrine Pública</a>
-          </div>
-
           <!-- Optimistic Concurrency Alert Banner -->
-          <div id="conflict-banner" class="conflict-banner" hidden>
+          <div id="conflict-banner" class="conflict-banner" role="alert" hidden>
             <div class="conflict-content">
               <h3>Alerta de Concorrência</h3>
-              <p>Este rascunho foi atualizado em outra aba ou dispositivo. Recarregue antes de salvar.</p>
+              <p>Este rascunho foi atualizado em outra aba ou dispositivo. O salvamento automático foi pausado; recarregue antes de continuar.</p>
               <div class="conflict-actions">
                 <button id="reload-conflict-button" class="button button-small button-pill" type="button">Recarregar rascunho remoto</button>
                 <button id="copy-conflict-button" class="button button-small button-secondary button-pill" type="button">Copiar alterações locais</button>
@@ -1154,7 +772,6 @@
             </div>
           </div>
 
-          <!-- Confirmation Dialog for Switching Vitrine Type -->
           <dialog id="catalog-type-confirm-dialog" class="portal-dialog" aria-labelledby="catalog-type-dialog-title">
             <div class="portal-dialog-body">
               <h3 id="catalog-type-dialog-title" class="portal-dialog-title">Trocar para Agendamento de Serviços?</h3>
@@ -1166,604 +783,633 @@
             </div>
           </dialog>
 
-          <!-- Editor Navigation Tabs (Fix AUD-005, 44px targets with icon on top, zero horizontal scroll) -->
-          <div class="editor-tabs-selector" role="tablist" aria-label="Seções do editor">
-            <button type="button" role="tab" class="tab-btn active" data-tab="items" aria-selected="true" aria-label="Itens e planilha">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-              <span>Itens</span>
-            </button>
-            <button type="button" role="tab" class="tab-btn" data-tab="categories" aria-selected="false" aria-label="Categorias da vitrine">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-              <span>Categorias</span>
-            </button>
-            <button type="button" role="tab" class="tab-btn" data-tab="settings" aria-selected="false" aria-label="Configurações e estrutura">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              <span>Ajustes</span>
-            </button>
-            <button type="button" role="tab" class="tab-btn" data-tab="order-msg" aria-selected="false" aria-label="Pedido e mensagem">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <span>Pedido</span>
-            </button>
-            <button type="button" role="tab" class="tab-btn" data-tab="channels" aria-selected="false" aria-label="Canais: links diretos e integrações">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              <span>Canais</span>
-            </button>
-            <button type="button" role="tab" class="tab-btn mobile-only-tab" data-tab="preview" aria-selected="false" aria-label="Prévia ao vivo">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span>Prévia</span>
-            </button>
+          <!-- ABA: Itens -->
+          <div id="panel-itens" class="vitrine-panel panel-itens" role="tabpanel" aria-labelledby="tab-itens" tabindex="-1">
+            <div class="items-column">
+              <!-- CSV Import Preview Panel -->
+              <div id="csv-preview-container" class="csv-preview-container" hidden>
+                <div class="csv-preview-top">
+                  <div>
+                    <h3>Prévia da Importação CSV</h3>
+                    <p id="csv-file-name" class="csv-file-name">Arquivo selecionado</p>
+                  </div>
+                  <span class="csv-summary-pill" id="csv-summary-text">0 linhas válidas</span>
+                </div>
+
+                <div id="csv-errors-list" class="csv-errors-list" hidden></div>
+
+                <div class="form-group csv-radio-group">
+                  <span class="sf-field-label">Como aplicar ao rascunho</span>
+                  <div class="radio-group-container">
+                    <label class="radio-label-styled">
+                      <input type="radio" name="csv-import-mode" value="merge" checked> Adicionar à vitrine (atualiza categoria + nome existentes)
+                    </label>
+                    <label class="radio-label-styled">
+                      <input type="radio" name="csv-import-mode" value="replace"> Substituir vitrine
+                    </label>
+                  </div>
+                </div>
+
+                <div class="csv-preview-actions">
+                  <button type="button" id="csv-cancel-btn" class="button button-small button-secondary button-pill">Cancelar</button>
+                  <button type="button" id="csv-apply-btn" class="button button-small button-pill">Aplicar ao rascunho</button>
+                </div>
+              </div>
+
+              <div id="items-container" class="items-list categories-list-builder">
+                <!-- Seções (categorias) e cartões de item renderizados via JS -->
+              </div>
+            </div>
+
+            <!-- Barra flutuante no estilo do Google Forms -->
+            <div class="forms-floating-toolbar" role="toolbar" aria-label="Adicionar à vitrine" aria-orientation="vertical">
+              <div class="toolbar-menu-wrapper">
+                <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item" aria-haspopup="menu" aria-expanded="false">
+                  <svg width="20" height="20" class="toolbar-svg-icon" aria-hidden="true"><use href="#icon-plus"/></svg>
+                  <span class="tooltip">Adicionar item</span>
+                </button>
+                <div id="toolbar-add-item-menu" class="dropdown-menu toolbar-dropdown-menu" hidden role="menu" aria-label="Tipo de item">
+                  <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="fixed">
+                    <span class="toolbar-mode-row">
+                      <svg width="18" height="18" class="toolbar-mode-icon" aria-hidden="true"><use href="#icon-tag"/></svg>
+                      <strong>Item à venda</strong>
+                    </span>
+                    <span>Preço fixo na vitrine</span>
+                  </button>
+                  <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="offer">
+                    <span class="toolbar-mode-row">
+                      <svg width="18" height="18" class="toolbar-mode-icon" aria-hidden="true"><use href="#icon-gavel"/></svg>
+                      <strong>Item de lance</strong>
+                    </span>
+                    <span>Visitante propõe o valor</span>
+                  </button>
+                  <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="donation">
+                    <span class="toolbar-mode-row">
+                      <svg width="18" height="18" class="toolbar-mode-icon" aria-hidden="true"><use href="#icon-heart-hand"/></svg>
+                      <strong>Doação</strong>
+                    </span>
+                    <span>Sem custo, com condições opcionais</span>
+                  </button>
+                  <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="trade">
+                    <span class="toolbar-mode-row">
+                      <svg width="18" height="18" class="toolbar-mode-icon" aria-hidden="true"><use href="#icon-arrows-swap"/></svg>
+                      <strong>Troca</strong>
+                    </span>
+                    <span>Combinar troca pelo WhatsApp</span>
+                  </button>
+                  <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="quota">
+                    <span class="toolbar-mode-row">
+                      <svg width="18" height="18" class="toolbar-mode-icon" aria-hidden="true"><use href="#icon-users-quota"/></svg>
+                      <strong>Cotas de apoio</strong>
+                    </span>
+                    <span>Meta dividida em partes iguais, sem sorteio</span>
+                  </button>
+                </div>
+              </div>
+              <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar categoria" aria-label="Adicionar categoria">
+                <svg width="20" height="20" viewBox="0 0 24 24" class="toolbar-svg-icon" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>
+                <span class="tooltip">Adicionar categoria</span>
+              </button>
+              <button type="button" class="toolbar-btn" id="toolbar-add-image" title="Adicionar item com foto" aria-label="Adicionar item com foto">
+                <svg width="20" height="20" class="toolbar-svg-icon" aria-hidden="true"><use href="#icon-image"/></svg>
+                <span class="tooltip">Adicionar item com foto</span>
+              </button>
+              <button type="button" class="toolbar-btn" id="csv-upload-btn" title="Importar planilha" aria-label="Importar planilha">
+                <svg width="20" height="20" viewBox="0 0 24 24" class="toolbar-svg-icon" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 21h14"/></svg>
+                <span class="tooltip">Importar planilha</span>
+              </button>
+              <input type="file" id="csv-file-input" accept=".csv,text/csv" class="file-input-hidden" aria-label="Selecionar arquivo CSV da vitrine">
+            </div>
           </div>
 
-          <div class="editor-workspace">
-            <!-- Editor Controls (Left Pane) -->
-            <div class="editor-controls-pane portal-card portal-card-left">
-
-              <!-- PANE 1: Items & CSV -->
-              <div id="pane-items" class="editor-tab-pane">
-                <div class="editor-items-header-row">
-                  <div>
-                    <h2>Itens da Vitrine</h2>
-                    <p class="form-help">Gerencie os produtos, serviços ou itens de orçamento de cada categoria.</p>
-                  </div>
-                  <div class="form-group-inline">
-                    <label for="editor-category-select">Categoria:</label>
-                    <select id="editor-category-select" class="select-styled compact-select">
-                      <!-- Populated via JS -->
-                    </select>
-                  </div>
-                </div>
-
-                <div class="editor-items-toolbar">
-                  <!-- Type Menu Dropdown -->
-                  <div class="dropdown-wrapper">
-                    <button id="add-item-button" class="button button-small button-pill" type="button" aria-haspopup="menu" aria-expanded="false">+ Adicionar item</button>
-                    <div id="add-item-menu" class="dropdown-menu" hidden role="menu" aria-label="Tipo de item">
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="photo">
-                        <strong>Produto com foto</strong>
-                        <span>Nome, preço, descrição e foto</span>
-                      </button>
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="price">
-                        <strong>Produto ou serviço com preço</strong>
-                        <span>Nome, preço e descrição</span>
-                      </button>
-                      <button type="button" role="menuitem" class="dropdown-item" data-type="text">
-                        <strong>Só texto (orçamento)</strong>
-                        <span>Nome e descrição</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Planilha Dropdown -->
-                  <div class="dropdown-wrapper">
-                    <button id="csv-menu-btn" class="button button-small button-secondary button-pill" type="button" aria-haspopup="menu" aria-expanded="false">Planilha (CSV)</button>
-                    <div id="csv-dropdown-menu" class="dropdown-menu" hidden role="menu">
-                      <button type="button" role="menuitem" id="csv-upload-btn-item" class="dropdown-item">Importar planilha</button>
-                      <button type="button" role="menuitem" id="csv-export-btn-item" class="dropdown-item">Exportar vitrine</button>
-                      <a href="./modelo-produtos.csv" download="modelo-produtos.csv" role="menuitem" class="dropdown-item">Baixar modelo (produtos)</a>
-                      <a href="./modelo-servicos.csv" download="modelo-servicos.csv" role="menuitem" class="dropdown-item">Baixar modelo (serviços)</a>
-                    </div>
-                  </div>
-                  
-                  <input type="file" id="csv-file-input" accept=".csv,text/csv" class="file-input-hidden" aria-label="Selecionar arquivo CSV da vitrine">
-                </div>
-
-                <div class="csv-models-hint">
-                  <span>Modelos compatíveis com Excel e Google Planilhas (UTF-8, <code>;</code> e vírgula decimal):</span>
-                  <a href="./modelo-produtos.csv" download="modelo-produtos.csv">modelo-produtos.csv</a>
-                  <span>·</span>
-                  <a href="./modelo-servicos.csv" download="modelo-servicos.csv">modelo-servicos.csv</a>
-                </div>
-
-                <!-- CSV Import Preview Panel -->
-                <div id="csv-preview-container" class="csv-preview-container" hidden>
-                  <div class="csv-preview-top">
-                    <div>
-                      <h3>Prévia da Importação CSV</h3>
-                      <p id="csv-file-name" class="csv-file-name">Arquivo selecionado</p>
-                    </div>
-                    <span class="csv-summary-pill" id="csv-summary-text">0 linhas válidas</span>
-                  </div>
-
-                  <div id="csv-errors-list" class="csv-errors-list" hidden></div>
-
-                  <div class="form-group csv-radio-group">
-                    <span class="sf-field-label">Como aplicar ao rascunho</span>
-                    <div class="radio-group-container">
-                      <label class="radio-label-styled">
-                        <input type="radio" name="csv-import-mode" value="merge" checked> Adicionar à vitrine (atualiza categoria + nome existentes)
-                      </label>
-                      <label class="radio-label-styled">
-                        <input type="radio" name="csv-import-mode" value="replace"> Substituir vitrine
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="csv-preview-actions">
-                    <button type="button" id="csv-cancel-btn" class="button button-small button-secondary button-pill">Cancelar</button>
-                    <button type="button" id="csv-apply-btn" class="button button-small button-pill">Aplicar ao rascunho</button>
-                  </div>
-                </div>
-
-                <div class="editor-items-workspace">
-                  <div id="items-container" class="categories-list-builder">
-                    <!-- Items rendered dynamically via JS -->
-                  </div>
-
-                  <!-- Floating Side/Bottom Toolbar (Google Forms style) -->
-                  <div class="forms-floating-toolbar" role="toolbar" aria-label="Ações do formulário">
-                    <div class="toolbar-menu-wrapper">
-                      <button type="button" class="toolbar-btn" id="toolbar-add-item" title="Adicionar item" aria-label="Adicionar item" aria-haspopup="menu" aria-expanded="false">
-                        <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-plus"/></svg>
-                        <span class="tooltip">Adicionar item</span>
-                      </button>
-                      <div id="toolbar-add-item-menu" class="dropdown-menu toolbar-dropdown-menu" hidden role="menu" aria-label="Tipo de item">
-                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="fixed">
-                          <span class="toolbar-mode-row">
-                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-tag"/></svg>
-                            <strong>Item à venda</strong>
-                          </span>
-                          <span>Preço fixo na vitrine</span>
-                        </button>
-                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="offer">
-                          <span class="toolbar-mode-row">
-                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-gavel"/></svg>
-                            <strong>Item de lance</strong>
-                          </span>
-                          <span>Visitante propõe o valor</span>
-                        </button>
-                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="donation">
-                          <span class="toolbar-mode-row">
-                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-heart-hand"/></svg>
-                            <strong>Doação</strong>
-                          </span>
-                          <span>Sem custo, com condições opcionais</span>
-                        </button>
-                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="trade">
-                          <span class="toolbar-mode-row">
-                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-arrows-swap"/></svg>
-                            <strong>Troca</strong>
-                          </span>
-                          <span>Combinar troca pelo WhatsApp</span>
-                        </button>
-                        <button type="button" role="menuitem" class="dropdown-item toolbar-mode-option" data-price-mode="quota">
-                          <span class="toolbar-mode-row">
-                            <svg width="18" height="18" class="toolbar-mode-icon"><use href="#icon-users-quota"/></svg>
-                            <strong>Cotas de apoio</strong>
-                          </span>
-                          <span>Meta dividida em partes iguais, sem sorteio</span>
-                        </button>
-                      </div>
-                    </div>
-                    <button type="button" class="toolbar-btn" id="toolbar-add-section" title="Adicionar seção" aria-label="Adicionar seção">
-                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-edit"/></svg>
-                      <span class="tooltip">Adicionar seção</span>
-                    </button>
-                    <button type="button" class="toolbar-btn" id="toolbar-add-image" title="Adicionar imagem" aria-label="Adicionar imagem">
-                      <svg width="20" height="20" class="toolbar-svg-icon"><use href="#icon-image"/></svg>
-                      <span class="tooltip">Adicionar imagem</span>
-                    </button>
-                  </div>
+          <!-- ABA: Pedidos (Insights e leilões da vitrine aberta) -->
+          <div id="panel-pedidos" class="vitrine-panel panel-narrow" role="tabpanel" aria-labelledby="tab-pedidos" tabindex="-1" hidden>
+            <div class="portal-card insights-summary-card">
+              <div class="insights-summary-top">
+                <ul id="insights-highlights-list" class="insights-highlights-list" aria-live="polite">
+                  <li>Carregando destaques do período...</li>
+                </ul>
+                <div class="insights-period-pills" role="group" aria-label="Período de análise">
+                  <button type="button" class="chip-btn insights-period-btn active" data-period="7d" aria-pressed="true">7 dias</button>
+                  <button type="button" class="chip-btn insights-period-btn" data-period="30d" aria-pressed="false">30 dias</button>
+                  <button type="button" class="chip-btn insights-period-btn" data-period="90d" aria-pressed="false">90 dias</button>
                 </div>
               </div>
 
-              <!-- PANE 2: Categories -->
-              <div id="pane-categories" class="editor-tab-pane" hidden>
-                <div class="editor-categories-header">
-                  <div>
-                    <h2>Categorias da Vitrine</h2>
-                    <p class="form-help">Adicione, ordene, exclua ou renomeie as seções da sua vitrine.</p>
-                  </div>
-                  <button id="add-category-button" class="button button-small button-pill" type="button">+ Categoria</button>
+              <dl class="insights-kpi-grid" aria-label="Resumo do período">
+                <div class="insights-kpi">
+                  <dt class="insights-kpi-label">Visitas</dt>
+                  <dd id="insights-kpi-visits" class="insights-kpi-value">0</dd>
+                  <dd id="insights-kpi-visits-delta" class="insights-kpi-delta">Período anterior: 0</dd>
                 </div>
-                <div id="categories-container" class="categories-list-builder">
-                  <!-- Rendered via JS -->
+                <div class="insights-kpi">
+                  <dt class="insights-kpi-label">Pedidos no WhatsApp</dt>
+                  <dd id="insights-kpi-orders" class="insights-kpi-value">0</dd>
+                  <dd id="insights-kpi-orders-delta" class="insights-kpi-delta">Período anterior: 0</dd>
+                  <dd id="insights-kpi-estimated" class="insights-kpi-delta">R$ 0,00 estimados</dd>
+                </div>
+                <div class="insights-kpi">
+                  <dt class="insights-kpi-label">Conversão</dt>
+                  <dd id="insights-kpi-conversion" class="insights-kpi-value">0,0%</dd>
+                  <dd id="insights-kpi-conversion-delta" class="insights-kpi-delta">Pedidos sobre visitas</dd>
+                </div>
+              </dl>
+            </div>
+
+            <section class="portal-card insights-chart-card" aria-labelledby="insights-day-chart-title">
+              <div class="insights-card-header">
+                <h2 id="insights-day-chart-title">Visitas e pedidos por dia</h2>
+                <div class="insights-chart-legend" aria-hidden="true">
+                  <span class="legend-item"><span class="legend-swatch swatch-visits"></span> Visitas</span>
+                  <span class="legend-item"><span class="legend-swatch swatch-orders"></span> Pedidos</span>
                 </div>
               </div>
+              <div id="insights-day-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de visitas e pedidos por dia"></div>
+            </section>
 
-              <!-- PANE 3: Settings -->
-              <div id="pane-settings" class="editor-tab-pane" hidden>
-                <h2>Configurações e Componentes</h2>
-                <form id="editor-settings-form" novalidate class="form-flex-col">
-                  <div class="form-group">
-                    <label for="editor-business-name">Nome exibido na vitrine</label>
-                    <input type="text" id="editor-business-name" name="businessName" maxlength="160" placeholder="Ex: Pastus Fogo &amp; Parrilla" class="item-input input-styled-height">
+            <section class="portal-card insights-ranking-card" aria-labelledby="insights-top-items-title">
+              <h2 id="insights-top-items-title">Itens mais escolhidos</h2>
+              <div id="insights-top-items-list" class="insights-ranking-list"></div>
+            </section>
+
+            <section id="auctions-block" class="portal-card auctions-block" aria-labelledby="auctions-title" hidden>
+              <div class="insights-card-header">
+                <h2 id="auctions-title">Leilões</h2>
+                <button id="auctions-refresh" type="button" class="button button-small button-secondary button-pill">Atualizar</button>
+              </div>
+              <p class="form-help">Lances, encerramento e quem venceu cada item em leilão. Nome e WhatsApp de quem deu lance aparecem só para proprietário e administradores.</p>
+              <p id="auctions-status" class="auction-empty" role="status"></p>
+              <div id="auctions-list" class="auctions-list"></div>
+            </section>
+
+            <details class="portal-card insights-more">
+              <summary class="insights-more-summary">Ver mais</summary>
+              <section id="insights-origin-card" class="insights-more-block insights-origin-card" aria-labelledby="insights-origin-title">
+                <!-- Populated via insights-origin.mjs -->
+              </section>
+              <section class="insights-more-block" aria-labelledby="insights-hour-chart-title">
+                <div class="insights-card-header">
+                  <h2 id="insights-hour-chart-title">Acessos e pedidos por hora</h2>
+                  <span class="insights-chart-unit">0h às 23h</span>
+                </div>
+                <div id="insights-hour-chart-container" class="insights-svg-wrap" role="img" aria-label="Gráfico de atividade por hora do dia"></div>
+              </section>
+              <section class="insights-more-block" aria-labelledby="insights-top-categories-title">
+                <h2 id="insights-top-categories-title">Categorias em destaque</h2>
+                <div id="insights-top-categories-list" class="insights-ranking-list"></div>
+              </section>
+              <section class="insights-more-block insights-likes-card" aria-labelledby="insights-likes-title">
+                <div class="insights-card-header">
+                  <h2 id="insights-likes-title">Itens mais curtidos</h2>
+                  <div class="insights-likes-summary">
+                    <span class="insights-metric-pill"><strong id="insights-likes-total">0</strong> no total</span>
+                    <span class="insights-delta-pill"><strong id="insights-likes-period">0</strong> novas no período</span>
                   </div>
+                </div>
+                <div id="insights-likes-list" class="insights-ranking-list"></div>
+                <p class="insights-privacy-footnote">Cada visitante curte um item uma única vez, lembrado por um cookie funcional e anônimo. Nenhum IP ou dado pessoal é armazenado.</p>
+              </section>
+            </details>
 
-                  <div class="form-group">
-                    <label for="editor-whatsapp">WhatsApp do Negócio</label>
-                    <input type="text" id="editor-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="+55 (51) 99999-9999" class="item-input input-styled-height">
-                    <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
-                  </div>
+            <p class="insights-privacy-footnote">Contadores diários agregados com retenção de 13 meses. Nenhum IP, cookie ou dado pessoal é armazenado.</p>
+          </div>
 
-                  <div class="form-group mila-relay-group">
-                    <label class="checkbox-label-styled mila-relay-toggle" for="editor-mila-relay">
-                      <input type="checkbox" id="editor-mila-relay" role="switch" aria-checked="false" aria-describedby="editor-mila-relay-help">
-                      <span>Receber pedidos pela Mila (meu número não aparece na vitrine)</span>
+          <!-- ABA: Configurações (seções recolhíveis) -->
+          <div id="panel-config" class="vitrine-panel panel-narrow" role="tabpanel" aria-labelledby="tab-config" tabindex="-1" hidden>
+            <details id="config-atendimento" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Atendimento</span>
+                <span id="config-atendimento-summary" class="config-summary-text">WhatsApp, tipo de vitrine e área de atuação</span>
+              </summary>
+              <form id="editor-settings-form" novalidate class="config-body form-flex-col">
+                <div class="form-group">
+                  <label for="editor-whatsapp">WhatsApp para pedidos</label>
+                  <input type="text" id="editor-whatsapp" name="whatsapp" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="+55 (51) 99999-9999" class="item-input input-styled-height">
+                  <span id="editor-whatsapp-error" class="form-error-msg" hidden>Digite um número de WhatsApp válido (ex: +55 (51) 99999-9999).</span>
+                </div>
+
+                <div class="form-group mila-relay-group">
+                  <label class="checkbox-label-styled mila-relay-toggle" for="editor-mila-relay">
+                    <input type="checkbox" id="editor-mila-relay" role="switch" aria-checked="false" aria-describedby="editor-mila-relay-help">
+                    <span>Receber pedidos pela Mila (meu número não aparece na vitrine)</span>
+                  </label>
+                  <span id="editor-mila-relay-help" class="form-help" aria-live="polite">Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="editor-catalog-type">Tipo de vitrine</label>
+                  <select id="editor-catalog-type" name="catalogType" class="select-styled">
+                    <option value="products">Produtos (com carrinho)</option>
+                    <option value="booking">Agendamento de Serviços</option>
+                    <option value="quote">Lista de Interesse / Orçamento</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="editor-storefront-type">Área de atuação</label>
+                  <select id="editor-storefront-type" name="storefrontType" class="select-styled">
+                    <option value="food">Alimentação</option>
+                    <option value="art">Arte &amp; design</option>
+                    <option value="photo">Fotografia &amp; mídia</option>
+                    <option value="health">Saúde</option>
+                    <option value="tech">Tecnologia</option>
+                  </select>
+                </div>
+              </form>
+            </details>
+
+            <details id="config-pedido" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Pedido</span>
+                <span id="config-pedido-summary" class="config-summary-text">Campos, horários e mensagem do WhatsApp</span>
+              </summary>
+              <form id="editor-order-msg-form" novalidate class="config-body form-flex-col">
+                <fieldset class="form-group">
+                  <legend class="label-spaced">Campos pedidos ao visitante</legend>
+                  <span class="form-help help-block-spaced">Escolha quais informações o visitante preenche antes de confirmar no WhatsApp:</span>
+                  <div class="checkbox-group-grid">
+                    <label class="checkbox-label-styled">
+                      <input type="checkbox" id="field-cust-name"> Nome de quem pede
                     </label>
-                    <span id="editor-mila-relay-help" class="form-help" aria-live="polite">Desligado: os pedidos chegam direto no seu WhatsApp, e o número aparece na vitrine publicada.</span>
-                  </div>
-                  <fieldset class="form-group locality-fieldset" id="editor-locality-group">
-                    <legend class="locality-legend">Página por cidade</legend>
-                    <span class="form-help">Seus itens de lance, doação e troca podem aparecer na página pública da sua cidade, junto com outras vitrines. Lá aparecem só o nome da vitrine, a cidade e os dados públicos dos itens; nada de nome, telefone ou endereço.</span>
-                    <label class="checkbox-label-styled locality-optin">
-                      <input type="checkbox" id="editor-locality-listed"> Mostrar meus itens de lance, doação e troca na página da cidade
+                    <label class="checkbox-label-styled">
+                      <input type="checkbox" id="field-date"> Data de preferência
                     </label>
-                    <div class="locality-fields-row">
-                      <div class="locality-field locality-field-city">
-                        <label for="editor-locality-city">Cidade</label>
-                        <input type="text" id="editor-locality-city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Porto Alegre" class="item-input input-styled-height">
+                    <label class="checkbox-label-styled">
+                      <input type="checkbox" id="field-delivery-pickup"> Endereço de entrega ou retirada
+                    </label>
+                    <label class="checkbox-label-styled">
+                      <input type="checkbox" id="field-notes"> Observação opcional
+                    </label>
+                  </div>
+                </fieldset>
+
+                <div class="form-group" id="field-timeslots-config-group">
+                  <div class="timeslots-header-row">
+                    <label for="timeslot-picker-input">Horários disponíveis para preferência</label>
+                    <span id="timeslots-status-note" class="timeslots-count-badge">0 / 24 horários</span>
+                  </div>
+                  <div class="timeslots-picker-controls">
+                    <input type="time" id="timeslot-picker-input" value="09:00" class="item-input input-styled-height timeslot-time-input" aria-label="Escolher horário">
+                    <button type="button" id="timeslot-add-btn" class="button button-small button-secondary button-pill">Adicionar horário</button>
+                    <button type="button" id="timeslot-generator-toggle-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Gerar horários</button>
+                  </div>
+                  <div id="timeslot-generator-panel" class="timeslot-generator-panel" hidden>
+                    <div class="timeslot-generator-grid">
+                      <div class="form-group structure-field-group">
+                        <label for="timeslot-gen-start" class="structure-field-label">Das</label>
+                        <input type="time" id="timeslot-gen-start" value="09:00" class="item-input input-styled-height">
                       </div>
-                      <div class="locality-field locality-field-uf">
-                        <label for="editor-locality-uf">Estado</label>
-                        <select id="editor-locality-uf" class="select-styled input-styled-height">
-                          <option value="">UF</option>
-                          <option value="AC">AC</option>
-                          <option value="AL">AL</option>
-                          <option value="AP">AP</option>
-                          <option value="AM">AM</option>
-                          <option value="BA">BA</option>
-                          <option value="CE">CE</option>
-                          <option value="DF">DF</option>
-                          <option value="ES">ES</option>
-                          <option value="GO">GO</option>
-                          <option value="MA">MA</option>
-                          <option value="MT">MT</option>
-                          <option value="MS">MS</option>
-                          <option value="MG">MG</option>
-                          <option value="PA">PA</option>
-                          <option value="PB">PB</option>
-                          <option value="PR">PR</option>
-                          <option value="PE">PE</option>
-                          <option value="PI">PI</option>
-                          <option value="RJ">RJ</option>
-                          <option value="RN">RN</option>
-                          <option value="RS">RS</option>
-                          <option value="RO">RO</option>
-                          <option value="RR">RR</option>
-                          <option value="SC">SC</option>
-                          <option value="SP">SP</option>
-                          <option value="SE">SE</option>
-                          <option value="TO">TO</option>
+                      <div class="form-group structure-field-group">
+                        <label for="timeslot-gen-end" class="structure-field-label">Às</label>
+                        <input type="time" id="timeslot-gen-end" value="17:00" class="item-input input-styled-height">
+                      </div>
+                      <div class="form-group structure-field-group">
+                        <label for="timeslot-gen-step" class="structure-field-label">A cada</label>
+                        <select id="timeslot-gen-step" class="select-styled">
+                          <option value="30">30 minutos</option>
+                          <option value="60" selected>60 minutos</option>
+                          <option value="90">90 minutos</option>
                         </select>
                       </div>
                     </div>
-                    <span id="editor-locality-error" class="form-error-msg" role="alert" hidden>Informe a cidade e o estado para aparecer na página da cidade.</span>
-                    <span class="form-help">Vale a partir da próxima publicação. <a id="editor-locality-link" class="text-link" href="/por-cidade" target="_blank" rel="noopener noreferrer">Ver página por cidade</a></span>
-                  </fieldset>
-
-                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-hours-group" aria-describedby="editor-hours-help">
-                    <legend class="locality-legend">Horário de funcionamento</legend>
-                    <span id="editor-hours-help" class="form-help">Horário de Brasília (São Paulo), até 2 faixas por dia. Com horário, a vitrine mostra o selo "Aberto agora" ou "Fechado · abre às 18h". Para faixas que passam da meia-noite (18:00 às 02:00), marque "Termina no dia seguinte".</span>
-                    <div id="editor-hours-days" class="hours-days"></div>
-                    <div class="hours-closed">
-                      <span class="label-spaced">Dias fechados (exceções)</span>
-                      <div class="hours-closed-actions">
-                        <button type="button" id="editor-hours-close-today" class="button button-small button-secondary button-pill" aria-pressed="false">Fechado hoje</button>
-                        <label class="hours-date-label" for="editor-hours-closed-date">Outra data</label>
-                        <input type="date" id="editor-hours-closed-date" class="item-input input-styled-height hours-date-input">
-                        <button type="button" id="editor-hours-closed-add" class="button button-small button-secondary button-pill">Fechar esta data</button>
-                      </div>
-                      <ul id="editor-hours-closed-list" class="hours-closed-list" aria-label="Datas fechadas"></ul>
-                      <span id="editor-hours-closed-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <p id="editor-hours-status" class="form-help hours-status" aria-live="polite"></p>
-                  </fieldset>
-
-                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-address-group">
-                    <legend class="locality-legend">Endereço público (opcional)</legend>
-                    <span class="form-help">Com endereço, a vitrine mostra o endereço e o botão "Traçar rota", que abre o Google Maps. Sem endereço, o botão não aparece. Vale a partir da próxima publicação.</span>
-                    <div class="locality-field">
-                      <label for="editor-address-street">Rua e número</label>
-                      <input type="text" id="editor-address-street" data-address-field="street" maxlength="120" autocomplete="address-line1" placeholder="Ex.: Rua Augusta, 1500" class="item-input input-styled-height" aria-describedby="editor-address-street-error">
-                      <span id="editor-address-street-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <div class="locality-field">
-                      <label for="editor-address-district">Bairro (opcional)</label>
-                      <input type="text" id="editor-address-district" data-address-field="district" maxlength="60" autocomplete="address-level3" placeholder="Ex.: Consolação" class="item-input input-styled-height" aria-describedby="editor-address-district-error">
-                      <span id="editor-address-district-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <div class="locality-fields-row">
-                      <div class="locality-field">
-                        <label for="editor-address-city">Cidade</label>
-                        <input type="text" id="editor-address-city" data-address-field="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: São Paulo" class="item-input input-styled-height" aria-describedby="editor-address-city-error">
-                        <span id="editor-address-city-error" class="form-error-msg" hidden></span>
-                      </div>
-                      <div class="locality-field">
-                        <label for="editor-address-uf">Estado</label>
-                        <select id="editor-address-uf" data-address-field="uf" class="select-styled input-styled-height" aria-describedby="editor-address-uf-error"></select>
-                        <span id="editor-address-uf-error" class="form-error-msg" hidden></span>
-                      </div>
-                    </div>
-                    <div class="locality-field address-postal-field">
-                      <label for="editor-address-postalCode">CEP (opcional)</label>
-                      <input type="text" id="editor-address-postalCode" data-address-field="postalCode" inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="01310-100" class="item-input input-styled-height" aria-describedby="editor-address-postalCode-error">
-                      <span id="editor-address-postalCode-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <a id="editor-address-route-link" class="text-link" href="#" target="_blank" rel="noopener" hidden>Testar o botão "Traçar rota"</a>
-                  </fieldset>
-
-                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-seo-group" aria-describedby="editor-seo-help editor-seo-plan-hint">
-                    <legend id="editor-seo-legend" class="locality-legend">Google e WhatsApp</legend>
-                    <p id="editor-seo-plan-hint" class="plan-gate-hint" hidden></p>
-                    <span id="editor-seo-help" class="form-help">O tipo de negócio e a área atendida completam os dados que o Google lê, junto com o endereço e o horário acima. Os dados para o Google fazem parte do plano Essencial ou superior; o cartão do link vale para todas as vitrines. Vale a partir da próxima publicação.</span>
-                    <div class="locality-field">
-                      <label for="editor-seo-type">Tipo de negócio</label>
-                      <select id="editor-seo-type" class="select-styled input-styled-height" aria-describedby="editor-seo-type-error"></select>
-                      <span id="editor-seo-type-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <div class="locality-field">
-                      <label for="editor-seo-area">Área atendida (opcional)</label>
-                      <input type="text" id="editor-seo-area" maxlength="120" placeholder="Ex.: Zona Sul de Porto Alegre" class="item-input input-styled-height" aria-describedby="editor-seo-area-help editor-seo-area-error">
-                      <span id="editor-seo-area-help" class="form-help">Bairros ou cidades onde você entrega ou atende.</span>
-                      <span id="editor-seo-area-error" class="form-error-msg" hidden></span>
-                    </div>
-                    <div class="share-preview-block">
-                      <span class="label-spaced" id="editor-share-preview-label">Prévia do link (simulação)</span>
-                      <figure id="editor-share-preview" class="share-preview" aria-labelledby="editor-share-preview-label">
-                        <img id="editor-share-preview-image" class="share-preview-image" src="/assets/brand/og-vitrine.png" width="1200" height="630" alt="" loading="lazy">
-                        <figcaption class="share-preview-text">
-                          <span id="editor-share-preview-host" class="share-preview-host">vitrine.inspira.dev.br</span>
-                          <strong id="editor-share-preview-title" class="share-preview-title">Sua vitrine — Vitrine</strong>
-                          <span id="editor-share-preview-description" class="share-preview-description">Vitrine oficial: faça seu pedido direto no WhatsApp.</span>
-                        </figcaption>
-                      </figure>
-                    </div>
-                    <details id="editor-seo-help-page" class="seo-help">
-                      <summary class="seo-help-summary">O que aparece no Google e no WhatsApp</summary>
-                      <div class="seo-help-body">
-                        <h3>No WhatsApp, Instagram e Facebook</h3>
-                        <p>Ao colar o link da vitrine, aparece um cartão com imagem, nome do negócio e a frase de boas-vindas. A imagem é a foto de capa do topo da vitrine, o logo ou a foto do primeiro item; sem foto, entra a capa da Vitrine Inspira. Vale para todos os planos. Com domínio próprio ativo, o link mostra o seu domínio.</p>
-                        <h3>No Google</h3>
-                        <p>No plano Essencial ou superior, a vitrine publicada leva dados de negócio local no padrão Schema.org: nome, tipo de negócio, endereço público, horário, área atendida e o WhatsApp do negócio. O Google decide se e quando mostra essas informações; não há garantia de posição na busca.</p>
-                        <h3>O que nunca aparece</h3>
-                        <p>E-mail, plano, dados de acesso ao painel e o seu número pessoal quando os pedidos passam pela Mila.</p>
-                        <h3>Depois de mudar</h3>
-                        <p>Publique de novo. O WhatsApp guarda a prévia antiga por algum tempo, então o cartão novo pode levar algumas horas para aparecer. O cadastro no Perfil da Empresa no Google é separado e faz parte da Implantação Chave na Mão.</p>
-                        <p>Para conferir os dados do Google, cole o endereço da vitrine no <a class="text-link" href="https://validator.schema.org/" target="_blank" rel="noopener noreferrer">validador do Schema.org</a>.</p>
-                      </div>
-                    </details>
-                  </fieldset>
-
-                  <fieldset class="form-group locality-fieldset place-fieldset" id="editor-qr-group">
-                    <legend class="locality-legend">QR Code da vitrine</legend>
-                    <span class="form-help">Para imprimir no balcão, na mesa, em cartazes ou na embalagem. Abre a vitrine com a marcação de origem "qr" no endereço.</span>
-                    <div class="qr-panel">
-                      <div id="editor-qr-preview" class="qr-preview"></div>
-                      <div class="qr-panel-info">
-                        <span class="form-help">Endereço do QR Code:</span>
-                        <code id="editor-qr-url" class="qr-url"></code>
-                        <div class="qr-actions">
-                          <button type="button" id="editor-qr-png" class="button button-small button-pill">Baixar PNG</button>
-                          <button type="button" id="editor-qr-svg" class="button button-small button-secondary button-pill">Baixar SVG</button>
-                        </div>
-                      </div>
-                    </div>
-                  </fieldset>
-
-                  <div id="editor-comment-kit"><!-- Populated via comment-to-vitrine.mjs --></div>
-
-                  <div class="form-group">
-                    <span class="label-spaced">Componentes Visíveis do Item</span>
-                    <span class="form-help help-block-spaced">Ligue ou desligue cada componente exibido nos cartões de item:</span>
-                    <div class="checkbox-group-grid">
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-name" checked disabled> Nome do item (obrigatório)
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-description"> Descrição
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-photo"> Foto (WebP até 200 KB)
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-price"> Preço
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-min-quantity"> Quantidade mínima
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-quantity-selector"> Seletor de quantidade
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="comp-duration"> Duração em minutos (serviços)
-                      </label>
+                    <div class="timeslot-generator-actions">
+                      <button type="button" id="timeslot-gen-apply-btn" class="button button-small button-pill">Preencher horários</button>
+                      <button type="button" id="timeslot-clear-all-btn" class="button button-small button-secondary button-pill">Limpar todos</button>
                     </div>
                   </div>
-                </form>
-
-                <div class="editor-advanced-sections">
-                  <h3>Administração e Estrutura da Vitrine</h3>
-                  <details id="publication-history" class="portal-card" hidden>
-                    <summary>Versões publicadas</summary>
-                    <p id="publication-history-status" role="status"></p>
-                    <ul id="publication-history-list"></ul>
-                  </details>
-
-                  <details id="team-management" class="portal-card" hidden>
-                    <summary>Equipe e permissões</summary>
-                    <p id="team-status" role="status"></p>
-                    <ul id="team-members"></ul>
-                    <form id="team-form">
-                      <label>ID da conta <input name="userId" required autocomplete="off"></label>
-                      <label>Papel
-                        <select name="role">
-                          <option value="viewer">Leitor</option>
-                          <option value="editor">Editor</option>
-                          <option value="admin">Administrador</option>
-                        </select>
-                      </label>
-                      <button class="button button-small button-pill" type="submit">Salvar membro</button>
-                    </form>
-                    <h3>Histórico de alterações</h3>
-                    <ul id="team-audit"></ul>
-                  </details>
-
-                  <details id="showcase-structure" class="portal-card structure-details-card" hidden>
-                    <summary class="structure-details-summary">
-                      <span class="structure-summary-main">
-                        <span class="structure-summary-icon" aria-hidden="true">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                        </span>
-                        <span class="structure-summary-texts">
-                          <strong>Identidade, menus e páginas</strong>
-                          <small>Cores, fonte, menus e páginas da sua vitrine</small>
-                        </span>
-                      </span>
-                      <span class="structure-summary-chevron" aria-hidden="true">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                      </span>
-                    </summary>
-                    <p id="showcase-structure-status" class="structure-status-msg" role="status"></p>
-                    <div id="showcase-structure-fields"></div>
-                  </details>
-
-                  <details id="asset-library" class="portal-card" hidden>
-                    <summary>Biblioteca de arquivos</summary>
-                    <p id="asset-library-status" role="status"></p>
-                    <label>Adicionar imagem <input id="asset-library-upload" type="file" accept="image/*"></label>
-                    <ul id="asset-library-list"></ul>
-                  </details>
-
-                  <details id="custom-domains" class="portal-card" hidden>
-                    <summary id="custom-domains-summary">Domínios e publicação</summary>
-                    <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
-                    <p id="custom-domains-status" role="status"></p>
-                    <div id="custom-domains-fields"></div>
-                    <ul id="custom-domains-list"></ul>
-                  </details>
+                  <div id="timeslots-chips-list" class="timeslots-chips-list" role="list" aria-label="Horários cadastrados"></div>
+                  <textarea id="editor-timeslots" class="textarea-goal" hidden aria-hidden="true"></textarea>
                 </div>
+
+                <div class="form-group">
+                  <div class="template-header-row">
+                    <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
+                    <button type="button" id="simulate-whatsapp-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Simular mensagem</button>
+                  </div>
+                  <div class="template-editor-wrap">
+                    <div id="editor-whatsapp-backdrop" class="template-editor-backdrop" aria-hidden="true"></div>
+                    <textarea id="editor-whatsapp-template" class="textarea-goal template-editor-textarea" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
+                  </div>
+                  <div class="template-vars-section">
+                    <span class="form-help">Variáveis disponíveis (clique para inserir ou remover, ou arraste para o texto):</span>
+                    <div id="whatsapp-template-vars" class="template-vars-bar" role="group" aria-label="Variáveis disponíveis"></div>
+                  </div>
+                  <div id="whatsapp-simulation-panel" class="whatsapp-simulation-panel" hidden>
+                    <div class="whatsapp-sim-header">
+                      <strong>Prévia da mensagem no WhatsApp</strong>
+                      <button type="button" id="whatsapp-sim-close-btn" class="button button-small button-secondary button-pill">Fechar</button>
+                    </div>
+                    <p id="whatsapp-sim-warning" class="whatsapp-sim-warning" role="alert" hidden></p>
+                    <div class="whatsapp-chat-stage">
+                      <div class="whatsapp-bubble">
+                        <pre id="whatsapp-sim-bubble-text" class="whatsapp-bubble-text"></pre>
+                        <span class="whatsapp-bubble-meta" aria-hidden="true">14:32 ✓✓</span>
+                      </div>
+                    </div>
+                    <div class="whatsapp-sim-actions">
+                      <a id="whatsapp-sim-open-link" class="button button-small button-pill" href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">Abrir no meu WhatsApp</a>
+                    </div>
+                  </div>
+                </div>
+              </form>
+              <section id="quote-webhook-panel" class="quote-webhook-card config-subsection" aria-labelledby="quote-webhook-title" hidden></section>
+            </details>
+
+            <details id="config-itens" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Itens</span>
+                <span id="config-itens-summary" class="config-summary-text">Componentes visíveis nos cartões</span>
+              </summary>
+              <fieldset class="config-body form-group">
+                <legend class="label-spaced">Componentes visíveis do item</legend>
+                <span class="form-help help-block-spaced">Ligue ou desligue cada componente exibido nos cartões de item:</span>
+                <div class="checkbox-group-grid">
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-name" checked disabled> Nome do item (obrigatório)
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-description"> Descrição
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-photo"> Foto (WebP até 200 KB)
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-price"> Preço
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-min-quantity"> Quantidade mínima
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-quantity-selector"> Seletor de quantidade
+                  </label>
+                  <label class="checkbox-label-styled">
+                    <input type="checkbox" id="comp-duration"> Duração em minutos (serviços)
+                  </label>
+                </div>
+              </fieldset>
+            </details>
+
+            <details id="config-local" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Local e horário</span>
+                <span class="config-summary-text">Página da cidade, horário de funcionamento e endereço</span>
+              </summary>
+              <div class="config-body form-flex-col">
+                <fieldset class="form-group locality-fieldset" id="editor-locality-group">
+                  <legend class="locality-legend">Página por cidade</legend>
+                  <span class="form-help">Seus itens de lance, doação e troca podem aparecer na página pública da sua cidade, junto com outras vitrines. Lá aparecem só o nome da vitrine, a cidade e os dados públicos dos itens; nada de nome, telefone ou endereço.</span>
+                  <label class="checkbox-label-styled locality-optin">
+                    <input type="checkbox" id="editor-locality-listed"> Mostrar meus itens de lance, doação e troca na página da cidade
+                  </label>
+                  <div class="locality-fields-row">
+                    <div class="locality-field locality-field-city">
+                      <label for="editor-locality-city">Cidade</label>
+                      <input type="text" id="editor-locality-city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Porto Alegre" class="item-input input-styled-height">
+                    </div>
+                    <div class="locality-field locality-field-uf">
+                      <label for="editor-locality-uf">Estado</label>
+                      <select id="editor-locality-uf" class="select-styled input-styled-height">
+                        <option value="">UF</option>
+                        <option value="AC">AC</option>
+                        <option value="AL">AL</option>
+                        <option value="AP">AP</option>
+                        <option value="AM">AM</option>
+                        <option value="BA">BA</option>
+                        <option value="CE">CE</option>
+                        <option value="DF">DF</option>
+                        <option value="ES">ES</option>
+                        <option value="GO">GO</option>
+                        <option value="MA">MA</option>
+                        <option value="MT">MT</option>
+                        <option value="MS">MS</option>
+                        <option value="MG">MG</option>
+                        <option value="PA">PA</option>
+                        <option value="PB">PB</option>
+                        <option value="PR">PR</option>
+                        <option value="PE">PE</option>
+                        <option value="PI">PI</option>
+                        <option value="RJ">RJ</option>
+                        <option value="RN">RN</option>
+                        <option value="RS">RS</option>
+                        <option value="RO">RO</option>
+                        <option value="RR">RR</option>
+                        <option value="SC">SC</option>
+                        <option value="SP">SP</option>
+                        <option value="SE">SE</option>
+                        <option value="TO">TO</option>
+                      </select>
+                    </div>
+                  </div>
+                  <span id="editor-locality-error" class="form-error-msg" role="alert" hidden>Informe a cidade e o estado para aparecer na página da cidade.</span>
+                  <span class="form-help">Vale a partir da próxima publicação. <a id="editor-locality-link" class="text-link" href="/por-cidade" target="_blank" rel="noopener noreferrer">Ver página por cidade</a></span>
+                </fieldset>
+
+                <fieldset class="form-group locality-fieldset place-fieldset" id="editor-hours-group" aria-describedby="editor-hours-help">
+                  <legend class="locality-legend">Horário de funcionamento</legend>
+                  <span id="editor-hours-help" class="form-help">Horário de Brasília (São Paulo), até 2 faixas por dia. Com horário, a vitrine mostra o selo "Aberto agora" ou "Fechado · abre às 18h". Para faixas que passam da meia-noite (18:00 às 02:00), marque "Termina no dia seguinte".</span>
+                  <div id="editor-hours-days" class="hours-days"></div>
+                  <div class="hours-closed">
+                    <span class="label-spaced">Dias fechados (exceções)</span>
+                    <div class="hours-closed-actions">
+                      <button type="button" id="editor-hours-close-today" class="button button-small button-secondary button-pill" aria-pressed="false">Fechado hoje</button>
+                      <label class="hours-date-label" for="editor-hours-closed-date">Outra data</label>
+                      <input type="date" id="editor-hours-closed-date" class="item-input input-styled-height hours-date-input">
+                      <button type="button" id="editor-hours-closed-add" class="button button-small button-secondary button-pill">Fechar esta data</button>
+                    </div>
+                    <ul id="editor-hours-closed-list" class="hours-closed-list" aria-label="Datas fechadas"></ul>
+                    <span id="editor-hours-closed-error" class="form-error-msg" hidden></span>
+                  </div>
+                  <p id="editor-hours-status" class="form-help hours-status" aria-live="polite"></p>
+                </fieldset>
+
+                <fieldset class="form-group locality-fieldset place-fieldset" id="editor-address-group">
+                  <legend class="locality-legend">Endereço público (opcional)</legend>
+                  <span class="form-help">Com endereço, a vitrine mostra o endereço e o botão "Traçar rota", que abre o Google Maps. Sem endereço, o botão não aparece. Vale a partir da próxima publicação.</span>
+                  <div class="locality-field">
+                    <label for="editor-address-street">Rua e número</label>
+                    <input type="text" id="editor-address-street" data-address-field="street" maxlength="120" autocomplete="address-line1" placeholder="Ex.: Rua Augusta, 1500" class="item-input input-styled-height" aria-describedby="editor-address-street-error">
+                    <span id="editor-address-street-error" class="form-error-msg" hidden></span>
+                  </div>
+                  <div class="locality-field">
+                    <label for="editor-address-district">Bairro (opcional)</label>
+                    <input type="text" id="editor-address-district" data-address-field="district" maxlength="60" autocomplete="address-level3" placeholder="Ex.: Consolação" class="item-input input-styled-height" aria-describedby="editor-address-district-error">
+                    <span id="editor-address-district-error" class="form-error-msg" hidden></span>
+                  </div>
+                  <div class="locality-fields-row">
+                    <div class="locality-field">
+                      <label for="editor-address-city">Cidade</label>
+                      <input type="text" id="editor-address-city" data-address-field="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: São Paulo" class="item-input input-styled-height" aria-describedby="editor-address-city-error">
+                      <span id="editor-address-city-error" class="form-error-msg" hidden></span>
+                    </div>
+                    <div class="locality-field">
+                      <label for="editor-address-uf">Estado</label>
+                      <select id="editor-address-uf" data-address-field="uf" class="select-styled input-styled-height" aria-describedby="editor-address-uf-error"></select>
+                      <span id="editor-address-uf-error" class="form-error-msg" hidden></span>
+                    </div>
+                  </div>
+                  <div class="locality-field address-postal-field">
+                    <label for="editor-address-postalCode">CEP (opcional)</label>
+                    <input type="text" id="editor-address-postalCode" data-address-field="postalCode" inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="01310-100" class="item-input input-styled-height" aria-describedby="editor-address-postalCode-error">
+                    <span id="editor-address-postalCode-error" class="form-error-msg" hidden></span>
+                  </div>
+                  <a id="editor-address-route-link" class="text-link" href="#" target="_blank" rel="noopener" hidden>Testar o botão "Traçar rota"</a>
+                </fieldset>
               </div>
+            </details>
 
-              <!-- PANE 4: Order & Message -->
-              <div id="pane-order-msg" class="editor-tab-pane" hidden>
-                <h2>Campos do Pedido e Mensagem</h2>
-                <form id="editor-order-msg-form" novalidate class="form-flex-col">
-                  <div class="form-group">
-                    <span class="label-spaced">Campos Solicitados ao Visitante</span>
-                    <span class="form-help help-block-spaced">Escolha quais informações o visitante preenche antes de confirmar no WhatsApp:</span>
-                    <div class="checkbox-group-grid">
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="field-cust-name"> Nome de quem pede
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="field-date"> Data de preferência
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="field-delivery-pickup"> Endereço de entrega ou retirada
-                      </label>
-                      <label class="checkbox-label-styled">
-                        <input type="checkbox" id="field-notes"> Observação opcional
-                      </label>
-                    </div>
+            <details id="config-divulgacao" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Google, WhatsApp e QR Code</span>
+                <span class="config-summary-text">Cartão do link, dados para o Google, QR Code e comentários</span>
+              </summary>
+              <div class="config-body form-flex-col">
+                <fieldset class="form-group locality-fieldset place-fieldset" id="editor-seo-group" aria-describedby="editor-seo-help editor-seo-plan-hint">
+                  <legend id="editor-seo-legend" class="locality-legend">Google e WhatsApp</legend>
+                  <p id="editor-seo-plan-hint" class="plan-gate-hint" hidden></p>
+                  <span id="editor-seo-help" class="form-help">O tipo de negócio e a área atendida completam os dados que o Google lê, junto com o endereço e o horário acima. Os dados para o Google fazem parte do plano Essencial ou superior; o cartão do link vale para todas as vitrines. Vale a partir da próxima publicação.</span>
+                  <div class="locality-field">
+                    <label for="editor-seo-type">Tipo de negócio</label>
+                    <select id="editor-seo-type" class="select-styled input-styled-height" aria-describedby="editor-seo-type-error"></select>
+                    <span id="editor-seo-type-error" class="form-error-msg" hidden></span>
                   </div>
-
-                  <div class="form-group" id="field-timeslots-config-group">
-                    <div class="timeslots-header-row">
-                      <label for="timeslot-picker-input">Horários disponíveis para preferência</label>
-                      <span id="timeslots-status-note" class="timeslots-count-badge">0 / 24 horários</span>
-                    </div>
-                    <div class="timeslots-picker-controls">
-                      <input type="time" id="timeslot-picker-input" value="09:00" class="item-input input-styled-height timeslot-time-input" aria-label="Escolher horário">
-                      <button type="button" id="timeslot-add-btn" class="button button-small button-secondary button-pill">Adicionar horário</button>
-                      <button type="button" id="timeslot-generator-toggle-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Gerar horários</button>
-                    </div>
-                    <div id="timeslot-generator-panel" class="timeslot-generator-panel" hidden>
-                      <div class="timeslot-generator-grid">
-                        <div class="form-group structure-field-group">
-                          <label for="timeslot-gen-start" class="structure-field-label">Das</label>
-                          <input type="time" id="timeslot-gen-start" value="09:00" class="item-input input-styled-height">
-                        </div>
-                        <div class="form-group structure-field-group">
-                          <label for="timeslot-gen-end" class="structure-field-label">Às</label>
-                          <input type="time" id="timeslot-gen-end" value="17:00" class="item-input input-styled-height">
-                        </div>
-                        <div class="form-group structure-field-group">
-                          <label for="timeslot-gen-step" class="structure-field-label">A cada</label>
-                          <select id="timeslot-gen-step" class="select-styled">
-                            <option value="30">30 minutos</option>
-                            <option value="60" selected>60 minutos</option>
-                            <option value="90">90 minutos</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div class="timeslot-generator-actions">
-                        <button type="button" id="timeslot-gen-apply-btn" class="button button-small button-pill">Preencher horários</button>
-                        <button type="button" id="timeslot-clear-all-btn" class="button button-small button-secondary button-pill">Limpar todos</button>
-                      </div>
-                    </div>
-                    <div id="timeslots-chips-list" class="timeslots-chips-list" role="list" aria-label="Horários cadastrados"></div>
-                    <textarea id="editor-timeslots" class="textarea-goal" hidden aria-hidden="true"></textarea>
+                  <div class="locality-field">
+                    <label for="editor-seo-area">Área atendida (opcional)</label>
+                    <input type="text" id="editor-seo-area" maxlength="120" placeholder="Ex.: Zona Sul de Porto Alegre" class="item-input input-styled-height" aria-describedby="editor-seo-area-help editor-seo-area-error">
+                    <span id="editor-seo-area-help" class="form-help">Bairros ou cidades onde você entrega ou atende.</span>
+                    <span id="editor-seo-area-error" class="form-error-msg" hidden></span>
                   </div>
-
-                  <div class="form-group">
-                    <label for="editor-hero-title">Título principal da vitrine</label>
-                    <input type="text" id="editor-hero-title" class="item-input input-styled-height" placeholder="Ex: Pastus Fogo &amp; Parrilla" maxlength="120">
+                  <div class="share-preview-block">
+                    <span class="label-spaced" id="editor-share-preview-label">Prévia do link (simulação)</span>
+                    <figure id="editor-share-preview" class="share-preview" aria-labelledby="editor-share-preview-label">
+                      <img id="editor-share-preview-image" class="share-preview-image" src="/assets/brand/og-vitrine.png" width="1200" height="630" alt="" loading="lazy">
+                      <figcaption class="share-preview-text">
+                        <span id="editor-share-preview-host" class="share-preview-host">vitrine.inspira.dev.br</span>
+                        <strong id="editor-share-preview-title" class="share-preview-title">Sua vitrine — Vitrine</strong>
+                        <span id="editor-share-preview-description" class="share-preview-description">Vitrine oficial: faça seu pedido direto no WhatsApp.</span>
+                      </figcaption>
+                    </figure>
                   </div>
-
-                  <div class="form-group">
-                    <label for="editor-welcome-text">Texto de boas-vindas</label>
-                    <textarea id="editor-welcome-text" class="textarea-goal" placeholder="Ex: Escolha seus itens abaixo, revise os dados e envie pelo WhatsApp." maxlength="500"></textarea>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="editor-cta-label">Texto do botão do WhatsApp</label>
-                    <input type="text" id="editor-cta-label" class="item-input input-styled-height" placeholder="Ex: Enviar pedido no WhatsApp" maxlength="120">
-                  </div>
-
-                  <div class="form-group">
-                    <div class="template-header-row">
-                      <label for="editor-whatsapp-template">Modelo da mensagem do WhatsApp</label>
-                      <button type="button" id="simulate-whatsapp-btn" class="button button-small button-secondary button-pill" aria-expanded="false">Simular mensagem</button>
+                  <details id="editor-seo-help-page" class="seo-help">
+                    <summary class="seo-help-summary">O que aparece no Google e no WhatsApp</summary>
+                    <div class="seo-help-body">
+                      <h3>No WhatsApp, Instagram e Facebook</h3>
+                      <p>Ao colar o link da vitrine, aparece um cartão com imagem, nome do negócio e a frase de boas-vindas. A imagem é a foto de capa do topo da vitrine, o logo ou a foto do primeiro item; sem foto, entra a capa da Vitrine Inspira. Vale para todos os planos. Com domínio próprio ativo, o link mostra o seu domínio.</p>
+                      <h3>No Google</h3>
+                      <p>No plano Essencial ou superior, a vitrine publicada leva dados de negócio local no padrão Schema.org: nome, tipo de negócio, endereço público, horário, área atendida e o WhatsApp do negócio. O Google decide se e quando mostra essas informações; não há garantia de posição na busca.</p>
+                      <h3>O que nunca aparece</h3>
+                      <p>E-mail, plano, dados de acesso ao painel e o seu número pessoal quando os pedidos passam pela Mila.</p>
+                      <h3>Depois de mudar</h3>
+                      <p>Publique de novo. O WhatsApp guarda a prévia antiga por algum tempo, então o cartão novo pode levar algumas horas para aparecer. O cadastro no Perfil da Empresa no Google é separado e faz parte da Implantação Chave na Mão.</p>
+                      <p>Para conferir os dados do Google, cole o endereço da vitrine no <a class="text-link" href="https://validator.schema.org/" target="_blank" rel="noopener noreferrer">validador do Schema.org</a>.</p>
                     </div>
-                    <div class="template-editor-wrap">
-                      <div id="editor-whatsapp-backdrop" class="template-editor-backdrop" aria-hidden="true"></div>
-                      <textarea id="editor-whatsapp-template" class="textarea-goal template-editor-textarea" placeholder="Olá! Meu nome é {nome}. Gostaria de pedir:&#10;{itens}&#10;Total: {total}" maxlength="1000"></textarea>
-                    </div>
-                    <div class="template-vars-section">
-                      <span class="form-help">Variáveis disponíveis (clique para inserir ou remover, ou arraste para o texto):</span>
-                      <div id="whatsapp-template-vars" class="template-vars-bar" role="group" aria-label="Variáveis disponíveis"></div>
-                    </div>
-                    <div id="whatsapp-simulation-panel" class="whatsapp-simulation-panel" hidden>
-                      <div class="whatsapp-sim-header">
-                        <strong>Prévia da mensagem no WhatsApp</strong>
-                        <button type="button" id="whatsapp-sim-close-btn" class="button button-small button-secondary button-pill">Fechar</button>
-                      </div>
-                      <p id="whatsapp-sim-warning" class="whatsapp-sim-warning" role="alert" hidden></p>
-                      <div class="whatsapp-chat-stage">
-                        <div class="whatsapp-bubble">
-                          <pre id="whatsapp-sim-bubble-text" class="whatsapp-bubble-text"></pre>
-                          <span class="whatsapp-bubble-meta" aria-hidden="true">14:32 ✓✓</span>
-                        </div>
-                      </div>
-                      <div class="whatsapp-sim-actions">
-                        <a id="whatsapp-sim-open-link" class="button button-small button-pill" href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">Abrir no meu WhatsApp</a>
+                  </details>
+                </fieldset>
+
+                <fieldset class="form-group locality-fieldset place-fieldset" id="editor-qr-group">
+                  <legend class="locality-legend">QR Code da vitrine</legend>
+                  <span class="form-help">Para imprimir no balcão, na mesa, em cartazes ou na embalagem. Abre a vitrine com a marcação de origem "qr" no endereço.</span>
+                  <div class="qr-panel">
+                    <div id="editor-qr-preview" class="qr-preview"></div>
+                    <div class="qr-panel-info">
+                      <span class="form-help">Endereço do QR Code:</span>
+                      <code id="editor-qr-url" class="qr-url"></code>
+                      <div class="qr-actions">
+                        <button type="button" id="editor-qr-png" class="button button-small button-pill">Baixar PNG</button>
+                        <button type="button" id="editor-qr-svg" class="button button-small button-secondary button-pill">Baixar SVG</button>
                       </div>
                     </div>
                   </div>
-                </form>
-                <section id="quote-webhook-panel" class="portal-card quote-webhook-card" aria-labelledby="quote-webhook-title" hidden></section>
+                </fieldset>
+
+                <div id="editor-comment-kit"><!-- Populated via comment-to-vitrine.mjs --></div>
               </div>
+            </details>
 
-              <!-- PANE 5: Channels -->
-              <div id="pane-channels" class="editor-tab-pane" hidden>
+            <details id="config-canais" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Canais</span>
+                <span class="config-summary-text">Links diretos e integrações</span>
+              </summary>
+              <div class="config-body">
                 <section id="channels-panel" class="channels-panel" aria-labelledby="channels-title"></section>
               </div>
+            </details>
 
-            </div>
+            <details id="showcase-structure" class="config-section portal-card structure-details-card" hidden>
+              <summary class="structure-details-summary">
+                <span class="structure-summary-main">
+                  <span class="structure-summary-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                  </span>
+                  <span class="structure-summary-texts">
+                    <strong>Identidade, menus e páginas</strong>
+                    <small>Cores, fonte, menus e páginas da sua vitrine</small>
+                  </span>
+                </span>
+                <span class="structure-summary-chevron" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+              </summary>
+              <p id="showcase-structure-status" class="structure-status-msg" role="status"></p>
+              <div id="showcase-structure-fields"></div>
+            </details>
 
-            <!-- Editor Live Preview (Right Pane) -->
-            <div class="editor-preview-pane">
-              <div class="preview-header">
-                <div>
-                  <h2>Pré-visualização Instantânea</h2>
-                  <p class="preview-subcaption">Renderizador idêntico à vitrine pública</p>
+            <details id="asset-library" class="config-section portal-card" hidden>
+              <summary class="config-summary"><span class="config-title">Biblioteca de arquivos</span></summary>
+              <p id="asset-library-status" role="status"></p>
+              <label>Adicionar imagem <input id="asset-library-upload" type="file" accept="image/*"></label>
+              <ul id="asset-library-list"></ul>
+            </details>
+
+            <details id="custom-domains" class="config-section portal-card" hidden>
+              <summary class="config-summary"><span class="config-title" id="custom-domains-summary">Domínios e publicação</span></summary>
+              <p>Endereço padrão: <a id="default-showcase-domain" href="/loja1"></a></p>
+              <p id="custom-domains-status" role="status"></p>
+              <div id="custom-domains-fields"></div>
+              <ul id="custom-domains-list"></ul>
+            </details>
+
+            <details id="publication-history" class="config-section portal-card" hidden>
+              <summary class="config-summary"><span class="config-title">Versões publicadas</span></summary>
+              <p id="publication-history-status" role="status"></p>
+              <ul id="publication-history-list"></ul>
+            </details>
+
+            <details id="config-acesso" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Acesso</span>
+                <span id="config-acesso-summary" class="config-summary-text">Publicação, link público e equipe</span>
+              </summary>
+              <div class="config-body access-body">
+                <div class="access-block">
+                  <h3 class="access-heading">Publicação</h3>
+                  <div id="publication-status-bar" class="publication-status-bar" aria-live="polite" hidden>
+                    <div class="publication-status-info">
+                      <span class="publication-badge">Publicada</span>
+                      <span id="publication-status-text">Vitrine publicada com sucesso.</span>
+                    </div>
+                  </div>
+                  <p class="form-help">Rascunho atual: <span id="editor-revision-indicator" class="revision-indicator">Revisão: 1</span></p>
+                  <div class="link-copy-row">
+                    <label class="visually-hidden" for="public-link-input">Link público da vitrine</label>
+                    <input id="public-link-input" class="item-input input-styled-height link-copy-input" type="text" readonly>
+                    <button id="copy-public-link-btn" class="button button-small button-secondary button-pill" type="button">Copiar link</button>
+                  </div>
                 </div>
-                <span class="preview-badge">Ao Vivo</span>
+
+                <div class="access-block">
+                  <h3 class="access-heading">Equipe</h3>
+                  <div id="team-panel" class="team-panel-slot">
+                    <p class="form-help">Abra esta seção com a vitrine conectada para ver a equipe.</p>
+                  </div>
+                  <details id="team-management" class="access-history" hidden>
+                    <summary>Histórico de alterações</summary>
+                    <p id="team-status" role="status"></p>
+                    <ul id="team-audit"></ul>
+                  </details>
+                </div>
               </div>
-              <div id="live-storefront-preview" class="live-preview-box">
-                <!-- Rendered dynamically via StorefrontRenderer -->
-              </div>
-            </div>
+            </details>
           </div>
         </section>
       </main>
@@ -1779,47 +1425,93 @@
       </footer>
     </div>
 
-    <!-- Mobile Bottom Navigation Bar -->
-    <nav class="app-bottom-nav" aria-label="Navegação móvel">
-      <ul>
-        <li>
-          <a href="#inicio" class="nav-link active" data-section="inicio">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-            <span>Início</span>
-          </a>
-        </li>
-        <li>
-          <a href="#vitrines" class="nav-link" data-section="vitrines">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-            <span>Vitrines</span>
-          </a>
-        </li>
-        <li>
-          <a href="#insights" class="nav-link" data-section="insights">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            <span>Insights</span>
-          </a>
-        </li>
-        <li>
-          <a href="#pedidos" class="nav-link" data-section="pedidos">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Pedidos</span>
-          </a>
-        </li>
-        <li class="nav-sponsor-item" hidden>
-          <a href="#impacto" class="nav-link" data-section="impacto">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg>
-            <span>Impacto</span>
-          </a>
-        </li>
-        <li class="nav-admin-item" hidden>
-          <a href="#administracao" class="nav-link" data-section="platform-cms">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-            <span>Admin</span>
-          </a>
-        </li>
-      </ul>
-    </nav>
+    <!-- Diálogo: Nova vitrine (nome e endereço) -->
+    <dialog id="new-vitrine-dialog" class="portal-dialog" aria-labelledby="new-vitrine-title" aria-describedby="new-vitrine-model-text">
+      <form id="new-vitrine-form" novalidate class="portal-dialog-body form-flex-col">
+        <div class="dialog-header">
+          <h2 id="new-vitrine-title" class="portal-dialog-title">Nova vitrine</h2>
+          <button class="icon-button dialog-close-btn" type="button" aria-label="Fechar">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <p id="new-vitrine-model-text" class="portal-dialog-desc">Modelo: Produtos</p>
+        <div class="form-group">
+          <label for="new-site-name">Nome</label>
+          <input type="text" id="new-site-name" name="name" required maxlength="160" placeholder="Ex: Pizzaria Bella Itália" class="item-input input-styled-height" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="new-site-slug">Endereço</label>
+          <input type="text" id="new-site-slug" name="slug" required maxlength="40" placeholder="pizzaria-bella" class="item-input input-styled-height" autocomplete="off" aria-describedby="new-site-slug-preview new-site-slug-error">
+          <span id="new-site-slug-preview" class="form-help">vitrine.inspira.dev.br/sua-loja</span>
+          <span id="new-site-slug-error" class="form-error-msg" role="alert" hidden>Endereço inválido. Use letras minúsculas, números e hífens.</span>
+        </div>
+        <div class="portal-dialog-actions">
+          <button type="button" class="button button-small button-secondary button-pill dialog-close-btn">Cancelar</button>
+          <button id="new-site-submit" type="submit" class="button button-small button-pill">Criar vitrine</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Diálogo: Personalizar -->
+    <dialog id="customize-dialog" class="portal-dialog side-sheet" aria-labelledby="customize-title">
+      <form id="customize-form" novalidate class="portal-dialog-body form-flex-col">
+        <div class="dialog-header">
+          <h2 id="customize-title" class="portal-dialog-title">Personalizar</h2>
+          <button class="icon-button dialog-close-btn" type="button" aria-label="Fechar">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <div id="palette-picker" class="palette-picker-slot"></div>
+        <div class="form-group">
+          <label for="editor-hero-title">Título principal da vitrine</label>
+          <input type="text" id="editor-hero-title" class="item-input input-styled-height" placeholder="Ex: Pastus Fogo &amp; Parrilla" maxlength="120">
+        </div>
+        <div class="form-group">
+          <label for="editor-welcome-text">Texto de boas-vindas</label>
+          <textarea id="editor-welcome-text" class="textarea-goal" placeholder="Ex: Escolha seus itens abaixo, revise os dados e envie pelo WhatsApp." maxlength="500"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="editor-cta-label">Texto do botão do WhatsApp</label>
+          <input type="text" id="editor-cta-label" class="item-input input-styled-height" placeholder="Ex: Enviar pedido no WhatsApp" maxlength="120">
+        </div>
+        <p class="form-help">Capa, fonte, menus e páginas ficam em Configurações, na seção "Identidade, menus e páginas". As alterações são salvas automaticamente.</p>
+      </form>
+    </dialog>
+
+    <!-- Diálogo: Visualizar (prévia em tela cheia) -->
+    <dialog id="preview-dialog" class="portal-dialog preview-dialog" aria-labelledby="preview-title">
+      <div class="dialog-header preview-dialog-header">
+        <h2 id="preview-title" class="portal-dialog-title">Visualizar</h2>
+        <span class="preview-badge">Renderizador idêntico à vitrine pública</span>
+        <button class="icon-button dialog-close-btn" type="button" aria-label="Fechar prévia" autofocus>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="preview-dialog-body">
+        <div id="live-storefront-preview" class="live-preview-box"></div>
+      </div>
+    </dialog>
+
+    <!-- Diálogo: Publicar -->
+    <dialog id="publish-dialog" class="portal-dialog" aria-labelledby="publish-title" aria-describedby="publish-dialog-text">
+      <div class="portal-dialog-body">
+        <div class="dialog-header">
+          <h2 id="publish-title" class="portal-dialog-title">Vitrine publicada</h2>
+          <button class="icon-button dialog-close-btn" type="button" aria-label="Fechar">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <p id="publish-dialog-text" class="portal-dialog-desc">Sua vitrine está no ar.</p>
+        <div class="link-copy-row">
+          <label class="visually-hidden" for="publish-link-input">Link da vitrine publicada</label>
+          <input id="publish-link-input" class="item-input input-styled-height link-copy-input" type="text" readonly>
+          <button id="publish-copy-btn" class="button button-small button-pill" type="button">Copiar</button>
+        </div>
+        <div class="portal-dialog-actions">
+          <a id="publication-view-link" class="button button-small button-secondary button-pill" href="/loja1" target="_blank" rel="noopener noreferrer">Abrir vitrine</a>
+        </div>
+      </div>
+    </dialog>
   </div>
 
   <script type="module" src="./portal.js"></script>

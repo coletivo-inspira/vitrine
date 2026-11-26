@@ -238,10 +238,13 @@ async function submitVoid() {
 function syncSiteSelect() {
   const select = globalThis.document?.getElementById('auctions-site-select');
   const sites = eligibleAuctionSites(state.getSites());
+  if (!select) {
+    // Inside a vitrine (Pedidos tab) the panel shows only that vitrine, never another one.
+    return sites.filter((site) => site.id === state.selectedSiteId);
+  }
   if (!state.selectedSiteId || !sites.some((site) => site.id === state.selectedSiteId)) {
     state.selectedSiteId = sites[0]?.id ?? null;
   }
-  if (!select) return sites;
   select.replaceChildren();
   for (const site of sites) {
     const option = el('option', '', site.name);

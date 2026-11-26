@@ -126,7 +126,7 @@ export const STRICT_CSP_HEADER =
 export const COMPLIANCE_CSP_HEADER =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 export const PORTAL_CSP_HEADER =
-  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
+  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://lh3.googleusercontent.com; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const PORTAL_STORAGE_CSP_HEADER =
   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL} data: blob:; font-src 'self'; connect-src 'self' ${SUPABASE_PUBLIC_PROJECT_URL}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`;
 export const STOREFRONT_STORAGE_CSP_HEADER =

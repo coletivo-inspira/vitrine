@@ -11,17 +11,16 @@ const adminHtml = html.slice(
   html.indexOf('</section>', html.indexOf('<section id="platform-cms-section"'))
 );
 
-test('Administração: entrada pelo menu só para platform_admin, sem pílula no Painel Inicial', () => {
+test('Administração: entrada pelo menu só para platform_admin, sem pílula no Início', () => {
   const inicio = html.slice(html.indexOf('<section id="inicio-section"'), html.indexOf('</section>', html.indexOf('<section id="inicio-section"')));
-  assert.ok(!inicio.includes('platform-cms-open'), 'o Painel Inicial não pode ter a pílula de administração');
-  const items = [...html.matchAll(/<li class="nav-admin-item" hidden>\s*<a\b([^>]*)>/g)];
-  assert.equal(items.length, 2, 'menu lateral e navegação móvel têm o item de administração oculto por padrão');
+  assert.ok(!inicio.includes('platform-cms-open'), 'o Início não pode ter a pílula de administração');
+  const items = [...html.matchAll(/<div class="nav-admin-item" role="none" hidden>\s*<a\b([^>]*)>/g)];
+  assert.equal(items.length, 1, 'o menu do avatar tem o item de administração oculto por padrão');
   for (const [, attrs] of items) {
-    assert.match(attrs, /href="#administracao"/);
-    assert.match(attrs, /data-section="platform-cms"/);
-    assert.match(attrs, /class="nav-link"/);
+    assert.match(attrs, /href="#\/administracao"/);
+    assert.match(attrs, /role="menuitem"/);
+    assert.match(attrs, /id="platform-cms-open"/);
   }
-  assert.match(html, /id="platform-cms-open"/);
 });
 
 test('Administração: abas acessíveis no lugar dos <details>', () => {
@@ -51,8 +50,9 @@ test('Administração: todo id usado pelo JS existe no HTML e a UI evita os term
   }
 });
 
-test('Administração: rota #administracao no portal', async () => {
+test('Administração: rota #/administracao no portal (e a antiga #administracao)', async () => {
   const { getSectionFromHash } = await import('../web/portal/portal.js');
+  assert.equal(getSectionFromHash('#/administracao'), 'platform-cms');
   assert.equal(getSectionFromHash('#administracao'), 'platform-cms');
   assert.equal(getSectionFromHash('#inicio'), 'inicio');
 });

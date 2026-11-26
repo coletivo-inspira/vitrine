@@ -64,6 +64,12 @@ _Evitar_: vitrine temporária publicada, teste grátis.
 **Cortesia**: Concessão sem cobrança do plano Profissional por 90 dias, dada no aceite de uma demonstração, no máximo uma por conta. Não é assinatura; ao fim, a vitrine volta ao Gratuito sem perder nada.
 _Evitar_: trial, período de teste.
 
+**Início**: Tela de entrada do painel, no modelo do Google Forms: "Começar nova vitrine" (modelos) e "Vitrines recentes" (grade com busca). Substitui o Painel Inicial e Minhas Vitrines (spec `019-portal-forms-ux`).
+
+**Abas da vitrine**: Itens (categorias como seções e cartões de item), Pedidos (Insights e Leilões só daquela vitrine) e Configurações (seções recolhíveis, incluindo Acesso com publicação, link e equipe).
+
+**Paleta da vitrine**: Uma das 8 combinações de cores com contraste AA escolhidas em Personalizar e guardadas em `structure.theme.palette`; a cor de destaque própria (`accentColor`), quando existe, vale por cima da paleta.
+
 **Funcionário**: Nome no painel do papel `editor` da equipe da vitrine: edita itens, blocos, fotos e rascunho, mas não publica nem mexe em configurações, equipe ou cobrança. Os outros papéis aparecem como Administrador (`admin`) e Somente leitura (`viewer`).
 
 **Patrocinador**: Pessoa ou entidade que financia o plano Gratuito/Social por cota negociada fora do sistema. No painel tem só a tela Impacto, atribuída por um Operador Inspira; não abre vitrines, rascunhos nem a administração.
