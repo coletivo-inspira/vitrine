@@ -13,6 +13,7 @@ import {
 import { projectPublicPlace } from './business-hours.mjs';
 import { renderStorefrontPlaceHtml } from '../web/assets/storefront-place.mjs';
 import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
+import { STOREFRONT_PALETTES_CSS } from '../web/assets/storefront-palettes.mjs';
 import {
   DEFAULT_SHARE_DESCRIPTION,
   assertPublicSeo,
@@ -1247,6 +1248,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   const accent = theme?.accentColor ? ` style="--storefront-custom-accent:${theme.accentColor}"` : '';
   const shape = theme?.buttonStyle ? ` data-button-style="${theme.buttonStyle}"` : '';
   const font = theme?.fontPair ? ` data-font-pair="${theme.fontPair}"` : '';
+  const palette = theme?.palette ? ` data-palette="${theme.palette}"` : '';
   if (!structure && typeof baseTemplateHtml === 'string' && baseTemplateHtml.trim()) {
     return baseTemplateHtml
       .replace(
@@ -1287,9 +1289,9 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
   <link rel="preload" href="/assets/fonts/dm-sans.ttf" as="font" type="font/ttf" crossorigin>
   `}<script src="/theme.js"></script>
   <link rel="stylesheet" href="/vitrine/vitrine.css">
-  ${jsonLd}
+  ${palette ? `<link rel="stylesheet" href="${STOREFRONT_PALETTES_CSS}">\n  ` : ''}${jsonLd}
 </head>
-<body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}>
+<body data-storefront-slug="${escapeHtml(menu.slug)}"${accent}${shape}${font}${palette}>
   <a class="skip-link" href="#vitrine-principal">Pular para os itens</a>
   ${header}
   <main id="vitrine-principal" class="wrap storefront-main">

@@ -5,6 +5,7 @@ import {
   formatDiscardNotice
 } from '../assets/selection-drawer.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
+import { STOREFRONT_PALETTES_CSS, storefrontPaletteOf } from '../assets/storefront-palettes.mjs';
 import { AUCTION_RULES, isAuctionItem } from '../assets/auction-rules.mjs';
 import { mountStorefrontPlace } from '../assets/storefront-place.mjs';
 import { createItemHref, resolveItemBasePath, setupItemPage } from '../assets/item-page.mjs';
@@ -431,6 +432,17 @@ export function createAuctionClient({ slug, fetchImpl = globalThis.fetch, onBoar
   return { loadBoard, placeBid, refresh: loadBoard };
 }
 
+/** `/vitrine/?slug=` só conhece a paleta depois do menu.json; a página publicada já vem com ela. */
+export function applyStorefrontPalette(doc, palette) {
+  if (!palette || !doc?.body) return;
+  doc.body.setAttribute?.('data-palette', palette);
+  if (doc.querySelector?.(`link[href="${STOREFRONT_PALETTES_CSS}"]`) || !doc.head) return;
+  const link = doc.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = STOREFRONT_PALETTES_CSS;
+  doc.head.appendChild(link);
+}
+
 export async function bootStorefront(deps = {}) {
   const doc = deps.document ?? globalThis.document;
   if (!doc) return null;
@@ -470,6 +482,7 @@ export async function bootStorefront(deps = {}) {
     }
 
     const menu = await response.json();
+    applyStorefrontPalette(doc, storefrontPaletteOf(menu));
     const displayName = menu.messages?.heroTitle || menu.businessName || menu.name || 'Vitrine';
     const tagLabel = resolveCatalogTagLabel(menu.catalogType);
 
