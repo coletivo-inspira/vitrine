@@ -214,9 +214,19 @@
               <input type="text" id="gate-business-name" name="businessName" placeholder="Ex: Ateliê Maria" maxlength="160" required class="item-input input-styled-height">
             </div>
 
-            <div class="form-group">
-              <label for="gate-city">Cidade / Estado</label>
-              <input type="text" id="gate-city" name="city" placeholder="Ex: Porto Alegre, RS" maxlength="120" required class="item-input input-styled-height">
+            <div class="form-row-location">
+              <div class="form-group">
+                <label for="gate-state">Estado</label>
+                <select id="gate-state" name="state" class="select-styled input-styled-height" autocomplete="address-level1" required>
+                  <option value="">Selecione o estado</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="gate-city">Cidade</label>
+                <input type="text" id="gate-city" name="city" list="gate-city-options" placeholder="Escolha o estado primeiro" maxlength="116" autocomplete="off" required aria-describedby="gate-city-help" class="item-input input-styled-height" disabled>
+                <datalist id="gate-city-options"></datalist>
+                <span id="gate-city-help" class="form-help" aria-live="polite">Selecione o estado para listar as cidades.</span>
+              </div>
             </div>
 
             <div class="form-group">
@@ -591,9 +601,19 @@
                 <input type="text" id="profile-business-name" name="businessName" placeholder="Ex: Ateliê Maria" maxlength="160">
               </div>
 
-              <div class="form-group">
-                <label for="profile-city">Cidade / Estado</label>
-                <input type="text" id="profile-city" name="city" placeholder="Ex: Porto Alegre, RS" maxlength="120">
+              <div class="form-row-location">
+                <div class="form-group">
+                  <label for="profile-state">Estado</label>
+                  <select id="profile-state" name="state" class="select-styled input-styled-height" autocomplete="address-level1">
+                    <option value="">Selecione o estado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="profile-city">Cidade</label>
+                  <input type="text" id="profile-city" name="city" list="profile-city-options" placeholder="Escolha o estado primeiro" maxlength="116" autocomplete="off" aria-describedby="profile-city-help" disabled>
+                  <datalist id="profile-city-options"></datalist>
+                  <span id="profile-city-help" class="form-help" aria-live="polite">Selecione o estado para listar as cidades.</span>
+                </div>
               </div>
 
               <div class="form-group">
