@@ -4,7 +4,7 @@
 
 ## Fase 1 - Base
 
-- [x] T001 Criar `specs/019-portal-forms-ux/` e apontar `AGENTS.md` e `.specify/feature.json` para ela.
+- [x] T001 Criar `specs/020-portal-forms-ux/` e apontar `AGENTS.md` e `.specify/feature.json` para ela.
 - [x] T002 [P] Ajustar CSP do portal (`web/_headers`, `scripts/serve.mjs`, `PORTAL_CSP_HEADER` em `workers/api.mjs`) com `img-src https://lh3.googleusercontent.com`.
 
 ## Fase 2 - Início e rotas (US1)
@@ -25,7 +25,7 @@
 
 ## Fase 4 - Equipe por link (US5, = 018 US5)
 
-- [x] T030 [P] [US5] Migração `supabase/migrations/20261126000100_site_team_invitations.sql` (`private.site_invitations`, funções de equipe e auditoria) + `test/database/site-team-invitations.test.mjs`.
+- [x] T030 [P] [US5] Migração `supabase/migrations/20261126003000_site_team_invitations.sql` (`private.site_invitations`, funções de equipe e auditoria) + `test/database/site-team-invitations.test.mjs`.
 - [x] T031 [US5] Rotas `GET /api/sites/:id/team`, `POST|DELETE /api/sites/:id/invitations`, `POST /api/invitations/lookup|accept`, página `/convite/:token`, loja em memória + `test/team-invitations.test.mjs`.
 - [x] T032 [US5] `web/portal/team-panel.mjs` em Configurações > Acesso e `web/portal/invite-accept.mjs` na rota `#/convite` + `test/team-panel.test.mjs`.
 - [x] T033 [P] `PATCH /api/sites/:id` e `publishedAt` na lista + `test/site-rename-and-published-at.test.mjs`.

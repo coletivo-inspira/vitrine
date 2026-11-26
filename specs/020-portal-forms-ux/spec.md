@@ -25,7 +25,7 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Encontrar e começar vitrines no Início (`019-US1`) (Priority: P1)
+### User Story 1 - Encontrar e começar vitrines no Início (`020-US1`) (Priority: P1)
 
 Como pessoa autenticada, quero uma tela inicial com uma linha **Começar nova vitrine** (Produtos, Serviços e produtos, Agendamento, Orçamento e Sob medida) e uma grade **Vitrines recentes** (capa, nome, endereço, Publicada/Rascunho, papel quando não sou proprietária e menu de 3 pontos), com busca e um menu do avatar, para chegar à vitrine certa ou criar uma nova sem painéis intermediários.
 
@@ -38,7 +38,7 @@ Como pessoa autenticada, quero uma tela inicial com uma linha **Começar nova vi
 3. **Given** a tela Início, **When** a pessoa abre o menu do avatar, **Then** encontra Perfil, Customizações, Plano e cobrança, Impacto (só patrocinador), Administração (só `platform_admin`), Tema e Sair.
 4. **Given** um cartão, **When** a pessoa abre o menu de 3 pontos, **Then** encontra Abrir, Pedidos, Copiar link e Abrir vitrine pública (só quando publicada) e as ações de ciclo de vida que o papel permite (Pausar, Retomar, Arquivar, Restaurar, Excluir de vez).
 
-### User Story 2 - Editar a vitrine com salvamento automático e aba Itens (`019-US2`) (Priority: P1)
+### User Story 2 - Editar a vitrine com salvamento automático e aba Itens (`020-US2`) (Priority: P1)
 
 Como responsável por uma vitrine, quero um cabeçalho com seta de voltar, nome editável, indicador "Salvando... / Salvo", **Personalizar**, **Visualizar**, **Publicar** e um menu de 3 pontos, e quero editar os itens numa lista única em que cada categoria é uma seção.
 
@@ -50,15 +50,15 @@ Como responsável por uma vitrine, quero um cabeçalho com seta de voltar, nome 
 4. **Given** o cabeçalho, **When** a pessoa toca em **Visualizar**, **Then** vê a prévia em tela cheia com o renderizador compartilhado; ao tocar em **Publicar**, o rascunho é salvo, publicado e um diálogo mostra o link com o botão Copiar.
 5. **Given** a pessoa sai da vitrine (voltar, outra rota ou Sair), **When** há alterações pendentes, **Then** o rascunho é salvo antes de sair.
 
-### User Story 3 - Acompanhar pedidos da vitrine aberta (`019-US3`) (Priority: P2)
+### User Story 3 - Acompanhar pedidos da vitrine aberta (`020-US3`) (Priority: P2)
 
 Como responsável ou membro, quero a aba **Pedidos** com os Insights só da vitrine aberta (períodos 7/30/90 dias, destaque, 3 números, gráfico por dia e itens mais escolhidos) e, quando gerencio lances, os **Leilões** dessa vitrine; gráfico por hora, categorias, origem das visitas e curtidas ficam em "Ver mais".
 
-### User Story 4 - Ajustar a vitrine em seções recolhíveis (`019-US4`) (Priority: P2)
+### User Story 4 - Ajustar a vitrine em seções recolhíveis (`020-US4`) (Priority: P2)
 
 Como responsável, quero a aba **Configurações** com seções recolhidas que mostram um resumo: **Atendimento**, **Pedido**, **Itens**, **Local e horário**, **Google, WhatsApp e QR Code**, **Canais**, **Identidade, menus e páginas**, **Biblioteca de arquivos**, **Domínios e publicação**, **Versões publicadas** e **Acesso**.
 
-### User Story 5 - Montar a equipe da vitrine por link (`019-US5`, = 018-US5) (Priority: P2)
+### User Story 5 - Montar a equipe da vitrine por link (`020-US5`, = 018-US5) (Priority: P2)
 
 Como proprietária (ou administradora) da vitrine, quero gerar um convite por link com papel (Administrador, Funcionário ou Somente leitura), copiar o link ou abrir o WhatsApp com a mensagem pronta, ver a equipe pelo nome de exibição, mudar papéis, remover pessoas e revogar convites abertos.
 
@@ -70,11 +70,11 @@ Como proprietária (ou administradora) da vitrine, quero gerar um convite por li
 4. **Given** uma pessoa com o link, **When** abre `/convite/<token>` e depois entra no painel e aceita, **Then** passa a ver só aquela vitrine com o papel do convite; se já é membro ou proprietária, vê "Você já faz parte desta vitrine" e nada muda.
 5. **Given** um link inválido, vencido, revogado ou já usado, **When** alguém o abre, **Then** vê a mesma resposta "Este convite não está mais disponível".
 
-### User Story 6 - Perfil com foto, Estado e Cidade (`019-US6`) (Priority: P3)
+### User Story 6 - Perfil com foto, Estado e Cidade (`020-US6`) (Priority: P3)
 
 Como pessoa autenticada, quero ver a foto da minha conta Google no avatar e no Perfil, e escolher Estado e Cidade de uma lista (IBGE) em vez de digitar "Cidade / Estado".
 
-### User Story 7 - Cores da vitrine em Personalizar (`019-US7`) (Priority: P3)
+### User Story 7 - Cores da vitrine em Personalizar (`020-US7`) (Priority: P3)
 
 Como responsável, quero escolher uma de 8 paletas com contraste AA (tema claro e escuro) no painel **Personalizar**, junto com título, boas-vindas e texto do botão, e ver a mudança na prévia e na vitrine publicada depois de publicar.
 
