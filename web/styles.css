@@ -42,7 +42,8 @@
 /* Theme controls stay available beside the mobile menu. */
 :root{color-scheme:light}
 .site-header>nav{order:2}.header-controls{order:3;display:flex;align-items:center;gap:8px}
-.theme-toggle{display:grid;place-items:center;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--line);border-radius:7px;color:var(--ink);cursor:pointer}
+.theme-toggle{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--line);border-radius:7px;color:var(--ink);cursor:pointer;overflow:hidden}
+.theme-toggle svg{display:block;width:20px;height:20px;overflow:visible;stroke:currentColor;stroke-width:1.7}
 .theme-toggle:hover{background:var(--apricot);border-color:var(--orange)}
 .theme-sun,.brand .brand-logo-dark{display:none}
 :root[data-theme="dark"]{color-scheme:dark;--paper:#171e1a;--ink:#f7f7f4;--ink-soft:#b9c5bd;--orange:#ffb18a;--orange-hover:#ffc4a7;--apricot:#33291f;--line:#45544a;--white:#222e26;--shadow-preview:0 18px 42px -18px #0009;--glass:32 42 35;--glass-border:rgb(247 247 244 / .14);--glass-highlight:inset 0 1px 0 0 rgb(247 247 244 / .12);--glass-shadow:0 24px 52px -20px rgb(0 0 0 / .55);--glass-fallback:#202a23}

@@ -8,16 +8,16 @@
   var GRID = 22;
   /* radial-gradient dots sit at the centre of each tile. */
   var GRID_OFFSET = GRID / 2;
-  var LIFETIME_MS = 700;
-  var CALM_LIFETIME_MS = 450;
-  var NODE_SIZE = 8;
-  var BAR_WIDTH = 3;
-  var MAX_SEGMENTS = 40;
+  var LIFETIME_MS = 500;
+  var CALM_LIFETIME_MS = 350;
+  var NODE_SIZE = 5;
+  var BAR_WIDTH = 1.5;
+  var MAX_SEGMENTS = 24;
   /* Jumps longer than this (in grid cells) start a new trail instead of drawing a long bar. */
   var MAX_LINK_CELLS = 12;
   var color = "#A3E5C2";
   /* Without `mix-blend-mode` the mint would sit on top of text, so it is drawn lighter. */
-  var NO_BLEND_OPACITY = 0.55;
+  var NO_BLEND_OPACITY = 0.28;
   var REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
   var canvas = document.createElement("canvas");
@@ -44,6 +44,7 @@
     var dark = document.documentElement.dataset.theme === "dark";
     color = dark ? "#BAFF29" : "#A3E5C2";
     canvas.style.mixBlendMode = dark ? "screen" : "multiply";
+    opacity = dark ? 0.16 : 0.28;
   }
   syncTheme();
   new MutationObserver(syncTheme).observe(document.documentElement, {
