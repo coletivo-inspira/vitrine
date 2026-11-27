@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   attachWhatsappMask,
   extractPhoneDigits,
@@ -12,6 +14,8 @@ import {
   createInterestsMultiSelect
 } from '../web/portal/multi-select.mjs';
 import { renderAccountEmailStatus } from '../web/portal/portal.js';
+
+const root = resolve(import.meta.dirname, '..');
 
 function createMiniDom() {
   const doc = {
@@ -159,36 +163,30 @@ test('PR (b) - App Shell and Wizard Flow Validation', async (t) => {
     assert.strictEqual(regex.test('55 11 999999999'), false); // contains space
   });
 
-  await t.test('3. Valida áreas de atuação aceitas no Passo 1 do assistente', () => {
-    const validAreas = ['food', 'art', 'photo', 'health', 'tech'];
-    assert.ok(validAreas.includes('food'));
-    assert.ok(validAreas.includes('art'));
-    assert.ok(validAreas.includes('photo'));
-    assert.ok(validAreas.includes('health'));
-    assert.ok(validAreas.includes('tech'));
+  await t.test('3. Área de atuação fica em Configurações > Atendimento (não é mais passo da criação)', async () => {
+    const html = await readFile(resolve(root, 'web/portal/index.html'), 'utf8');
+    const atendimento = html.slice(html.indexOf('id="config-atendimento"'), html.indexOf('id="config-pedido"'));
+    const areas = [...atendimento.matchAll(/<option value="([a-z]+)">/g)].map(([, value]) => value);
+    assert.deepEqual(areas.slice(-5), ['food', 'art', 'photo', 'health', 'tech']);
+    assert.match(atendimento, /<select id="editor-storefront-type" name="storefrontType"/);
+    const dialog = html.slice(html.indexOf('<dialog id="new-vitrine-dialog"'), html.indexOf('</dialog>', html.indexOf('<dialog id="new-vitrine-dialog"')));
+    assert.doesNotMatch(dialog, /storefrontType|wizard-area/);
   });
 
-  await t.test('4. Valida mapeamento e resolução de hashes para seções do portal', () => {
-    function getSectionFromHash(hash) {
-      const hashToSection = {
-        '#inicio': 'inicio',
-        '#vitrines': 'vitrines',
-        '#dashboard': 'vitrines',
-        '#insights': 'insights',
-        '#perfil': 'perfil',
-        '#pedidos': 'pedidos',
-        '#wizard': 'wizard',
-        '#editor': 'editor'
-      };
-      return hashToSection[hash] || 'inicio';
-    }
-
-    assert.equal(getSectionFromHash('#inicio'), 'inicio');
-    assert.equal(getSectionFromHash('#vitrines'), 'vitrines');
-    assert.equal(getSectionFromHash('#dashboard'), 'vitrines');
-    assert.equal(getSectionFromHash('#insights'), 'insights');
+  await t.test('4. Valida mapeamento e resolução de hashes para seções do portal', async () => {
+    const { getSectionFromHash, describeSlugProblem, slugifySiteName } = await import('../web/portal/portal.js');
+    assert.equal(getSectionFromHash('#/'), 'inicio');
+    assert.equal(getSectionFromHash('#/v/s1/config'), 'editor');
+    assert.equal(getSectionFromHash('#/perfil'), 'perfil');
+    assert.equal(getSectionFromHash('#/customizacoes'), 'customizacoes');
+    assert.equal(getSectionFromHash('#vitrines'), 'inicio');
+    assert.equal(getSectionFromHash('#pedidos'), 'customizacoes');
     assert.equal(getSectionFromHash(''), 'inicio');
     assert.equal(getSectionFromHash('#unknown'), 'inicio');
+    assert.equal(slugifySiteName('Pizzaria Bella Itália!'), 'pizzaria-bella-italia');
+    assert.equal(describeSlugProblem('ok-loja'), '');
+    assert.match(describeSlugProblem('admin'), /reservado/);
+    assert.match(describeSlugProblem('a'), /entre 3 e 40/);
   });
 
   await t.test('5. Máscara de WhatsApp (celular, fixo, colar, apagar, outro DDI e valor salvo sem máscara)', () => {

@@ -216,9 +216,9 @@ test('Trocar uma vitrine existente para o modelo preserva itens e contato (spec 
   assert.deepEqual(publication.menu.structure.pages.map(page => page.slug), ['home']);
 });
 
-test('Painel oferece o modelo no assistente de criação', async () => {
+test('Painel oferece o modelo em "Começar nova vitrine"', async () => {
   const html = await readFile(resolve(root, 'web/portal/index.html'), 'utf8');
   const portal = await readFile(resolve(root, 'web/portal/portal.js'), 'utf8');
-  assert.match(html, /name="wizard-model" value="services"[\s\S]{0,200}<h3>Serviços e produtos<\/h3>/);
-  assert.match(portal, /model === 'services'\) \{\s*template = 'servicos-produtos-v1';\s*catalogType = 'products';/);
+  assert.match(html, /data-template="services"[\s\S]{0,300}<span class="template-name">Serviços e produtos<\/span>/);
+  assert.match(portal, /services: \{ label: 'Serviços e produtos', template: 'servicos-produtos-v1', catalogType: 'products' \}/);
 });

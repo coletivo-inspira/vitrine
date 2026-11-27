@@ -50,6 +50,10 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR');
 }
 
+export function siteStatusBadge(site) {
+  return statusBadge(site);
+}
+
 function statusBadge(site) {
   if (!site.pausedAt && !site.archivedAt) return null;
   const badge = document.createElement('span');
@@ -220,6 +224,24 @@ export function decorateSiteItem(site, info, actions, { online = true, notify, o
     });
     actions.append(button);
   }
+}
+
+// Same actions as decorateSiteItem, as items of the card's "more" menu on the Início grid.
+export function createLifecycleMenuItems(site, { online = true, notify, onChanged } = {}) {
+  if (!online) return [];
+  return visibleActions(site).map((action) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = `menu-item site-lifecycle-${action}`;
+    item.setAttribute('role', 'menuitem');
+    item.textContent = ACTION_LABELS[action][0];
+    item.addEventListener('click', async () => {
+      item.disabled = true;
+      await runAction(site, action, { notify, onChanged });
+      item.disabled = false;
+    });
+    return item;
+  });
 }
 
 export async function confirmDomainDisconnect(site, domain) {

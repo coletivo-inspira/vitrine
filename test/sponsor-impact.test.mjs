@@ -90,7 +90,7 @@ test('auditoria da administração descreve atribuir e retirar o papel', async (
 
 test('portal: "Impacto" e "Patrocinadores" ficam ocultos até o servidor confirmar; sem "catálogo" nem "cardápio"', async () => {
   const html = await readFile(resolve(root, 'web/portal/index.html'), 'utf8');
-  assert.equal((html.match(/<li class="nav-sponsor-item" hidden>/g) ?? []).length, 2);
+  assert.equal((html.match(/<div class="nav-sponsor-item" role="none" hidden>/g) ?? []).length, 1);
   assert.match(html, /<section id="sponsor-impact-section"[^>]*hidden>/);
   assert.match(html, /id="platform-tab-sponsors"[^>]*>Patrocinadores</);
   const start = html.indexOf('id="sponsor-impact-section"');

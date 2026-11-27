@@ -248,7 +248,8 @@ test('Issue #126 — painel usa o diálogo padronizado e o filtro "Arquivadas"',
     read('web/portal/index.html'), read('web/portal/portal.js'), read('web/portal/editor.js'), read('web/portal/site-lifecycle.js')
   ]);
   assert.match(html, /href="\.\/site-lifecycle\.css"/);
-  assert.match(portal, /decorateSiteItem\(site, info, actions/);
+  assert.match(portal, /createLifecycleMenuItems\(site, \{/);
+  assert.match(ui, /export function createLifecycleMenuItems/);
   assert.match(portal, /createSiteViewFilter\(sites, renderSites\)/);
   assert.match(editor, /await confirmDomainDisconnect\(site, domain\)/);
   assert.doesNotMatch(editor, /window\.confirm\(`Desvincular/);

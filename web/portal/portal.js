@@ -1,20 +1,34 @@
 import { detectPlatformCms, hasPlatformAdminAccess, initializePlatformCms, showPlatformCms } from './platform-cms.js';
 import { detectSponsorImpact, hasSponsorImpactAccess, initializeSponsorImpact, showSponsorImpact } from './sponsor-impact.mjs';
-import { clearEditor, hasUnsavedDraftChanges, loadEditor } from './editor.js';
+import { clearEditor, flushAutosave, isEditorShowingSite, loadEditor, showEditorTab } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 import { loadBillingNotice } from './billing-notice.mjs';
 import { initBillingPanel, loadBillingPanel } from './billing-panel.mjs';
 import { loadDemoInvitations } from './linktree-import.js';
-import { activeSites, createSiteViewFilter, decorateSiteItem, emptyViewMessage, sitesForCurrentView } from './site-lifecycle.js';
+import {
+  activeSites,
+  createLifecycleMenuItems,
+  createSiteViewFilter,
+  emptyViewMessage,
+  siteStatusBadge,
+  sitesForCurrentView
+} from './site-lifecycle.js';
 import { renderInsightsOrigin } from './insights-origin.mjs';
+import { captureInviteToken, renderInviteConfirmation } from './invite-accept.mjs';
 
 // State variables
 let isOnline = false;
 let currentUser = null;
 let sites = [];
 let activeSite = null;
+let currentSection = null;
+let routeToken = 0;
+let homeSearchQuery = '';
+let newVitrineTemplate = 'products';
+let newSiteSlugTouched = false;
+let insightsRequestToken = 0;
 
 export let PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
 export let PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
@@ -29,29 +43,34 @@ let profile = {
 };
 let customizationRequests = [];
 let selectedInterests = new Set();
-let wizardCurrentStep = 1;
 let insightsPeriod = '7d';
-let insightsSelectedSiteId = null;
 let currentInsightsData = null;
 
 // DOM Elements
 const authSection = globalThis.document?.getElementById('auth-section');
 const authenticatedApp = globalThis.document?.getElementById('authenticated-app');
-const vitrinesSection = globalThis.document?.getElementById('vitrines-section');
-const insightsSection = globalThis.document?.getElementById('insights-section');
-const leiloesSection = globalThis.document?.getElementById('leiloes-section');
+const mainContent = globalThis.document?.getElementById('conteudo-portal');
+const appTopBar = globalThis.document?.getElementById('app-top-bar');
+const homeSearch = globalThis.document?.getElementById('home-search');
+const homeSearchInput = globalThis.document?.getElementById('home-search-input');
 const editorSection = globalThis.document?.getElementById('editor-section');
 const inicioSection = globalThis.document?.getElementById('inicio-section');
 const perfilSection = globalThis.document?.getElementById('perfil-section');
-const pedidosSection = globalThis.document?.getElementById('pedidos-section');
+const customizacoesSection = globalThis.document?.getElementById('customizacoes-section');
 const planoSection = globalThis.document?.getElementById('plano-section');
-const wizardSection = globalThis.document?.getElementById('wizard-section');
+const conviteSection = globalThis.document?.getElementById('convite-section');
 const profileGateSection = globalThis.document?.getElementById('profile-gate-section');
+const auctionsBlock = globalThis.document?.getElementById('auctions-block');
 
 const demoModeBadge = globalThis.document?.getElementById('demo-mode-badge');
 const logoutButton = globalThis.document?.getElementById('logout-button');
 const globalFeedback = globalThis.document?.getElementById('global-feedback');
 const sitesListContainer = globalThis.document?.getElementById('sites-list-container');
+const sitesListStatus = globalThis.document?.getElementById('sites-list-status');
+const sitesViewFilterSlot = globalThis.document?.getElementById('sites-view-filter-slot');
+const accountMenuButton = globalThis.document?.getElementById('account-menu-button');
+const accountMenu = globalThis.document?.getElementById('account-menu');
+const accountMenuName = globalThis.document?.getElementById('account-menu-name');
 
 // Profile DOM Elements
 const profileForm = globalThis.document?.getElementById('profile-form');
@@ -81,27 +100,20 @@ const requestReferenceError = globalThis.document?.getElementById('request-refer
 const requestDesiredDeadlineInput = globalThis.document?.getElementById('request-desired-deadline');
 const requestsListContainer = globalThis.document?.getElementById('requests-list-container');
 
-// Wizard DOM Elements
-const wizardForm = globalThis.document?.getElementById('wizard-form');
-const wizardSiteNameInput = globalThis.document?.getElementById('wizard-site-name');
-const wizardSiteSlugInput = globalThis.document?.getElementById('wizard-site-slug');
-const wizardSlugPreview = globalThis.document?.getElementById('wizard-slug-preview');
-const wizardSlugValidationError = globalThis.document?.getElementById('wizard-slug-validation-error');
-const wizardOpenBtn = globalThis.document?.getElementById('wizard-open-btn');
-
-// Hub DOM Elements
-const vitrinesSummaryText = globalThis.document?.getElementById('vitrines-summary-text');
-const hubVitrinesList = globalThis.document?.getElementById('hub-vitrines-list');
-const customRequestsSummaryText = globalThis.document?.getElementById('custom-requests-summary-text');
-const hubRequestsList = globalThis.document?.getElementById('hub-requests-list');
-const hubInsightsHighlightText = globalThis.document?.getElementById('hub-insights-highlight-text');
-const hubInsightsStatsList = globalThis.document?.getElementById('hub-insights-stats-list');
+// New vitrine dialog (name + address)
+const newVitrineDialog = globalThis.document?.getElementById('new-vitrine-dialog');
+const newVitrineForm = globalThis.document?.getElementById('new-vitrine-form');
+const newVitrineModelText = globalThis.document?.getElementById('new-vitrine-model-text');
+const newSiteNameInput = globalThis.document?.getElementById('new-site-name');
+const newSiteSlugInput = globalThis.document?.getElementById('new-site-slug');
+const newSiteSlugPreview = globalThis.document?.getElementById('new-site-slug-preview');
+const newSiteSlugError = globalThis.document?.getElementById('new-site-slug-error');
+const newSiteSubmit = globalThis.document?.getElementById('new-site-submit');
 
 let profileInterestsMultiSelect = null;
 let gateInterestsMultiSelect = null;
 
-// Insights DOM Elements
-const insightsSiteSelect = globalThis.document?.getElementById('insights-site-select');
+// Insights DOM Elements (aba Pedidos da vitrine aberta)
 const insightsHighlightsList = globalThis.document?.getElementById('insights-highlights-list');
 const insightsKpiVisits = globalThis.document?.getElementById('insights-kpi-visits');
 const insightsKpiVisitsDelta = globalThis.document?.getElementById('insights-kpi-visits-delta');
@@ -110,7 +122,6 @@ const insightsKpiOrdersDelta = globalThis.document?.getElementById('insights-kpi
 const insightsKpiConversion = globalThis.document?.getElementById('insights-kpi-conversion');
 const insightsKpiConversionDelta = globalThis.document?.getElementById('insights-kpi-conversion-delta');
 const insightsKpiEstimated = globalThis.document?.getElementById('insights-kpi-estimated');
-const insightsKpiEstimatedDelta = globalThis.document?.getElementById('insights-kpi-estimated-delta');
 const insightsDayChartContainer = globalThis.document?.getElementById('insights-day-chart-container');
 const insightsHourChartContainer = globalThis.document?.getElementById('insights-hour-chart-container');
 const insightsTopItemsList = globalThis.document?.getElementById('insights-top-items-list');
@@ -120,101 +131,250 @@ const insightsLikesPeriod = globalThis.document?.getElementById('insights-likes-
 const insightsLikesList = globalThis.document?.getElementById('insights-likes-list');
 
 const googleLoginButton = globalThis.document?.getElementById('google-login-button');
-const localDemoButton = globalThis.document?.getElementById('local-demo-button');
-const backToDashboardButton = globalThis.document?.getElementById('back-to-dashboard');
 
 // Reserved slugs to block on the client side
 const RESERVED_SLUGS = ['admin', 'api', 'auth', 'app', 'www', 'portal', 'assets', 'data', 'login', 'logout'];
 export const DEFAULT_SUPABASE_URL = 'https://qawlpsrfewosxsfgmmpm.supabase.co';
 
+const TEMPLATE_MODELS = Object.freeze({
+  products: { label: 'Produtos', template: 'products-v1', catalogType: 'products' },
+  services: { label: 'Serviços e produtos', template: 'servicos-produtos-v1', catalogType: 'products' },
+  booking: { label: 'Agendamento', template: 'booking-v1', catalogType: 'booking' },
+  quote: { label: 'Orçamento', template: 'quote-v1', catalogType: 'quote' }
+});
+
+// ==========================================
+// Rotas por hash
+// ==========================================
+
+const VITRINE_TABS = new Set(['itens', 'pedidos', 'config']);
+const SIMPLE_ROUTES = Object.freeze({
+  '#/perfil': 'perfil',
+  '#/customizacoes': 'customizacoes',
+  '#/plano': 'plano',
+  '#/administracao': 'platform-cms',
+  '#/impacto': 'impacto',
+  '#/primeiro-acesso': 'profile-gate',
+  '#/convite': 'convite'
+});
+const LEGACY_ROUTES = Object.freeze({
+  '#inicio': '#/',
+  '#vitrines': '#/',
+  '#dashboard': '#/',
+  '#perfil': '#/perfil',
+  '#pedidos': '#/customizacoes',
+  '#plano': '#/plano',
+  '#administracao': '#/administracao',
+  '#impacto': '#/impacto',
+  '#profile-gate': '#/primeiro-acesso'
+});
+const CONTEXT_LEGACY_ROUTES = new Set(['#insights', '#leiloes', '#editor', '#wizard']);
+const AUCTION_ROLES = ['owner', 'admin'];
+
+export function parseRoute(hash = '') {
+  const raw = String(hash || '').trim();
+  if (raw === '' || raw === '#' || raw === '#/') return { section: 'inicio' };
+  if (Object.hasOwn(SIMPLE_ROUTES, raw)) return { section: SIMPLE_ROUTES[raw] };
+  if (/^#\/convite\/[^/]+$/.test(raw)) return { section: 'convite' };
+
+  const vitrineMatch = raw.match(/^#\/v\/([^/?#]+)(?:\/([a-z]+))?\/?$/);
+  if (vitrineMatch) {
+    let siteId;
+    try {
+      siteId = decodeURIComponent(vitrineMatch[1]);
+    } catch {
+      return { section: 'inicio', unknown: true };
+    }
+    const tab = vitrineMatch[2] || 'itens';
+    if (!VITRINE_TABS.has(tab)) return { section: 'editor', siteId, tab: 'itens', redirectTab: true };
+    return { section: 'editor', siteId, tab };
+  }
+
+  if (Object.hasOwn(LEGACY_ROUTES, raw) || CONTEXT_LEGACY_ROUTES.has(raw)) {
+    return { section: parseRoute(LEGACY_ROUTES[raw] ?? '#/').section, legacy: raw };
+  }
+  return { section: 'inicio', unknown: true };
+}
+
 export function getSectionFromHash(hash) {
-  const hashToSection = {
-    '#inicio': 'inicio',
-    '#vitrines': 'vitrines',
-    '#dashboard': 'vitrines',
-    '#insights': 'insights',
-    '#leiloes': 'leiloes',
-    '#perfil': 'perfil',
-    '#pedidos': 'pedidos',
-    '#plano': 'plano',
-    '#wizard': 'wizard',
-    '#editor': 'editor',
-    '#profile-gate': 'profile-gate',
-    '#administracao': 'platform-cms',
-    '#impacto': 'impacto'
-  };
-  return hashToSection[hash] || 'inicio';
+  return parseRoute(hash).section;
+}
+
+export function vitrineHash(siteId, tab = 'itens') {
+  return `#/v/${encodeURIComponent(siteId)}/${VITRINE_TABS.has(tab) ? tab : 'itens'}`;
+}
+
+export function routeRedirectTarget(route, context = { activeSite, sites }) {
+  if (route.legacy) {
+    if (Object.hasOwn(LEGACY_ROUTES, route.legacy)) return LEGACY_ROUTES[route.legacy];
+    const listed = activeSites(context.sites || []);
+    if (route.legacy === '#insights') {
+      const site = context.activeSite || listed[0];
+      return site ? vitrineHash(site.id, 'pedidos') : '#/';
+    }
+    if (route.legacy === '#leiloes') {
+      const site = AUCTION_ROLES.includes(context.activeSite?.role)
+        ? context.activeSite
+        : listed.find((entry) => AUCTION_ROLES.includes(entry.role));
+      return site ? vitrineHash(site.id, 'pedidos') : '#/';
+    }
+    if (route.legacy === '#editor') {
+      return context.activeSite ? vitrineHash(context.activeSite.id, 'itens') : '#/';
+    }
+    return '#/';
+  }
+  if (route.redirectTab) return vitrineHash(route.siteId, 'itens');
+  if (route.unknown) return '#/';
+  return null;
+}
+
+function replaceHash(target) {
+  const win = globalThis.window;
+  if (!win) return;
+  if (typeof win.history?.replaceState === 'function') {
+    win.history.replaceState(null, '', target);
+  } else {
+    win.location.hash = target;
+  }
+}
+
+export function navigate(hash) {
+  const win = globalThis.window;
+  if (!win) return;
+  if (win.location.hash === hash) {
+    void handleRouting();
+  } else {
+    win.location.hash = hash;
+  }
 }
 
 export function isProfileComplete() {
   return !!(profile && profile.displayName && profile.businessName && profile.city && profile.whatsapp && /^[1-9]\d{7,14}$/.test(profile.whatsapp));
 }
 
-export function handleRouting() {
+function resolveProfileGate(route) {
+  if (route.section === 'convite') return route;
+  if (!isProfileComplete()) {
+    if (hasSponsorImpactAccess()) {
+      if (route.section !== 'impacto') replaceHash('#/impacto');
+      return { section: 'impacto' };
+    }
+    if (route.section !== 'profile-gate') replaceHash('#/primeiro-acesso');
+    return { section: 'profile-gate' };
+  }
+  if (route.section === 'profile-gate') {
+    replaceHash('#/');
+    return { section: 'inicio' };
+  }
+  return route;
+}
+
+export async function handleRouting() {
   if (!currentUser) {
     showSection('auth');
     return;
   }
+  const token = ++routeToken;
+  captureInviteToken({
+    location: globalThis.window?.location,
+    history: globalThis.window?.history,
+    storage: globalThis.sessionStorage
+  });
 
-  const complete = isProfileComplete();
-  const hash = globalThis.window?.location?.hash || '';
-  let section = getSectionFromHash(hash);
-
-  if (!complete && hasSponsorImpactAccess()) {
-    if (section !== 'impacto' && globalThis.window) {
-      globalThis.window.location.hash = '#impacto';
+  let route = parseRoute(globalThis.window?.location?.hash || '');
+  const target = routeRedirectTarget(route, { activeSite, sites });
+  if (target) {
+    const openDialogAfter = route.legacy === '#wizard';
+    replaceHash(target);
+    route = parseRoute(target);
+    if (openDialogAfter && isProfileComplete()) {
+      showSection('inicio');
+      openNewVitrineDialog('products');
       return;
     }
-    section = 'impacto';
-  } else if (!complete) {
-    section = 'profile-gate';
-    if (globalThis.window && globalThis.window.location.hash !== '#profile-gate') {
-      globalThis.window.location.hash = '#profile-gate';
+  }
+  route = resolveProfileGate(route);
+
+  const leavingVitrine =
+    currentSection === 'editor' && (route.section !== 'editor' || route.siteId !== activeSite?.id);
+  if (leavingVitrine) {
+    const saved = await flushAutosave();
+    if (token !== routeToken) return;
+    if (!saved) showFeedback('Algumas alterações não foram salvas: complete os nomes e preços pendentes na vitrine.', 'error');
+  }
+
+  if (route.section === 'editor') {
+    const site = sites.find((entry) => entry.id === route.siteId);
+    if (!site) {
+      showFeedback('Vitrine não encontrada ou sem acesso.', 'error');
+      replaceHash('#/');
+      showSection('inicio');
       return;
     }
-  } else {
-    if (section === 'profile-gate') {
-      section = 'inicio';
-      if (globalThis.window) {
-        globalThis.window.location.hash = '#inicio';
-        return;
-      }
+    const needsLoad = !isEditorShowingSite(site.id);
+    activeSite = site;
+    showSection('editor');
+    showEditorTab(route.tab);
+    if (needsLoad) {
+      await loadEditor(site, isOnline);
+      if (token !== routeToken) return;
+      showEditorTab(route.tab);
     }
-  }
-
-  if (section === 'editor' && !activeSite) {
-    if (globalThis.window) {
-      globalThis.window.location.hash = '#vitrines';
-    }
-    return;
-  }
-  
-  if (section === 'wizard') {
-    openWizard();
+    if (route.tab === 'pedidos') loadPedidosForActiveSite();
     return;
   }
 
-  // Set hash if it's empty to keep deep links consistent and trigger onSection/showSection
-  if (globalThis.window && !globalThis.window.location.hash && section === 'inicio') {
-    globalThis.window.location.hash = '#inicio';
+  if (route.section === 'convite') {
+    showSection('convite');
+    showInviteConfirmation();
     return;
   }
 
-  showSection(section);
+  showSection(route.section);
 }
 
 function setupHashRouting() {
   globalThis.window?.addEventListener('hashchange', () => {
-    handleRouting();
+    void handleRouting();
   });
+}
+
+function showInviteConfirmation() {
+  const container = globalThis.document?.getElementById('invite-confirmation');
+  if (!container) return;
+  renderInviteConfirmation({
+    doc: globalThis.document,
+    container,
+    request: portalRequest,
+    storage: globalThis.sessionStorage,
+    onAccepted: async ({ siteId }) => {
+      await loadSites();
+      navigate(siteId ? vitrineHash(siteId, 'itens') : '#/');
+    }
+  });
+}
+
+export async function portalRequest(path, init = {}) {
+  const headers = { Accept: 'application/json', ...(init.headers || {}) };
+  if (init.body !== undefined && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const response = await globalThis.fetch(path, { ...init, headers });
+  const data = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || 'Não foi possível concluir a operação.');
+    error.status = response.status;
+    error.code = data?.error?.code;
+    throw error;
+  }
+  return data;
 }
 
 // Initialize App
 globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  setupAppShellNavigation();
+  setupMenus();
+  setupHomeControls();
   setupProfileChips();
-  setupWizardFlow();
+  setupNewVitrineDialog();
   setupInsightsControls();
   initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
   initBillingPanel({ getSites: () => sites, isOnline: () => isOnline, publicOrigin: () => PUBLIC_SITE_ORIGIN });
@@ -223,37 +383,209 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   if (currentUser) {
     await loadProfile();
     await loadCustomizationRequests();
-    await loadInsightsForActiveSite();
-    updateHubSummary();
-    handleRouting();
+    updateAccountMenu();
+    await handleRouting();
   }
 });
 
-// Setup App Shell Navigation
-function setupAppShellNavigation() {
-  globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const hash = link.getAttribute('href');
-      if (hash && globalThis.window) {
-        globalThis.window.location.hash = hash;
+// ==========================================
+// Menus e diálogos (compartilhados com o editor)
+// ==========================================
+
+let openMenuState = null;
+
+function menuItemsOf(menu) {
+  return Array.from(menu.querySelectorAll('[role="menuitem"]')).filter(
+    (el) => !el.closest('[hidden]') && !el.disabled && el.getAttribute('aria-disabled') !== 'true'
+  );
+}
+
+function openMenu(button, menu) {
+  closeOpenMenu(false);
+  menu.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  openMenuState = { button, menu };
+  menuItemsOf(menu)[0]?.focus();
+}
+
+export function closeOpenMenu(returnFocus = false) {
+  if (!openMenuState) return;
+  const { button, menu } = openMenuState;
+  openMenuState = null;
+  menu.hidden = true;
+  button.setAttribute('aria-expanded', 'false');
+  if (returnFocus && button.isConnected) button.focus();
+}
+
+export function bindMenu(button, menu) {
+  if (!button || !menu || button.dataset.menuBound === 'true') return;
+  button.dataset.menuBound = 'true';
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  menu.hidden = true;
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (openMenuState?.menu === menu) {
+      closeOpenMenu(false);
+    } else {
+      openMenu(button, menu);
+    }
+  });
+
+  button.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openMenu(button, menu);
+      if (event.key === 'ArrowUp') {
+        const items = menuItemsOf(menu);
+        items[items.length - 1]?.focus();
+      }
+    }
+  });
+
+  menu.addEventListener('keydown', (event) => {
+    const items = menuItemsOf(menu);
+    if (items.length === 0) return;
+    const index = items.indexOf(globalThis.document?.activeElement);
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      items[(index + 1) % items.length].focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(index - 1 + items.length) % items.length].focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      items[0].focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1].focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeOpenMenu(true);
+    } else if (event.key === 'Tab') {
+      closeOpenMenu(false);
+    }
+  });
+
+  menu.addEventListener('click', (event) => {
+    if (event.target.closest('[role="menuitem"]')) {
+      closeOpenMenu(false);
+    }
+  });
+}
+
+function setupMenus() {
+  bindMenu(accountMenuButton, accountMenu);
+  globalThis.document?.addEventListener('click', (event) => {
+    if (!openMenuState) return;
+    const { button, menu } = openMenuState;
+    if (menu.contains(event.target) || button.contains(event.target)) return;
+    closeOpenMenu(false);
+  });
+}
+
+export function openDialog(dialog, opener = null) {
+  if (!dialog) return;
+  closeOpenMenu(false);
+  if (dialog.dataset.dialogBound !== 'true') {
+    dialog.dataset.dialogBound = 'true';
+    dialog.querySelectorAll('.dialog-close-btn').forEach((btn) => {
+      btn.addEventListener('click', () => closeDialog(dialog));
+    });
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeDialog(dialog);
+    });
+    dialog.addEventListener('close', () => {
+      const returnTo = dialog.returnFocusTarget;
+      dialog.returnFocusTarget = null;
+      if (returnTo && returnTo.isConnected && typeof returnTo.focus === 'function') {
+        returnTo.focus();
+      }
+    });
+  }
+  dialog.returnFocusTarget = opener || globalThis.document?.activeElement || null;
+  if (typeof dialog.showModal === 'function') {
+    if (!dialog.open) dialog.showModal();
+  } else {
+    dialog.setAttribute('open', '');
+  }
+  const autofocusTarget =
+    dialog.querySelector('[autofocus]') ||
+    dialog.querySelector('input:not([type="hidden"]):not([readonly]), textarea, select') ||
+    dialog.querySelector('.dialog-close-btn');
+  autofocusTarget?.focus();
+}
+
+export function closeDialog(dialog) {
+  if (!dialog) return;
+  if (typeof dialog.close === 'function' && dialog.open) {
+    dialog.close();
+  } else {
+    dialog.removeAttribute('open');
+    dialog.dispatchEvent(new Event('close'));
+  }
+}
+
+export async function copyToClipboard(text) {
+  try {
+    await globalThis.navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function publicUrlForSite(site) {
+  if (!site) return PUBLIC_SITE_ORIGIN;
+  return isOnline ? `${PUBLIC_SITE_ORIGIN}/${site.slug}` : `${globalThis.window?.location?.origin || PUBLIC_SITE_ORIGIN}/loja1`;
+}
+
+export function updateSiteSummary(siteId, patch) {
+  const site = sites.find((entry) => entry.id === siteId);
+  if (!site) return;
+  Object.assign(site, patch);
+  if (!isOnline) {
+    try {
+      localStorage.setItem('vitrine_local_sites', JSON.stringify(sites));
+    } catch {
+      // Local mode keeps the change in memory when storage is blocked.
+    }
+  }
+  renderSites();
+}
+
+// ==========================================
+// Início: modelos, busca e diálogo de nova vitrine
+// ==========================================
+
+function setupHomeControls() {
+  homeSearchInput?.addEventListener('input', () => {
+    homeSearchQuery = homeSearchInput.value;
+    renderSites();
+  });
+
+  globalThis.document?.querySelectorAll('.template-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const template = card.getAttribute('data-template') || 'products';
+      if (template === 'custom') {
+        startCustomRequest();
+      } else {
+        openNewVitrineDialog(template, card);
       }
     });
   });
+}
 
-  // Hub shortcuts
-  globalThis.document?.getElementById('hub-create-site-btn')?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#wizard';
-  });
-  globalThis.document?.getElementById('hub-new-request-btn')?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#pedidos';
-  });
-  globalThis.document?.getElementById('hub-open-insights-btn')?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#insights';
-  });
-  wizardOpenBtn?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#wizard';
-  });
+function startCustomRequest() {
+  if (requestStorefrontTypeSelect) requestStorefrontTypeSelect.value = 'food';
+  if (requestTemplateInterestInput) requestTemplateInterestInput.value = 'Modelo Sob Medida';
+  if (requestGoalInput) requestGoalInput.value = 'Gostaria de uma vitrine sob medida para o meu negócio.';
+  if (requestDesiredDeadlineInput) requestDesiredDeadlineInput.value = '';
+  if (requestReferenceUrlsInput) requestReferenceUrlsInput.value = '';
+  navigate('#/customizacoes');
+  showFeedback('Revise os detalhes do seu pedido sob medida e envie.', 'success');
 }
 
 // Profile Interests & Phone Mask setup
@@ -306,11 +638,6 @@ function setupEventListeners() {
     await handleLogout();
   });
 
-  // Back to Dashboard from Editor
-  backToDashboardButton?.addEventListener('click', () => {
-    if (globalThis.window) globalThis.window.location.hash = '#vitrines';
-  });
-
   // Profile Form Submit
   if (profileForm) {
     profileForm.addEventListener('submit', async (e) => {
@@ -336,84 +663,6 @@ function setupEventListeners() {
   }
 }
 
-// 3-Step Wizard Flow setup
-function setupWizardFlow() {
-  const wizardFormEl = globalThis.document?.getElementById('wizard-form');
-
-  // Cancel Buttons
-  globalThis.document?.querySelectorAll('.wizard-cancel-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (globalThis.window) globalThis.window.location.hash = '#vitrines';
-    });
-  });
-
-  // Next Buttons
-  wizardSection?.querySelectorAll('.wizard-next-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (wizardCurrentStep === 1) {
-        // Area selection
-        goToWizardStep(2);
-      } else if (wizardCurrentStep === 2) {
-        // Model selection
-        const model = wizardFormEl.elements['wizard-model'].value;
-        if (model === 'custom') {
-          // Redirect to Customization Request with pre-fill!
-          const area = wizardFormEl.elements['wizard-area'].value;
-          requestStorefrontTypeSelect.value = area;
-          requestTemplateInterestInput.value = 'Modelo Personalizado';
-          requestGoalInput.value = `Gostaria de um modelo personalizado de vitrine para o segmento de ${getAreaLabel(area)}.`;
-          requestDesiredDeadlineInput.value = '';
-          requestReferenceUrlsInput.value = '';
-          
-          showSection('pedidos');
-          showFeedback('Preencha os detalhes do seu pedido personalizado abaixo.', 'success');
-        } else {
-          goToWizardStep(3);
-        }
-      }
-    });
-  });
-
-  // Prev Buttons
-  wizardSection?.querySelectorAll('.wizard-prev-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      goToWizardStep(wizardCurrentStep - 1);
-    });
-  });
-
-  // Reactive Slug Input in Wizard
-  wizardSiteSlugInput?.addEventListener('input', () => {
-    const rawVal = wizardSiteSlugInput.value;
-    const cleaned = rawVal.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (rawVal !== cleaned) {
-      wizardSiteSlugInput.value = cleaned;
-    }
-    validateWizardSlug(wizardSiteSlugInput.value);
-  });
-
-  // Automatic Slug generation on Name input
-  wizardSiteNameInput?.addEventListener('input', () => {
-    const name = wizardSiteNameInput.value;
-    const suggestedSlug = name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // remove accents
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-');
-    wizardSiteSlugInput.value = suggestedSlug.substring(0, 40);
-    validateWizardSlug(wizardSiteSlugInput.value);
-  });
-
-  // Wizard Form Submit
-  if (wizardForm) {
-    wizardForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      await handleCreateWizardSite();
-    });
-  }
-}
-
 function getAreaLabel(area) {
   const map = {
     food: 'Alimentação',
@@ -425,62 +674,89 @@ function getAreaLabel(area) {
   return map[area] || area;
 }
 
-function openWizard() {
-  wizardSiteNameInput.value = profile.businessName || '';
-  if (profile.businessName) {
-    wizardSiteNameInput.dispatchEvent(new Event('input'));
-  } else {
-    wizardSiteSlugInput.value = '';
-    wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/sua-loja';
-    wizardSlugValidationError.hidden = true;
-  }
-  goToWizardStep(1);
-  showSection('wizard');
+export function slugifySiteName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 40)
+    .replace(/-+$/g, '');
 }
 
-function goToWizardStep(step) {
-  wizardCurrentStep = step;
-  
-  // Show/Hide step panes
-  globalThis.document?.getElementById('wizard-step-1').toggleAttribute('hidden', step !== 1);
-  globalThis.document?.getElementById('wizard-step-2').toggleAttribute('hidden', step !== 2);
-  globalThis.document?.getElementById('wizard-step-3').toggleAttribute('hidden', step !== 3);
+function setupNewVitrineDialog() {
+  newSiteSlugInput?.addEventListener('input', () => {
+    newSiteSlugTouched = true;
+    const rawVal = newSiteSlugInput.value;
+    const cleaned = rawVal.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (rawVal !== cleaned) newSiteSlugInput.value = cleaned;
+    validateNewSiteSlug(newSiteSlugInput.value);
+  });
 
-  // Update steps indicator classes
-  globalThis.document?.getElementById('step-ind-1')?.classList.toggle('active', step >= 1);
-  globalThis.document?.getElementById('step-ind-2')?.classList.toggle('active', step >= 2);
-  globalThis.document?.getElementById('step-ind-3')?.classList.toggle('active', step >= 3);
+  newSiteNameInput?.addEventListener('input', () => {
+    if (newSiteSlugTouched) return;
+    newSiteSlugInput.value = slugifySiteName(newSiteNameInput.value);
+    validateNewSiteSlug(newSiteSlugInput.value, { quiet: true });
+  });
+
+  newVitrineForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (newSiteSubmit?.disabled) return;
+    if (newSiteSubmit) newSiteSubmit.disabled = true;
+    try {
+      await handleCreateSite();
+    } finally {
+      if (newSiteSubmit) newSiteSubmit.disabled = false;
+    }
+  });
 }
 
-function validateWizardSlug(slug) {
-  wizardSlugPreview.textContent = `Endereço: vitrine.inspira.dev.br/${slug || 'sua-loja'}`;
-
-  if (!slug) {
-    wizardSlugValidationError.hidden = true;
-    return false;
+function openNewVitrineDialog(template = 'products', opener = null) {
+  newVitrineTemplate = TEMPLATE_MODELS[template] ? template : 'products';
+  newSiteSlugTouched = false;
+  if (newVitrineModelText) {
+    newVitrineModelText.textContent = `Modelo: ${TEMPLATE_MODELS[newVitrineTemplate].label}`;
   }
-
-  const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-  if (!slugRegex.test(slug)) {
-    wizardSlugValidationError.textContent = 'O endereço deve conter apenas letras minúsculas, números e hífens, sem hífens consecutivos ou nas extremidades.';
-    wizardSlugValidationError.hidden = false;
-    return false;
+  if (newSiteNameInput) {
+    newSiteNameInput.value = activeSites(sites).length === 0 ? profile.businessName || '' : '';
   }
+  if (newSiteSlugInput) newSiteSlugInput.value = slugifySiteName(newSiteNameInput?.value || '');
+  if (newSiteSlugError) newSiteSlugError.hidden = true;
+  validateNewSiteSlug(newSiteSlugInput?.value || '', { quiet: true });
+  openDialog(newVitrineDialog, opener);
+}
 
-  if (slug.length < 3 || slug.length > 40) {
-    wizardSlugValidationError.textContent = 'O endereço deve ter entre 3 e 40 caracteres.';
-    wizardSlugValidationError.hidden = false;
-    return false;
+export function describeSlugProblem(slug) {
+  if (!slug) return 'Digite um endereço para a vitrine.';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    return 'O endereço deve conter apenas letras minúsculas, números e hífens, sem hífens consecutivos ou nas extremidades.';
   }
+  if (slug.length < 3 || slug.length > 40) return 'O endereço deve ter entre 3 e 40 caracteres.';
+  if (RESERVED_SLUGS.includes(slug)) return 'Este endereço é reservado pelo sistema.';
+  return '';
+}
 
-  if (RESERVED_SLUGS.includes(slug)) {
-    wizardSlugValidationError.textContent = 'Este endereço é reservado pelo sistema.';
-    wizardSlugValidationError.hidden = false;
-    return false;
+function validateNewSiteSlug(slug, { quiet = false } = {}) {
+  if (newSiteSlugPreview) newSiteSlugPreview.textContent = `vitrine.inspira.dev.br/${slug || 'sua-loja'}`;
+  const message = describeSlugProblem(slug);
+  if (newSiteSlugError) {
+    newSiteSlugError.textContent = message;
+    newSiteSlugError.hidden = quiet || !message || !slug;
   }
+  newSiteSlugInput?.setAttribute('aria-invalid', message && !quiet ? 'true' : 'false');
+  return !message;
+}
 
-  wizardSlugValidationError.hidden = true;
-  return true;
+function showSlugError(message) {
+  if (newSiteSlugError) {
+    newSiteSlugError.textContent = message;
+    newSiteSlugError.hidden = false;
+  }
+  newSiteSlugInput?.setAttribute('aria-invalid', 'true');
+  newSiteSlugInput?.focus();
 }
 
 function extractAuthCodeFromUrl(deps = {}) {
@@ -858,11 +1134,13 @@ async function handleLogout() {
   // Clear local state
   globalThis.sessionStorage?.removeItem('pkce_verifier');
   globalThis.sessionStorage?.removeItem('supabase_publishable_key');
+  await flushAutosave();
   currentUser = null;
   void detectPlatformCms(false);
   void detectSponsorImpact(false);
   sites = [];
   activeSite = null;
+  currentSection = null;
   clearEditor();
   profile = {
     displayName: '',
@@ -882,56 +1160,53 @@ async function handleLogout() {
   showSection('auth');
 }
 
-// Section Switching with sidebar/bottom-nav integration
+const SHELL_SECTIONS = [
+  ['inicio', () => inicioSection],
+  ['perfil', () => perfilSection],
+  ['customizacoes', () => customizacoesSection],
+  ['plano', () => planoSection],
+  ['convite', () => conviteSection],
+  ['editor', () => editorSection],
+  ['profile-gate', () => profileGateSection]
+];
+
 export function showSection(section) {
   if (section === 'platform-cms' && !hasPlatformAdminAccess()) section = 'inicio';
   if (section === 'impacto' && !hasSponsorImpactAccess()) section = 'inicio';
-  // Toggle Auth section
+  if (section === 'editor' && !activeSite) section = 'inicio';
+  const previous = currentSection;
+  currentSection = section;
+
   if (authSection) authSection.hidden = section !== 'auth';
   if (authenticatedApp) authenticatedApp.hidden = section === 'auth';
   showPlatformCms(section === 'platform-cms');
   showSponsorImpact(section === 'impacto');
+  closeOpenMenu(false);
 
-  if (section !== 'auth') {
-    // Show/Hide authenticated content panes
-    if (inicioSection) inicioSection.hidden = section !== 'inicio';
-    if (vitrinesSection) vitrinesSection.hidden = section !== 'vitrines';
-    if (insightsSection) insightsSection.hidden = section !== 'insights';
-    if (leiloesSection) leiloesSection.hidden = section !== 'leiloes';
-    if (perfilSection) perfilSection.hidden = section !== 'perfil';
-    if (pedidosSection) pedidosSection.hidden = section !== 'pedidos';
-    if (planoSection) planoSection.hidden = section !== 'plano';
-    if (wizardSection) wizardSection.hidden = section !== 'wizard';
-    if (editorSection) editorSection.hidden = section !== 'editor';
-    if (profileGateSection) profileGateSection.hidden = section !== 'profile-gate';
+  if (section === 'auth') return;
 
-    // Update active nav styling
-    globalThis.document?.querySelectorAll('.nav-link').forEach(link => {
-      const matches = link.getAttribute('data-section') === section;
-      link.classList.toggle('active', matches);
-    });
-    const topBarProfile = globalThis.document?.getElementById('top-bar-profile');
-    if (topBarProfile) {
-      const profileOpen = section === 'perfil';
-      topBarProfile.classList.toggle('active', profileOpen);
-      if (profileOpen) topBarProfile.setAttribute('aria-current', 'page');
-      else topBarProfile.removeAttribute('aria-current');
-    }
+  for (const [name, getElement] of SHELL_SECTIONS) {
+    const element = getElement();
+    if (element) element.hidden = section !== name;
+  }
+  if (appTopBar) appTopBar.hidden = section === 'editor';
+  if (homeSearch) homeSearch.hidden = section !== 'inicio';
+  globalThis.document?.body?.classList.toggle('is-vitrine-view', section === 'editor');
 
-    if (section === 'insights') {
-      syncInsightsSiteSelector();
-      loadInsightsForActiveSite();
-    }
-    if (section === 'leiloes') {
-      void loadAuctionsPanel();
-    }
-    if (section === 'plano') {
-      void loadBillingPanel();
+  if (section === 'plano') {
+    void loadBillingPanel();
+  }
+
+  if (previous && previous !== 'auth' && previous !== section) {
+    mainContent?.focus?.({ preventScroll: true });
+    if (typeof globalThis.window?.scrollTo === 'function') {
+      globalThis.window.scrollTo({ top: 0 });
     }
   }
 }
 
 // Show Feedback Messages
+let feedbackTimer = null;
 export function showFeedback(msg, type = 'success') {
   const feedbackEl = isOnline ? 
     (globalThis.document?.getElementById('shell-global-feedback') || globalFeedback) : 
@@ -940,14 +1215,12 @@ export function showFeedback(msg, type = 'success') {
   if (feedbackEl) {
     feedbackEl.textContent = msg;
     feedbackEl.className = `feedback-banner ${type}`;
+    feedbackEl.setAttribute('role', type === 'error' ? 'alert' : 'status');
     feedbackEl.hidden = false;
-    setTimeout(() => {
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(() => {
       feedbackEl.hidden = true;
     }, 6000);
-  }
-
-  if (typeof globalThis.window?.scrollTo === 'function') {
-    globalThis.window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
@@ -1009,12 +1282,41 @@ export function renderAccountEmailStatus(emailSpan, googleName, googleEmail) {
   }
 }
 
+const AVATAR_URL_PREFIX = 'https://lh3.googleusercontent.com/';
+
+// Only Google profile photos are allowed by the portal CSP (img-src).
+export function getSafeAvatarUrl(url) {
+  const value = typeof url === 'string' ? url.trim() : '';
+  return value.startsWith(AVATAR_URL_PREFIX) ? value : '';
+}
+
+export function getAvatarInitials(label) {
+  const text = String(label ?? '').trim();
+  if (!text) return 'U';
+  const firstLetter = (word) => (Array.from(word)[0] || '').toLocaleUpperCase('pt-BR');
+  if (text.includes('@')) return firstLetter(text);
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return firstLetter(words[0]);
+  return firstLetter(words[0]) + firstLetter(words[words.length - 1]);
+}
+
+function updateAccountMenu() {
+  const googleName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
+  const name = (profile.displayName && profile.displayName.trim()) || googleName;
+  const email = currentUser?.email || '';
+  const label = name || email || (isOnline ? 'Sua conta' : 'Modo local');
+  if (accountMenuName) accountMenuName.textContent = label;
+  accountMenuButton?.setAttribute('aria-label', `Menu da conta: ${label}`);
+  const placeholder = globalThis.document?.getElementById('top-bar-avatar-placeholder');
+  if (placeholder) placeholder.textContent = getAvatarInitials(name || email);
+}
+
 export function prefillProfileWithGoogleCredentials(userOverride = currentUser, profileTarget = profile) {
   const userObj = userOverride ?? currentUser;
   if (!userObj) return;
   
   const googleName = userObj.user_metadata?.full_name || userObj.user_metadata?.name || '';
-  const googleAvatar = userObj.user_metadata?.avatar_url || userObj.user_metadata?.picture || '';
+  const googleAvatar = getSafeAvatarUrl(userObj.user_metadata?.avatar_url || userObj.user_metadata?.picture);
   const googleEmail = userObj.email || '';
 
   // Prefill ONLY empty fields!
@@ -1036,7 +1338,7 @@ export function prefillProfileWithGoogleCredentials(userOverride = currentUser, 
             avatarImg.hidden = true;
             if (placeholderDiv) {
               placeholderDiv.hidden = false;
-              placeholderDiv.textContent = (googleName || googleEmail || 'U')[0].toUpperCase();
+              placeholderDiv.textContent = getAvatarInitials(googleName || googleEmail);
             }
           });
         }
@@ -1046,7 +1348,7 @@ export function prefillProfileWithGoogleCredentials(userOverride = currentUser, 
       if (avatarImg) avatarImg.hidden = true;
       if (placeholderDiv) {
         placeholderDiv.hidden = false;
-        placeholderDiv.textContent = (googleName || googleEmail || 'U')[0].toUpperCase();
+        placeholderDiv.textContent = getAvatarInitials(googleName || googleEmail);
       }
     }
   };
@@ -1139,12 +1441,10 @@ async function handleSaveProfileGate() {
     }
   }
 
-  updateHubSummary();
+  updateAccountMenu();
   if (savedOnServer) {
     showFeedback('Perfil criado com sucesso na nuvem!', 'success');
-    if (globalThis.window) {
-      globalThis.window.location.hash = '#inicio';
-    }
+    navigate('#/');
   } else {
     showFeedback(
       serverErrorMsg || 'Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.',
@@ -1194,10 +1494,10 @@ async function handleSaveProfile() {
     }
   }
 
-  updateHubSummary();
+  updateAccountMenu();
   if (savedOnServer) {
     showFeedback('Perfil e interesses salvos com sucesso na nuvem!', 'success');
-    showSection('inicio');
+    navigate('#/');
   } else {
     showFeedback(
       serverErrorMsg || 'Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.',
@@ -1296,7 +1596,7 @@ function renderCustomizationRequests() {
     // Fallback or real WhatsApp discussion link
     const waText = `Olá Coletivo Inspira! Enviei uma solicitação de customização para o segmento de ${getAreaLabel(req.storefrontType)} (${req.templateInterest}). Meu objetivo é: ${req.goal.substring(0, 100)}...`;
     waBtn.href = `https://wa.me/5511999999999?text=${encodeURIComponent(waText)}`;
-    waBtn.textContent = 'Conversar no WhatsApp 💬';
+    waBtn.textContent = 'Conversar no WhatsApp';
 
     actionContainer.appendChild(waBtn);
 
@@ -1398,7 +1698,6 @@ async function handleCreateCustomizationRequest() {
 
   customizationForm.reset();
   renderCustomizationRequests();
-  updateHubSummary();
 
   if (savedOnServer) {
     showFeedback('Pedido de customização registrado com sucesso!', 'success');
@@ -1407,156 +1706,29 @@ async function handleCreateCustomizationRequest() {
   }
 }
 
-function updateOnboardingChecklist() {
-  const checklistCard = globalThis.document?.getElementById('onboarding-checklist-card');
-  if (!checklistCard) return;
+// ==========================================
+// Vitrines recentes (Início)
+// ==========================================
 
-  const profileComplete = isProfileComplete();
-  const hasSite = sites.length > 0;
-  
-  // Check if published from localStorage
-  let isPublished = localStorage.getItem('vitrine_has_published') === 'true';
-
-  const itemProfile = globalThis.document?.getElementById('checklist-item-profile');
-  const itemCreate = globalThis.document?.getElementById('checklist-item-create');
-  const itemPublish = globalThis.document?.getElementById('checklist-item-publish');
-
-  const updateChecklistItem = (el, done) => {
-    if (!el) return;
-    el.classList.toggle('done', done);
-    const icon = el.querySelector('.checklist-status-icon');
-    if (icon) {
-      icon.textContent = done ? '✓' : '○';
-    }
-  };
-
-  updateChecklistItem(itemProfile, profileComplete);
-  updateChecklistItem(itemCreate, hasSite);
-  updateChecklistItem(itemPublish, isPublished);
-
-  checklistCard.hidden = false;
-}
-
-// Update Home Dashboard (Início) Summary Cards
-export function createHubSiteLink(site, doc, onOpen) {
-  const item = doc.createElement('button');
-  item.type = 'button';
-  item.className = 'hub-list-item hub-site-link';
-  item.setAttribute('aria-label', `Abrir a vitrine ${site.name}`);
-
-  const title = doc.createElement('strong');
-  title.textContent = site.name;
-
-  const badge = doc.createElement('span');
-  badge.textContent = site.role === 'owner' ? 'Proprietário' : 'Colaborador';
-
-  const arrow = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  arrow.setAttribute('class', 'hub-site-link-arrow');
-  arrow.setAttribute('viewBox', '0 0 24 24');
-  arrow.setAttribute('width', '18');
-  arrow.setAttribute('height', '18');
-  arrow.setAttribute('aria-hidden', 'true');
-  const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', 'm9 6 6 6-6 6');
-  arrow.appendChild(path);
-
-  item.appendChild(title);
-  item.appendChild(badge);
-  item.appendChild(arrow);
-  item.addEventListener('click', () => onOpen(site));
-  return item;
-}
-
-function updateHubSummary() {
-  // Update onboarding checklist
-  updateOnboardingChecklist();
-
-  // 1. Vitrines list summary
-  const listedSiteCount = activeSites(sites).length;
-  if (vitrinesSummaryText) {
-    if (listedSiteCount === 0) {
-      vitrinesSummaryText.textContent = 'Você não possui nenhuma vitrine cadastrada.';
-    } else if (listedSiteCount === 1) {
-      vitrinesSummaryText.textContent = 'Você possui 1 vitrine cadastrada.';
-    } else {
-      vitrinesSummaryText.textContent = `Você possui ${listedSiteCount} vitrines cadastradas.`;
-    }
-  }
-  if (hubVitrinesList) {
-    const hubSites = activeSites(sites);
-    if (hubSites.length === 0) {
-      hubVitrinesList.replaceChildren();
-      const emptyP = document.createElement('p');
-      emptyP.className = 'soft-text';
-      emptyP.textContent = 'Nenhuma vitrine ativa.';
-      hubVitrinesList.appendChild(emptyP);
-    } else {
-      hubVitrinesList.replaceChildren();
-      hubSites.slice(0, 3).forEach(site => {
-        hubVitrinesList.appendChild(createHubSiteLink(site, document, openEditor));
-      });
-    }
-  }
-
-  // 3. Customization Requests summary
-  if (customRequestsSummaryText) {
-    if (customizationRequests.length === 0) {
-      customRequestsSummaryText.textContent = 'Nenhum pedido enviado ao coletivo.';
-    } else if (customizationRequests.length === 1) {
-      customRequestsSummaryText.textContent = '1 pedido enviado ao coletivo.';
-    } else {
-      customRequestsSummaryText.textContent = `${customizationRequests.length} pedidos enviados ao coletivo.`;
-    }
-  }
-  if (hubRequestsList) {
-    if (customizationRequests.length === 0) {
-      hubRequestsList.replaceChildren();
-      const emptyReqP = document.createElement('p');
-      emptyReqP.className = 'soft-text';
-      emptyReqP.textContent = 'Nenhuma solicitação pendente.';
-      hubRequestsList.appendChild(emptyReqP);
-    } else {
-      hubRequestsList.replaceChildren();
-      customizationRequests.slice(0, 2).forEach(req => {
-        const item = document.createElement('div');
-        item.className = 'hub-list-item';
-        
-        const title = document.createElement('strong');
-        title.textContent = req.templateInterest || 'Customização';
-        
-        const badge = document.createElement('span');
-        badge.textContent = getRequestStatusLabel(req.status);
-
-        item.appendChild(title);
-        item.appendChild(badge);
-        hubRequestsList.appendChild(item);
-      });
-    }
-  }
-
-  // 4. Insights Weekly Highlight Card on Home Dashboard
-  renderHubInsightsCard(currentInsightsData);
-}
-
-// Load Sites (Online / Offline)
 async function loadSites(fetchImpl = globalThis.fetch) {
-  if (sitesListContainer) {
-    sitesListContainer.innerHTML = '<p class="loading-msg">Carregando vitrines...</p>';
-  }
+  setSitesStatus('Carregando vitrines...');
   try {
     const res = await fetchImpl('/api/sites');
     if (res.ok) {
       const data = await res.json();
       sites = data.sites || [];
+      if (activeSite) activeSite = sites.find((site) => site.id === activeSite.id) || activeSite;
       if (sitesListContainer && globalThis.document) {
         renderSites();
         void loadDemoInvitations(() => loadSites(fetchImpl));
       }
       void loadBillingNotice(globalThis.document?.getElementById('billing-notice'), fetchImpl);
     } else {
+      setSitesStatus('');
       showFeedback('Erro ao carregar vitrines do servidor.', 'error');
     }
   } catch (err) {
+    setSitesStatus('');
     showFeedback('Falha de rede ao carregar vitrines.', 'error');
   }
 }
@@ -1612,225 +1784,313 @@ function loadLocalSites() {
   renderSites();
 }
 
-function renderSites() {
-  if (!sitesListContainer) return;
-
-  sitesListContainer.replaceChildren(createSiteViewFilter(sites, renderSites));
-  const listedSites = sitesForCurrentView(sites);
-  if (listedSites.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-msg';
-    empty.textContent = emptyViewMessage();
-    sitesListContainer.appendChild(empty);
-    return;
-  }
-
-  listedSites.forEach(site => {
-    const item = document.createElement('div');
-    item.className = 'site-item';
-
-    const info = document.createElement('div');
-    info.className = 'site-item-info';
-    
-    const title = document.createElement('h3');
-    title.textContent = site.name;
-    
-    const link = document.createElement('p');
-    link.textContent = `vitrine.inspira.dev.br/${site.slug}`;
-
-    const badge = document.createElement('span');
-    badge.className = 'site-role-badge';
-    badge.textContent = site.role === 'owner' ? 'Proprietário' : 'Colaborador';
-
-    info.appendChild(title);
-    info.appendChild(link);
-    info.appendChild(badge);
-
-    const actionBtn = document.createElement('button');
-    actionBtn.className = 'button button-small button-secondary button-pill';
-    actionBtn.type = 'button';
-    actionBtn.textContent = 'Editar vitrine';
-    actionBtn.addEventListener('click', () => {
-      openEditor(site);
-    });
-
-    const actions = document.createElement('div');
-    actions.className = 'site-item-actions';
-    actions.appendChild(actionBtn);
-    if (site.role === 'owner' || site.role === 'admin') {
-      const auctionsBtn = document.createElement('button');
-      auctionsBtn.className = 'button button-small button-secondary button-pill';
-      auctionsBtn.type = 'button';
-      auctionsBtn.textContent = 'Leilões';
-      auctionsBtn.addEventListener('click', () => {
-        selectAuctionSite(site.id);
-        if (globalThis.window) globalThis.window.location.hash = '#leiloes';
-      });
-      actions.appendChild(auctionsBtn);
-    }
-    decorateSiteItem(site, info, actions, { online: isOnline, notify: showFeedback, onChanged: loadSites });
-
-    item.appendChild(info);
-    item.appendChild(actions);
-
-    sitesListContainer.appendChild(item);
-  });
+function setSitesStatus(message) {
+  if (!sitesListStatus) return;
+  sitesListStatus.textContent = message;
+  sitesListStatus.hidden = !message;
 }
 
-// Handle Wizard site creation
-async function handleCreateWizardSite() {
-  const name = wizardSiteNameInput.value.trim();
-  const slug = wizardSiteSlugInput.value.trim();
-  const area = wizardForm.elements['wizard-area'].value;
-  const model = wizardForm.elements['wizard-model'].value;
+function catalogTypeOfSite(site) {
+  const template = site?.template || '';
+  if (template.startsWith('servicos')) return 'services';
+  if (template.startsWith('booking')) return 'booking';
+  if (template.startsWith('quote')) return 'quote';
+  return 'products';
+}
+
+function formatShortDate(value) {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+function normalizeSearch(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isSitePublished(site) {
+  return Boolean(site?.publishedAt);
+}
+
+export function filterSitesForHome(list, query) {
+  const normalized = normalizeSearch(query).trim();
+  return list
+    .filter((site) => !normalized || normalizeSearch(`${site.name} ${site.slug}`).includes(normalized))
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+}
+
+function renderSites() {
+  if (!sitesListContainer || !globalThis.document) return;
+  sitesListContainer.replaceChildren();
+  sitesViewFilterSlot?.replaceChildren();
+
+  if (sites.length === 0) {
+    setSitesStatus('Nenhuma vitrine ainda. Escolha um modelo acima para começar.');
+    return;
+  }
+
+  if (sites.some((site) => site.archivedAt)) {
+    sitesViewFilterSlot?.appendChild(createSiteViewFilter(sites, renderSites));
+  }
+
+  const viewSites = sitesForCurrentView(sites);
+  if (viewSites.length === 0) {
+    setSitesStatus(emptyViewMessage());
+    return;
+  }
+
+  const filtered = filterSitesForHome(viewSites, homeSearchQuery);
+  if (filtered.length === 0) {
+    setSitesStatus(`Nenhuma vitrine encontrada para "${homeSearchQuery.trim()}".`);
+    return;
+  }
+  setSitesStatus(homeSearchQuery.trim() ? `${filtered.length} vitrine(s) encontrada(s).` : '');
+
+  for (const site of filtered) {
+    sitesListContainer.appendChild(createSiteCard(site));
+  }
+}
+
+function roleLabel(role) {
+  return {
+    owner: 'Proprietário',
+    admin: 'Administrador',
+    editor: 'Funcionário',
+    viewer: 'Somente leitura'
+  }[role] || 'Colaborador';
+}
+
+function createSiteCard(site) {
+  const doc = globalThis.document;
+  const item = doc.createElement('li');
+  item.className = 'vitrine-card';
+
+  const link = doc.createElement('a');
+  link.className = 'vitrine-card-link';
+  link.href = vitrineHash(site.id, 'itens');
+  link.setAttribute('aria-label', `Abrir a vitrine ${site.name}`);
+
+  const cover = doc.createElement('span');
+  cover.className = `vitrine-card-cover template-thumb thumb-${catalogTypeOfSite(site)}`;
+  cover.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i += 1) cover.appendChild(doc.createElement('span'));
+
+  const body = doc.createElement('span');
+  body.className = 'vitrine-card-body';
+
+  const title = doc.createElement('span');
+  title.className = 'vitrine-card-title';
+  title.textContent = site.name;
+
+  const address = doc.createElement('span');
+  address.className = 'vitrine-card-address';
+  address.textContent = `vitrine.inspira.dev.br/${site.slug}`;
+
+  const meta = doc.createElement('span');
+  meta.className = 'vitrine-card-meta';
+
+  const published = isSitePublished(site);
+  const status = doc.createElement('span');
+  status.className = `status-pill ${published ? 'is-published' : 'is-draft'}`;
+  status.textContent = published ? 'Publicada' : 'Rascunho';
+  meta.appendChild(status);
+
+  const lifecycleBadge = siteStatusBadge(site);
+  if (lifecycleBadge) meta.appendChild(lifecycleBadge);
+
+  if (site.role && site.role !== 'owner') {
+    const shared = doc.createElement('span');
+    shared.className = 'vitrine-card-shared';
+    shared.textContent = roleLabel(site.role);
+    meta.appendChild(shared);
+  }
+
+  const date = doc.createElement('span');
+  date.className = 'vitrine-card-date';
+  date.textContent = `Editada ${formatShortDate(site.updatedAt)}`;
+  meta.appendChild(date);
+
+  body.append(title, address, meta);
+  link.append(cover, body);
+
+  const menuAnchor = doc.createElement('div');
+  menuAnchor.className = 'menu-anchor vitrine-card-menu';
+
+  const menuId = `site-menu-${String(site.id).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const menuBtn = doc.createElement('button');
+  menuBtn.type = 'button';
+  menuBtn.className = 'icon-button';
+  menuBtn.setAttribute('aria-label', `Mais opções de ${site.name}`);
+  menuBtn.setAttribute('aria-controls', menuId);
+  menuBtn.appendChild(createDotsIcon());
+
+  const menu = doc.createElement('div');
+  menu.className = 'menu-popup menu-popup-end';
+  menu.id = menuId;
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', `Opções de ${site.name}`);
+
+  const menuLink = (text, href, extra = {}) => {
+    const anchor = doc.createElement('a');
+    anchor.className = 'menu-item';
+    anchor.setAttribute('role', 'menuitem');
+    anchor.href = href;
+    anchor.textContent = text;
+    if (extra.external) {
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+    }
+    return anchor;
+  };
+
+  menu.appendChild(menuLink('Abrir', vitrineHash(site.id, 'itens')));
+  menu.appendChild(menuLink('Pedidos', vitrineHash(site.id, 'pedidos')));
+
+  if (published) {
+    const copyItem = doc.createElement('button');
+    copyItem.type = 'button';
+    copyItem.className = 'menu-item';
+    copyItem.setAttribute('role', 'menuitem');
+    copyItem.textContent = 'Copiar link';
+    copyItem.addEventListener('click', async () => {
+      const ok = await copyToClipboard(publicUrlForSite(site));
+      showFeedback(ok ? 'Link da vitrine copiado.' : 'Não foi possível copiar o link.', ok ? 'success' : 'error');
+    });
+    menu.appendChild(copyItem);
+    menu.appendChild(menuLink('Abrir vitrine pública', publicUrlForSite(site), { external: true }));
+  }
+
+  for (const lifecycleItem of createLifecycleMenuItems(site, {
+    online: isOnline,
+    notify: showFeedback,
+    onChanged: loadSites
+  })) {
+    menu.appendChild(lifecycleItem);
+  }
+
+  menuAnchor.append(menuBtn, menu);
+  bindMenu(menuBtn, menu);
+
+  item.append(link, menuAnchor);
+  return item;
+}
+
+export function createDotsIcon() {
+  const svg = createSvgElement('svg', {
+    width: '22',
+    height: '22',
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true',
+    class: 'icon-dots'
+  });
+  for (const cy of [5, 12, 19]) {
+    svg.appendChild(createSvgElement('circle', { cx: 12, cy, r: 1.6 }));
+  }
+  return svg;
+}
+
+// ==========================================
+// Criação de vitrine (diálogo único)
+// ==========================================
+
+async function handleCreateSite() {
+  const name = newSiteNameInput.value.trim();
+  const slug = newSiteSlugInput.value.trim();
+  const model = TEMPLATE_MODELS[newVitrineTemplate] || TEMPLATE_MODELS.products;
 
   if (!name) {
-    showFeedback('Digite o nome do negócio.', 'error');
+    showFeedback('Digite o nome da vitrine.', 'error');
+    newSiteNameInput.focus();
     return;
   }
 
-  if (!validateWizardSlug(slug)) {
-    showFeedback('Verifique o endereço da vitrine fornecido.', 'error');
+  if (!validateNewSiteSlug(slug)) {
+    if (newSiteSlugError) newSiteSlugError.hidden = false;
+    newSiteSlugInput.focus();
     return;
   }
 
-  // Determine template based on selected model
-  let template = 'pizzeria-v1';
-  let catalogType = 'products';
-  if (model === 'booking') {
-    template = 'booking-v1';
-    catalogType = 'booking';
-  } else if (model === 'quote') {
-    template = 'quote-v1';
-    catalogType = 'quote';
-  } else if (model === 'products') {
-    template = 'products-v1';
-    catalogType = 'products';
-  } else if (model === 'services') {
-    template = 'servicos-produtos-v1';
-    catalogType = 'products';
-  }
+  const { template, catalogType } = model;
 
   if (isOnline) {
     try {
       const res = await fetch('/api/sites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          slug,
-          storefrontType: area,
-          template,
-          catalogType,
-          whatsapp: profile.whatsapp
-        })
+        body: JSON.stringify({ name, slug, template, catalogType, whatsapp: profile.whatsapp })
       });
 
       if (res.status === 201) {
-        showFeedback(`Vitrine "${name}" criada com sucesso!`, 'success');
-        wizardForm.reset();
-        wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
-        await loadSites();
-        updateHubSummary();
-        if (globalThis.window) globalThis.window.location.hash = '#vitrines';
+        const created = await res.json().catch(() => null);
+        await finishSiteCreation(name, slug, created);
       } else if (res.status === 409) {
         const errorData = await res.json().catch(() => null);
         if (errorData?.error?.code === 'PROFILE_INCOMPLETE') {
+          closeDialog(newVitrineDialog);
           showFeedback('Por favor, preencha todos os campos do seu perfil antes de criar sua vitrine.', 'error');
-          profile.displayName = ''; // force incomplete
-          handleRouting();
+          profile.displayName = '';
+          void handleRouting();
         } else {
-          showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine.', 'error');
+          showSlugError('Este endereço já está sendo utilizado por outra vitrine.');
         }
       } else {
-        // Safe 404/501 retry fallback for backwards compatibility when route is not yet fully extended
         const errorData = await res.json().catch(() => null);
-        if (res.status === 404 || res.status === 501 || errorData?.error?.code === 'INVALID_TEMPLATE') {
-          // Retry with original pizzeria-v1 template
-          const retryRes = await fetch('/api/sites', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, slug, template: 'pizzeria-v1', whatsapp: profile.whatsapp })
-          });
-          if (retryRes.status === 201) {
-            showFeedback(`Vitrine "${name}" criada com sucesso (modelo padrão)!`, 'success');
-            wizardForm.reset();
-            await loadSites();
-            updateHubSummary();
-            if (globalThis.window) globalThis.window.location.hash = '#vitrines';
-            return;
-          }
-        }
         showFeedback(errorData?.error?.message || 'Erro ao criar vitrine.', 'error');
       }
     } catch (err) {
       showFeedback('Erro de rede ao criar vitrine.', 'error');
     }
-  } else {
-    // Local creation
-    const duplicate = sites.some(s => s.slug === slug);
-    if (duplicate) {
-      showFeedback('Este endereço (slug) já está sendo utilizado por outra vitrine local.', 'error');
-      return;
-    }
-
-    const newId = `local-site-${Date.now()}`;
-    const newSite = {
-      id: newId,
-      slug,
-      name,
-      template,
-      role: "owner",
-      updatedAt: new Date().toISOString()
-    };
-
-    sites.push(newSite);
-    localStorage.setItem('vitrine_local_sites', JSON.stringify(sites));
-
-    // Create default local draft matching selected template
-    const defaultDraft = {
-      siteId: newId,
-      revision: 1,
-      updatedAt: new Date().toISOString(),
-      content: {
-        schemaVersion: 1,
-        template,
-        slug,
-        businessName: name,
-        whatsapp: profile.whatsapp || "5511999999999",
-        categories: [],
-        ...(template === 'servicos-produtos-v1' ? { structure: {} } : {})
-      }
-    };
-    localStorage.setItem(`vitrine_local_draft_${newId}`, JSON.stringify(defaultDraft));
-
-    showFeedback(`Vitrine "${name}" criada com sucesso no modo local!`, 'success');
-    wizardForm.reset();
-    wizardSlugPreview.textContent = 'Endereço: vitrine.inspira.dev.br/loja';
-    
-    loadLocalSites();
-    updateHubSummary();
-    if (globalThis.window) globalThis.window.location.hash = '#vitrines';
+    return;
   }
+
+  // Local creation
+  if (sites.some((site) => site.slug === slug)) {
+    showSlugError('Este endereço já está sendo utilizado por outra vitrine local.');
+    return;
+  }
+
+  const newId = `local-site-${Date.now()}`;
+  sites.push({ id: newId, slug, name, template, role: 'owner', updatedAt: new Date().toISOString() });
+  localStorage.setItem('vitrine_local_sites', JSON.stringify(sites));
+
+  const defaultDraft = {
+    siteId: newId,
+    revision: 1,
+    updatedAt: new Date().toISOString(),
+    content: {
+      schemaVersion: 1,
+      template,
+      catalogType,
+      slug,
+      businessName: name,
+      whatsapp: profile.whatsapp || '5511999999999',
+      categories: [],
+      ...(template === 'servicos-produtos-v1' ? { structure: {} } : {})
+    }
+  };
+  localStorage.setItem(`vitrine_local_draft_${newId}`, JSON.stringify(defaultDraft));
+  await finishSiteCreation(name, slug, { site: { id: newId } });
 }
 
-// Open Catalog Editor screen
-function openEditor(site) {
-  if (activeSite?.id === site.id && !editorSection?.hidden) {
-    return;
+async function finishSiteCreation(name, slug, created) {
+  newVitrineForm?.reset();
+  closeDialog(newVitrineDialog);
+  if (isOnline) {
+    await loadSites();
+  } else {
+    renderSites();
   }
-  if (hasUnsavedDraftChanges() && !globalThis.window.confirm('Trocar de vitrine e descartar as alterações ainda não salvas?')) {
-    return;
-  }
-  activeSite = site;
-  if (globalThis.window && globalThis.window.location.hash !== '#editor') {
-    globalThis.window.location.hash = '#editor';
-  }
-  void loadEditor(site, isOnline);
+  const createdId = created?.site?.id ?? created?.id;
+  const site = sites.find((entry) => (createdId && entry.id === createdId) || entry.slug === slug);
+  showFeedback(`Vitrine "${name}" criada.`, 'success');
+  if (site) navigate(vitrineHash(site.id, 'itens'));
 }
 
 // ==========================================
-// Insights Panel & Weekly Highlight Logic
+// Aba Pedidos: Insights e leilões da vitrine aberta
 // ==========================================
 
 function formatInsightsCurrencyBRL(cents) {
@@ -1957,13 +2217,6 @@ export function buildDemoInsightsDataset(siteId = 'demo-site-pastus', period = '
 }
 
 function setupInsightsControls() {
-  if (insightsSiteSelect) {
-    insightsSiteSelect.addEventListener('change', () => {
-      insightsSelectedSiteId = insightsSiteSelect.value;
-      loadInsightsForActiveSite();
-    });
-  }
-
   globalThis.document?.querySelectorAll('.insights-period-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const nextPeriod = btn.getAttribute('data-period') || '7d';
@@ -1973,35 +2226,9 @@ function setupInsightsControls() {
         b.classList.toggle('active', isCurrent);
         b.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
       });
-      loadInsightsForActiveSite();
+      void loadInsightsForActiveSite();
     });
   });
-}
-
-function syncInsightsSiteSelector() {
-  if (!insightsSiteSelect || !globalThis.document) return;
-  insightsSiteSelect.replaceChildren();
-
-  if (!Array.isArray(sites) || sites.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'Nenhuma vitrine cadastrada';
-    insightsSiteSelect.appendChild(opt);
-    insightsSelectedSiteId = null;
-    return;
-  }
-
-  if (!insightsSelectedSiteId || !sites.some((s) => s.id === insightsSelectedSiteId)) {
-    insightsSelectedSiteId = sites[0].id;
-  }
-
-  for (const site of sites) {
-    const opt = document.createElement('option');
-    opt.value = site.id;
-    opt.textContent = `${site.name} (/${site.slug})`;
-    opt.selected = site.id === insightsSelectedSiteId;
-    insightsSiteSelect.appendChild(opt);
-  }
 }
 
 export function getEmptyInsightsDataset() {
@@ -2024,9 +2251,19 @@ export function getEmptyInsightsDataset() {
   };
 }
 
+function loadPedidosForActiveSite() {
+  void loadInsightsForActiveSite();
+  const canSeeAuctions = AUCTION_ROLES.includes(activeSite?.role);
+  if (auctionsBlock) auctionsBlock.hidden = !canSeeAuctions;
+  if (canSeeAuctions) {
+    selectAuctionSite(activeSite.id);
+    void loadAuctionsPanel();
+  }
+}
+
 export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
-  syncInsightsSiteSelector();
-  const targetSiteId = insightsSelectedSiteId || sites[0]?.id || 'demo-site-pastus';
+  const targetSiteId = activeSite?.id;
+  const token = ++insightsRequestToken;
 
   if (isOnline && targetSiteId && typeof fetchImpl === 'function') {
     try {
@@ -2039,9 +2276,9 @@ export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
       if (res && res.ok) {
         const body = await res.json();
         if (body?.insights) {
+          if (token !== insightsRequestToken) return currentInsightsData;
           currentInsightsData = body.insights;
           renderInsightsPanel(currentInsightsData);
-          renderHubInsightsCard(currentInsightsData);
           return currentInsightsData;
         }
       }
@@ -2050,52 +2287,10 @@ export async function loadInsightsForActiveSite(fetchImpl = globalThis.fetch) {
     }
   }
 
+  if (token !== insightsRequestToken) return currentInsightsData;
   currentInsightsData = getEmptyInsightsDataset();
   renderInsightsPanel(currentInsightsData);
-  renderHubInsightsCard(currentInsightsData);
   return currentInsightsData;
-}
-
-function renderHubInsightsCard(insights) {
-  if (!hubInsightsHighlightText || !hubInsightsStatsList || !globalThis.document) return;
-  const data = insights || getEmptyInsightsDataset();
-  const firstHighlight =
-    Array.isArray(data.highlights) && data.highlights.length > 0
-      ? data.highlights[0]
-      : 'Acompanhe visitas, pedidos no WhatsApp e itens mais escolhidos da sua vitrine.';
-
-  hubInsightsHighlightText.textContent = firstHighlight;
-  hubInsightsStatsList.replaceChildren();
-
-  const rows = [
-    {
-      label: 'Visitas (7 dias)',
-      badge: `${data.summary?.visits ?? 0} acessos`
-    },
-    {
-      label: 'Pedidos no WhatsApp',
-      badge: `${data.summary?.orders ?? 0} (${formatInsightsPercent(data.summary?.conversionPercent ?? 0)})`
-    },
-    {
-      label: 'Valor estimado',
-      badge: formatInsightsCurrencyBRL(data.summary?.estimatedCents ?? 0)
-    }
-  ];
-
-  for (const r of rows) {
-    const item = document.createElement('div');
-    item.className = 'hub-list-item';
-
-    const strong = document.createElement('strong');
-    strong.textContent = r.label;
-
-    const span = document.createElement('span');
-    span.textContent = r.badge;
-
-    item.appendChild(strong);
-    item.appendChild(span);
-    hubInsightsStatsList.appendChild(item);
-  }
 }
 
 function createSvgElement(tag, attrs = {}) {
@@ -2365,14 +2560,7 @@ export function renderInsightsPanel(insights) {
   }
 
   if (insightsKpiEstimated) {
-    insightsKpiEstimated.textContent = formatInsightsCurrencyBRL(summary.estimatedCents ?? 0);
-  }
-  if (insightsKpiEstimatedDelta) {
-    insightsKpiEstimatedDelta.textContent = `Anterior: ${formatInsightsCurrencyBRL(summary.previousEstimatedCents ?? 0)}`;
-    insightsKpiEstimatedDelta.classList.toggle(
-      'is-positive',
-      (summary.estimatedCents ?? 0) > (summary.previousEstimatedCents ?? 0)
-    );
+    insightsKpiEstimated.textContent = `${formatInsightsCurrencyBRL(summary.estimatedCents ?? 0)} estimados`;
   }
 
   if (insightsHighlightsList) {
@@ -2570,8 +2758,8 @@ function renderInsightsLikes(likes) {
 
 
 initializePlatformCms(() => {
-  if (globalThis.window?.location?.hash === '#administracao') handleRouting();
+  if (getSectionFromHash(globalThis.window?.location?.hash) === 'platform-cms') void handleRouting();
 });
 initializeSponsorImpact(() => {
-  if (['#impacto', '#profile-gate'].includes(globalThis.window?.location?.hash)) handleRouting();
+  if (['impacto', 'profile-gate'].includes(getSectionFromHash(globalThis.window?.location?.hash))) void handleRouting();
 });

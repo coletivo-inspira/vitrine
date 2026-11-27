@@ -1,6 +1,23 @@
-import { renderStructureFields } from './showcase-structure.js';
+import {
+  canChooseStructurePalette,
+  getStructurePalette,
+  renderStructureFields,
+  setStructurePalette
+} from './showcase-structure.js';
+import { renderPalettePicker } from './palette-picker.mjs';
 import { confirmDomainDisconnect } from './site-lifecycle.js';
-import { showFeedback } from './portal.js';
+import {
+  bindMenu,
+  closeDialog,
+  copyToClipboard,
+  openDialog,
+  portalRequest,
+  publicUrlForSite,
+  showFeedback,
+  updateSiteSummary,
+  vitrineHash
+} from './portal.js';
+import { mountTeamPanel } from './team-panel.mjs';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { StorefrontRenderer, slugifyCategoryId } from '../assets/storefront-renderer.mjs';
 import { MILA_WHATSAPP, ORDER_RELAY_MILA, buildPublicOrderRelay } from '../assets/mila-relay.mjs';
@@ -51,9 +68,36 @@ let currentIsOnline = false;
 let currentDraft = null;
 let savedDraftContent = '';
 let editorLoadGeneration = 0;
+let editorLoadInFlight = false;
+let pendingRename = null;
+let renameTimer = null;
+let autosaveTimeout = null;
+let autosaveInFlight = null;
+let autosaveBlocked = false;
+
+const AUTOSAVE_DELAY_MS = 1500;
+const LIMIT_WARNING_RATIO = 0.8;
+const MAX_ACTIVE_ITEMS = 20;
+const MAX_TOTAL_ITEMS = 100;
+const MAX_DRAFT_BYTES = 262144;
+const KEEPALIVE_MAX_BYTES = 60000;
+const EDITOR_TABS = ['itens', 'pedidos', 'config'];
+const LEGACY_EDITOR_TABS = Object.freeze({
+  items: 'itens',
+  categories: 'itens',
+  preview: 'itens',
+  settings: 'config',
+  'order-msg': 'config',
+  channels: 'config'
+});
+const MANAGER_ROLES = ['owner', 'admin'];
 
 export function clearEditor() {
   editorLoadGeneration += 1;
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = null;
+  clearRenameTimer();
+  pendingRename = null;
   currentDraft = null;
   currentSite = null;
   savedDraftContent = '';
@@ -62,17 +106,52 @@ export function clearEditor() {
 export function hasUnsavedDraftChanges() {
   return Boolean(currentDraft && JSON.stringify(currentDraft.content) !== savedDraftContent);
 }
+
+export function isEditorShowingSite(siteId) {
+  return Boolean(currentSite && currentSite.id === siteId && (currentDraft || editorLoadInFlight));
+}
+
+function canManageSite(site) {
+  return Boolean(site) && (!site.role || MANAGER_ROLES.includes(site.role));
+}
 let selectedCategoryForItems = null;
 let activePreviewRenderer = null;
 let activeEditingItemId = null;
 
 // DOM Elements
-const editorSiteTitle = globalThis.document?.getElementById('editor-site-title');
 const editorSiteSlug = globalThis.document?.getElementById('editor-site-slug');
 const editorRevisionIndicator = globalThis.document?.getElementById('editor-revision-indicator');
 const editorOpenPublicLink = globalThis.document?.getElementById('editor-open-public-link');
-const saveDraftButton = globalThis.document?.getElementById('save-draft-button');
 const publishSiteButton = globalThis.document?.getElementById('publish-site-button');
+const vitrineMoreBtn = globalThis.document?.getElementById('vitrine-more-btn');
+const vitrineMoreMenu = globalThis.document?.getElementById('vitrine-more-menu');
+const customizeOpenBtn = globalThis.document?.getElementById('customize-open-btn');
+const previewOpenBtn = globalThis.document?.getElementById('preview-open-btn');
+const customizeDialog = globalThis.document?.getElementById('customize-dialog');
+const customizeForm = globalThis.document?.getElementById('customize-form');
+const previewDialog = globalThis.document?.getElementById('preview-dialog');
+const publishDialog = globalThis.document?.getElementById('publish-dialog');
+const publishDialogText = globalThis.document?.getElementById('publish-dialog-text');
+const publishLinkInput = globalThis.document?.getElementById('publish-link-input');
+const publishCopyBtn = globalThis.document?.getElementById('publish-copy-btn');
+const publicLinkInput = globalThis.document?.getElementById('public-link-input');
+const copyPublicLinkBtn = globalThis.document?.getElementById('copy-public-link-btn');
+const csvUploadMenuItem = globalThis.document?.getElementById('csv-upload-menu-item');
+const editorLimits = globalThis.document?.getElementById('editor-limits');
+const editorTabList = globalThis.document?.querySelector('.vitrine-tabs');
+const editorPanels = {
+  itens: globalThis.document?.getElementById('panel-itens'),
+  pedidos: globalThis.document?.getElementById('panel-pedidos'),
+  config: globalThis.document?.getElementById('panel-config')
+};
+const configAcesso = globalThis.document?.getElementById('config-acesso');
+const configAtendimentoSummary = globalThis.document?.getElementById('config-atendimento-summary');
+const configPedidoSummary = globalThis.document?.getElementById('config-pedido-summary');
+const configItensSummary = globalThis.document?.getElementById('config-itens-summary');
+const configAcessoSummary = globalThis.document?.getElementById('config-acesso-summary');
+const teamPanelSlot = globalThis.document?.getElementById('team-panel');
+const palettePickerSlot = globalThis.document?.getElementById('palette-picker');
+const editorStorefrontType = globalThis.document?.getElementById('editor-storefront-type');
 const publicationStatusBar = globalThis.document?.getElementById('publication-status-bar');
 const publicationStatusText = globalThis.document?.getElementById('publication-status-text');
 const publicationViewLink = globalThis.document?.getElementById('publication-view-link');
@@ -101,7 +180,7 @@ const draftSizeWarning = globalThis.document?.getElementById('draft-size-warning
 // Forms, Tabs & Containers
 const editorSettingsForm = globalThis.document?.getElementById('editor-settings-form');
 const editorOrderMsgForm = globalThis.document?.getElementById('editor-order-msg-form');
-const editorBusinessName = globalThis.document?.getElementById('editor-business-name');
+const editorBusinessName = globalThis.document?.getElementById('vitrine-name-input');
 const editorWhatsapp = globalThis.document?.getElementById('editor-whatsapp');
 const editorWhatsappError = globalThis.document?.getElementById('editor-whatsapp-error');
 const editorMilaRelay = globalThis.document?.getElementById('editor-mila-relay');
@@ -113,8 +192,6 @@ const editorLocalityUf = globalThis.document?.getElementById('editor-locality-uf
 const editorLocalityError = globalThis.document?.getElementById('editor-locality-error');
 const editorLocalityLink = globalThis.document?.getElementById('editor-locality-link');
 const LOCALITY_CITY_PATTERN = /^[\p{L}][\p{L}\s.'’-]{0,58}[\p{L}.]$/u;
-const addCategoryButton = globalThis.document?.getElementById('add-category-button');
-const categoriesContainer = globalThis.document?.getElementById('categories-container');
 const liveStorefrontPreview = globalThis.document?.getElementById('live-storefront-preview');
 
 // Components checkboxes
@@ -126,8 +203,6 @@ const compQuantitySelector = globalThis.document?.getElementById('comp-quantity-
 const compDuration = globalThis.document?.getElementById('comp-duration');
 
 // Category selector and Items panel
-const editorCategorySelect = globalThis.document?.getElementById('editor-category-select');
-const addItemButton = globalThis.document?.getElementById('add-item-button');
 const itemsContainer = globalThis.document?.getElementById('items-container');
 
 // Order Fields and messages
@@ -349,17 +424,23 @@ export function normalizeDraftForEditor(rawContent, site = {}) {
 
 export async function loadEditor(site, isOnline) {
   const generation = ++editorLoadGeneration;
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = null;
+  autosaveBlocked = false;
   currentSite = site;
   currentIsOnline = isOnline;
   currentDraft = null;
+  editorLoadInFlight = true;
   selectedCategoryForItems = null;
   activePreviewRenderer = null;
+  activeEditingItemId = null;
 
-  const team = globalThis.document?.getElementById('team-management');
   if (team) {
     team.open = false;
-    team.hidden = !isOnline || !['owner', 'admin'].includes(site.role);
+    team.hidden = !isOnline || !MANAGER_ROLES.includes(site.role);
   }
+  if (configAcesso) configAcesso.open = false;
+  resetTeamPanel();
   if (domainPanel) {
     domainPanel.open = false;
     domainPanel.hidden = !isOnline || !['owner', 'admin'].includes(site.role);
@@ -391,18 +472,21 @@ export async function loadEditor(site, isOnline) {
   if (publicationStatusBar) publicationStatusBar.hidden = true;
   if (csvPreviewContainer) csvPreviewContainer.hidden = true;
 
-  if (editorSiteTitle) editorSiteTitle.textContent = site.name;
+  if (editorBusinessName) editorBusinessName.value = site.name || '';
   if (editorSiteSlug) editorSiteSlug.textContent = `vitrine.inspira.dev.br/${site.slug}`;
   if (editorOpenPublicLink) {
     editorOpenPublicLink.href = isOnline ? `/${site.slug}` : '/loja1';
   }
+  if (publishSiteButton) publishSiteButton.hidden = !canManageSite(site);
+  updateAccessSection(site);
+  setSaveIndicator('loading');
 
-  if (categoriesContainer) {
-    categoriesContainer.replaceChildren();
+  if (itemsContainer) {
+    itemsContainer.replaceChildren();
     const loadingP = document.createElement('p');
     loadingP.className = 'loading-msg';
     loadingP.textContent = 'Carregando vitrine...';
-    categoriesContainer.appendChild(loadingP);
+    itemsContainer.appendChild(loadingP);
   }
 
   if (isOnline) {
@@ -411,20 +495,25 @@ export async function loadEditor(site, isOnline) {
       if (res.ok) {
         const data = await res.json();
         if (generation !== editorLoadGeneration) return;
+        editorLoadInFlight = false;
         currentDraft = data.draft;
         currentDraft.content = normalizeDraftForEditor(currentDraft.content, site);
-        const initialTab =
-          currentDraft.content.categories.length > 0 ? 'items' : 'settings';
-        setActiveTab(initialTab);
         initializeEditorWorkspace({ skipAutosave: true });
         savedDraftContent = JSON.stringify(currentDraft.content);
-      } else {
-        if (generation === editorLoadGeneration) showFeedback('Erro ao carregar o rascunho remoto.', 'error');
+      } else if (generation === editorLoadGeneration) {
+        editorLoadInFlight = false;
+        setSaveIndicator('error', 'rascunho indisponível');
+        showFeedback('Erro ao carregar o rascunho remoto.', 'error');
       }
     } catch {
-      if (generation === editorLoadGeneration) showFeedback('Falha de rede ao buscar o rascunho.', 'error');
+      if (generation === editorLoadGeneration) {
+        editorLoadInFlight = false;
+        setSaveIndicator('error', 'sem conexão');
+        showFeedback('Falha de rede ao buscar o rascunho.', 'error');
+      }
     }
   } else {
+    editorLoadInFlight = false;
     const saved = localStorage.getItem(`vitrine_local_draft_${site.id}`);
     if (saved) {
       currentDraft = JSON.parse(saved);
@@ -438,50 +527,45 @@ export async function loadEditor(site, isOnline) {
       };
       localStorage.setItem(`vitrine_local_draft_${site.id}`, JSON.stringify(currentDraft));
     }
-    const initialTab =
-      currentDraft.content.categories.length > 0 ? 'items' : 'settings';
-    setActiveTab(initialTab);
     initializeEditorWorkspace({ skipAutosave: true });
     savedDraftContent = JSON.stringify(currentDraft.content);
   }
 }
 
-function setActiveTab(tabId) {
-  const tabs = globalThis.document?.querySelectorAll('.tab-btn') || [];
-  tabs.forEach((tab) => {
-    const isMatch = tab.dataset.tab === tabId;
+export function resolveEditorTab(tabId) {
+  if (EDITOR_TABS.includes(tabId)) return tabId;
+  return LEGACY_EDITOR_TABS[tabId] ?? 'itens';
+}
+
+export function showEditorTab(tabId) {
+  const target = resolveEditorTab(tabId);
+  editorTabList?.querySelectorAll('[role="tab"]').forEach((tab) => {
+    const isMatch = tab.dataset.tab === target;
     tab.classList.toggle('active', isMatch);
     tab.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+    tab.tabIndex = isMatch ? 0 : -1;
   });
-
-  const panes = globalThis.document?.querySelectorAll('.editor-tab-pane') || [];
-  panes.forEach((pane) => {
-    pane.hidden = pane.id !== `pane-${tabId}`;
-  });
-  if (tabId === 'channels') refreshChannelsPanel();
-
-  const controlsPane = globalThis.document?.querySelector('.editor-controls-pane');
-  const previewPane = globalThis.document?.querySelector('.editor-preview-pane');
-
-  if (tabId === 'preview') {
-    if (controlsPane) controlsPane.hidden = true;
-    if (previewPane) {
-      previewPane.classList.add('mobile-active');
-      previewPane.hidden = false;
-    }
-  } else {
-    if (controlsPane) controlsPane.hidden = false;
-    if (previewPane) {
-      previewPane.classList.remove('mobile-active');
-      previewPane.hidden = false;
-    }
+  for (const [name, panel] of Object.entries(editorPanels)) {
+    if (panel) panel.hidden = name !== target;
   }
+  if (target === 'config') refreshChannelsPanel();
+  return target;
+}
+
+function goToTab(tabId) {
+  const target = showEditorTab(tabId);
+  if (!currentSite || !globalThis.window) return;
+  const hash = vitrineHash(currentSite.id, target);
+  if (globalThis.window.location.hash !== hash) globalThis.window.location.hash = hash;
 }
 
 function openEditorSection(tabId, targetId) {
-  setActiveTab(tabId);
+  goToTab(tabId);
   const target = globalThis.document?.getElementById(targetId);
   if (!target || target.hidden) return;
+  for (let parent = target.parentElement?.closest('details'); parent; parent = parent.parentElement?.closest('details')) {
+    parent.open = true;
+  }
   if (target.tagName === 'DETAILS') target.open = true;
   const focusable = target.tagName === 'DETAILS' ? target.querySelector('summary') : target;
   target.scrollIntoView?.({ block: 'start' });
@@ -506,21 +590,79 @@ function setupEditorEvents() {
   if (globalThis.editorEventsBound) return;
   globalThis.editorEventsBound = true;
 
-  const tabSelector = globalThis.document?.querySelector('.editor-tabs-selector');
-  tabSelector?.addEventListener('click', (e) => {
-    const tabBtn = e.target.closest('.tab-btn');
-    if (tabBtn) {
-      setActiveTab(tabBtn.dataset.tab);
-    }
+  editorTabList?.addEventListener('click', (e) => {
+    const tabBtn = e.target.closest('[role="tab"]');
+    if (tabBtn) goToTab(tabBtn.dataset.tab);
   });
 
-  saveDraftButton?.addEventListener('click', async () => {
-    await handleSaveDraft();
+  editorTabList?.addEventListener('keydown', (e) => {
+    const tabs = Array.from(editorTabList.querySelectorAll('[role="tab"]'));
+    const index = tabs.indexOf(globalThis.document?.activeElement);
+    if (index === -1) return;
+    let next = null;
+    if (e.key === 'ArrowRight') next = tabs[(index + 1) % tabs.length];
+    else if (e.key === 'ArrowLeft') next = tabs[(index - 1 + tabs.length) % tabs.length];
+    else if (e.key === 'Home') next = tabs[0];
+    else if (e.key === 'End') next = tabs[tabs.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    goToTab(next.dataset.tab);
+    next.focus();
   });
 
   publishSiteButton?.addEventListener('click', async () => {
-    await handlePublishSite();
+    if (publishSiteButton.disabled) return;
+    publishSiteButton.disabled = true;
+    try {
+      await handlePublishSite();
+    } finally {
+      publishSiteButton.disabled = false;
+    }
   });
+
+  bindMenu(vitrineMoreBtn, vitrineMoreMenu);
+
+  customizeOpenBtn?.addEventListener('click', () => {
+    openDialog(customizeDialog, customizeOpenBtn);
+  });
+
+  customizeForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    closeDialog(customizeDialog);
+  });
+
+  previewOpenBtn?.addEventListener('click', () => {
+    if (!currentDraft) return;
+    activePreviewRenderer = null;
+    renderLivePreview();
+    openDialog(previewDialog, previewOpenBtn);
+  });
+
+  publishCopyBtn?.addEventListener('click', async () => {
+    const ok = await copyToClipboard(publishLinkInput?.value || '');
+    showFeedback(ok ? 'Link da vitrine copiado.' : 'Não foi possível copiar o link.', ok ? 'success' : 'error');
+  });
+
+  copyPublicLinkBtn?.addEventListener('click', async () => {
+    const ok = await copyToClipboard(publicLinkInput?.value || '');
+    showFeedback(ok ? 'Link da vitrine copiado.' : 'Não foi possível copiar o link.', ok ? 'success' : 'error');
+  });
+
+  csvUploadMenuItem?.addEventListener('click', () => {
+    csvFileInput?.click();
+  });
+
+  editorStorefrontType?.addEventListener('change', () => {
+    if (!currentDraft) return;
+    currentDraft.content.storefrontType = editorStorefrontType.value;
+    updateDraftAndPreview();
+  });
+
+  configAcesso?.addEventListener('toggle', () => {
+    if (configAcesso.open) void refreshTeamPanel();
+  });
+
+  globalThis.window?.addEventListener('pagehide', handlePageHide);
 
   if (editorSettingsForm) {
     editorSettingsForm.addEventListener('submit', (e) => {
@@ -533,34 +675,6 @@ function setupEditorEvents() {
       e.preventDefault();
     });
   }
-
-  addCategoryButton?.addEventListener('click', () => {
-    addCategory();
-  });
-
-  const addItemBtn = document.getElementById('add-item-button');
-  const addItemMenu = document.getElementById('add-item-menu');
-
-  addItemBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (!currentDraft) return;
-    if (!currentDraft.content.categories || currentDraft.content.categories.length === 0) {
-      addCategory('Geral');
-    }
-    const expanded = addItemBtn.getAttribute('aria-expanded') === 'true';
-    addItemBtn.setAttribute('aria-expanded', !expanded);
-    addItemMenu.hidden = expanded;
-  });
-
-  // Handle clicking items in type menu
-  addItemMenu?.querySelectorAll('.dropdown-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      const type = item.getAttribute('data-type');
-      addItem(type);
-      addItemBtn.setAttribute('aria-expanded', 'false');
-      addItemMenu.hidden = true;
-    });
-  });
 
   // Floating Side/Bottom Toolbar Event Listeners
   const toolbarAddItem = document.getElementById('toolbar-add-item');
@@ -651,66 +765,18 @@ function setupEditorEvents() {
     addItem('photo');
   });
 
-  const csvBtn = document.getElementById('csv-menu-btn');
-  const csvMenu = document.getElementById('csv-dropdown-menu');
-  const viewMenuBtn = document.getElementById('editor-view-menu-btn');
-  const viewMenu = document.getElementById('editor-view-menu');
-
-  const closeViewMenu = () => {
-    if (viewMenuBtn) viewMenuBtn.setAttribute('aria-expanded', 'false');
-    if (viewMenu) viewMenu.hidden = true;
-  };
-
-  viewMenuBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const expanded = viewMenuBtn.getAttribute('aria-expanded') === 'true';
-    viewMenuBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    if (viewMenu) viewMenu.hidden = expanded;
-  });
-
-  viewMenu?.addEventListener('click', () => {
-    closeViewMenu();
-  });
-
-  csvBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const expanded = csvBtn.getAttribute('aria-expanded') === 'true';
-    csvBtn.setAttribute('aria-expanded', !expanded);
-    csvMenu.hidden = expanded;
-  });
-
-  // Wire up Planilha (CSV) dropdown items:
-  const csvUploadItem = document.getElementById('csv-upload-btn-item');
-  const csvExportItem = document.getElementById('csv-export-btn-item');
-  
-  csvUploadItem?.addEventListener('click', () => {
-    document.getElementById('csv-file-input')?.click();
-  });
-  
-  csvExportItem?.addEventListener('click', () => {
-    document.getElementById('csv-export-btn')?.click();
-  });
-
-  // Close dropdowns when clicking outside
+  // Close the add-item dropdown when clicking outside
   document.addEventListener('click', () => {
-    if (addItemBtn) addItemBtn.setAttribute('aria-expanded', 'false');
-    if (addItemMenu) addItemMenu.hidden = true;
     closeToolbarAddMenu();
-    closeViewMenu();
-    if (csvBtn) csvBtn.setAttribute('aria-expanded', 'false');
-    if (csvMenu) csvMenu.hidden = true;
-  });
-
-  editorCategorySelect?.addEventListener('change', () => {
-    selectedCategoryForItems = editorCategorySelect.value;
-    renderItems();
   });
 
   editorBusinessName?.addEventListener('input', () => {
     if (!currentDraft) return;
     currentDraft.content.businessName = editorBusinessName.value;
-    if (editorSiteTitle && editorBusinessName.value.trim()) {
-      editorSiteTitle.textContent = editorBusinessName.value.trim();
+    const trimmed = editorBusinessName.value.trim();
+    if (trimmed && currentSite && canManageSite(currentSite)) {
+      updateSiteSummary(currentSite.id, { name: trimmed });
+      scheduleRename(trimmed);
     }
     updateDraftAndPreview();
   });
@@ -1088,7 +1154,7 @@ function setupEditorEvents() {
           selectedCategoryForItems = candidateContent.categories[0]?.id || null;
           initializeEditorWorkspace();
           showFeedback(
-            `Importação aplicada ao rascunho (${result.validRows.length} itens processados). Clique em Salvar Rascunho para gravar.`,
+            `Importação aplicada ao rascunho (${result.validRows.length} itens processados). As alterações são salvas automaticamente.`,
             'success'
           );
 
@@ -1119,6 +1185,9 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   syncMilaRelayUI();
   if (editorCatalogType) {
     editorCatalogType.value = currentDraft.content.catalogType || 'products';
+  }
+  if (editorStorefrontType) {
+    editorStorefrontType.value = currentDraft.content.storefrontType || 'food';
   }
   const locality = currentDraft.content.locality || {};
   if (editorLocalityListed) editorLocalityListed.checked = locality.listed === true;
@@ -1195,10 +1264,27 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
   }
 
   updateCsvModelLink();
-  populateCategorySelect();
-  renderCategories();
+  syncTargetCategory();
+  mountPalettePicker();
   renderItems();
   updateDraftAndPreview({ skipAutosave });
+}
+
+function mountPalettePicker() {
+  if (!palettePickerSlot || !currentDraft) return;
+  const available = canChooseStructurePalette(currentDraft.content);
+  renderPalettePicker({
+    doc: globalThis.document,
+    container: palettePickerSlot,
+    value: getStructurePalette(currentDraft.content),
+    disabled: !available,
+    hint: available ? '' : 'Disponível depois de escolher a estrutura da vitrine em Configurações > Identidade, menus e páginas.',
+    onChange: (id) => {
+      if (!currentDraft) return;
+      currentDraft.content = setStructurePalette(currentDraft.content, id);
+      updateDraftAndPreview();
+    }
+  });
 }
 
 function syncCatalogTypeDefaults() {
@@ -1427,169 +1513,99 @@ function renderWhatsappSimulation() {
   }
 }
 
-function populateCategorySelect() {
-  if (!editorCategorySelect) return;
-  editorCategorySelect.replaceChildren();
-  const categories = currentDraft.content.categories || [];
-
+function syncTargetCategory() {
+  const categories = currentDraft?.content?.categories || [];
   if (categories.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'Nenhuma categoria criada';
-    editorCategorySelect.appendChild(opt);
     selectedCategoryForItems = null;
     return;
   }
-
-  categories.forEach((cat, idx) => {
-    const opt = document.createElement('option');
-    opt.value = cat.id;
-    opt.textContent = cat.name || `Categoria ${idx + 1}`;
-    editorCategorySelect.appendChild(opt);
-  });
-
   if (!selectedCategoryForItems || !categories.some((c) => c.id === selectedCategoryForItems)) {
-    selectedCategoryForItems = categories[0].id;
-  }
-  editorCategorySelect.value = selectedCategoryForItems;
-  const activeCat = categories.find((c) => c.id === selectedCategoryForItems);
-  if (activeCat?.items?.length > 0 && (!activeEditingItemId || !activeCat.items.some((i) => i.id === activeEditingItemId))) {
-    activeEditingItemId = activeCat.items[0].id;
+    selectedCategoryForItems = categories[categories.length - 1].id;
   }
 }
 
-function renderCategories() {
-  if (!categoriesContainer) return;
-  categoriesContainer.replaceChildren();
-  const categories = currentDraft.content.categories || [];
-
-  if (categories.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-msg';
-    empty.textContent = 'Nenhuma categoria cadastrada. Clique em "+ Categoria" para começar.';
-    categoriesContainer.appendChild(empty);
-    return;
-  }
-
-  categories.forEach((category, catIndex) => {
-    const block = document.createElement('div');
-    block.className = 'category-block';
-    block.dataset.index = String(catIndex);
-
-    const labelGroup = document.createElement('div');
-    labelGroup.className = 'form-group';
-
-    const label = document.createElement('label');
-    label.setAttribute('for', `cat-input-${category.id}`);
-    label.textContent = `Nome da categoria ${catIndex + 1}`;
-
-    const titleInput = document.createElement('input');
-    titleInput.type = 'text';
-    titleInput.id = `cat-input-${category.id}`;
-    titleInput.className = 'category-title-input input-styled-height';
-    titleInput.value = category.name || '';
-    titleInput.placeholder = 'Ex: Pizzas Artesanais';
-    titleInput.addEventListener('input', () => {
-      category.name = titleInput.value;
-      populateCategorySelect();
-      updateDraftAndPreview();
-    });
-
-    labelGroup.appendChild(label);
-    labelGroup.appendChild(titleInput);
-
-    const controls = document.createElement('div');
-    controls.className = 'category-controls';
-
-    const editItemsBtn = document.createElement('button');
-    editItemsBtn.type = 'button';
-    editItemsBtn.className = 'button button-small button-secondary button-pill';
-    const itemLen = Array.isArray(category.items) ? category.items.length : 0;
-    editItemsBtn.textContent = `Ver itens (${itemLen})`;
-    editItemsBtn.addEventListener('click', () => {
-      selectedCategoryForItems = category.id;
-      populateCategorySelect();
-      renderItems();
-      setActiveTab('items');
-    });
-
-    const moveUpBtn = document.createElement('button');
-    moveUpBtn.type = 'button';
-    moveUpBtn.className = 'button button-small button-secondary button-pill';
-    moveUpBtn.textContent = 'Subir';
-    moveUpBtn.disabled = catIndex === 0;
-    moveUpBtn.setAttribute('aria-label', `Mover categoria ${category.name || catIndex + 1} para cima`);
-    moveUpBtn.addEventListener('click', () => {
-      moveCategory(catIndex, -1);
-    });
-
-    const moveDownBtn = document.createElement('button');
-    moveDownBtn.type = 'button';
-    moveDownBtn.className = 'button button-small button-secondary button-pill';
-    moveDownBtn.textContent = 'Descer';
-    moveDownBtn.disabled = catIndex === categories.length - 1;
-    moveDownBtn.setAttribute('aria-label', `Mover categoria ${category.name || catIndex + 1} para baixo`);
-    moveDownBtn.addEventListener('click', () => {
-      moveCategory(catIndex, 1);
-    });
-
-    const deleteCatBtn = document.createElement('button');
-    deleteCatBtn.type = 'button';
-    deleteCatBtn.className = 'button button-small button-secondary button-pill';
-    deleteCatBtn.textContent = 'Excluir';
-    deleteCatBtn.setAttribute('aria-label', `Excluir categoria ${category.name || catIndex + 1}`);
-    deleteCatBtn.addEventListener('click', () => {
-      if (category.items && category.items.length > 0) {
-        if (
-          !confirm(
-            `Deseja excluir a categoria "${category.name || 'sem nome'}" e seus ${category.items.length} itens?`
-          )
-        ) {
-          return;
-        }
-      }
-      deleteCategory(catIndex);
-    });
-
-    if (currentIsOnline && ['owner', 'admin', 'editor'].includes(currentSite.role)) {
-      controls.appendChild(quickToggleButton(category, 'category'));
-    }
-    controls.appendChild(editItemsBtn);
-    controls.appendChild(moveUpBtn);
-    controls.appendChild(moveDownBtn);
-    controls.appendChild(deleteCatBtn);
-
-    block.appendChild(labelGroup);
-    block.appendChild(controls);
-    categoriesContainer.appendChild(block);
+function sectionButton(text, label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button-small button-secondary button-pill';
+  button.textContent = text;
+  if (label) button.setAttribute('aria-label', label);
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
   });
+  return button;
+}
+
+function createCategorySection(category, catIndex, total) {
+  const section = document.createElement('div');
+  section.className = 'category-block items-section-header';
+  section.dataset.index = String(catIndex);
+  const displayName = category.name || `Categoria ${catIndex + 1}`;
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'form-group';
+
+  const label = document.createElement('label');
+  label.setAttribute('for', `cat-input-${category.id}`);
+  label.className = 'items-section-label';
+  label.textContent = `Categoria ${catIndex + 1}`;
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.id = `cat-input-${category.id}`;
+  titleInput.className = 'category-title-input input-styled-height';
+  titleInput.value = category.name || '';
+  titleInput.placeholder = 'Ex: Pizzas Artesanais';
+  titleInput.addEventListener('focus', () => {
+    selectedCategoryForItems = category.id;
+  });
+  titleInput.addEventListener('input', () => {
+    category.name = titleInput.value;
+    updateDraftAndPreview();
+  });
+
+  const count = document.createElement('span');
+  count.className = 'form-help items-section-count';
+  const itemLen = Array.isArray(category.items) ? category.items.length : 0;
+  count.textContent = itemLen === 1 ? '1 item' : `${itemLen} itens`;
+
+  labelGroup.append(label, titleInput, count);
+
+  const controls = document.createElement('div');
+  controls.className = 'category-controls';
+
+  controls.appendChild(sectionButton('+ Item', `Adicionar item em ${displayName}`, () => {
+    selectedCategoryForItems = category.id;
+    addItem('price', 'fixed');
+  }));
+  if (currentIsOnline && ['owner', 'admin', 'editor'].includes(currentSite.role)) {
+    controls.appendChild(quickToggleButton(category, 'category'));
+  }
+  const moveUpBtn = sectionButton('Subir', `Mover categoria ${displayName} para cima`, () => moveCategory(catIndex, -1));
+  moveUpBtn.disabled = catIndex === 0;
+  const moveDownBtn = sectionButton('Descer', `Mover categoria ${displayName} para baixo`, () => moveCategory(catIndex, 1));
+  moveDownBtn.disabled = catIndex === total - 1;
+  const deleteCatBtn = sectionButton('Excluir', `Excluir categoria ${displayName}`, () => {
+    if (category.items && category.items.length > 0) {
+      if (!confirm(`Deseja excluir a categoria "${category.name || 'sem nome'}" e seus ${category.items.length} itens?`)) {
+        return;
+      }
+    }
+    deleteCategory(catIndex);
+  });
+  controls.append(moveUpBtn, moveDownBtn, deleteCatBtn);
+
+  section.append(labelGroup, controls);
+  return section;
 }
 
 function renderItems() {
-  if (!itemsContainer) return;
+  if (!itemsContainer || !currentDraft) return;
   itemsContainer.replaceChildren();
+  syncTargetCategory();
 
-  if (!selectedCategoryForItems) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-msg';
-    empty.textContent = 'Clique em "+ Adicionar Item" ou importe uma planilha CSV para começar.';
-    itemsContainer.appendChild(empty);
-    return;
-  }
-
-  const category = (currentDraft.content.categories || []).find(
-    (c) => c.id === selectedCategoryForItems
-  );
-  if (!category) return;
-
-  if (!category.items || category.items.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-msg';
-    empty.textContent = 'Nenhum item nesta categoria. Clique em "+ Adicionar Item" ou importe uma planilha.';
-    itemsContainer.appendChild(empty);
-    return;
-  }
-
+  const categories = currentDraft.content.categories || [];
   const comp = currentDraft.content.components || {};
   const isQuote = currentDraft.content.catalogType === 'quote';
   const isBooking = currentDraft.content.catalogType === 'booking';
@@ -1610,22 +1626,46 @@ function renderItems() {
     return 'Item à venda';
   };
 
+  const totalItems = categories.reduce((sum, cat) => sum + (cat.items?.length || 0), 0);
+
   // Google Forms-style header card (storefront title and short description)
   const formHeaderCard = document.createElement('div');
   formHeaderCard.className = 'google-forms-header-card';
-  const formTitle = document.createElement('h3');
+  const formTitle = document.createElement('h2');
   formTitle.className = 'forms-header-title';
   formTitle.textContent = currentDraft.content.businessName || currentSite?.name || 'Minha Vitrine';
   const formSubtitle = document.createElement('p');
   formSubtitle.className = 'forms-header-subtitle';
   formSubtitle.textContent =
     currentDraft.content.messages?.welcomeText ||
-    `Categoria: ${category.name || 'Itens'} · ${category.items.length} ${category.items.length === 1 ? 'item' : 'itens'} na vitrine`;
+    `${categories.length} ${categories.length === 1 ? 'categoria' : 'categorias'} · ${totalItems} ${totalItems === 1 ? 'item' : 'itens'} na vitrine`;
   formHeaderCard.appendChild(formTitle);
   formHeaderCard.appendChild(formSubtitle);
   itemsContainer.appendChild(formHeaderCard);
 
-  category.items.forEach((item, itemIdx) => {
+  if (categories.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-msg';
+    empty.textContent = 'Nenhum item ainda. Use a barra ao lado para adicionar um item, uma categoria ou importar uma planilha.';
+    itemsContainer.appendChild(empty);
+    return;
+  }
+
+  const context = { comp, isQuote, isBooking, getPriceModeLabel };
+  categories.forEach((category, catIndex) => {
+    itemsContainer.appendChild(createCategorySection(category, catIndex, categories.length));
+    if (!category.items || category.items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-msg items-section-empty';
+      empty.textContent = 'Nenhum item nesta categoria.';
+      itemsContainer.appendChild(empty);
+      return;
+    }
+    category.items.forEach((item, itemIdx) => renderItemCard(category, item, itemIdx, context));
+  });
+}
+
+function renderItemCard(category, item, itemIdx, { comp, isQuote, isBooking, getPriceModeLabel }) {
     const card = document.createElement('div');
     // Accent bar visual highlight like Google Forms
     const isEditing = activeEditingItemId === item.id;
@@ -1636,6 +1676,7 @@ function renderItems() {
     card.addEventListener('click', (e) => {
       if (activeEditingItemId !== item.id && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('textarea')) {
         activeEditingItemId = item.id;
+        selectedCategoryForItems = category.id;
         renderItems();
       }
     });
@@ -1771,7 +1812,7 @@ function renderItems() {
     upBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-up"/></svg>`;
     upBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      moveItem(selectedCategoryForItems, itemIdx, -1);
+      moveItem(category.id, itemIdx, -1);
     });
 
     // Move Down
@@ -1783,7 +1824,7 @@ function renderItems() {
     downBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-down"/></svg>`;
     downBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      moveItem(selectedCategoryForItems, itemIdx, 1);
+      moveItem(category.id, itemIdx, 1);
     });
 
     // Duplicate
@@ -1794,7 +1835,7 @@ function renderItems() {
     dupBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-copy"/></svg>`;
     dupBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      duplicateItem(selectedCategoryForItems, itemIdx);
+      duplicateItem(category.id, itemIdx);
     });
 
     headerActions.appendChild(upBtn);
@@ -2257,7 +2298,7 @@ function renderItems() {
     footerDupBtn.innerHTML = `<svg width="18" height="18"><use href="#icon-copy"/></svg>`;
     footerDupBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      duplicateItem(selectedCategoryForItems, itemIdx);
+      duplicateItem(category.id, itemIdx);
     });
 
     // Delete Trash icon
@@ -2272,7 +2313,7 @@ function renderItems() {
       if (item.name && !confirm(`Deseja excluir o item "${item.name}"?`)) {
         return;
       }
-      removeItem(selectedCategoryForItems, itemIdx);
+      removeItem(category.id, itemIdx);
     });
 
     // Separator line
@@ -2298,7 +2339,6 @@ function renderItems() {
 
     card.appendChild(footer);
     itemsContainer.appendChild(card);
-  });
 }
 
 /** Abre o cartão do item com erro no link de pagamento e leva o foco ao campo. */
@@ -2307,9 +2347,8 @@ function revealPaymentLinkError(error) {
   if (!itemId || !currentDraft) return;
   const category = (currentDraft.content.categories || []).find((cat) => (cat.items || []).some((entry) => String(entry.id) === itemId));
   if (!category) return;
-  setActiveTab('items');
+  goToTab('itens');
   selectedCategoryForItems = category.id;
-  if (editorCategorySelect) editorCategorySelect.value = category.id;
   activeEditingItemId = category.items.find((entry) => String(entry.id) === itemId).id;
   renderItems();
   showPaymentLinkServerErrors(error, { focus: true });
@@ -2543,22 +2582,26 @@ function parseReaisToCents(valStr) {
 
 function addCategory(defaultName = '') {
   const id = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const focusName = !defaultName;
   currentDraft.content.categories.push({
     id,
-    name: defaultName,
+    name: defaultName || `Categoria ${currentDraft.content.categories.length + 1}`,
     items: []
   });
   selectedCategoryForItems = id;
-  populateCategorySelect();
-  renderCategories();
+  syncTargetCategory();
   renderItems();
   updateDraftAndPreview();
+  if (focusName) {
+    const input = globalThis.document?.getElementById(`cat-input-${id}`);
+    input?.focus();
+    input?.select?.();
+  }
 }
 
 function deleteCategory(catIndex) {
   currentDraft.content.categories.splice(catIndex, 1);
-  populateCategorySelect();
-  renderCategories();
+  syncTargetCategory();
   renderItems();
   updateDraftAndPreview();
 }
@@ -2570,8 +2613,8 @@ function moveCategory(catIndex, direction) {
     const temp = categories[catIndex];
     categories[catIndex] = categories[targetIndex];
     categories[targetIndex] = temp;
-    populateCategorySelect();
-    renderCategories();
+    syncTargetCategory();
+    renderItems();
     updateDraftAndPreview();
   }
 }
@@ -2726,7 +2769,6 @@ function addItem(type = 'price', priceMode = 'fixed') {
 
   category.items.push(item);
   activeEditingItemId = item.id; // Highlight new item in editing mode
-  renderCategories();
   renderItems();
   updateDraftAndPreview();
 }
@@ -2735,7 +2777,6 @@ function removeItem(catId, itemIdx) {
   const category = (currentDraft.content.categories || []).find((c) => c.id === catId);
   if (category && category.items) {
     category.items.splice(itemIdx, 1);
-    renderCategories();
     renderItems();
     updateDraftAndPreview();
   }
@@ -2769,161 +2810,346 @@ function duplicateItem(catId, itemIdx) {
   }
 }
 
-let autosaveTimeout = null;
+function setSaveIndicator(state, detail = '') {
+  const indicator = globalThis.document?.getElementById('autosave-indicator');
+  if (!indicator) return;
+  const texts = {
+    loading: 'Carregando...',
+    saving: 'Salvando...',
+    saved: currentIsOnline ? 'Salvo' : 'Salvo neste navegador',
+    conflict: 'Não salvo: conflito de revisão',
+    invalid: `Não salvo: ${detail}`,
+    error: detail ? `Erro ao salvar: ${detail}` : 'Erro ao salvar'
+  };
+  const text = texts[state] ?? '';
+  if (indicator.textContent !== text) indicator.textContent = text;
+  indicator.dataset.state = state;
+  const tone = state === 'saved' ? 'saved' : ['conflict', 'invalid', 'error'].includes(state) ? 'error' : 'saving';
+  indicator.className = `autosave-indicator ${tone}`;
+}
+
+function countDraftItems(content) {
+  let totalCount = 0;
+  let activeCount = 0;
+  (content?.categories || []).forEach((cat) => {
+    (cat.items || []).forEach((item) => {
+      totalCount += 1;
+      if (item.active !== false) activeCount += 1;
+    });
+  });
+  return { totalCount, activeCount };
+}
+
+function measureDraftBytes(content) {
+  return new TextEncoder().encode(JSON.stringify(content)).length;
+}
+
+function draftLimitIssue(sizeInBytes, activeCount, totalCount) {
+  if (activeCount > MAX_ACTIVE_ITEMS) return `limite de ${MAX_ACTIVE_ITEMS} itens ativos`;
+  if (totalCount > MAX_TOTAL_ITEMS) return `limite de ${MAX_TOTAL_ITEMS} itens`;
+  if (sizeInBytes > MAX_DRAFT_BYTES) return 'rascunho acima de 256 KiB';
+  return '';
+}
+
+// Incomplete names or prices stay local so autosave never sends a draft the API rejects.
+export function findIncompleteDraftField(content) {
+  const categories = content?.categories || [];
+  const priceRequired = content?.catalogType !== 'quote' && content?.components?.price !== false;
+  for (let catIndex = 0; catIndex < categories.length; catIndex += 1) {
+    const category = categories[catIndex];
+    if (!String(category.name || '').trim()) return `dê um nome à categoria ${catIndex + 1}`;
+    const items = category.items || [];
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
+      const item = items[itemIndex];
+      const where = `"${category.name.trim()}"`;
+      if (!String(item.name || '').trim()) return `dê um nome ao item ${itemIndex + 1} de ${where}`;
+      const priceMode = content.catalogType === 'booking' ? 'fixed' : (item.priceMode || 'fixed');
+      if ((priceMode === 'fixed' && priceRequired) || priceMode === 'quota') {
+        if (!Number.isSafeInteger(item.priceCents) || item.priceCents <= 0) {
+          return `informe o preço de "${item.name.trim()}"`;
+        }
+      }
+    }
+  }
+  return '';
+}
+
+function updateLimitMeters(sizeInBytes, activeCount, totalCount) {
+  if (draftSizeCount) draftSizeCount.textContent = `${(sizeInBytes / 1024).toFixed(1)} / 256 KiB`;
+  if (draftSizeProgress) draftSizeProgress.value = sizeInBytes;
+  if (draftSizeWarning) draftSizeWarning.hidden = sizeInBytes <= MAX_DRAFT_BYTES;
+  if (activeItemsCount) activeItemsCount.textContent = `${activeCount} / ${MAX_ACTIVE_ITEMS}`;
+  if (activeItemsProgress) activeItemsProgress.value = activeCount;
+  if (activeItemsWarning) activeItemsWarning.hidden = activeCount <= MAX_ACTIVE_ITEMS;
+  if (totalItemsCount) totalItemsCount.textContent = `${totalCount} / ${MAX_TOTAL_ITEMS}`;
+  if (totalItemsProgress) totalItemsProgress.value = totalCount;
+  if (totalItemsWarning) totalItemsWarning.hidden = totalCount <= MAX_TOTAL_ITEMS;
+  if (editorLimits) {
+    editorLimits.hidden = !(
+      activeCount > MAX_ACTIVE_ITEMS * LIMIT_WARNING_RATIO ||
+      totalCount > MAX_TOTAL_ITEMS * LIMIT_WARNING_RATIO ||
+      sizeInBytes > MAX_DRAFT_BYTES * LIMIT_WARNING_RATIO
+    );
+  }
+}
+
+function updateConfigSummaries() {
+  const content = currentDraft?.content;
+  if (!content) return;
+  if (configAtendimentoSummary) {
+    const phone = content.whatsapp ? formatWhatsappBR(content.whatsapp) : 'WhatsApp não informado';
+    configAtendimentoSummary.textContent = `${phone} · ${getCatalogTypeDisplayLabel(content.catalogType)}`;
+  }
+  if (configPedidoSummary) {
+    const fields = content.orderFields || {};
+    const asked = [
+      fields.customerName !== false && 'nome',
+      fields.date && 'data',
+      fields.deliveryOrPickup && 'endereço',
+      fields.notes !== false && 'observação'
+    ].filter(Boolean);
+    const slots = (fields.timeSlots || []).length;
+    configPedidoSummary.textContent =
+      `${asked.length ? `Pede ${asked.join(', ')}` : 'Sem campos extras'} · ${slots} ${slots === 1 ? 'horário' : 'horários'}`;
+  }
+  if (configItensSummary) {
+    const comp = content.components || {};
+    const visible = 1 + ['description', 'photo', 'price', 'minQuantity', 'quantitySelector', 'durationMinutes']
+      .filter((key) => Boolean(comp[key])).length;
+    configItensSummary.textContent = `${visible} componentes visíveis nos cartões`;
+  }
+}
+
+function updateAccessSection(site = currentSite) {
+  if (!site) return;
+  if (publicLinkInput) publicLinkInput.value = publicUrlForSite(site);
+  if (configAcessoSummary) {
+    configAcessoSummary.textContent = `${site.publishedAt ? 'Publicada' : 'Rascunho'} · link público e equipe`;
+  }
+}
 
 function updateDraftAndPreview({ skipAutosave = false } = {}) {
   if (!currentDraft) return;
 
-  const textEncoder = new TextEncoder();
-  const serialized = JSON.stringify(currentDraft.content);
-  const sizeInBytes = textEncoder.encode(serialized).length;
-
-  if (draftSizeCount) {
-    draftSizeCount.textContent = `${(sizeInBytes / 1024).toFixed(1)} / 256 KiB`;
-  }
-  if (draftSizeProgress) draftSizeProgress.value = sizeInBytes;
-  if (draftSizeWarning) draftSizeWarning.hidden = sizeInBytes <= 262144;
-
-  let totalCount = 0;
-  let activeCount = 0;
-
-  (currentDraft.content.categories || []).forEach((cat) => {
-    if (cat.items) {
-      cat.items.forEach((item) => {
-        totalCount += 1;
-        if (item.active !== false) {
-          activeCount += 1;
-        }
-      });
-    }
-  });
-
-  if (activeItemsCount) activeItemsCount.textContent = `${activeCount} / 20`;
-  if (activeItemsProgress) activeItemsProgress.value = activeCount;
-  if (activeItemsWarning) activeItemsWarning.hidden = activeCount <= 20;
-
-  if (totalItemsCount) totalItemsCount.textContent = `${totalCount} / 100`;
-  if (totalItemsProgress) totalItemsProgress.value = totalCount;
-  if (totalItemsWarning) totalItemsWarning.hidden = totalCount <= 100;
-
-  if (saveDraftButton) {
-    saveDraftButton.disabled = sizeInBytes > 262144;
-  }
-
+  const sizeInBytes = measureDraftBytes(currentDraft.content);
+  const { activeCount, totalCount } = countDraftItems(currentDraft.content);
+  updateLimitMeters(sizeInBytes, activeCount, totalCount);
   renderLivePreview();
+  updateConfigSummaries();
 
-  // AUTOSAVE DEBOUNCED TRIGGER
-  const indicator = globalThis.document?.getElementById('autosave-indicator');
-  if (activeCount > 20) {
-    if (indicator) {
-      indicator.textContent = '⚠️ Limite de 20 itens ativos';
-      indicator.className = 'autosave-indicator error';
-    }
+  const limitIssue = draftLimitIssue(sizeInBytes, activeCount, totalCount);
+  if (limitIssue) {
+    setSaveIndicator('invalid', limitIssue);
     if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    autosaveTimeout = null;
     return;
   }
-  if (totalCount > 100) {
-    if (indicator) {
-      indicator.textContent = '⚠️ Limite de 100 itens totais';
-      indicator.className = 'autosave-indicator error';
-    }
+
+  const incomplete = skipAutosave ? '' : findIncompleteDraftField(currentDraft.content);
+  if (incomplete) {
+    setSaveIndicator('invalid', incomplete);
     if (autosaveTimeout) clearTimeout(autosaveTimeout);
-    return;
-  }
-  if (sizeInBytes > 262144) {
-    if (indicator) {
-      indicator.textContent = '⚠️ Limite de 256 KiB excedido';
-      indicator.className = 'autosave-indicator error';
-    }
-    if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    autosaveTimeout = null;
     return;
   }
 
   if (skipAutosave) {
-    if (indicator) {
-      indicator.textContent = '✓ Todas as alterações foram salvas';
-      indicator.className = 'autosave-indicator saved';
-    }
+    setSaveIndicator('saved');
+    return;
+  }
+  if (autosaveBlocked) {
+    setSaveIndicator('conflict');
     return;
   }
 
-  if (indicator) {
-    indicator.textContent = 'Alterando...';
-    indicator.className = 'autosave-indicator saving';
+  setSaveIndicator('saving');
+  scheduleAutosave();
+}
+
+function scheduleAutosave(delay = AUTOSAVE_DELAY_MS) {
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = setTimeout(() => {
+    autosaveTimeout = null;
+    void runAutosave();
+  }, delay);
+}
+
+async function runAutosave() {
+  while (autosaveInFlight) await autosaveInFlight;
+  if (!currentDraft || !currentSite) return true;
+  if (autosaveBlocked) {
+    setSaveIndicator('conflict');
+    return false;
+  }
+  if (!hasUnsavedDraftChanges()) {
+    setSaveIndicator('saved');
+    return true;
+  }
+  const { activeCount, totalCount } = countDraftItems(currentDraft.content);
+  const limitIssue =
+    draftLimitIssue(measureDraftBytes(currentDraft.content), activeCount, totalCount) ||
+    findIncompleteDraftField(currentDraft.content);
+  if (limitIssue) {
+    setSaveIndicator('invalid', limitIssue);
+    return false;
   }
 
-  if (autosaveTimeout) clearTimeout(autosaveTimeout);
-  autosaveTimeout = setTimeout(async () => {
-    if (!currentDraft) return;
-    try {
-      if (currentIsOnline) {
-        const res = await fetch(`/api/sites/${currentSite.id}/draft`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            revision: currentDraft.revision,
-            content: currentDraft.content
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          currentDraft = data.draft;
-          currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
-          if (editorRevisionIndicator) {
-            editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-          }
-          savedDraftContent = JSON.stringify(currentDraft.content);
-          if (indicator) {
-            indicator.textContent = '✓ Todas as alterações foram salvas';
-            indicator.className = 'autosave-indicator saved';
-          }
-          if (conflictBanner) conflictBanner.hidden = true;
-        } else if (res.status === 409) {
-          const data = await res.json();
-          if (conflictBanner) conflictBanner.hidden = false;
-          if (indicator) {
-            indicator.textContent = '⚠️ Erro ao salvar (conflito)';
-            indicator.className = 'autosave-indicator error';
-          }
-          if (data.error?.currentRevision && editorRevisionIndicator) {
-            editorRevisionIndicator.textContent = `Revisão em conflito: ${currentDraft.revision} (servidor: ${data.error.currentRevision})`;
-          }
-        } else {
-          const errData = await res.json().catch(() => null);
-          const errCode = errData?.error?.code;
-          showPlaceServerErrors(errData?.error, { focus: false });
-          showSeoServerErrors(errData?.error, { focus: false });
-          showPaymentLinkServerErrors(errData?.error, { focus: false });
-          if (indicator) {
-            indicator.textContent =
-              errCode === 'ACTIVE_ITEMS_LIMIT_EXCEEDED'
-                ? '⚠️ Limite de 20 itens ativos'
-                : errData?.error?.message
-                  ? `⚠️ ${errData.error.message}`
-                  : '⚠️ Erro ao salvar';
-            indicator.className = 'autosave-indicator error';
-          }
-        }
-      } else {
-        currentDraft.revision += 1;
-        currentDraft.updatedAt = new Date().toISOString();
-        localStorage.setItem(`vitrine_local_draft_${currentSite.id}`, JSON.stringify(currentDraft));
-        if (editorRevisionIndicator) {
-          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-        }
-        savedDraftContent = JSON.stringify(currentDraft.content);
-        if (indicator) {
-          indicator.textContent = '✓ Salvo localmente (offline)';
-          indicator.className = 'autosave-indicator saved';
-        }
-      }
-    } catch {
-      if (indicator) {
-        indicator.textContent = '⚠️ Erro de conexão';
-        indicator.className = 'autosave-indicator error';
-      }
+  const site = currentSite;
+  const draft = currentDraft;
+  const generation = editorLoadGeneration;
+  const sentContent = JSON.stringify(draft.content);
+  setSaveIndicator('saving');
+
+  autosaveInFlight = (async () => {
+    if (!currentIsOnline) {
+      draft.revision += 1;
+      draft.updatedAt = new Date().toISOString();
+      localStorage.setItem(`vitrine_local_draft_${site.id}`, JSON.stringify(draft));
+      return { ok: true };
     }
-  }, 1200);
+    try {
+      const res = await fetch(`/api/sites/${site.id}/draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revision: draft.revision, content: draft.content })
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (Number.isSafeInteger(data?.draft?.revision)) draft.revision = data.draft.revision;
+        if (data?.draft?.updatedAt) draft.updatedAt = data.draft.updatedAt;
+        return { ok: true };
+      }
+      const data = await res.json().catch(() => null);
+      if (res.status === 409) return { ok: false, conflict: true, error: data?.error };
+      return { ok: false, error: data?.error };
+    } catch {
+      return { ok: false, network: true };
+    }
+  })();
+
+  let result;
+  try {
+    result = await autosaveInFlight;
+  } finally {
+    autosaveInFlight = null;
+  }
+  if (generation !== editorLoadGeneration || draft !== currentDraft) return result.ok;
+
+  if (result.ok) {
+    savedDraftContent = sentContent;
+    if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${draft.revision}`;
+    if (conflictBanner) conflictBanner.hidden = true;
+    updateSiteSummary(site.id, { updatedAt: draft.updatedAt || new Date().toISOString() });
+    if (hasUnsavedDraftChanges()) {
+      setSaveIndicator('saving');
+      scheduleAutosave();
+    } else {
+      setSaveIndicator('saved');
+    }
+    return true;
+  }
+
+  if (result.conflict) {
+    autosaveBlocked = true;
+    if (conflictBanner) conflictBanner.hidden = false;
+    setSaveIndicator('conflict');
+    if (result.error?.currentRevision && editorRevisionIndicator) {
+      editorRevisionIndicator.textContent = `Revisão em conflito: ${draft.revision} (servidor: ${result.error.currentRevision})`;
+    }
+    return false;
+  }
+
+  if (result.network) {
+    setSaveIndicator('error', 'sem conexão');
+    scheduleAutosave(10000);
+    return false;
+  }
+
+  showPlaceServerErrors(result.error, { focus: false });
+  showSeoServerErrors(result.error, { focus: false });
+  showPaymentLinkServerErrors(result.error, { focus: false });
+  setSaveIndicator(
+    'error',
+    result.error?.code === 'ACTIVE_ITEMS_LIMIT_EXCEEDED'
+      ? `limite de ${MAX_ACTIVE_ITEMS} itens ativos`
+      : result.error?.message || ''
+  );
+  return false;
+}
+
+function clearRenameTimer() {
+  if (renameTimer) {
+    clearTimeout(renameTimer);
+    renameTimer = null;
+  }
+}
+
+function scheduleRename(name) {
+  if (!currentSite || !currentIsOnline) return;
+  pendingRename = { siteId: currentSite.id, name };
+  clearRenameTimer();
+  renameTimer = setTimeout(() => {
+    renameTimer = null;
+    void flushRename();
+  }, AUTOSAVE_DELAY_MS);
+}
+
+async function flushRename() {
+  clearRenameTimer();
+  const rename = pendingRename;
+  pendingRename = null;
+  if (!rename) return true;
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(rename.siteId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ name: rename.name })
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.site) updateSiteSummary(rename.siteId, { name: data.site.name, updatedAt: data.site.updatedAt });
+      return true;
+    }
+    const data = await res.json().catch(() => ({}));
+    showFeedback(data.error?.message || 'Não foi possível renomear a vitrine.', 'error');
+  } catch {
+    showFeedback('Sem conexão para renomear a vitrine.', 'error');
+  }
+  return false;
+}
+
+export async function flushAutosave() {
+  await flushRename();
+  if (autosaveTimeout) {
+    clearTimeout(autosaveTimeout);
+    autosaveTimeout = null;
+  }
+  if (autosaveInFlight) await autosaveInFlight;
+  if (!currentDraft || !hasUnsavedDraftChanges() || autosaveBlocked) return true;
+  return runAutosave();
+}
+
+function handlePageHide() {
+  if (!currentDraft || !currentSite || !hasUnsavedDraftChanges() || autosaveBlocked || autosaveInFlight) return;
+  const { activeCount, totalCount } = countDraftItems(currentDraft.content);
+  if (draftLimitIssue(measureDraftBytes(currentDraft.content), activeCount, totalCount)) return;
+  if (findIncompleteDraftField(currentDraft.content)) return;
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = null;
+  if (!currentIsOnline) {
+    currentDraft.revision += 1;
+    localStorage.setItem(`vitrine_local_draft_${currentSite.id}`, JSON.stringify(currentDraft));
+    savedDraftContent = JSON.stringify(currentDraft.content);
+    return;
+  }
+  const body = JSON.stringify({ revision: currentDraft.revision, content: currentDraft.content });
+  if (new TextEncoder().encode(body).length > KEEPALIVE_MAX_BYTES) return;
+  void fetch(`/api/sites/${currentSite.id}/draft`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true
+  }).catch(() => {});
 }
 
 function resolveDraftMilaRelay() {
@@ -2977,14 +3203,14 @@ function validateCatalogLocal() {
   const { whatsapp, categories } = currentDraft.content;
 
   if (!whatsapp) {
-    showFeedback('Digite o número de WhatsApp comercial na aba Configurações.', 'error');
-    setActiveTab('settings');
+    showFeedback('Digite o número de WhatsApp comercial em Configurações > Atendimento.', 'error');
+    openEditorSection('config', 'config-atendimento');
     return false;
   }
 
   if (!/^[1-9]\d{7,14}$/.test(whatsapp)) {
     showFeedback('Número de WhatsApp comercial inválido. Exemplo: 5511999999999', 'error');
-    setActiveTab('settings');
+    openEditorSection('config', 'config-atendimento');
     return false;
   }
 
@@ -3089,130 +3315,34 @@ function validateCatalogLocal() {
   return true;
 }
 
-async function handleSaveDraft() {
-  if (!currentDraft || !validateCatalogLocal()) return;
-  const generation = editorLoadGeneration;
-
-  if (currentIsOnline) {
-    try {
-      const res = await fetch(`/api/sites/${currentSite.id}/draft`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          revision: currentDraft.revision,
-          content: currentDraft.content
-        })
-      });
-
-      if (generation !== editorLoadGeneration) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (generation !== editorLoadGeneration) return;
-        currentDraft = data.draft;
-        currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
-        if (editorRevisionIndicator) {
-          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-        }
-        savedDraftContent = JSON.stringify(currentDraft.content);
-        showFeedback('Rascunho salvo com sucesso.', 'success');
-        if (conflictBanner) conflictBanner.hidden = true;
-      } else if (res.status === 409) {
-        const data = await res.json();
-        if (generation !== editorLoadGeneration) return;
-        if (conflictBanner) conflictBanner.hidden = false;
-        showFeedback(
-          'Conflito de revisão detectado. Salve suas alterações locais ou recarregue.',
-          'error'
-        );
-        if (data.error?.currentRevision && editorRevisionIndicator) {
-          editorRevisionIndicator.textContent = `Revisão em conflito: ${currentDraft.revision} (servidor: ${data.error.currentRevision})`;
-        }
-      } else {
-        const data = await res.json().catch(() => ({}));
-        if (generation !== editorLoadGeneration) return;
-        showFeedback(data.error?.message || 'Erro ao salvar rascunho.', 'error');
-        if (!showPlaceServerErrors(data.error, { reveal: () => setActiveTab('settings') })) {
-          showSeoServerErrors(data.error, { reveal: () => setActiveTab('settings') });
-        }
-        revealPaymentLinkError(data.error);
-      }
-    } catch {
-      if (generation !== editorLoadGeneration) return;
-      showFeedback('Erro de rede ao salvar rascunho.', 'error');
-    }
-  } else {
-    currentDraft.revision += 1;
-    currentDraft.updatedAt = new Date().toISOString();
-    localStorage.setItem(`vitrine_local_draft_${currentSite.id}`, JSON.stringify(currentDraft));
-    if (editorRevisionIndicator) {
-      editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-    }
-    savedDraftContent = JSON.stringify(currentDraft.content);
-    showFeedback('Rascunho local salvo com sucesso.', 'success');
-    if (conflictBanner) conflictBanner.hidden = true;
-  }
-  updateDraftAndPreview();
-}
-
 async function handlePublishSite() {
   if (!currentDraft || !validateCatalogLocal()) return;
   const generation = editorLoadGeneration;
+  const site = currentSite;
 
   if (currentIsOnline) {
+    const saved = await flushAutosave();
+    if (generation !== editorLoadGeneration) return;
+    if (!saved || hasUnsavedDraftChanges()) {
+      showFeedback(
+        autosaveBlocked
+          ? 'Conflito de revisão detectado antes de publicar. Recarregue o rascunho.'
+          : 'Não foi possível salvar o rascunho antes de publicar.',
+        'error'
+      );
+      return;
+    }
     try {
-      const saveRes = await fetch(`/api/sites/${currentSite.id}/draft`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          revision: currentDraft.revision,
-          content: currentDraft.content
-        })
-      });
-
-      if (generation !== editorLoadGeneration) return;
-      if (saveRes.ok) {
-        const savedData = await saveRes.json();
-        if (generation !== editorLoadGeneration) return;
-        currentDraft = savedData.draft;
-        currentDraft.content = normalizeDraftForEditor(currentDraft.content, currentSite);
-        if (editorRevisionIndicator) {
-          editorRevisionIndicator.textContent = `Revisão: ${currentDraft.revision}`;
-        }
-        savedDraftContent = JSON.stringify(currentDraft.content);
-      } else if (saveRes.status === 409) {
-        if (conflictBanner) conflictBanner.hidden = false;
-        showFeedback(
-          'Conflito de revisão detectado antes de publicar. Recarregue o rascunho.',
-          'error'
-        );
-        return;
-      } else {
-        const errData = await saveRes.json().catch(() => ({}));
-        if (generation !== editorLoadGeneration) return;
-        showFeedback(errData.error?.message || 'Erro ao salvar rascunho antes de publicar.', 'error');
-        return;
-      }
-
-      const pubRes = await fetch(`/api/sites/${currentSite.id}/publish`, {
+      const pubRes = await fetch(`/api/sites/${site.id}/publish`, {
         method: 'POST'
       });
-
       if (generation !== editorLoadGeneration) return;
       if (pubRes.ok) {
         const pubData = await pubRes.json();
         if (generation !== editorLoadGeneration) return;
         const pub = pubData.publication;
-        if (publicationStatusBar && publicationStatusText && publicationViewLink) {
-          const shortHash = String(pub.hash || '').slice(0, 12);
-          publicationStatusText.textContent = `Revisão ${pub.revision} publicada em ${pub.url} (SHA-256: ${shortHash}...)`;
-          publicationViewLink.href = pub.url;
-          publicationStatusBar.hidden = false;
-        }
-        if (editorOpenPublicLink) {
-          editorOpenPublicLink.href = pub.url;
-        }
-        localStorage.setItem('vitrine_has_published', 'true');
-        showFeedback(`Vitrine publicada com sucesso em ${pub.url}.`, 'success');
+        const shortHash = String(pub.hash || '').slice(0, 12);
+        markPublished(site, pub.url, `Revisão ${pub.revision} publicada em ${pub.url} (SHA-256: ${shortHash}...)`);
         void refreshPublicationHistory();
       } else {
         const errData = await pubRes.json().catch(() => ({}));
@@ -3225,29 +3355,43 @@ async function handlePublishSite() {
     } catch {
       showFeedback('Erro de rede ao publicar vitrine.', 'error');
     }
-  } else {
-    let activeCount = 0;
-    (currentDraft.content.categories || []).forEach((cat) => {
-      (cat.items || []).forEach((item) => {
-        if (item.active !== false) activeCount += 1;
-      });
-    });
-
-    if (activeCount === 0) {
-      showFeedback('O rascunho precisa ter ao menos 1 item ativo para ser publicado.', 'error');
-      return;
-    }
-
-    if (publicationStatusBar && publicationStatusText && publicationViewLink) {
-      publicationStatusText.textContent = `Prévia publicada no modo local (revisão ${currentDraft.revision}). Exemplo estático disponível em /loja1.`;
-      publicationViewLink.href = '/loja1';
-      publicationStatusBar.hidden = false;
-    }
-    localStorage.setItem('vitrine_has_published', 'true');
-    showFeedback('Publicação validada com sucesso no modo local.', 'success');
+    return;
   }
+
+  let activeCount = 0;
+  (currentDraft.content.categories || []).forEach((cat) => {
+    (cat.items || []).forEach((item) => {
+      if (item.active !== false) activeCount += 1;
+    });
+  });
+
+  if (activeCount === 0) {
+    showFeedback('O rascunho precisa ter ao menos 1 item ativo para ser publicado.', 'error');
+    return;
+  }
+
+  markPublished(
+    site,
+    publicUrlForSite(site),
+    `Prévia publicada no modo local (revisão ${currentDraft.revision}). Exemplo estático disponível em /loja1.`
+  );
 }
 
+function markPublished(site, url, statusText) {
+  if (publicationStatusText) publicationStatusText.textContent = statusText;
+  if (publicationStatusBar) publicationStatusBar.hidden = false;
+  if (editorOpenPublicLink) editorOpenPublicLink.href = url;
+  if (publicationViewLink) publicationViewLink.href = url;
+  localStorage.setItem('vitrine_has_published', 'true');
+  const publishedAt = new Date().toISOString();
+  site.publishedAt = publishedAt;
+  updateSiteSummary(site.id, { publishedAt });
+  updateAccessSection(site);
+  if (publishDialogText) publishDialogText.textContent = 'Sua vitrine está no ar. Compartilhe o link com seus clientes.';
+  if (publishLinkInput) publishLinkInput.value = url;
+  openDialog(publishDialog, publishSiteButton);
+  publishCopyBtn?.focus();
+}
 
 function quickToggleButton(target, targetType) {
   const button = document.createElement('button');
@@ -3273,7 +3417,6 @@ function quickToggleButton(target, targetType) {
       target.active = target.active === false;
       if (Object.hasOwn(target, 'available')) target.available = target.active;
       if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${draft.revision}`;
-      renderCategories();
       renderItems();
       updateDraftAndPreview();
       showFeedback('Disponibilidade salva no rascunho.', 'success');
@@ -3353,53 +3496,50 @@ async function refreshPublicationHistory() {
 publicationHistory?.addEventListener('toggle', refreshPublicationHistory);
 
 const team = globalThis.document?.getElementById('team-management');
-const teamForm = globalThis.document?.getElementById('team-form');
 const teamStatus = globalThis.document?.getElementById('team-status');
-const teamMembers = globalThis.document?.getElementById('team-members');
 const teamAudit = globalThis.document?.getElementById('team-audit');
-const teamRoleLabels = { owner: 'Proprietário', admin: 'Administrador', editor: 'Editor', viewer: 'Leitor', collaborator: 'Colaborador' };
+let teamPanelMountedFor = null;
 
-async function refreshTeam() {
+function teamPanelNote(text) {
+  const note = document.createElement('p');
+  note.className = 'form-help';
+  note.textContent = text;
+  teamPanelSlot?.replaceChildren(note);
+}
+
+function resetTeamPanel() {
+  teamPanelMountedFor = null;
+  teamPanelNote('Abra esta seção com a vitrine conectada para ver a equipe.');
+}
+
+async function refreshTeamPanel() {
+  if (!teamPanelSlot || !currentSite) return;
+  if (!currentIsOnline) {
+    teamPanelNote('A equipe aparece quando você entra com sua conta.');
+    return;
+  }
+  if (teamPanelMountedFor === currentSite.id) return;
+  teamPanelMountedFor = currentSite.id;
+  teamPanelSlot.replaceChildren();
+  await mountTeamPanel({
+    doc: globalThis.document,
+    container: teamPanelSlot,
+    siteId: currentSite.id,
+    siteName: currentSite.name,
+    role: currentSite.role,
+    request: portalRequest
+  });
+}
+
+async function refreshTeamAudit() {
   if (!team?.open || !currentIsOnline) return;
   const site = currentSite;
-  teamMembers.replaceChildren();
   teamAudit.replaceChildren();
-  teamStatus.textContent = 'Carregando equipe…';
+  teamStatus.textContent = 'Carregando histórico…';
   try {
-    const [{ members }, { logs }] = await Promise.all([
-      publicationRequest(site, 'members'),
-      publicationRequest(site, 'audit-logs')
-    ]);
+    const { logs } = await publicationRequest(site, 'audit-logs');
     if (site !== currentSite || !team.open) return;
-    teamStatus.textContent = members.length ? '' : 'Nenhum membro adicional.';
-    for (const member of members) {
-      const row = document.createElement('li');
-      row.textContent = `${teamRoleLabels[member.role] ?? member.role} · ${member.userId} `;
-      if (member.role !== 'admin' || site.role === 'owner') {
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'button button-small button-secondary button-pill';
-        remove.textContent = 'Remover';
-        remove.setAttribute('aria-label', `Remover membro ${member.userId}`);
-        remove.addEventListener('click', async () => {
-          if (!window.confirm('Remover o acesso deste membro à vitrine?')) return;
-          remove.disabled = true;
-          try {
-            const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}/members/${encodeURIComponent(member.userId)}`, {
-              method: 'DELETE', headers: { 'Content-Type': 'application/json' }
-            });
-            if (!response.ok) throw new Error('Não foi possível remover o membro.');
-            if (site === currentSite) await refreshTeam();
-          } catch (error) {
-            if (site === currentSite) teamStatus.textContent = error.message;
-          } finally {
-            remove.disabled = false;
-          }
-        });
-        row.append(remove);
-      }
-      teamMembers.append(row);
-    }
+    teamStatus.textContent = logs.length ? '' : 'Nenhuma alteração registrada.';
     for (const log of logs) {
       const row = document.createElement('li');
       const action = { insert: 'Adição', update: 'Alteração', delete: 'Remoção', rollback: 'Restauração' }[log.action] ?? log.action;
@@ -3411,25 +3551,7 @@ async function refreshTeam() {
   }
 }
 
-team?.addEventListener('toggle', refreshTeam);
-teamForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const site = currentSite;
-  const values = new FormData(teamForm);
-  const submit = teamForm.querySelector('button[type="submit"]');
-  submit.disabled = true;
-  try {
-    await publicationRequest(site, 'members', { userId: values.get('userId').trim(), role: values.get('role') });
-    if (site === currentSite) {
-      teamForm.reset();
-      await refreshTeam();
-    }
-  } catch (error) {
-    if (site === currentSite) teamStatus.textContent = error.message;
-  } finally {
-    submit.disabled = false;
-  }
-});
+team?.addEventListener('toggle', refreshTeamAudit);
 
 const structurePanel = globalThis.document?.getElementById('showcase-structure');
 const structureStatus = globalThis.document?.getElementById('showcase-structure-status');
@@ -3471,6 +3593,7 @@ structurePanel?.addEventListener('toggle', async () => {
           previous.structure = data.draft.content.structure;
           savedDraftContent = JSON.stringify(previous);
         }
+        mountPalettePicker();
         if (Object.hasOwn(structure, 'templateCode')) render(data.resolved, data.draft.content.structure.templateCode);
         if (editorRevisionIndicator) editorRevisionIndicator.textContent = `Revisão: ${expectedRevision}`;
         structureStatus.textContent = 'Estrutura salva. Abra a prévia para conferir.';
@@ -3479,7 +3602,10 @@ structurePanel?.addEventListener('toggle', async () => {
         structureStatus.textContent = error.message;
         structureFields.querySelector('form')?.showFieldErrors?.(error.missingFields);
       }
-    }, widgets, null, { templates, selected, uploadImage: uploadHeroImage, uploadTestimonialPhoto, planGate });
+    }, widgets, null, {
+      templates, selected, uploadImage: uploadHeroImage, uploadTestimonialPhoto, planGate,
+      readPalette: () => getStructurePalette(currentDraft?.content)
+    });
     const planSummary = await loadSitePlan(site.id);
     if (site !== currentSite || !structurePanel.open) return;
     const planGate = planSummary
