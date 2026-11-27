@@ -3,6 +3,7 @@ import { detectSponsorImpact, hasSponsorImpactAccess, initializeSponsorImpact, s
 import { clearEditor, flushAutosave, isEditorShowingSite, loadEditor, showEditorTab } from './editor.js';
 import { attachWhatsappMask, extractPhoneDigits, formatWhatsappBR } from './phone-mask.mjs';
 import { createInterestsMultiSelect } from './multi-select.mjs';
+import { createLocationPicker } from './br-locations.js';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 import { loadBillingNotice } from './billing-notice.mjs';
 import { initBillingPanel, loadBillingPanel } from './billing-panel.mjs';
@@ -29,6 +30,8 @@ let homeSearchQuery = '';
 let newVitrineTemplate = 'products';
 let newSiteSlugTouched = false;
 let insightsRequestToken = 0;
+let profileLocation = null;
+let gateLocation = null;
 
 export let PUBLIC_SITE_ORIGIN = 'https://vitrine.inspira.dev.br';
 export let PORTAL_ORIGIN = 'https://painel.inspira.dev.br';
@@ -76,7 +79,10 @@ const accountMenuName = globalThis.document?.getElementById('account-menu-name')
 const profileForm = globalThis.document?.getElementById('profile-form');
 const profileDisplayNameInput = globalThis.document?.getElementById('profile-display-name');
 const profileBusinessNameInput = globalThis.document?.getElementById('profile-business-name');
+const profileStateSelect = globalThis.document?.getElementById('profile-state');
 const profileCityInput = globalThis.document?.getElementById('profile-city');
+const profileCityOptions = globalThis.document?.getElementById('profile-city-options');
+const profileCityHelp = globalThis.document?.getElementById('profile-city-help');
 const profileWhatsappInput = globalThis.document?.getElementById('profile-whatsapp');
 const profileWhatsappError = globalThis.document?.getElementById('profile-whatsapp-error');
 const interestsChipsContainer = globalThis.document?.getElementById('interests-chips-container');
@@ -85,7 +91,10 @@ const interestsChipsContainer = globalThis.document?.getElementById('interests-c
 const profileGateForm = globalThis.document?.getElementById('profile-gate-form');
 const gateDisplayNameInput = globalThis.document?.getElementById('gate-display-name');
 const gateBusinessNameInput = globalThis.document?.getElementById('gate-business-name');
+const gateStateSelect = globalThis.document?.getElementById('gate-state');
 const gateCityInput = globalThis.document?.getElementById('gate-city');
+const gateCityOptions = globalThis.document?.getElementById('gate-city-options');
+const gateCityHelp = globalThis.document?.getElementById('gate-city-help');
 const gateWhatsappInput = globalThis.document?.getElementById('gate-whatsapp');
 const gateWhatsappError = globalThis.document?.getElementById('gate-whatsapp-error');
 const gateInterestsChipsContainer = globalThis.document?.getElementById('gate-interests-chips-container');
@@ -374,6 +383,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupMenus();
   setupHomeControls();
   setupProfileChips();
+  setupLocationPickers();
   setupNewVitrineDialog();
   setupInsightsControls();
   initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
@@ -616,6 +626,25 @@ function setupProfileChips() {
   attachWhatsappMask(profileWhatsappInput, () => {
     if (profileWhatsappError) profileWhatsappError.hidden = true;
   });
+}
+
+function setupLocationPickers() {
+  profileLocation = createLocationPicker({
+    stateSelect: profileStateSelect,
+    cityInput: profileCityInput,
+    cityList: profileCityOptions,
+    cityHelp: profileCityHelp
+  });
+  gateLocation = createLocationPicker({
+    stateSelect: gateStateSelect,
+    cityInput: gateCityInput,
+    cityList: gateCityOptions,
+    cityHelp: gateCityHelp
+  });
+}
+
+function readCity(picker, input) {
+  return picker ? picker.getValue() : (input?.value || '').trim();
 }
 
 // Setup Events
@@ -1377,12 +1406,14 @@ function syncProfileToForm() {
 
   if (profileDisplayNameInput) profileDisplayNameInput.value = profile.displayName || '';
   if (profileBusinessNameInput) profileBusinessNameInput.value = profile.businessName || '';
-  if (profileCityInput) profileCityInput.value = profile.city || '';
+  if (profileLocation) void profileLocation.setValue(profile.city || '');
+  else if (profileCityInput) profileCityInput.value = profile.city || '';
   if (profileWhatsappInput) profileWhatsappInput.value = formatWhatsappBR(profile.whatsapp || '');
 
   if (gateDisplayNameInput) gateDisplayNameInput.value = profile.displayName || '';
   if (gateBusinessNameInput) gateBusinessNameInput.value = profile.businessName || '';
-  if (gateCityInput) gateCityInput.value = profile.city || '';
+  if (gateLocation) void gateLocation.setValue(profile.city || '');
+  else if (gateCityInput) gateCityInput.value = profile.city || '';
   if (gateWhatsappInput) gateWhatsappInput.value = formatWhatsappBR(profile.whatsapp || '');
 
   selectedInterests.clear();
@@ -1399,7 +1430,7 @@ function syncProfileToForm() {
 async function handleSaveProfileGate() {
   const displayName = gateDisplayNameInput.value.trim();
   const businessName = gateBusinessNameInput.value.trim();
-  const city = gateCityInput.value.trim();
+  const city = readCity(gateLocation, gateCityInput);
   const whatsapp = extractPhoneDigits(gateWhatsappInput.value);
   const interests = gateInterestsMultiSelect
     ? gateInterestsMultiSelect.getValues()
@@ -1457,7 +1488,7 @@ async function handleSaveProfileGate() {
 async function handleSaveProfile() {
   const displayName = profileDisplayNameInput.value.trim();
   const businessName = profileBusinessNameInput.value.trim();
-  const city = profileCityInput.value.trim();
+  const city = readCity(profileLocation, profileCityInput);
   const whatsapp = extractPhoneDigits(profileWhatsappInput.value);
   const interests = profileInterestsMultiSelect
     ? profileInterestsMultiSelect.getValues()
