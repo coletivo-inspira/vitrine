@@ -27,6 +27,10 @@ async function acquireBuildLock() {
   }
 }
 
+function minifyCss(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n[ \t]+/g, '\n').replace(/\n{2,}/g, '\n').trim() + '\n';
+}
+
 await acquireBuildLock();
 try {
   const catalog = JSON.parse(await readFile(new URL('../content/portfolio.json', import.meta.url), 'utf8'));
@@ -45,7 +49,15 @@ try {
   }
 
   await mkdir(output, { recursive: true });
-  await cp(new URL('../web/', import.meta.url), output, { recursive: true, force: true });
+  // A vitrine pública tem teto de peso (test/e2e-full-journey.test.mjs): o CSS dela vai sem comentários nem recuos.
+  const vitrineCssSource = fileURLToPath(new URL('../web/vitrine/vitrine.css', import.meta.url));
+  await cp(new URL('../web/', import.meta.url), output, {
+    recursive: true,
+    force: true,
+    filter: (source) => resolve(source) !== vitrineCssSource
+  });
+  await mkdir(resolve(output, 'vitrine'), { recursive: true });
+  await writeFile(resolve(output, 'vitrine/vitrine.css'), minifyCss(await readFile(vitrineCssSource, 'utf8')));
   const planTable = JSON.parse(await readFile(new URL('../content/plans.json', import.meta.url), 'utf8'));
   const pricingPath = resolve(output, 'planos/index.html');
   await writeFile(pricingPath, applyPricingPage(await readFile(pricingPath, 'utf8'), planTable));

@@ -8,7 +8,9 @@ import {
   DELIVERY_PLATFORMS,
   MAX_DELIVERY_COURIERS,
   COURIER_NAME_MAX,
+  DELIVERY_CITY_MAX,
   normalizeCourierWhatsapp,
+  normalizeDeliveryArea,
   normalizeDeliveryPlatformUrl
 } from '../assets/delivery.mjs';
 
@@ -126,6 +128,13 @@ function renderFeeAndPayment() {
     else delete orderFields().payment;
     panel.onChange();
   });
+  const map = el('input', { type: 'checkbox', id: 'delivery-address-map' });
+  map.checked = fields.addressMap === true;
+  map.addEventListener('change', () => {
+    if (map.checked) orderFields().addressMap = true;
+    else delete orderFields().addressMap;
+    panel.onChange();
+  });
   return el('fieldset', { className: 'form-group delivery-group' }, [
     el('legend', { className: 'label-spaced', text: 'Entrega e pagamento' }),
     el('div', { className: 'form-group delivery-field' }, [
@@ -135,7 +144,39 @@ function renderFeeAndPayment() {
     ]),
     el('label', { className: 'checkbox-label-styled', for: 'delivery-payment' }, [
       payment, panel.doc.createTextNode(' Perguntar a forma de pagamento (Pix, cartão na entrega ou dinheiro com troco)')
-    ])
+    ]),
+    el('label', { className: 'checkbox-label-styled', for: 'delivery-address-map' }, [
+      map, panel.doc.createTextNode(' Endereço com mapa: sugestões, localização do aparelho e pino ajustável, com o link do Google Maps na mensagem')
+    ]),
+    renderDeliveryArea()
+  ]);
+}
+
+function renderDeliveryArea() {
+  const draftArea = content().deliveryArea ?? {};
+  const city = el('input', {
+    type: 'text', id: 'delivery-area-city', className: 'item-input input-styled-height',
+    maxlength: DELIVERY_CITY_MAX, placeholder: 'Cidade', 'aria-label': 'Cidade das entregas', autocomplete: 'address-level2'
+  });
+  city.value = panel.areaDraft?.city ?? draftArea.city ?? '';
+  const uf = el('input', {
+    type: 'text', id: 'delivery-area-uf', className: 'item-input input-styled-height delivery-uf',
+    maxlength: 2, placeholder: 'UF', 'aria-label': 'UF das entregas', autocomplete: 'address-level1'
+  });
+  uf.value = panel.areaDraft?.uf ?? draftArea.uf ?? '';
+  const sync = () => {
+    panel.areaDraft = { city: city.value, uf: uf.value };
+    const area = normalizeDeliveryArea(panel.areaDraft);
+    if (area) content().deliveryArea = area;
+    else delete content().deliveryArea;
+    panel.onChange();
+  };
+  city.addEventListener('input', sync);
+  uf.addEventListener('input', () => { uf.value = uf.value.toUpperCase(); sync(); });
+  return el('div', { className: 'form-group delivery-field' }, [
+    el('label', { for: 'delivery-area-city', text: 'Cidade das entregas' }),
+    el('div', { className: 'delivery-area-row' }, [city, uf]),
+    el('span', { className: 'form-help', text: 'O endereço com mapa sugere primeiro ruas desta cidade.' })
   ]);
 }
 
@@ -216,7 +257,7 @@ function render() {
 export function mountDeliveryPanel({ getContent, onChange, doc = globalThis.document } = {}) {
   const container = doc?.getElementById('delivery-panel');
   if (!container) return;
-  Object.assign(panel, { getContent: getContent ?? (() => null), onChange: onChange ?? (() => {}), container, doc, platformDrafts: {} });
+  Object.assign(panel, { getContent: getContent ?? (() => null), onChange: onChange ?? (() => {}), container, doc, platformDrafts: {}, areaDraft: null });
   const couriers = Array.isArray(panel.getContent()?.deliveryCouriers) ? panel.getContent().deliveryCouriers : [];
   panel.rows = couriers.map((courier) => ({ id: courier.id, name: courier.name ?? '', whatsapp: courier.whatsapp ?? '' }));
   render();

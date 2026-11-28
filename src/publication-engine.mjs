@@ -14,7 +14,7 @@ import { projectPublicPlace } from './business-hours.mjs';
 import { renderStorefrontPlaceHtml } from '../web/assets/storefront-place.mjs';
 import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
 import { STOREFRONT_PALETTES_CSS } from '../web/assets/storefront-palettes.mjs';
-import { deliveryPlatformLinks, projectPublicDeliveryPlatforms } from '../web/assets/delivery.mjs';
+import { deliveryPlatformLinks, projectPublicDeliveryArea, projectPublicDeliveryPlatforms } from '../web/assets/delivery.mjs';
 import { normalizeItemOptions } from '../web/assets/item-options.mjs';
 import {
   DEFAULT_SHARE_DESCRIPTION,
@@ -141,7 +141,8 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'supportBadge',
   'instagramUrl',
   'publicEmail',
-  'deliveryPlatforms'
+  'deliveryPlatforms',
+  'deliveryArea'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -191,7 +192,8 @@ const ALLOWED_ORDER_FIELD_KEYS = new Set([
   'customerName',
   'notes',
   'deliveryFeeCents',
-  'payment'
+  'payment',
+  'addressMap'
 ]);
 const ALLOWED_MESSAGE_KEYS = new Set([
   'heroTitle',
@@ -854,7 +856,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...projectPublicFeatures(limits),
     ...projectPublicFooter(limits),
     ...projectPublicChannels(migrated),
-    ...projectPublicDeliveryPlatforms(migrated)
+    ...projectPublicDeliveryPlatforms(migrated),
+    ...projectPublicDeliveryArea(migrated)
   };
 
   for (const item of menu.items) {

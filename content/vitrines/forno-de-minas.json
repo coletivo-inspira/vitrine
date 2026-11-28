@@ -9,7 +9,8 @@
     "deliveryOrPickup": true,
     "customerName": true,
     "notes": true,
-    "payment": true
+    "payment": true,
+    "addressMap": true
   },
   "messages": {
     "heroTitle": "Pizzaria Forno de Minas",

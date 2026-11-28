@@ -110,3 +110,9 @@
   opacity: 0.5;
   pointer-events: none;
 }
+
+.delivery-area-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px;
+  gap: 8px;
+}

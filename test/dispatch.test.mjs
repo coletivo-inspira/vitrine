@@ -27,7 +27,7 @@ test('Despacho: lê nome, endereço, total, pagamento e observações da mensage
   assert.equal(parseOrderMessage('Olá! Tenho interesse nestes itens:\n- 1x Pizza\nTotal estimado: R$ 39,90\nRetirada no local').total, 'R$ 39,90');
   assert.equal(parseOrderMessage('Retirada no local').pickup, true);
   assert.deepEqual(parseOrderMessage('oi, quero uma pizza'), {
-    name: '', address: '', total: '', payment: '', notes: '', pickup: false, text: 'oi, quero uma pizza'
+    name: '', address: '', total: '', payment: '', notes: '', location: '', pickup: false, text: 'oi, quero uma pizza'
   });
 });
 

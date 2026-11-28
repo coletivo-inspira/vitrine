@@ -1,4 +1,4 @@
-import { COMPLIANCE_CSP_HEADER } from '../workers/api.mjs';
+import { COMPLIANCE_CSP_HEADER, STOREFRONT_PERMISSIONS_POLICY } from '../workers/api.mjs';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
@@ -46,6 +46,7 @@ createServer(async (req, res) => {
     if (pathname.includes('\\') || pathname.includes('\0')) throw new Error('Invalid path');
     let resolvedPath = pathname;
     let cacheControl = security['Cache-Control'];
+    let storefrontPage = false;
 
     if (resolvedPath === '/') {
       resolvedPath = '/index.html';
@@ -63,6 +64,7 @@ createServer(async (req, res) => {
         const slug = slugMatch[1];
         const staticStorefrontIndex = resolve(root, `./${slug}/index.html`);
         const staticStorefrontMenu = resolve(root, `./data/vitrines/${slug}/menu.json`);
+        storefrontPage = (await isFile(staticStorefrontIndex)) || (await isFile(staticStorefrontMenu));
         if (await isFile(staticStorefrontIndex)) {
           resolvedPath = `/${slug}/index.html`;
           cacheControl = 'public, max-age=300, stale-while-revalidate=86400';
@@ -79,6 +81,7 @@ createServer(async (req, res) => {
     const content = await readFile(target);
     res.writeHead(200, {
       ...securityHeadersForPath(pathname),
+      ...(storefrontPage ? { 'Permissions-Policy': STOREFRONT_PERMISSIONS_POLICY } : {}),
       'Cache-Control': cacheControl,
       'Content-Type': mime[extname(target)] || 'application/octet-stream'
     });

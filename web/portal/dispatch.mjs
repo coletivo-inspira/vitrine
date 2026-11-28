@@ -9,6 +9,7 @@ const PAYMENT_LINE = /^\s*Pagamento\s*:\s*(.+)$/im;
 const NOTES_LINE = /^\s*Observações\s*:\s*(.+)$/im;
 const NAME_PATTERNS = [/Meu nome é\s+([^.\n]+)/i, /^\s*Nome\s*:\s*(.+)$/im];
 const PICKUP_LINE = /^\s*Retirada no local\s*$/im;
+const LOCATION_LINE = /^\s*Localização\s*:\s*(https:\/\/maps\.google\.com\/\?q=-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?)\s*$/im;
 
 const MESSAGE_MAX = 3500;
 
@@ -26,6 +27,7 @@ export function parseOrderMessage(rawText) {
     total: firstMatch(text, TOTAL_LINE),
     payment: firstMatch(text, PAYMENT_LINE),
     notes: firstMatch(text, NOTES_LINE),
+    location: firstMatch(text, LOCATION_LINE),
     pickup: PICKUP_LINE.test(text),
     text: text.trim()
   };
@@ -40,10 +42,8 @@ export function mapsLink(address) {
 export function buildDispatchMessage(order, { businessName = '', courierName = '' } = {}) {
   const lines = [`Entrega${businessName ? ` ${businessName}` : ''}${courierName ? ` para ${courierName}` : ''}`];
   if (order.name) lines.push(`Cliente: ${order.name}`);
-  if (order.address) {
-    lines.push(`Endereço: ${order.address}`);
-    lines.push(`Mapa: ${mapsLink(order.address)}`);
-  }
+  if (order.address) lines.push(`Endereço: ${order.address}`);
+  if (order.location || order.address) lines.push(`Mapa: ${order.location || mapsLink(order.address)}`);
   if (order.total) lines.push(`Cobrar: ${order.total}`);
   if (order.payment) lines.push(`Pagamento: ${order.payment}`);
   if (order.notes) lines.push(`Observações: ${order.notes}`);

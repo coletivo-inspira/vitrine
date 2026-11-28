@@ -1363,10 +1363,11 @@ function syncComponentsFromUI() {
 }
 
 function syncOrderFieldsFromUI() {
-  const { deliveryFeeCents, payment } = currentDraft.content.orderFields ?? {};
+  const { deliveryFeeCents, payment, addressMap } = currentDraft.content.orderFields ?? {};
   currentDraft.content.orderFields = {
     ...(deliveryFeeCents !== undefined ? { deliveryFeeCents } : {}),
     ...(payment !== undefined ? { payment } : {}),
+    ...(addressMap !== undefined ? { addressMap } : {}),
     date: Boolean(fieldDate?.checked),
     timeSlots: currentDraft.content.orderFields?.timeSlots || [],
     deliveryOrPickup: Boolean(fieldDeliveryPickup?.checked),
