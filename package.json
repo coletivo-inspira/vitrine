@@ -13,6 +13,6 @@
     "campanha": "node carrossel-instagram/2026-11-profundidade-e-movimento/fonte/exportar.mjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.16"
+    "@electric-sql/pglite": "0.6.0"
   }
 }
