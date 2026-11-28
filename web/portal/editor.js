@@ -38,10 +38,13 @@ import { mountSeoPanel, showSeoServerErrors } from './seo-panel.mjs';
 import { mountCommentToVitrinePanel } from './comment-to-vitrine.mjs';
 import { mountQuoteWebhookPanel } from './quote-webhook.mjs';
 import { mountChannelsPanel, refreshChannelsPanel } from './channels-panel.mjs';
+import { mountDeliveryPanel } from './delivery-panel.mjs';
+import { mountDispatchPanel, refreshDispatchPanel } from './dispatch-panel.mjs';
 import { mountAutoReplyPanel } from './auto-reply-panel.mjs';
 import { loadSitePlan, lockAction, markPlanRequirement, requiredPlanFor } from './plan-gate.mjs';
 import { renderItemPageFields } from './item-page-fields.mjs';
 import { renderPaymentLinkField, showPaymentLinkServerErrors } from './payment-link-field.mjs';
+import { renderItemOptionsField } from './item-options-field.mjs';
 import { itemPageTexts } from '../assets/item-page-fields.mjs';
 import {
   DEFAULT_SOON_LABEL,
@@ -549,6 +552,7 @@ export function showEditorTab(tabId) {
     if (panel) panel.hidden = name !== target;
   }
   if (target === 'config') refreshChannelsPanel();
+  if (target === 'pedidos') refreshDispatchPanel();
   return target;
 }
 
@@ -1219,6 +1223,14 @@ function initializeEditorWorkspace({ skipAutosave = false } = {}) {
     openSection: openEditorSection
   });
   void mountAutoReplyPanel({ site: currentSite, isOnline: currentIsOnline });
+  mountDispatchPanel({ getContent: () => currentDraft?.content });
+  mountDeliveryPanel({
+    getContent: () => currentDraft?.content,
+    onChange: () => {
+      renderTemplateVarsAndHighlight();
+      updateDraftAndPreview();
+    }
+  });
 
   const comp = currentDraft.content.components || {};
   if (compDescription) compDescription.checked = comp.description !== false;
@@ -1351,7 +1363,10 @@ function syncComponentsFromUI() {
 }
 
 function syncOrderFieldsFromUI() {
+  const { deliveryFeeCents, payment } = currentDraft.content.orderFields ?? {};
   currentDraft.content.orderFields = {
+    ...(deliveryFeeCents !== undefined ? { deliveryFeeCents } : {}),
+    ...(payment !== undefined ? { payment } : {}),
     date: Boolean(fieldDate?.checked),
     timeSlots: currentDraft.content.orderFields?.timeSlots || [],
     deliveryOrPickup: Boolean(fieldDeliveryPickup?.checked),
@@ -2231,6 +2246,14 @@ function renderItemCard(category, item, itemIdx, { comp, isQuote, isBooking, get
       priceMode: itemPriceMode,
       soon: itemVisibilityState(item) === 'soon'
     });
+
+    if (currentDraft.content.catalogType !== 'booking') {
+      renderItemOptionsField(item, fields, {
+        onChange: updateDraftAndPreview,
+        priceMode: itemPriceMode,
+        rerender: renderItems
+      });
+    }
 
     renderItemPageFields(item, fields, {
       onChange: updateDraftAndPreview,

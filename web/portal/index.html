@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="./comment-to-vitrine.css">
   <link rel="stylesheet" href="./quote-webhook.css">
   <link rel="stylesheet" href="./channels-panel.css">
+  <link rel="stylesheet" href="./delivery.css">
   <link rel="stylesheet" href="./auto-reply-panel.css">
   <link rel="stylesheet" href="./auto-reply-admin.css">
   <link rel="stylesheet" href="./sponsor-impact.css">
@@ -911,6 +912,7 @@
 
           <!-- ABA: Pedidos (Insights e leilões da vitrine aberta) -->
           <div id="panel-pedidos" class="vitrine-panel panel-narrow" role="tabpanel" aria-labelledby="tab-pedidos" tabindex="-1" hidden>
+            <section id="dispatch-panel" class="portal-card dispatch-card" aria-labelledby="dispatch-title"></section>
             <div class="portal-card insights-summary-card">
               <div class="insights-summary-top">
                 <ul id="insights-highlights-list" class="insights-highlights-list" aria-live="polite">
@@ -1140,6 +1142,14 @@
                 </div>
               </form>
               <section id="quote-webhook-panel" class="quote-webhook-card config-subsection" aria-labelledby="quote-webhook-title" hidden></section>
+            </details>
+
+            <details id="config-delivery" class="config-section portal-card">
+              <summary class="config-summary">
+                <span class="config-title">Delivery</span>
+                <span id="config-delivery-summary" class="config-summary-text">iFood, 99Food, taxa, pagamento e entregadores</span>
+              </summary>
+              <div id="delivery-panel" class="config-body form-flex-col"></div>
             </details>
 
             <details id="config-itens" class="config-section portal-card">

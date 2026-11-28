@@ -112,3 +112,13 @@ _Evitar_: robô, bot de atendimento, disparo.
 **Conexão de canal**: Vínculo autorizado pelo proprietário entre uma vitrine e uma conta social (hoje só Instagram), com situação Conectada, Reconexão necessária ou Suspensa. Uma conta responde por uma única vitrine.
 
 **Frequência da AutoResposta**: Intervalo mínimo entre duas respostas à mesma pessoa: uma vez por contato, no máximo a cada 24 horas (padrão) ou a cada 7 dias. Só uma mensagem nova da pessoa dispara a resposta.
+
+**Opções do item**: Tamanhos (de 2 a 4, cada um com preço), meio a meio e um adicional de escolha única (como a borda), escolhidos no cartão do item; o preço da unidade muda na hora. Spec `021-pizzaria-delivery`.
+
+**Meio a meio**: Item dividido entre dois sabores que aceitam meio a meio, no mesmo tamanho; vale o preço do sabor mais caro.
+
+**Entregador**: Pessoa cadastrada pela equipe em Configurações > Delivery, com nome e WhatsApp. Fica só no rascunho e nunca é publicada.
+
+**Despachar entrega**: Na aba Pedidos, colar a mensagem do pedido recebida no WhatsApp, escolher o entregador e abrir a conversa dele com endereço, mapa, valor a cobrar e o pedido. Nada é salvo no servidor.
+
+**Plataformas de delivery**: Links da loja do negócio no iFood e no 99Food, mostrados como "Também estamos no". Não há integração com as plataformas.

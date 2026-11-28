@@ -5622,19 +5622,28 @@ textarea {
   color: #274066;
 }
 
+.var-chip-pagamento,
+.template-var-highlight.var-chip-pagamento {
+  background: rgb(110 98 20 / 0.16);
+  border-color: #6E6214;
+  color: #4F460E;
+}
+
 [data-theme="dark"] .var-chip-itens { color: #FFB18A; border-color: #FFB18A; background: rgb(255 177 138 / 0.22); }
 [data-theme="dark"] .var-chip-total { color: #A3E5C2; border-color: #A3E5C2; background: rgb(163 229 194 / 0.2); }
 [data-theme="dark"] .var-chip-data { color: #F5CBA7; border-color: #F5CBA7; background: rgb(245 203 167 / 0.2); }
 [data-theme="dark"] .var-chip-horario { color: #9AD7E8; border-color: #9AD7E8; background: rgb(154 215 232 / 0.2); }
 [data-theme="dark"] .var-chip-endereco { color: #E8B4DC; border-color: #E8B4DC; background: rgb(232 180 220 / 0.2); }
 [data-theme="dark"] .var-chip-nome { color: #B4CBF0; border-color: #B4CBF0; background: rgb(180 203 240 / 0.2); }
+[data-theme="dark"] .var-chip-pagamento { color: #E6DA8F; border-color: #E6DA8F; background: rgb(230 218 143 / 0.2); }
 
 .template-var-highlight.var-chip-itens,
 .template-var-highlight.var-chip-total,
 .template-var-highlight.var-chip-data,
 .template-var-highlight.var-chip-horario,
 .template-var-highlight.var-chip-endereco,
-.template-var-highlight.var-chip-nome {
+.template-var-highlight.var-chip-nome,
+.template-var-highlight.var-chip-pagamento {
   color: transparent;
 }
 
