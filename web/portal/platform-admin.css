@@ -1,0 +1,213 @@
+/* Administração: usuários, licenças e cupons, equipe da plataforma (spec 021) e "Tenho um cupom". */
+
+.admin-role-line {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.admin-users-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-search-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.admin-search-form .item-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-user-list {
+  gap: 8px;
+}
+
+.admin-user-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-user-open:hover,
+.admin-user-open[aria-current="true"] {
+  border-color: var(--orange);
+}
+
+.admin-user-open:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+.admin-user-name {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-meta,
+.admin-coupon-meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.admin-user-detail h2:focus {
+  outline: none;
+}
+
+.admin-user-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.admin-user-id code,
+.admin-coupon-code {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.admin-coupon-code-large {
+  font-size: 20px;
+}
+
+.admin-site-card {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.admin-site-card h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.admin-site-plan {
+  margin: 6px 0;
+  font-weight: 600;
+}
+
+.admin-subtitle {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.admin-license-row,
+.admin-coupon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-coupon-row {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.admin-coupon-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-coupon-text .admin-badge {
+  align-self: flex-start;
+}
+
+.admin-coupon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-coupon-created {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--orange);
+  border-radius: 16px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.admin-inline-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.admin-inline-form .button {
+  min-height: 44px;
+}
+
+.billing-coupon {
+  margin-top: 20px;
+}
+
+.billing-coupon h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.billing-coupon-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.billing-coupon-form .form-group {
+  flex: 1 1 200px;
+  margin: 0;
+}
+
+@media (max-width: 899px) {
+  .admin-users-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-license-row,
+  .admin-coupon-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .admin-coupon-actions {
+    justify-content: flex-start;
+  }
+}

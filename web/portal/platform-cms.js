@@ -4,6 +4,10 @@ import { buildMilaForwardMessage, normalizeMilaRelayCode } from '../assets/mila-
 import { resetLinktreeImport } from './linktree-import.js';
 import { loadSponsorAdmin, resetSponsorAdmin } from './sponsor-admin.mjs';
 import { loadAutoReplyAdmin, resetAutoReplyAdmin } from './auto-reply-admin.mjs';
+import { NO_ACCESS, ROLE_LABELS, can, normalizeAccess } from './platform-access.mjs';
+import { loadPlatformUsers, resetPlatformUsers } from './platform-users.mjs';
+import { loadPlatformLicenses, resetPlatformLicenses } from './platform-licenses.mjs';
+import { loadPlatformTeam, resetPlatformTeam } from './platform-team.mjs';
 const section = globalThis.document?.getElementById('platform-cms-section');
 const open = globalThis.document?.getElementById('platform-cms-open');
 const navItems = [...(globalThis.document?.querySelectorAll('.nav-admin-item') ?? [])];
@@ -12,6 +16,10 @@ const cmsList = globalThis.document?.getElementById('platform-cms-list');
 const status = globalThis.document?.getElementById('platform-cms-status');
 const publish = globalThis.document?.getElementById('platform-cms-publish');
 const tabs = [...(globalThis.document?.querySelectorAll('.admin-tab') ?? [])];
+const roleLine = globalThis.document?.getElementById('platform-role-line');
+const operateOnly = ['platform-overview', 'platform-operations-row']
+  .map(id => globalThis.document?.getElementById(id))
+  .filter(Boolean);
 
 const sectionNames = {
   hero: 'Abertura', value_props: 'Benefícios', areas_showcase: 'Áreas',
@@ -36,9 +44,30 @@ const emptyItem = {
 let available = false;
 let onAvailable = () => {};
 let generation = 0;
+let access = NO_ACCESS;
 
 export function hasPlatformAdminAccess() {
   return available;
+}
+
+export function platformAccess() {
+  return access;
+}
+
+// Abas e blocos marcados com data-capability só aparecem para quem tem a capacidade.
+function applyAccess() {
+  for (const node of [...tabs, ...operateOnly]) {
+    const capability = node.getAttribute('data-capability');
+    if (capability) node.hidden = !can(access, capability);
+  }
+  if (roleLine) {
+    roleLine.hidden = !access.role;
+    roleLine.textContent = access.role ? `Seu papel: ${ROLE_LABELS[access.role] ?? access.role}` : '';
+  }
+}
+
+function visibleTabs() {
+  return tabs.filter(tab => !tab.hidden);
 }
 
 function setAvailable(value) {
@@ -137,18 +166,24 @@ function selectTab(tab, focus = false) {
     if (panel) panel.hidden = !selected;
   }
   if (focus) tab.focus();
-  if (tab.getAttribute('aria-controls') === 'platform-templates') void loadTemplates();
-  if (tab.getAttribute('aria-controls') === 'platform-sponsors') loadSponsorAdmin({ confirm: confirmAction });
-  if (tab.getAttribute('aria-controls') === 'platform-auto-reply') loadAutoReplyAdmin({ confirm: confirmAction });
+  if (!available) return;
+  const panel = tab.getAttribute('aria-controls');
+  if (panel === 'platform-templates') void loadTemplates();
+  if (panel === 'platform-sponsors') loadSponsorAdmin({ confirm: confirmAction });
+  if (panel === 'platform-auto-reply') loadAutoReplyAdmin({ confirm: confirmAction });
+  if (panel === 'platform-users') loadPlatformUsers({ access, confirm: confirmAction });
+  if (panel === 'platform-licenses') loadPlatformLicenses({ confirm: confirmAction });
+  if (panel === 'platform-team') loadPlatformTeam({ access, confirm: confirmAction });
 }
 
-tabs.forEach((tab, index) => {
+tabs.forEach(tab => {
   tab.addEventListener('click', () => selectTab(tab));
   tab.addEventListener('keydown', event => {
-    const next = nextTabIndex(index, event.key, tabs.length);
+    const visible = visibleTabs();
+    const next = nextTabIndex(visible.indexOf(tab), event.key, visible.length);
     if (next < 0) return;
     event.preventDefault();
-    selectTab(tabs[next], true);
+    selectTab(visible[next], true);
   });
 });
 
@@ -504,17 +539,37 @@ export async function detectPlatformCms(authenticated) {
   resetLinktreeImport();
   resetSponsorAdmin();
   resetAutoReplyAdmin();
-  selectTab(tabs[0]);
+  resetPlatformUsers();
+  resetPlatformLicenses();
+  resetPlatformTeam();
+  access = NO_ACCESS;
+  applyAccess();
   if (!authenticated) return;
   try {
-    const { sections } = await request();
+    const response = await fetch('/api/admin/me');
+    if (!response.ok) return;
+    const data = await response.json();
     if (requestGeneration !== generation) return;
-    renderCms(sections);
-    setAvailable(true);
-    onAvailable();
+    access = normalizeAccess(data?.access);
   } catch {
     // A administração só aparece após autorização positiva do servidor.
+    return;
   }
+  if (!access.capabilities.length) return;
+  applyAccess();
+  if (can(access, 'platform.operate')) {
+    try {
+      const { sections } = await request();
+      if (requestGeneration !== generation) return;
+      renderCms(sections);
+    } catch (error) {
+      if (requestGeneration !== generation) return;
+      cmsList.replaceChildren(emptyState(error.message));
+    }
+  }
+  setAvailable(true);
+  selectTab(visibleTabs()[0]);
+  onAvailable();
 }
 
 const operationStatus = globalThis.document?.getElementById('platform-operations-status');
@@ -531,16 +586,27 @@ const auditActions = {
   linktree_imported: 'Importação do Linktree', linktree_demo_invited: 'Dono convidado para a demonstração',
   linktree_demo_accepted: 'Demonstração aceita pelo dono',
   sponsor_granted: 'Acesso ao Impacto dado', sponsor_revoked: 'Acesso ao Impacto retirado',
+  platform_owner_bootstrapped: 'Dono da plataforma definido',
+  platform_role_granted: 'Papel dado', platform_role_revoked: 'Papel retirado',
+  license_granted: 'Licença concedida', license_revoked: 'Licença retirada',
+  coupon_created: 'Cupom criado', coupon_disabled: 'Cupom desativado', coupon_enabled: 'Cupom reativado',
+  coupon_redeemed: 'Cupom resgatado',
+  site_limits_set: 'Limites ajustados', site_limits_cleared: 'Limites do plano restaurados',
   insert: 'Criação', update: 'Alteração', delete: 'Remoção'
 };
 const auditEntities = {
   platform_cms: 'página institucional', customization_request: 'pedido de customização',
   platform_operator: 'patrocinador',
-  template: 'modelo de vitrine', site: 'vitrine', draft: 'rascunho da vitrine', publication: 'publicação da vitrine'
+  template: 'modelo de vitrine', site: 'vitrine', draft: 'rascunho da vitrine', publication: 'publicação da vitrine',
+  license_grant: 'licença', coupon: 'cupom'
 };
 
 export function describeAudit(entry) {
   const action = auditActions[entry.action] ?? entry.action;
+  if (entry.entity_type === 'platform_operator' && entry.action?.startsWith('platform_')) {
+    const role = entry.summary?.role ?? (entry.action === 'platform_owner_bootstrapped' ? 'platform_owner' : '');
+    return role ? `${action} · ${ROLE_LABELS[role] ?? role}` : action;
+  }
   const entity = auditEntities[entry.entity_type] ?? entry.entity_type;
   const target = entry.entity_type === 'template' && entry.entity_id ? ` ${entry.entity_id}` : '';
   const change = entry.summary?.from && entry.summary?.to
@@ -671,7 +737,7 @@ function auditItem(entry) {
 }
 
 async function loadOperations() {
-  if (!available || section.hidden) return;
+  if (!available || section.hidden || !can(access, 'platform.operate')) return;
   const currentGeneration = generation;
   operationStatus.textContent = 'Carregando indicadores e pedidos…';
   if (!overviewList.children.length) renderMetricPlaceholders('carregando');

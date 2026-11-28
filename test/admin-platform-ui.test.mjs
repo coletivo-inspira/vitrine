@@ -29,7 +29,11 @@ test('Administração: abas acessíveis no lugar dos <details>', () => {
   assert.match(adminHtml, /role="tablist"/);
   assert.match(adminHtml, /class="display-title"/);
   const tabs = [...adminHtml.matchAll(/<button\b[^>]*role="tab"[^>]*>([^<]+)<\/button>/g)];
-  assert.deepEqual(tabs.map(([, label]) => label), ['Visão geral', 'Pedidos pela Mila', 'Importar do Linktree', 'Patrocinadores', 'Resposta automática', 'Modelos de vitrine', 'Site institucional']);
+  assert.deepEqual(tabs.map(([, label]) => label), [
+    'Processos', 'Usuários', 'Licenças e cupons', 'Equipe da plataforma', 'Pedidos pela Mila', 'Importar do Linktree',
+    'Patrocinadores', 'Resposta automática', 'Modelos de vitrine', 'Site institucional'
+  ]);
+  for (const [tag] of tabs) assert.match(tag, /data-capability="(platform\.operate|users\.read|licenses\.manage|staff\.manage)"/);
   for (const [tag] of tabs) {
     const panelId = tag.match(/aria-controls="([^"]+)"/)[1];
     const tabId = tag.match(/id="([^"]+)"/)[1];
@@ -41,13 +45,19 @@ test('Administração: abas acessíveis no lugar dos <details>', () => {
   assert.equal([...adminHtml.matchAll(/aria-selected="true"/g)].length, 1);
 });
 
-test('Administração: todo id usado pelo JS existe no HTML e a UI evita os termos proibidos', () => {
-  for (const [, id] of cmsJs.matchAll(/getElementById\('([^']+)'\)/g)) {
-    assert.match(html, new RegExp(`id="${id}"`), `#${id} referenciado em platform-cms.js`);
+test('Administração: todo id usado pelo JS existe no HTML e a UI evita os termos proibidos', async () => {
+  const modules = ['platform-cms.js', 'platform-users.mjs', 'platform-licenses.mjs', 'platform-team.mjs', 'coupon-redeem.mjs'];
+  for (const file of modules) {
+    const source = await readFile(resolve(root, 'web/portal', file), 'utf8');
+    for (const [, id] of source.matchAll(/(?:getElementById|byId)\('([^']+)'\)/g)) {
+      assert.match(html, new RegExp(`id="${id}"`), `#${id} referenciado em ${file}`);
+    }
+    for (const [, id] of source.matchAll(/'((?:platform|billing-coupon)-[a-z0-9-]+)'/g)) {
+      assert.match(html, new RegExp(`id="${id}"`), `#${id} citado em ${file}`);
+    }
+    assert.doesNotMatch(source, /cat[aá]logo|card[aá]pio/i, file);
   }
-  for (const source of [adminHtml, cmsJs]) {
-    assert.doesNotMatch(source, /cat[aá]logo|card[aá]pio/i);
-  }
+  assert.doesNotMatch(adminHtml, /cat[aá]logo|card[aá]pio/i);
 });
 
 test('Administração: rota #/administracao no portal (e a antiga #administracao)', async () => {
@@ -172,6 +182,7 @@ test('Administração: menu só após autorização, abas, rascunho e publicaç�
   globalThis.document = doc;
   const calls = [];
   const responses = {
+    'GET /api/admin/me': [200, { access: { role: null, capabilities: [] } }],
     'GET /api/admin/cms': [200, { sections: [
       { sectionKey: 'footer', visible: true, displayOrder: 9, publishedAt: '2026-11-12T19:00:00Z', content: { copyright: 'Coletivo Inspira' } },
       { sectionKey: 'hero', visible: true, displayOrder: 1, publishedAt: null, content: { headline: 'Sua vitrine', subtitle: 'Pedidos no WhatsApp' } }
@@ -190,17 +201,21 @@ test('Administração: menu só após autorização, abas, rascunho e publicaç�
   cms.initializePlatformCms();
   const navItems = doc.querySelectorAll('.nav-admin-item');
 
-  responses['GET /api/admin/cms'][0] = 403;
   await cms.detectPlatformCms(true);
-  assert.ok(navItems.every(item => item.hidden), 'sem autorização o item do menu continua oculto');
+  assert.ok(navItems.every(item => item.hidden), 'sem papel na plataforma o item do menu continua oculto');
   assert.equal(cms.hasPlatformAdminAccess(), false);
+  assert.equal(calls.some(call => call.key === 'GET /api/admin/cms'), false, 'sem papel nem consulta o CMS');
   cms.showPlatformCms(true);
   assert.equal(doc.getElementById('platform-cms-section').hidden, true, 'a seção não abre sem autorização');
 
-  responses['GET /api/admin/cms'][0] = 200;
+  responses['GET /api/admin/me'] = [200, { access: {
+    role: 'platform_admin', capabilities: ['platform.operate', 'users.read', 'licenses.manage', 'staff.manage']
+  } }];
   await cms.detectPlatformCms(true);
   assert.ok(navItems.every(item => !item.hidden), 'com autorização o item aparece no menu e na navegação móvel');
   assert.equal(cms.hasPlatformAdminAccess(), true);
+  assert.equal(doc.getElementById('platform-role-line').textContent, 'Seu papel: Administrador');
+  assert.ok(doc.querySelectorAll('.admin-tab').every(tab => !tab.hidden), 'o Administrador vê todas as abas');
 
   const list = doc.getElementById('platform-cms-list');
   const names = list.querySelectorAll('.admin-cms-item').map(item => item.textContent);
@@ -276,4 +291,158 @@ test('Administração: helpers de abas, indicadores e atividade', async () => {
     'Etapa alterada · pedido de customização (Novo → Em análise)'
   );
   assert.equal(describeAudit({ action: 'template_updated', entity_type: 'template', entity_id: 'booking-v1' }), 'Modelo atualizado · modelo de vitrine booking-v1');
+});
+
+test('Administração: o Gestor de licenças vê só Usuários e Licenças e cupons, sem indicadores nem CMS', async () => {
+  const doc = createDocument(html);
+  globalThis.document = doc;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${url}`);
+    if (url === '/api/admin/me') {
+      return { ok: true, status: 200, json: async () => ({ access: { role: 'license_manager', capabilities: ['users.read', 'licenses.manage'] } }) };
+    }
+    return { ok: false, status: 403, json: async () => ({ error: { message: 'Acesso restrito.' } }) };
+  };
+  const cms = await import(`../web/portal/platform-cms.js?dom=gestor-${Date.now()}`);
+  await cms.detectPlatformCms(true);
+  assert.equal(cms.hasPlatformAdminAccess(), true);
+  const visible = doc.querySelectorAll('.admin-tab').filter(tab => !tab.hidden).map(tab => tab.id);
+  assert.deepEqual(visible, ['platform-tab-users', 'platform-tab-licenses']);
+  assert.equal(doc.getElementById('platform-tab-users').getAttribute('aria-selected'), 'true', 'a primeira aba visível abre');
+  assert.equal(doc.getElementById('platform-users').hidden, false);
+  assert.equal(doc.getElementById('platform-overview').hidden, true);
+  assert.equal(doc.getElementById('platform-operations-row').hidden, true);
+  assert.equal(calls.includes('GET /api/admin/cms'), false, 'o CMS nem é consultado');
+  assert.equal(doc.getElementById('platform-role-line').textContent, 'Seu papel: Gestor de licenças');
+  doc.getElementById('platform-tab-users').dispatchEvent({ type: 'keydown', key: 'ArrowRight' });
+  assert.equal(doc.getElementById('platform-tab-licenses').getAttribute('aria-selected'), 'true', 'as setas pulam abas ocultas');
+  await cms.detectPlatformCms(false);
+  assert.ok(doc.querySelectorAll('.admin-tab').every(tab => tab.hidden), 'ao sair as abas somem');
+  delete globalThis.document;
+});
+
+test('Usuários: lista, detalhe e concessão de licença com confirmação', async () => {
+  const doc = createDocument(html);
+  globalThis.document = doc;
+  const calls = [];
+  const detail = {
+    user: { id: '30000000-0000-0000-0000-000000000005', email: 'rita@doces.com', displayName: 'Rita', platformRole: null, createdAt: '2026-11-01T12:00:00Z' },
+    sites: [{
+      id: '31000000-0000-0000-0000-000000000001', slug: 'doces-da-rita', name: 'Doces da Rita', role: 'owner',
+      entitlements: { planCode: 'free', planName: 'Gratuito/Social', maxActiveItems: 20, maxItemBlocks: 1 },
+      limits: null, subscription: null,
+      licenses: [{ id: 'l1', planCode: 'profissional', source: 'coupon', startsAt: '2026-01-01T00:00:00Z', endsAt: '2099-01-01T12:00:00Z', revokedAt: null, note: '' }]
+    }]
+  };
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ key: `${init.method ?? 'GET'} ${url}`, body: init.body ? JSON.parse(init.body) : undefined });
+    if (url.startsWith('/api/admin/users?')) {
+      return { ok: true, status: 200, json: async () => ({ users: [{ id: detail.user.id, email: 'rita@doces.com', displayName: 'Rita', siteCount: 1 }], total: 1 }) };
+    }
+    if (url.startsWith('/api/admin/users/')) return { ok: true, status: 200, json: async () => detail };
+    if (url === '/api/admin/licenses') return { ok: true, status: 201, json: async () => ({ license: {} }) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const tick = () => new Promise(resolveTick => setTimeout(resolveTick, 0));
+  const users = await import(`../web/portal/platform-users.mjs?dom=${Date.now()}`);
+  const confirms = [];
+  users.loadPlatformUsers({
+    access: { role: 'license_manager', capabilities: ['users.read', 'licenses.manage'] },
+    confirm: async (options) => { confirms.push(options); return true; }
+  });
+  await tick();
+  const rows = doc.getElementById('platform-users-list').querySelectorAll('button');
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].textContent, /Rita.*rita@doces\.com.*1 vitrine/);
+  rows[0].click();
+  await tick();
+  const panel = doc.getElementById('platform-user-detail');
+  assert.equal(panel.hidden, false);
+  assert.match(panel.textContent, /Gratuito\/Social: até 20 itens ativos e 1 bloco de itens/);
+  assert.match(panel.textContent, /Profissional \(cupom\) · vale até 01\/01\/2099/);
+  const grant = panel.querySelectorAll('form')[0];
+  grant.dispatchEvent({ type: 'submit' });
+  await tick();
+  await tick();
+  assert.match(confirms[0].title, /Conceder Profissional por 12 meses/);
+  const post = calls.find(call => call.key === 'POST /api/admin/licenses');
+  assert.deepEqual(post.body, { siteId: detail.sites[0].id, planCode: 'profissional', months: 12, note: '' });
+  assert.equal(users.describeLicense({ planCode: 'essencial', source: 'manual', startsAt: '2026-01-01', endsAt: '2026-02-01', revokedAt: '2026-01-10T12:00:00Z', note: 'Teste' }), 'Essencial (manual) · retirada em 10/01/2026 · Teste');
+  delete globalThis.document;
+});
+
+test('Licenças e cupons: relatório, estado dos cupons e criação com código copiável', async () => {
+  const doc = createDocument(html);
+  globalThis.document = doc;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ key: `${init.method ?? 'GET'} ${url}`, body: init.body ? JSON.parse(init.body) : undefined });
+    if (url === '/api/admin/coupons/report') {
+      return { ok: true, status: 200, json: async () => ({ report: { coupons: 2, activeCoupons: 1, redemptions: 2, monthsGranted: 24, valueCents: 213600, activeLicenses: { manual: 1, coupon: 2, courtesy: 0 } } }) };
+    }
+    if (url === '/api/admin/coupons' && init.method === 'POST') {
+      return { ok: true, status: 201, json: async () => ({ coupon: { id: 'c2', code: 'FEIRA-2027' } }) };
+    }
+    if (url === '/api/admin/coupons') {
+      return { ok: true, status: 200, json: async () => ({ coupons: [{ id: 'c1', code: 'ABCD-EFGH-JKLM', planCode: 'profissional', months: 12, maxRedemptions: 2, redemptions: 2, expiresAt: null, disabledAt: null, valueCents: 213600, note: '' }] }) };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const tick = () => new Promise(resolveTick => setTimeout(resolveTick, 0));
+  const licenses = await import(`../web/portal/platform-licenses.mjs?dom=${Date.now()}`);
+  licenses.loadPlatformLicenses({ confirm: async () => true });
+  await tick();
+  await tick();
+  const report = doc.getElementById('platform-coupon-report').textContent.replace(/\u00a0/g, ' ');
+  assert.match(report, /Valor concedido em cuponsR\$ 2\.136,00/);
+  assert.match(report, /Licenças vigentes3/);
+  assert.match(doc.getElementById('platform-coupon-list').textContent, /ABCD-EFGH-JKLMEsgotadoProfissional por 12 meses · 2 de 2 usos · sem validade/);
+  doc.getElementById('platform-coupon-plan').value = 'profissional';
+  doc.getElementById('platform-coupon-months').value = '12';
+  doc.getElementById('platform-coupon-max').value = '1';
+  doc.getElementById('platform-coupon-code').value = 'feira-2027';
+  doc.getElementById('platform-coupon-form').dispatchEvent({ type: 'submit' });
+  await tick();
+  await tick();
+  const post = calls.find(call => call.key === 'POST /api/admin/coupons');
+  assert.deepEqual(post.body, { planCode: 'profissional', months: 12, maxRedemptions: 1, expiresAt: null, code: 'FEIRA-2027', note: '' });
+  assert.equal(doc.getElementById('platform-coupon-created').hidden, false);
+  assert.match(doc.getElementById('platform-coupon-created').textContent, /FEIRA-2027/);
+  assert.equal(licenses.couponState({ disabledAt: null, expiresAt: '2000-01-01', redemptions: 0, maxRedemptions: 1 }), 'Vencido');
+  assert.equal(licenses.couponPayload({ planCode: 'essencial', monthsValue: '3', maxValue: '5', expiresValue: '2027-01-31', codeValue: '', noteValue: ' x ' }).expiresAt, '2027-02-01T02:59:59.000Z');
+  delete globalThis.document;
+});
+
+test('Plano e cobrança: "Tenho um cupom" só para proprietária e mensagem de sucesso', async () => {
+  const doc = createDocument(html);
+  globalThis.document = doc;
+  const coupon = await import(`../web/portal/coupon-redeem.mjs?dom=${Date.now()}`);
+  let redeemed = null;
+  const sent = [];
+  coupon.initCouponRedeem({
+    getSites: () => [
+      { id: 's1', name: 'Doces da Rita', role: 'owner' },
+      { id: 's2', name: 'Equipe', role: 'editor' },
+      { id: 's3', name: 'Arquivada', role: 'owner', archivedAt: '2026-01-01' }
+    ],
+    isOnline: () => true,
+    onRedeemed: (value) => { redeemed = value; },
+    fetch: async (url, init) => {
+      sent.push([url, JSON.parse(init.body)]);
+      return { ok: true, status: 200, json: async () => ({ redemption: { planCode: 'profissional', planName: 'Profissional', months: 12, endsAt: '2027-11-28T12:00:00Z' } }) };
+    }
+  });
+  coupon.refreshCouponRedeem();
+  assert.equal(doc.getElementById('billing-coupon').hidden, false);
+  assert.equal(doc.getElementById('billing-coupon-site').children.length, 1);
+  assert.equal(doc.getElementById('billing-coupon-site-group').hidden, true, 'com uma vitrine o seletor some');
+  await coupon.submitCoupon();
+  assert.equal(doc.getElementById('billing-coupon-status').textContent, 'Digite o código do cupom.');
+  doc.getElementById('billing-coupon-code').value = ' abcd-efgh-jklm ';
+  await coupon.submitCoupon();
+  assert.deepEqual(sent, [['/api/sites/s1/coupon', { code: 'ABCD-EFGH-JKLM' }]]);
+  assert.equal(doc.getElementById('billing-coupon-status').textContent, 'Profissional liberado até 28 de novembro de 2027. Os recursos já valem na vitrine.');
+  assert.equal(redeemed.planCode, 'profissional');
+  delete globalThis.document;
 });
