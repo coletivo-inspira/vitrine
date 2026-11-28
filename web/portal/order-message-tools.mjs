@@ -13,7 +13,8 @@ export const WHATSAPP_TEMPLATE_VARIABLES = Object.freeze([
   { token: '{data}', key: 'data', label: 'Data', colorClass: 'var-chip-data' },
   { token: '{horario}', key: 'horario', label: 'Horário', colorClass: 'var-chip-horario' },
   { token: '{endereco}', key: 'endereco', label: 'Endereço', colorClass: 'var-chip-endereco' },
-  { token: '{nome}', key: 'nome', label: 'Nome', colorClass: 'var-chip-nome' }
+  { token: '{nome}', key: 'nome', label: 'Nome', colorClass: 'var-chip-nome' },
+  { token: '{pagamento}', key: 'pagamento', label: 'Pagamento', colorClass: 'var-chip-pagamento' }
 ]);
 
 const VARIABLE_BY_TOKEN = new Map(
@@ -42,6 +43,7 @@ export function getAvailableTemplateVariables(
     if (v.key === 'data') return hasDate;
     if (v.key === 'horario') return hasTime;
     if (v.key === 'endereco') return hasAddress;
+    if (v.key === 'pagamento') return orderFields?.payment === true;
     return true;
   });
 }
@@ -67,7 +69,7 @@ export function findUnsupportedTemplateVariables(
 
 export function findVariableOccurrences(text = '') {
   const str = String(text ?? '');
-  const pattern = /\{(itens|total|data|horario|endereco|nome)\}/g;
+  const pattern = /\{(itens|total|data|horario|endereco|nome|pagamento)\}/g;
   const matches = [];
   let match;
   while ((match = pattern.exec(str)) !== null) {
@@ -271,7 +273,8 @@ export function buildSimulatedWhatsappPreview(draftContent = {}) {
     data: '15/11/2026',
     horario: sampleSlot,
     endereco: 'Entrega: Rua das Flores, 120 - Centro',
-    nome: 'Maria'
+    nome: 'Maria',
+    pagamento: fields.payment === true ? 'Pix' : ''
   });
   let orderRelay = null;
   if (draftContent?.orderRelay === ORDER_RELAY_MILA) {
