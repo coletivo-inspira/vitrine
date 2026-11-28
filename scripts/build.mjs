@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { publishedPortfolio, quoteContactLink } from '../src/portfolio.mjs';
 import { compilePublicStorefront, renderStorefrontHtml } from '../src/publication-engine.mjs';
 import { applyPricingPage } from '../src/pricing-page.mjs';
+import { STATIC_STOREFRONTS } from '../src/static-storefronts.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = resolve(root, 'dist');
@@ -31,21 +32,17 @@ try {
   const catalog = JSON.parse(await readFile(new URL('../content/portfolio.json', import.meta.url), 'utf8'));
   const contact = JSON.parse(await readFile(new URL('../content/contact.json', import.meta.url), 'utf8'));
   const paymentLinkDomains = JSON.parse(await readFile(new URL('../content/payment-link-domains.json', import.meta.url), 'utf8'));
-  const loja1Source = JSON.parse(await readFile(new URL('../content/vitrines/loja1.json', import.meta.url), 'utf8'));
   const publicCases = publishedPortfolio(catalog);
   const contactHref = quoteContactLink(contact.teamWhatsapp);
-  const loja1Compiled = await compilePublicStorefront(
-    loja1Source,
-    {
-      slug: loja1Source.slug,
-      name: loja1Source.businessName,
-      template: loja1Source.template
-    },
-    {
-      revision: 1,
-      publishedAt: '2026-11-11T00:00:00.000Z'
-    }
-  );
+  const storefronts = [];
+  for (const { file, publishedAt, limits } of STATIC_STOREFRONTS) {
+    const source = JSON.parse(await readFile(new URL(`../content/vitrines/${file}`, import.meta.url), 'utf8'));
+    storefronts.push(await compilePublicStorefront(
+      source,
+      { slug: source.slug, name: source.businessName, template: source.template },
+      { revision: 1, publishedAt, ...limits }
+    ));
+  }
 
   await mkdir(output, { recursive: true });
   await cp(new URL('../web/', import.meta.url), output, { recursive: true, force: true });
@@ -55,27 +52,29 @@ try {
   const notFoundPath = resolve(output, '404.html');
   const notFound = await readFile(notFoundPath, 'utf8');
   await writeFile(notFoundPath, notFound.replaceAll('__SITE_BASE__', basePath));
-  await mkdir(resolve(output, 'data/vitrines/loja1/releases'), { recursive: true });
+  await mkdir(resolve(output, 'data'), { recursive: true });
   await writeFile(resolve(output, 'data/portfolio.json'), JSON.stringify(publicCases));
   await writeFile(resolve(output, 'data/contact.json'), JSON.stringify({ href: contactHref }));
   // O editor confere o link de pagamento com a mesma lista do servidor (#134).
   await writeFile(resolve(output, 'assets/payment-link-domains.json'), JSON.stringify({ domains: paymentLinkDomains.domains }));
-  await writeFile(resolve(output, 'data/vitrines/loja1/menu.json'), loja1Compiled.json);
-  await writeFile(
-    resolve(output, `data/vitrines/loja1/releases/${loja1Compiled.hash}.json`),
-    loja1Compiled.json
-  );
   await cp(new URL('../src/portfolio.mjs', import.meta.url), resolve(output, 'assets/portfolio.mjs'));
   await cp(new URL('../src/public-menu.mjs', import.meta.url), resolve(output, 'assets/public-menu.mjs'));
 
   const vitrineTemplatePath = resolve(output, 'vitrine/index.html');
   const vitrineTemplateHtml = await readFile(vitrineTemplatePath, 'utf8');
-  const loja1Html = renderStorefrontHtml(loja1Compiled.menu, vitrineTemplateHtml);
-  await mkdir(resolve(output, 'loja1'), { recursive: true });
-  await writeFile(resolve(output, 'loja1/index.html'), loja1Html);
+  for (const { hash, json, menu } of storefronts) {
+    await mkdir(resolve(output, `data/vitrines/${menu.slug}/releases`), { recursive: true });
+    await writeFile(resolve(output, `data/vitrines/${menu.slug}/menu.json`), json);
+    await writeFile(resolve(output, `data/vitrines/${menu.slug}/releases/${hash}.json`), json);
+    await mkdir(resolve(output, menu.slug), { recursive: true });
+    await writeFile(resolve(output, `${menu.slug}/index.html`), renderStorefrontHtml(menu, vitrineTemplateHtml));
+  }
 
+  const summary = storefronts
+    .map(({ hash, menu }) => `/${menu.slug}, ${menu.items.length} active items, hash ${hash.slice(0, 12)}`)
+    .join('; ');
   console.log(
-    `Built marketing site & pilot storefront (/loja1, ${loja1Compiled.menu.items.length} active items, hash ${loja1Compiled.hash.slice(0, 12)}): ${publicCases.length} published cases; contact ${contactHref ? 'configured' : 'not configured'}.`
+    `Built marketing site & storefronts (${summary}): ${publicCases.length} published cases; contact ${contactHref ? 'configured' : 'not configured'}.`
   );
 } finally {
   await unlink(lockFile).catch(() => {});

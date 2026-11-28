@@ -1006,7 +1006,7 @@ function hasSelectableItems(menu, structure) {
  */
 export function renderStorefrontHeader(menu, structure = null) {
   const name = String(menu?.name ?? '').trim() || 'Vitrine';
-  const logo = publicLogoSrc(menu?.logoUrl);
+  const logo = publicLogoSrc(menu?.logoUrl || structure?.theme?.logoUrl);
   const identity = logo
     ? `<img class="storefront-identity-logo" src="${escapeHtml(logo)}" width="160" height="40" alt="${escapeHtml(name)}">`
     : `<span id="storefront-header-name" class="storefront-identity-name">${escapeHtml(name)}</span>`;
