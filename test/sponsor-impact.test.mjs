@@ -224,8 +224,9 @@ function postgrestOver(db) {
       }
       if (url.pathname === '/rest/v1/platform_operators') {
         const user = (url.searchParams.get('user_id') ?? '').replace(/^eq\./, '');
-        const role = (url.searchParams.get('role') ?? '').replace(/^eq\./, '');
-        const { rows } = await run(userId, 'select role from public.platform_operators where user_id = $1 and role = $2', [user, role]);
+        const filter = url.searchParams.get('role') ?? '';
+        const roles = filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : [filter.replace(/^eq\./, '')];
+        const { rows } = await run(userId, 'select role from public.platform_operators where user_id = $1 and role = any($2)', [user, roles]);
         return Response.json(rows);
       }
       if (url.pathname === '/rest/v1/rpc/read_platform_overview') {

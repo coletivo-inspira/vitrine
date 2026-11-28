@@ -6,6 +6,10 @@ import { signPreviewToken, verifyPreviewToken } from '../src/preview-token.mjs';
 import { createAuctionBook, teamAuctionViewsFromRows } from '../src/auction-engine.mjs';
 import { handleLinktreeRoute, matchLinktreeRoute, purgeExpiredLinktreeDemos, resolveLinktreeRepository } from '../src/linktree-import.mjs';
 import { handleSponsorRoute, matchSponsorRoute, resolveSponsorRepository, sponsorRouteNeedsGuard } from '../src/sponsor-impact.mjs';
+import {
+  adminRouteNeedsGuard, adminRouteNeedsJson, handleAdminHierarchyRoute, matchAdminHierarchyRoute,
+  normalizePlatformAccess, resolveAdminRepository, resolvePlatformAccess
+} from '../src/admin/routes.mjs';
 import { AUCTION_RULES, AuctionError, validateBidPayload } from '../web/assets/auction-rules.mjs';
 import {
   ALLOWED_TEMPLATES,
@@ -2252,7 +2256,7 @@ export function createSupabaseRestStore({ supabaseUrl, supabaseAnonKey, fetch: c
 
     async isPlatformAdmin(userId, { token }) {
       const response = await fetchImpl(
-        `${baseUrl}/rest/v1/platform_operators?user_id=eq.${encodeURIComponent(userId)}&role=eq.platform_admin&select=role`,
+        `${baseUrl}/rest/v1/platform_operators?user_id=eq.${encodeURIComponent(userId)}&role=in.(platform_owner,platform_admin)&select=role`,
         { headers: authHeaders(token) }
       );
       if (!response.ok) throw new Error('Falha ao consultar a autorização da plataforma.');
@@ -4453,6 +4457,25 @@ export function createApiHandler(deps = {}) {
           return cached;
         }
         return await refresh();
+      }
+
+      const adminRoute = matchAdminHierarchyRoute(pathname);
+      if (adminRoute) {
+        const user = await resolveSessionUser(request, env, deps);
+        if (!user) return errorResponse(401, 'UNAUTHORIZED', 'Sessão inválida ou expirada.');
+        const options = { token: user.token, env };
+        const needsJson = adminRouteNeedsJson(adminRoute, method);
+        if (adminRouteNeedsGuard(adminRoute, method)) {
+          const guardError = validateMutationOriginAndJson(request, url, { requireOrigin: true, requireJson: needsJson });
+          if (guardError) return guardError;
+        }
+        const repository = resolveAdminRepository(store, env, deps.fetch);
+        const access = adminRoute.action === 'redeem'
+          ? normalizePlatformAccess(null)
+          : await resolvePlatformAccess(repository, store, user.id, options);
+        const payload = needsJson ? (await parseJsonRequest(request)).parsed : undefined;
+        const { status, body } = await handleAdminHierarchyRoute(adminRoute, method, payload, { repository, access, options, url });
+        return jsonResponse(status, body, { 'cache-control': 'no-store' });
       }
 
       const operations = pathname.match(/^\/api\/admin\/(overview|audit-logs|customization-requests)(?:\/([^/]+))?\/?$/);
