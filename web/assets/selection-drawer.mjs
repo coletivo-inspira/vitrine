@@ -128,11 +128,14 @@ function describeEntry(renderer, { item, qty, priceMode }) {
     return { meta: `${renderer.formatPrice(price)} por cota`, lineTotal: renderer.formatPrice(price * qty) };
   }
   const parts = [];
+  const choiceLabel = typeof renderer.getItemChoiceLabel === 'function' ? renderer.getItemChoiceLabel(item) : '';
+  if (choiceLabel) parts.push(choiceLabel);
+  const unit = typeof renderer.getUnitPrice === 'function' ? renderer.getUnitPrice(item) : price;
   const showsPrice = components.price && (catalogType !== 'quote' || price > 0);
-  if (showsPrice) parts.push(qty > 1 ? `${renderer.formatPrice(price)} cada` : renderer.formatPrice(price));
+  if (showsPrice) parts.push(qty > 1 ? `${renderer.formatPrice(unit)} cada` : renderer.formatPrice(unit));
   else if (catalogType === 'quote') parts.push('Sob consulta');
   if (components.durationMinutes && item.durationMinutes > 0) parts.push(`${item.durationMinutes} min`);
-  return { meta: parts.join(' · '), lineTotal: showsPrice ? renderer.formatPrice(price * qty) : '' };
+  return { meta: parts.join(' · '), lineTotal: showsPrice ? renderer.formatPrice(unit * qty) : '' };
 }
 
 function usesStepper(renderer, { item, priceMode }) {
