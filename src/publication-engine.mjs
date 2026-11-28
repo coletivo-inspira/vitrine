@@ -14,6 +14,8 @@ import { projectPublicPlace } from './business-hours.mjs';
 import { renderStorefrontPlaceHtml } from '../web/assets/storefront-place.mjs';
 import { HIGHLIGHT_ICON_PATHS, highlightIconSvg } from '../web/assets/highlight-icons.mjs';
 import { STOREFRONT_PALETTES_CSS } from '../web/assets/storefront-palettes.mjs';
+import { deliveryPlatformLinks, projectPublicDeliveryPlatforms } from '../web/assets/delivery.mjs';
+import { normalizeItemOptions } from '../web/assets/item-options.mjs';
 import {
   DEFAULT_SHARE_DESCRIPTION,
   assertPublicSeo,
@@ -71,6 +73,7 @@ import {
 const utf8Encoder = new TextEncoder();
 
 export const FORBIDDEN_PUBLIC_KEYS = Object.freeze([
+  'deliveryCouriers',
   'owner_user_id',
   'ownerUserId',
   'ownerEmail',
@@ -137,7 +140,8 @@ const ALLOWED_TOP_LEVEL_MENU_KEYS = new Set([
   'features',
   'supportBadge',
   'instagramUrl',
-  'publicEmail'
+  'publicEmail',
+  'deliveryPlatforms'
 ]);
 const ALLOWED_LOCALITY_KEYS = new Set(['city', 'uf', 'citySlug']);
 
@@ -165,7 +169,10 @@ const ALLOWED_ITEM_KEYS = new Set([
   'gallery',
   'availability',
   'availabilityLabel',
-  'paymentLink'
+  'paymentLink',
+  'sizes',
+  'halfAndHalf',
+  'extras'
 ]);
 const ALLOWED_CATEGORY_KEYS = new Set(['id', 'name', 'items']);
 const ALLOWED_COMPONENT_KEYS = new Set([
@@ -182,7 +189,9 @@ const ALLOWED_ORDER_FIELD_KEYS = new Set([
   'timeSlots',
   'deliveryOrPickup',
   'customerName',
-  'notes'
+  'notes',
+  'deliveryFeeCents',
+  'payment'
 ]);
 const ALLOWED_MESSAGE_KEYS = new Set([
   'heroTitle',
@@ -649,6 +658,7 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
           const label = normalizeAvailabilityLabel(rawItem.availabilityLabel);
           if (label) extras.availabilityLabel = label;
         }
+        Object.assign(extras, normalizeItemOptions(rawItem).options);
         const paymentLink = projectPaymentLink(rawItem, extras);
         if (paymentLink) extras.paymentLink = paymentLink;
         extras.pageFields = projectItemPageFields(rawItem);
@@ -693,6 +703,9 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
       ...(extras.availability !== undefined ? { availability: extras.availability } : {}),
       ...(extras.availabilityLabel !== undefined ? { availabilityLabel: extras.availabilityLabel } : {}),
       ...(extras.paymentLink !== undefined ? { paymentLink: extras.paymentLink } : {}),
+      ...(extras.sizes !== undefined ? { sizes: extras.sizes } : {}),
+      ...(extras.halfAndHalf !== undefined ? { halfAndHalf: extras.halfAndHalf } : {}),
+      ...(extras.extras !== undefined ? { extras: extras.extras } : {}),
       ...extras.pageFields
     };
     validatedItemsById.set(item.id, projectedItem);
@@ -840,7 +853,8 @@ export function projectPublicStorefrontMenu(draftContent, site = {}, limits = {}
     ...projectPublicSeo(migrated, baseMenu.slug, limits),
     ...projectPublicFeatures(limits),
     ...projectPublicFooter(limits),
-    ...projectPublicChannels(migrated)
+    ...projectPublicChannels(migrated),
+    ...projectPublicDeliveryPlatforms(migrated)
   };
 
   for (const item of menu.items) {
@@ -895,6 +909,19 @@ export function formatPublicPriceBRL(priceCents) {
   return `R$ ${reais.toLocaleString('pt-BR')},${centavos}`;
 }
 
+/** "Também estamos no iFood / 99Food": só links, abertos em nova aba. */
+export function renderDeliveryPlatformsHtml(menu) {
+  const links = deliveryPlatformLinks(menu);
+  if (!links.length) return '';
+  const items = links.map((link) =>
+    `<li><a class="storefront-platform-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a></li>`
+  ).join('');
+  return `<section class="storefront-platforms" aria-label="Também estamos nos aplicativos de delivery">
+      <p class="storefront-platforms-title">Também estamos no</p>
+      <ul class="storefront-platforms-list">${items}</ul>
+    </section>`;
+}
+
 export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug ?? ''}` } = {}) {
   const itemSlugs = assignItemSlugs(menu?.items ?? []);
   const categories =
@@ -919,6 +946,9 @@ export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug 
           const descHtml = item.description
             ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>`
             : '';
+          const sizesHtml = Array.isArray(item.sizes) && item.sizes.length
+            ? `<p class="menu-item-sizes">${item.sizes.map((size) => `${escapeHtml(size.label)} ${escapeHtml(formatPublicPriceBRL(size.priceCents))}`).join(' · ')}</p>`
+            : '';
           const detailsHtml = hasItemPageContent(item)
             ? `<a class="sf-item-details-link" href="${escapeHtml(itemPagePath(basePath, itemSlugs.get(String(item.id))))}" aria-label="Ver detalhes de ${escapeHtml(item.name)}">Ver detalhes</a>`
             : '';
@@ -928,6 +958,7 @@ export function renderStorefrontCatalogMarkup(menu, { basePath = `/${menu?.slug 
             `    <h3 class="menu-item-title">${escapeHtml(item.name)}</h3>`,
             soon ? `    <p class="sf-soon-badge">${escapeHtml(soonBadgeText(item))}</p>` : '',
             descHtml ? `    ${descHtml}` : '',
+            sizesHtml ? `    ${sizesHtml}` : '',
             detailsHtml ? `    ${detailsHtml}` : '',
             `  </div>`,
             `  <div class="menu-item-footer">`,
@@ -1239,7 +1270,7 @@ export function renderStorefrontHtml(menu, baseTemplateHtml, { interactive = tru
     ? `<a class="storefront-city-link" href="/por-cidade/${escapeHtml(menu.locality.citySlug)}">Mais itens de lance, doação e troca em ${escapeHtml(menu.locality.city)} – ${escapeHtml(menu.locality.uf)}</a>`
     : '';
   const footer = renderStorefrontFooterHtml(menu, { navigation: structure?.navigation.footer, extraLinks: cityLink });
-  const placeHtml = renderStorefrontPlaceHtml(menu);
+  const placeHtml = renderStorefrontPlaceHtml(menu) + renderDeliveryPlatformsHtml(menu);
   const modularHtml = structure
     ? (hero ? '' : placeHtml) + renderPublicSections(structure.pages, menu, catalog, placeHtml)
     : renderStorefrontHero(menu, {}, '', renderCategoryNavigation(chipsHtml)) + placeHtml +

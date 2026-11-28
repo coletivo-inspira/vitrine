@@ -33,6 +33,16 @@ import {
 } from './item-availability.mjs';
 import { PAYMENT_LINK_ICON_PATH, PAYMENT_LINK_NOTICE, publicPaymentLink } from './payment-link.mjs';
 import { storefrontPaletteOf } from './storefront-palettes.mjs';
+import { PAYMENT_METHODS, deliveryFeeFor, deliveryPlatformLinks, describePayment } from './delivery.mjs';
+import {
+  defaultItemChoice,
+  describeItemChoice,
+  extraChoicePriceCents,
+  halfAndHalfPartners,
+  hasItemOptions,
+  itemUnitPriceCents,
+  resolveItemChoice
+} from './item-options.mjs';
 
 /** Portal preview: mirrors the draft palette on the preview container (`.live-preview-box[data-palette]`). */
 export function applyPreviewPalette(container, menuOrDraft) {
@@ -85,8 +95,12 @@ export function interpolateWhatsappTemplate(template, vars = {}) {
     .replaceAll('{data}', vars.data ?? '')
     .replaceAll('{horario}', vars.horario ?? '')
     .replaceAll('{endereco}', vars.endereco ?? '')
-    .replaceAll('{nome}', vars.nome ?? '');
+    .replaceAll('{nome}', vars.nome ?? '')
+    .replaceAll('{pagamento}', vars.pagamento ?? '');
 
+  if (typeof vars.pagamento === 'string' && vars.pagamento.trim() && !base.includes('{pagamento}')) {
+    output += `\nPagamento: ${vars.pagamento.trim()}`;
+  }
   if (typeof vars.observacoes === 'string' && vars.observacoes.trim()) {
     output += `\nObservações: ${vars.observacoes.trim()}`;
   }
@@ -102,6 +116,7 @@ export class StorefrontRenderer {
     this.options = options || {};
     this.stage = 1; // 1: Escolher, 2: Dados, 3: Revisar e enviar
     this.cart = new Map(); // itemId -> quantity
+    this.itemChoices = new Map(); // itemId -> { sizeId, halfWith, extraId }
     this.offers = new Map(); // itemId -> offerCents
     this.tradeProposals = new Map(); // itemId -> text
     this.itemErrors = new Map(); // itemId -> error message
@@ -127,8 +142,56 @@ export class StorefrontRenderer {
       deliveryOrPickup: orderFields.deliveryOrPickup ? 'pickup' : '',
       address: '',
       customerName: '',
-      notes: ''
+      notes: '',
+      paymentMethod: '',
+      changeFor: ''
     };
+  }
+
+  /** Escolha de tamanho, meio a meio e adicional do item (padrão quando a pessoa não mexeu). */
+  getItemChoice(item) {
+    return resolveItemChoice(item, this.itemChoices.get(item?.id) ?? defaultItemChoice(item), this.getAllActiveItems());
+  }
+
+  setItemChoice(item, patch) {
+    const current = this.getItemChoice(item);
+    this.itemChoices.set(item.id, {
+      sizeId: current.sizeId,
+      halfWith: current.halfWith,
+      extraId: current.extraId,
+      ...patch
+    });
+    if (typeof this.options.onUpdate === 'function') this.options.onUpdate(this);
+    this.render();
+  }
+
+  /** Preço de uma unidade do item com as escolhas feitas. */
+  getUnitPrice(item) {
+    if (!hasItemOptions(item)) return item?.priceCents || 0;
+    return itemUnitPriceCents(item, this.getItemChoice(item), this.getAllActiveItems());
+  }
+
+  getItemChoiceLabel(item) {
+    return hasItemOptions(item) ? describeItemChoice(item, this.getItemChoice(item), this.getAllActiveItems()) : '';
+  }
+
+  getDeliveryFee() {
+    const fields = this.getResolvedOrderFields();
+    return fields.deliveryOrPickup ? deliveryFeeFor(fields, this.customerDetails.deliveryOrPickup) : 0;
+  }
+
+  /** Total do pedido: itens de preço fixo mais a taxa de entrega. */
+  getOrderTotal() {
+    return this.getCartTotal() + this.getDeliveryFee();
+  }
+
+  getPaymentText() {
+    if (!this.getResolvedOrderFields().payment) return '';
+    const digits = String(this.customerDetails.changeFor || '').replace(/\D/g, '');
+    return describePayment(
+      { method: this.customerDetails.paymentMethod, changeForCents: digits ? parseInt(digits, 10) : 0 },
+      (cents) => this.formatPrice(cents)
+    );
   }
 
   getItemPriceMode(item) {
@@ -396,7 +459,7 @@ export class StorefrontRenderer {
     let total = 0;
     for (const item of this.getAllActiveItems()) {
       if (this.cart.has(item.id) && this.getItemPriceMode(item) === 'fixed') {
-        total += (item.priceCents || 0) * this.cart.get(item.id);
+        total += this.getUnitPrice(item) * this.cart.get(item.id);
       }
     }
     return total;
@@ -1541,6 +1604,10 @@ export class StorefrontRenderer {
       body.appendChild(detailsLink);
     }
 
+    if (priceMode === 'fixed' && hasItemOptions(item)) {
+      this.renderItemOptions(item, body, isInactive);
+    }
+
     if (priceMode === 'donation' && typeof item.conditions === 'string' && item.conditions.trim()) {
       const condP = document.createElement('p');
       condP.className = 'sf-item-condition-note';
@@ -1818,7 +1885,7 @@ export class StorefrontRenderer {
       if (resolvedComponents.price && (catalogType !== 'quote' || hasPositivePrice)) {
         const price = document.createElement('span');
         price.className = 'menu-item-price';
-        price.textContent = this.formatPrice(item.priceCents || 0);
+        price.textContent = this.formatPrice(this.getUnitPrice(item));
         footer.appendChild(price);
       } else if (catalogType === 'quote') {
         const quoteLabel = document.createElement('span');
@@ -1880,6 +1947,173 @@ export class StorefrontRenderer {
     }
 
     return footer;
+  }
+
+  /** Tamanho, meio a meio e adicional no cartão do item (spec 021). */
+  renderItemOptions(item, body, isInactive) {
+    const choice = this.getItemChoice(item);
+    const allItems = this.getAllActiveItems();
+    const wrap = document.createElement('div');
+    wrap.className = 'sf-item-options';
+    const fieldId = (suffix) => `${this.idPrefix}-opt-${suffix}-${item.id}`;
+
+    if (Array.isArray(item.sizes) && item.sizes.length) {
+      const group = document.createElement('div');
+      group.className = 'sf-option-sizes';
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', `Tamanho de ${item.name || 'item'}`);
+      for (const size of item.sizes) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const chosen = size.id === choice.sizeId;
+        btn.className = chosen ? 'sf-slot-pill sf-size-pill is-selected' : 'sf-slot-pill sf-size-pill';
+        btn.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+        btn.disabled = isInactive;
+        const sizeLabel = document.createElement('span');
+        sizeLabel.textContent = size.label;
+        const sizePrice = document.createElement('span');
+        sizePrice.className = 'sf-size-price';
+        sizePrice.textContent = this.formatPrice(size.priceCents);
+        btn.appendChild(sizeLabel);
+        btn.appendChild(sizePrice);
+        btn.addEventListener('click', () => this.setItemChoice(item, { sizeId: size.id }));
+        group.appendChild(btn);
+      }
+      wrap.appendChild(group);
+    }
+
+    const partners = halfAndHalfPartners(item, allItems, choice.sizeId);
+    if (item.halfAndHalf && partners.length) {
+      const halfId = fieldId('half');
+      const label = document.createElement('label');
+      label.className = 'sf-field-label';
+      label.setAttribute('for', halfId);
+      label.textContent = 'Meio a meio com';
+      const select = document.createElement('select');
+      select.id = halfId;
+      select.className = 'sf-input sf-option-select';
+      select.disabled = isInactive;
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'Sabor inteiro';
+      select.appendChild(none);
+      for (const other of partners) {
+        const option = document.createElement('option');
+        option.value = String(other.id);
+        option.textContent = other.name || 'Sabor';
+        option.selected = other.id === choice.halfWith;
+        select.appendChild(option);
+      }
+      select.addEventListener('change', () => this.setItemChoice(item, { halfWith: select.value || null }));
+      const row = document.createElement('div');
+      row.className = 'sf-option-row';
+      row.appendChild(label);
+      row.appendChild(select);
+      wrap.appendChild(row);
+    }
+
+    if (item.extras?.choices?.length) {
+      const extraId = fieldId('extra');
+      const label = document.createElement('label');
+      label.className = 'sf-field-label';
+      label.setAttribute('for', extraId);
+      label.textContent = item.extras.label;
+      const select = document.createElement('select');
+      select.id = extraId;
+      select.className = 'sf-input sf-option-select';
+      select.disabled = isInactive;
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'Sem adicional';
+      select.appendChild(none);
+      for (const extra of item.extras.choices) {
+        const option = document.createElement('option');
+        option.value = extra.id;
+        const cents = extraChoicePriceCents(extra, choice.sizeId);
+        option.textContent = cents > 0 ? `${extra.label} (+ ${this.formatPrice(cents)})` : extra.label;
+        option.selected = extra.id === choice.extraId;
+        select.appendChild(option);
+      }
+      select.addEventListener('change', () => this.setItemChoice(item, { extraId: select.value || null }));
+      const row = document.createElement('div');
+      row.className = 'sf-option-row';
+      row.appendChild(label);
+      row.appendChild(select);
+      wrap.appendChild(row);
+    }
+
+    body.appendChild(wrap);
+  }
+
+  /** "Prefere pedir pelo app?": links das lojas no iFood e no 99Food, quando existem. */
+  renderPlatformLinks(parent) {
+    const links = deliveryPlatformLinks(this.menu);
+    if (!links.length) return;
+    const box = document.createElement('p');
+    box.className = 'sf-field-help sf-platform-links';
+    box.appendChild(document.createTextNode('Prefere pedir pelo app? '));
+    links.forEach((link, index) => {
+      if (index > 0) box.appendChild(document.createTextNode(' ou '));
+      const anchor = document.createElement('a');
+      anchor.href = link.url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.textContent = link.label;
+      box.appendChild(anchor);
+    });
+    parent.appendChild(box);
+  }
+
+  /** Forma de pagamento: Pix, cartão na entrega ou dinheiro, com troco opcional. */
+  renderPaymentField(form) {
+    const group = document.createElement('div');
+    group.className = 'sf-field-group';
+    const label = document.createElement('span');
+    label.className = 'sf-field-label';
+    label.textContent = 'Forma de pagamento';
+    group.appendChild(label);
+    const row = document.createElement('div');
+    row.className = 'sf-delivery-toggle sf-payment-toggle';
+    for (const method of PAYMENT_METHODS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const chosen = this.customerDetails.paymentMethod === method.id;
+      btn.className = chosen ? 'sf-slot-pill is-selected' : 'sf-slot-pill';
+      btn.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+      btn.textContent = method.label;
+      btn.addEventListener('click', () => {
+        this.customerDetails.paymentMethod = method.id;
+        this.render();
+      });
+      row.appendChild(btn);
+    }
+    group.appendChild(row);
+    if (this.customerDetails.paymentMethod === 'cash') {
+      const changeId = `${this.idPrefix}-change-for`;
+      const changeLabel = document.createElement('label');
+      changeLabel.className = 'sf-field-label';
+      changeLabel.setAttribute('for', changeId);
+      changeLabel.textContent = 'Troco para quanto? (opcional)';
+      const changeInput = document.createElement('input');
+      changeInput.type = 'text';
+      changeInput.id = changeId;
+      changeInput.inputMode = 'numeric';
+      changeInput.className = 'sf-input';
+      changeInput.placeholder = 'Ex.: R$ 100,00';
+      changeInput.value = this.customerDetails.changeFor
+        ? this.formatPrice(parseInt(this.customerDetails.changeFor, 10))
+        : '';
+      changeInput.addEventListener('input', () => {
+        const digits = changeInput.value.replace(/\D/g, '').slice(0, 8);
+        changeInput.value = digits
+          ? `R$ ${parseInt(digits.slice(0, -2) || '0', 10).toLocaleString('pt-BR')},${digits.slice(-2).padStart(2, '0')}`
+          : '';
+        this.customerDetails.changeFor = digits;
+      });
+      group.appendChild(changeLabel);
+      group.appendChild(changeInput);
+    }
+    form.appendChild(group);
   }
 
   renderQuotaDetails(item, body) {
@@ -2189,10 +2423,23 @@ export class StorefrontRenderer {
       modeRow.appendChild(deliveryBtn);
       group.appendChild(modeRow);
 
+      const feeCents = deliveryFeeFor(resolvedFields, 'delivery');
+      if (feeCents > 0) {
+        const feeNote = document.createElement('p');
+        feeNote.className = 'sf-field-help sf-delivery-fee-note';
+        feeNote.textContent = `Taxa de entrega: ${this.formatPrice(feeCents)}, somada ao total.`;
+        group.appendChild(feeNote);
+      }
+
       addrGroup.appendChild(addrLabel);
       addrGroup.appendChild(addrInput);
       group.appendChild(addrGroup);
+      this.renderPlatformLinks(group);
       form.appendChild(group);
+    }
+
+    if (resolvedFields.payment) {
+      this.renderPaymentField(form);
     }
 
     if (resolvedFields.notes) {
@@ -2250,6 +2497,11 @@ export class StorefrontRenderer {
         !this.customerDetails.address.trim()
       ) {
         this.validationMessage = 'Por favor, informe o endereço para entrega.';
+        this.render();
+        return;
+      }
+      if (resolvedFields.payment && !this.customerDetails.paymentMethod) {
+        this.validationMessage = 'Por favor, escolha a forma de pagamento.';
         this.render();
         return;
       }
@@ -2324,18 +2576,24 @@ export class StorefrontRenderer {
         );
       } else {
         const parts = [`- ${qty}x ${item.name || 'Item'}`];
+        const choiceLabel = this.getItemChoiceLabel(item);
+        if (choiceLabel) parts.push(`(${choiceLabel})`);
         if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
           parts.push(`(${item.durationMinutes} min)`);
         }
         const hasPrice = Number.isInteger(item.priceCents) && item.priceCents > 0;
         if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
-          parts.push(`— ${this.formatPrice((item.priceCents || 0) * qty)}`);
+          parts.push(`— ${this.formatPrice(this.getUnitPrice(item) * qty)}`);
         }
         itemLines.push(parts.join(' '));
       }
     }
 
-    const cartTotal = this.getCartTotal();
+    const deliveryFee = this.getDeliveryFee();
+    if (deliveryFee > 0 && resolvedComponents.price) {
+      itemLines.push(`- Taxa de entrega — ${this.formatPrice(deliveryFee)}`);
+    }
+    const cartTotal = this.getOrderTotal();
     const hasOffers = this.hasSelectedOffers();
     const quotaTotal = this.getQuotaTotal();
     const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
@@ -2383,6 +2641,7 @@ export class StorefrontRenderer {
             : '',
         endereco: enderecoStr,
         nome: resolvedFields.customerName ? this.customerDetails.customerName.trim() : '',
+        pagamento: this.getPaymentText(),
         observacoes: resolvedFields.notes ? this.customerDetails.notes.trim() : ''
       });
     }
@@ -2397,6 +2656,7 @@ export class StorefrontRenderer {
           : '',
       endereco: enderecoStr,
       nome: resolvedFields.customerName ? this.customerDetails.customerName.trim() : '',
+      pagamento: this.getPaymentText(),
       observacoes: resolvedFields.notes ? this.customerDetails.notes.trim() : ''
     });
   }
@@ -2514,6 +2774,8 @@ export class StorefrontRenderer {
         itemRow.appendChild(titleSpan);
       } else {
         let labelText = `${qty}x ${item.name || 'Item'}`;
+        const choiceLabel = this.getItemChoiceLabel(item);
+        if (choiceLabel) labelText += ` (${choiceLabel})`;
         if (resolvedComponents.durationMinutes && item.durationMinutes > 0) {
           labelText += ` (${item.durationMinutes} min)`;
         }
@@ -2524,17 +2786,31 @@ export class StorefrontRenderer {
         if (resolvedComponents.price && (catalogType !== 'quote' || hasPrice)) {
           const priceSpan = document.createElement('span');
           priceSpan.className = 'review-item-price';
-          priceSpan.textContent = this.formatPrice((item.priceCents || 0) * qty);
+          priceSpan.textContent = this.formatPrice(this.getUnitPrice(item) * qty);
           itemRow.appendChild(priceSpan);
         }
       }
 
       summaryList.appendChild(itemRow);
     }
+    const reviewFee = this.getDeliveryFee();
+    if (reviewFee > 0 && resolvedComponents.price) {
+      const feeRow = document.createElement('div');
+      feeRow.className = 'review-item-row';
+      const feeLabel = document.createElement('span');
+      feeLabel.className = 'review-item-title-qty';
+      feeLabel.textContent = 'Taxa de entrega';
+      const feePrice = document.createElement('span');
+      feePrice.className = 'review-item-price';
+      feePrice.textContent = this.formatPrice(reviewFee);
+      feeRow.appendChild(feeLabel);
+      feeRow.appendChild(feePrice);
+      summaryList.appendChild(feeRow);
+    }
     card.appendChild(summaryList);
     this.renderReviewPaymentLinks(card);
 
-    const cartTotal = this.getCartTotal();
+    const cartTotal = this.getOrderTotal();
     const hasOffers = this.hasSelectedOffers();
     const quotaTotal = this.getQuotaTotal();
     const quotaOnly = quotaTotal > 0 && !hasOffers && !this.hasSelectedFixedPriceItems();
@@ -2605,6 +2881,8 @@ export class StorefrontRenderer {
           : 'Retirada no local'
       ]);
     }
+    const paymentText = this.getPaymentText();
+    if (paymentText) detailPairs.push(['Pagamento', paymentText]);
     if (resolvedFields.notes && this.customerDetails.notes.trim()) {
       detailPairs.push(['Observações', this.customerDetails.notes.trim()]);
     }

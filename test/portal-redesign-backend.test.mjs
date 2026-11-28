@@ -1066,7 +1066,7 @@ test('Spec 008 PR (a) - Backend: Migração 202611120002, RLS, Rotas Worker e Ca
     assert.deepEqual(ALLOWED_CATALOG_TYPES, ['products', 'booking', 'quote']);
     assert.equal(ALLOWED_PROFILE_INTERESTS.length, 8);
     assert.equal(ALLOWED_CUSTOMIZATION_STATUSES.length, 4);
-    assert.equal(ALLOWED_WHATSAPP_VARIABLES.length, 6);
+    assert.equal(ALLOWED_WHATSAPP_VARIABLES.length, 7);
 
     const quoteDraft = createInitialDraftContent({
       slug: 'atelie-orcamento',

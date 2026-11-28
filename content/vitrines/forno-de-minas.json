@@ -8,13 +8,14 @@
   "orderFields": {
     "deliveryOrPickup": true,
     "customerName": true,
-    "notes": true
+    "notes": true,
+    "payment": true
   },
   "messages": {
     "heroTitle": "Pizzaria Forno de Minas",
     "welcomeText": "Escolha as pizzas, diga se é entrega ou retirada e mande o pedido direto para a pizzaria pelo WhatsApp.",
     "ctaLabel": "Enviar pedido no WhatsApp",
-    "whatsappTemplate": "Olá, Forno de Minas! Meu nome é {nome}.\nQuero pedir:\n{itens}\nTotal estimado (preço da Grande): {total}\n{endereco}\nTamanho, meio a meio, borda e troco vão nas observações."
+    "whatsappTemplate": "Olá, Forno de Minas! Meu nome é {nome}.\nQuero pedir:\n{itens}\nTotal: {total}\n{endereco}\nPagamento: {pagamento}"
   },
   "structure": {
     "themeOverrides": {
@@ -83,16 +84,16 @@
               "title": "Como pedir",
               "items": [
                 {
-                  "q": "Qual tamanho aparece no preço?",
-                  "a": "O preço de cada pizza é o da Grande. Média e Gigante estão na descrição. Escreva o tamanho nas observações e a pizzaria confirma o valor final."
+                  "q": "Como escolho o tamanho?",
+                  "a": "No próprio cartão da pizza: Média, Grande ou Gigante. O preço muda na hora."
                 },
                 {
                   "q": "Dá para pedir meio a meio ou com borda recheada?",
-                  "a": "Dá. Escreva os dois sabores nas observações. A borda de catupiry ou cheddar custa R$ 9,90 na Média, R$ 12,90 na Grande e R$ 14,90 na Gigante."
+                  "a": "Dá. Escolha o segundo sabor em \"Meio a meio com\"; vale o preço do sabor mais caro. A borda de catupiry ou cheddar custa R$ 9,90 na Média, R$ 12,90 na Grande e R$ 14,90 na Gigante."
                 },
                 {
                   "q": "Como pago?",
-                  "a": "Combine a forma de pagamento na conversa. Se for em dinheiro, diga nas observações para quanto precisa de troco."
+                  "a": "Pix, cartão na entrega ou dinheiro. Se for dinheiro, diga para quanto precisa de troco."
                 }
               ]
             }
@@ -109,99 +110,701 @@
         {
           "id": "alho-e-oleo",
           "name": "01. Alho e Óleo",
-          "description": "Parmesão, alho e mussarela. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "description": "Parmesão, alho e mussarela.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "atum",
           "name": "02. Atum",
-          "description": "Atum, tomate, cebola e mussarela. Grande R$ 44,90 · Média R$ 34,90 · Gigante R$ 54,90.",
+          "description": "Atum, tomate, cebola e mussarela.",
           "priceCents": 4490,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3490
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4490
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "bacon",
           "name": "03. Bacon",
-          "description": "Mussarela, bacon e milho. Grande R$ 44,90 · Média R$ 34,90 · Gigante R$ 54,90.",
+          "description": "Mussarela, bacon e milho.",
           "priceCents": 4490,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3490
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4490
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "calabresa",
           "name": "04. Calabresa",
-          "description": "Mussarela, calabresa fatiada e cebola. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "description": "Mussarela, calabresa fatiada e cebola.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "frango-catupiry",
           "name": "05. Frango com Catupiry",
-          "description": "Peito de frango desfiado e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "description": "Peito de frango desfiado e catupiry.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "frango-cheddar",
           "name": "06. Frango com Cheddar",
-          "description": "Peito de frango desfiado e cheddar. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "description": "Peito de frango desfiado e cheddar.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "frango-bolonhesa",
           "name": "07. Frango à Bolonhesa",
-          "description": "Mussarela, frango à bolonhesa e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "description": "Mussarela, frango à bolonhesa e palmito.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "frango-especial",
           "name": "08. Frango Especial",
-          "description": "Peito de frango desfiado, catupiry e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 63,90.",
+          "description": "Peito de frango desfiado, catupiry e palmito.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6390
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "lombinho-canadense",
           "name": "09. Lombinho Canadense",
-          "description": "Lombo, cebola, tomate e mussarela. Grande R$ 48,90 · Média R$ 38,90 · Gigante R$ 61,90.",
+          "description": "Lombo, cebola, tomate e mussarela.",
           "priceCents": 4890,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3890
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4890
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6190
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "milho-verde",
           "name": "10. Milho Verde",
-          "description": "Milho, cebola, mussarela e parmesão. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "description": "Milho, cebola, mussarela e parmesão.",
           "priceCents": 3490,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2490
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3490
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "presunto",
           "name": "11. Presunto",
-          "description": "Mussarela e presunto. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "description": "Mussarela e presunto.",
           "priceCents": 3490,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2490
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3490
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "portuguesa",
           "name": "12. Portuguesa",
-          "description": "Mussarela, presunto, cebola, ovos e azeitona. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 54,90.",
+          "description": "Mussarela, presunto, cebola, ovos e azeitona.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "mussarela",
           "name": "13. Mussarela",
-          "description": "Molho ao sugo e mussarela. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "description": "Molho ao sugo e mussarela.",
           "priceCents": 3490,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2490
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3490
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "moda-da-casa",
           "name": "14. À Moda da Casa",
-          "description": "Mussarela, milho, presunto, bacon, ovos, cebola e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Mussarela, milho, presunto, bacon, ovos, cebola e catupiry.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         }
       ]
@@ -213,91 +816,551 @@
         {
           "id": "marguerita",
           "name": "15. Marguerita",
-          "description": "Parmesão, alho, mussarela, tomate e manjericão. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "description": "Parmesão, alho, mussarela, tomate e manjericão.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "nordestina",
           "name": "16. Nordestina",
-          "description": "Mussarela, carne de sol e catupiry. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 69,90.",
+          "description": "Mussarela, carne de sol e catupiry.",
           "priceCents": 5990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 4990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 5990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "palmito",
           "name": "17. Palmito",
-          "description": "Ovos, cebola, catupiry e palmito. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "description": "Ovos, cebola, catupiry e palmito.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "palmito-bolonhesa",
           "name": "18. Palmito à Bolonhesa",
-          "description": "Mussarela, molho à bolonhesa, cebola, parmesão e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Mussarela, molho à bolonhesa, cebola, parmesão e palmito.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "peperoni",
           "name": "19. Peperoni",
-          "description": "Mussarela e peperoni. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 69,90.",
+          "description": "Mussarela e peperoni.",
           "priceCents": 5990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 4990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 5990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 6990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "quatro-queijos",
           "name": "20. Quatro Queijos",
-          "description": "Mussarela, provolone, parmesão e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Mussarela, provolone, parmesão e catupiry.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "salaminho",
           "name": "21. Salaminho",
-          "description": "Provolone, salaminho e mussarela. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Provolone, salaminho e mussarela.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "tomate-seco",
           "name": "22. Tomate Seco",
-          "description": "Mussarela, palmito, manjericão e tomate seco. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Mussarela, palmito, manjericão e tomate seco.",
           "priceCents": 4990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "do-chefe",
           "name": "23. Do Chefe",
-          "description": "Mussarela, presunto, calabresa, cebola, catupiry, pimentão, milho, ervilha, ovo, azeitona, tomate e bacon. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 74,90.",
+          "description": "Mussarela, presunto, calabresa, cebola, catupiry, pimentão, milho, ervilha, ovo, azeitona, tomate e bacon.",
           "priceCents": 5990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 4990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 5990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 7490
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "vegetariana",
           "name": "24. Vegetariana",
-          "description": "Mussarela, palmito, milho, azeitona, champignon, cebola e pimentão. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "description": "Mussarela, palmito, milho, azeitona, champignon, cebola e pimentão.",
           "priceCents": 3990,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 2990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 3990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 4990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         },
         {
           "id": "pizza-de-minas",
           "name": "25. Pizza de Minas",
-          "description": "Mussarela, presunto, calabresa, pimentão, cebola e azeitona. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "description": "Mussarela, presunto, calabresa, pimentão, cebola e azeitona.",
           "priceCents": 4990,
-          "active": true
-        }
-      ]
-    },
-    {
-      "id": "acrescimos",
-      "name": "Acréscimos",
-      "items": [
-        {
-          "id": "borda-recheada-grande",
-          "name": "Borda de Catupiry ou Cheddar (Grande)",
-          "description": "Diga o recheio nas observações. Média R$ 9,90 · Gigante R$ 14,90.",
-          "priceCents": 1290,
+          "sizes": [
+            {
+              "id": "media",
+              "label": "Média",
+              "priceCents": 3990
+            },
+            {
+              "id": "grande",
+              "label": "Grande",
+              "priceCents": 4990
+            },
+            {
+              "id": "gigante",
+              "label": "Gigante",
+              "priceCents": 5990
+            }
+          ],
+          "halfAndHalf": true,
+          "extras": {
+            "label": "Borda",
+            "choices": [
+              {
+                "id": "catupiry",
+                "label": "Catupiry",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              },
+              {
+                "id": "cheddar",
+                "label": "Cheddar",
+                "priceCents": 1290,
+                "prices": {
+                  "media": 990,
+                  "grande": 1290,
+                  "gigante": 1490
+                }
+              }
+            ]
+          },
           "active": true
         }
       ]

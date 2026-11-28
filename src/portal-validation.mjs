@@ -11,6 +11,8 @@ import { collectPlaceErrors } from './business-hours.mjs';
 import { validateLocalSeo } from '../web/assets/local-seo.mjs';
 import { validateQuoteLeadConfig } from '../web/assets/quote-lead.mjs';
 import { channelDraftErrors } from '../web/assets/channels.mjs';
+import { deliveryDraftErrors, isValidDeliveryFeeCents } from '../web/assets/delivery.mjs';
+import { itemOptionTexts, normalizeItemOptions } from '../web/assets/item-options.mjs';
 import { itemPageTexts, normalizeItemPageFields } from '../web/assets/item-page-fields.mjs';
 import {
   ITEM_AVAILABILITY_LABEL_MAX,
@@ -172,7 +174,8 @@ export const ALLOWED_WHATSAPP_VARIABLES = Object.freeze([
   '{data}',
   '{horario}',
   '{endereco}',
-  '{nome}'
+  '{nome}',
+  '{pagamento}'
 ]);
 
 export const CATALOG_IMAGES_BUCKET = 'catalog-images';
@@ -237,7 +240,9 @@ const ALLOWED_ORDER_FIELD_KEYS = Object.freeze([
   'timeSlots',
   'deliveryOrPickup',
   'customerName',
-  'notes'
+  'notes',
+  'deliveryFeeCents',
+  'payment'
 ]);
 const ALLOWED_MESSAGE_KEYS = Object.freeze([
   'heroTitle',
@@ -634,6 +639,14 @@ export function validateOrderFieldsConfig(orderFields, catalogType = DEFAULT_CAT
           );
         }
         assertNoDangerousTextPayload(slot, 422, 'INVALID_ORDER_FIELDS');
+      }
+    } else if (key === 'deliveryFeeCents') {
+      if (!isValidDeliveryFeeCents(orderFields.deliveryFeeCents)) {
+        throw new PortalValidationError(
+          422,
+          'INVALID_ORDER_FIELDS',
+          'A taxa de entrega deve ficar entre R$ 0,00 e R$ 500,00.'
+        );
       }
     } else if (typeof orderFields[key] !== 'boolean') {
       throw new PortalValidationError(
@@ -1561,7 +1574,8 @@ export function validateDraftContent(content, options = {}) {
     ...collectPlaceErrors(content),
     ...validateLocalSeo(content.localSeo).errors,
     ...validateQuoteLeadConfig(content.quoteLead).errors,
-    ...channelDraftErrors(content)
+    ...channelDraftErrors(content),
+    ...deliveryDraftErrors(content)
   ];
   if (placeError) {
     throw new PortalValidationError(422, placeError.code, placeError.message, {
@@ -1657,6 +1671,15 @@ export function validateDraftContent(content, options = {}) {
     if (itemPriceMode === 'quota') {
       validateQuotaFields(item);
     }
+
+    const [optionError] = normalizeItemOptions(item).errors;
+    if (optionError) {
+      throw new PortalValidationError(422, optionError.code, optionError.message, {
+        field: optionError.field,
+        itemId: typeof item.id === 'string' ? item.id : undefined
+      });
+    }
+    for (const text of itemOptionTexts(item)) assertNoDangerousTextPayload(text, 422, 'INVALID_ITEM');
 
     const pageFields = validateItemPageFields(item);
     const paymentLinkLabel = validateItemPaymentLink(item);
