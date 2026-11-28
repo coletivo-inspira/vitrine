@@ -74,6 +74,20 @@ _Evitar_: trial, período de teste.
 
 **Patrocinador**: Pessoa ou entidade que financia o plano Gratuito/Social por cota negociada fora do sistema. No painel tem só a tela Impacto, atribuída por um Operador Inspira; não abre vitrines, rascunhos nem a administração.
 
+**Dono da plataforma**: A única conta com todo o acesso à administração (papel `platform_owner`), inclusive dar e retirar o papel de Administrador. É definida fora do painel, no SQL Editor (spec `021-administracao-hierarquia`).
+
+**Administrador da plataforma**: Operador Inspira (papel `platform_admin`) que opera usuários, processos, licenças, cupons, limites, CMS e modelos, mas não mexe em outros administradores nem no Dono. Não confundir com o Administrador da equipe de uma vitrine (`admin` em `site_memberships`).
+
+**Gestor de licenças**: Operador Inspira (papel `license_manager`) que só concede e retira licenças, cria cupons e ajusta limites por vitrine; vê a lista de usuários só para achar a vitrine.
+
+**Licença**: Concessão sem cobrança de um plano pago por um período, ligada à organização cliente e separada da assinatura. A origem é manual (dada por quem gere licenças), cupom ou cortesia. Vale o maior plano entre a assinatura válida e as licenças vigentes.
+_Evitar_: assinatura grátis.
+
+**Cupom**: Código criado pela administração que, resgatado pela proprietária em "Plano e cobrança", gera uma licença do plano e do número de meses do cupom. Um resgate por organização; o relatório soma o valor (preço mensal do plano × meses).
+_Evitar_: desconto (o cupom não muda preço de assinatura).
+
+**Limites da vitrine**: Número de itens ativos e de blocos de itens ajustado para uma vitrine por quem gere licenças, por cima do plano.
+
 **Impacto**: Tela somente leitura do patrocinador com o número de vitrines sociais ativas (plano Gratuito/Social, não arquivadas) e suas visitas e cliques para enviar no WhatsApp somados por mês e por cidade, sem nome de negócio nem itens. Cidade com menos de 5 vitrines entra em "Outras cidades".
 
 **Organização cliente (Inquilino / Tenant)**: Agrupador comercial de um cliente que pode possuir uma ou mais vitrines sob cotas controladas, mantendo o isolamento de acesso por vitrine.
