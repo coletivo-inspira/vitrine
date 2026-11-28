@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compilePublicStorefront, renderStorefrontHeader, renderStorefrontHtml } from '../src/publication-engine.mjs';
 import { createInitialDraftContent } from '../src/portal-validation.mjs';
+import { staticStorefrontLimits } from '../src/static-storefronts.mjs';
 import {
   SELECTION_OPEN_EVENT,
   formatSelectionLabel,
@@ -83,6 +84,33 @@ test('Cabeçalho: até 5 links de navigation.header, Instagram válido e logo co
     assert.doesNotMatch(renderStorefrontHeader({ ...menu, instagramUrl }), /Instagram/);
   }
   assert.doesNotMatch(renderStorefrontHeader({ ...menu, logoUrl: 'javascript:alert(1)' }), /<img/);
+});
+
+test('Cabeçalho: logo do tema (structure.themeOverrides.logoUrl) é publicada e aceita só WebP', async () => {
+  const draft = modularDraft([{ id: 'itens', moduleCode: 'catalog_grid', config: {} }]);
+  draft.structure.themeOverrides = { logoUrl: '/assets/forno-de-minas-logo.webp' };
+  const menu = await compile(draft);
+  assert.equal(menu.structure.theme.logoUrl, '/assets/forno-de-minas-logo.webp');
+  assert.match(headerOf(renderStorefrontHtml(menu)), /<img class="storefront-identity-logo" src="\/assets\/forno-de-minas-logo\.webp"[^>]*alt="Ateliê Barro Vivo">/);
+
+  for (const logoUrl of ['javascript:alert(1)', '/assets/logo.png', 'http://exemplo.com/logo.webp']) {
+    draft.structure.themeOverrides = { logoUrl };
+    await assert.rejects(compile(draft), { status: 422 }, logoUrl);
+  }
+});
+
+test('Vitrine da Pizzaria Forno de Minas: 25 sabores, logo e mensagem de pizzaria no build', async () => {
+  const draft = JSON.parse(await readFile(resolve(root, 'content/vitrines/forno-de-minas.json'), 'utf8'));
+  const { menu } = await compilePublicStorefront(draft, { slug: draft.slug, name: draft.businessName, template: draft.template }, {
+    revision: 1,
+    publishedAt: '2026-11-28T05:00:00.000Z',
+    ...staticStorefrontLimits(draft.slug)
+  });
+  const pizzas = menu.categories.filter((category) => category.id.startsWith('pizzas-')).flatMap((category) => category.items);
+  assert.equal(pizzas.length, 25);
+  assert.equal(menu.structure.theme.logoUrl, '/assets/forno-de-minas-logo.webp');
+  assert.match(menu.messages.whatsappTemplate, /\{endereco\}/);
+  assert.ok((await readFile(resolve(root, 'web/assets/forno-de-minas-logo.webp'))).byteLength < 40 * 1024);
 });
 
 test('Cabeçalho: vitrine sem bloco de itens não mostra "Sua seleção"', async () => {

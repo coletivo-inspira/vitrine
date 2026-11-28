@@ -34,6 +34,10 @@
 - atelie-exemplo-hero.webp: foto gerada pelo ImageGen em 2026-11-15 para um ateliê
   fictício (pessoa fictícia), 800×1000, WebP de 53 KB. Foto do hero da vitrine de
   exemplo do modelo "Serviços e produtos" (issue 136); prompt no sidecar.
+- forno-de-minas-logo.webp: logo da Pizzaria Forno de Minas, recortada de uma foto do
+  cardápio impresso tirada na pizzaria em 2026-11-28, com o fundo preto uniformizado;
+  378×160, WebP de 12 KB. Usada só na vitrine `/forno-de-minas`, demonstração montada
+  para a própria pizzaria; a marca é dela.
 - highlight-icons.mjs: ícones de traço 24×24 desenhados para o módulo Destaques
   (lista fechada), sem arquivo externo nem fonte de ícones.
 

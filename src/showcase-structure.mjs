@@ -32,7 +32,7 @@ const moduleFields = {
   links_bio: { links: [{ label: 'text', href: 'link' }] },
   custom_sandbox: { widgetId: 'uuid', bundleHash: 'hash' }
 };
-const themeFields = { accentColor: 'color', fontPair: 'font', buttonStyle: 'button', palette: 'palette' };
+const themeFields = { accentColor: 'color', fontPair: 'font', buttonStyle: 'button', palette: 'palette', logoUrl: 'webp' };
 const navFields = { header: [{ label: 'text', href: 'link' }], footer: [{ label: 'text', href: 'link' }] };
 const fonts = ['editorial-syne', 'modern-inter', 'playful-poppins', 'classic-garamond'];
 const identifier = /^[a-z0-9][a-z0-9_-]{0,39}$/;

@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "template": "pizzeria-v1",
+  "catalogType": "products",
+  "slug": "forno-de-minas",
+  "businessName": "Pizzaria Forno de Minas",
+  "whatsapp": "553135828479",
+  "orderFields": {
+    "deliveryOrPickup": true,
+    "customerName": true,
+    "notes": true
+  },
+  "messages": {
+    "heroTitle": "Pizzaria Forno de Minas",
+    "welcomeText": "Escolha as pizzas, diga se é entrega ou retirada e mande o pedido direto para a pizzaria pelo WhatsApp.",
+    "ctaLabel": "Enviar pedido no WhatsApp",
+    "whatsappTemplate": "Olá, Forno de Minas! Meu nome é {nome}.\nQuero pedir:\n{itens}\nTotal estimado (preço da Grande): {total}\n{endereco}\nTamanho, meio a meio, borda e troco vão nas observações."
+  },
+  "structure": {
+    "themeOverrides": {
+      "palette": "vinho",
+      "logoUrl": "/assets/forno-de-minas-logo.webp"
+    },
+    "pages": [
+      {
+        "slug": "home",
+        "title": "Início",
+        "sections": [
+          {
+            "id": "abertura",
+            "moduleCode": "hero",
+            "config": {
+              "eyebrow": "Pizzaria e delivery",
+              "headline": "Peça sua pizza direto pelo WhatsApp",
+              "subtitle": "São 25 sabores em três tamanhos, além de lasanha e macarrão na chapa. Monte o pedido aqui e escolha entrega ou retirada no balcão.",
+              "imageUrl": "/assets/pizza-demo-hero.webp",
+              "imageAlt": "Pizza inteira com mussarela derretida, tomate e manjericão fresco",
+              "primaryAction": {
+                "label": "Ver o cardápio",
+                "target": "selecao"
+              },
+              "secondaryAction": {
+                "label": "Falar no WhatsApp",
+                "target": "whatsapp"
+              }
+            }
+          },
+          {
+            "id": "destaques",
+            "moduleCode": "highlights",
+            "config": {
+              "items": [
+                {
+                  "icon": "mensagem",
+                  "text": "Pedido direto no WhatsApp, sem aplicativo"
+                },
+                {
+                  "icon": "entrega",
+                  "text": "Delivery: (31) 3582-8479"
+                },
+                {
+                  "icon": "local",
+                  "text": "Retirada no balcão"
+                },
+                {
+                  "icon": "estrela",
+                  "text": "Pizza fatia + refri 200 ml por R$ 9,90"
+                }
+              ]
+            }
+          },
+          {
+            "id": "itens",
+            "moduleCode": "catalog_grid",
+            "config": {
+              "columns": 2
+            }
+          },
+          {
+            "id": "perguntas",
+            "moduleCode": "faq",
+            "config": {
+              "title": "Como pedir",
+              "items": [
+                {
+                  "q": "Qual tamanho aparece no preço?",
+                  "a": "O preço de cada pizza é o da Grande. Média e Gigante estão na descrição. Escreva o tamanho nas observações e a pizzaria confirma o valor final."
+                },
+                {
+                  "q": "Dá para pedir meio a meio ou com borda recheada?",
+                  "a": "Dá. Escreva os dois sabores nas observações. A borda de catupiry ou cheddar custa R$ 9,90 na Média, R$ 12,90 na Grande e R$ 14,90 na Gigante."
+                },
+                {
+                  "q": "Como pago?",
+                  "a": "Combine a forma de pagamento na conversa. Se for em dinheiro, diga nas observações para quanto precisa de troco."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "categories": [
+    {
+      "id": "pizzas-tradicionais",
+      "name": "Pizzas Tradicionais",
+      "items": [
+        {
+          "id": "alho-e-oleo",
+          "name": "01. Alho e Óleo",
+          "description": "Parmesão, alho e mussarela. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "atum",
+          "name": "02. Atum",
+          "description": "Atum, tomate, cebola e mussarela. Grande R$ 44,90 · Média R$ 34,90 · Gigante R$ 54,90.",
+          "priceCents": 4490,
+          "active": true
+        },
+        {
+          "id": "bacon",
+          "name": "03. Bacon",
+          "description": "Mussarela, bacon e milho. Grande R$ 44,90 · Média R$ 34,90 · Gigante R$ 54,90.",
+          "priceCents": 4490,
+          "active": true
+        },
+        {
+          "id": "calabresa",
+          "name": "04. Calabresa",
+          "description": "Mussarela, calabresa fatiada e cebola. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "frango-catupiry",
+          "name": "05. Frango com Catupiry",
+          "description": "Peito de frango desfiado e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "frango-cheddar",
+          "name": "06. Frango com Cheddar",
+          "description": "Peito de frango desfiado e cheddar. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "frango-bolonhesa",
+          "name": "07. Frango à Bolonhesa",
+          "description": "Mussarela, frango à bolonhesa e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 64,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "frango-especial",
+          "name": "08. Frango Especial",
+          "description": "Peito de frango desfiado, catupiry e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 63,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "lombinho-canadense",
+          "name": "09. Lombinho Canadense",
+          "description": "Lombo, cebola, tomate e mussarela. Grande R$ 48,90 · Média R$ 38,90 · Gigante R$ 61,90.",
+          "priceCents": 4890,
+          "active": true
+        },
+        {
+          "id": "milho-verde",
+          "name": "10. Milho Verde",
+          "description": "Milho, cebola, mussarela e parmesão. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "priceCents": 3490,
+          "active": true
+        },
+        {
+          "id": "presunto",
+          "name": "11. Presunto",
+          "description": "Mussarela e presunto. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "priceCents": 3490,
+          "active": true
+        },
+        {
+          "id": "portuguesa",
+          "name": "12. Portuguesa",
+          "description": "Mussarela, presunto, cebola, ovos e azeitona. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 54,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "mussarela",
+          "name": "13. Mussarela",
+          "description": "Molho ao sugo e mussarela. Grande R$ 34,90 · Média R$ 24,90 · Gigante R$ 44,90.",
+          "priceCents": 3490,
+          "active": true
+        },
+        {
+          "id": "moda-da-casa",
+          "name": "14. À Moda da Casa",
+          "description": "Mussarela, milho, presunto, bacon, ovos, cebola e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "pizzas-especiais",
+      "name": "Pizzas Especiais",
+      "items": [
+        {
+          "id": "marguerita",
+          "name": "15. Marguerita",
+          "description": "Parmesão, alho, mussarela, tomate e manjericão. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "nordestina",
+          "name": "16. Nordestina",
+          "description": "Mussarela, carne de sol e catupiry. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 69,90.",
+          "priceCents": 5990,
+          "active": true
+        },
+        {
+          "id": "palmito",
+          "name": "17. Palmito",
+          "description": "Ovos, cebola, catupiry e palmito. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "palmito-bolonhesa",
+          "name": "18. Palmito à Bolonhesa",
+          "description": "Mussarela, molho à bolonhesa, cebola, parmesão e palmito. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "peperoni",
+          "name": "19. Peperoni",
+          "description": "Mussarela e peperoni. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 69,90.",
+          "priceCents": 5990,
+          "active": true
+        },
+        {
+          "id": "quatro-queijos",
+          "name": "20. Quatro Queijos",
+          "description": "Mussarela, provolone, parmesão e catupiry. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "salaminho",
+          "name": "21. Salaminho",
+          "description": "Provolone, salaminho e mussarela. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "tomate-seco",
+          "name": "22. Tomate Seco",
+          "description": "Mussarela, palmito, manjericão e tomate seco. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        },
+        {
+          "id": "do-chefe",
+          "name": "23. Do Chefe",
+          "description": "Mussarela, presunto, calabresa, cebola, catupiry, pimentão, milho, ervilha, ovo, azeitona, tomate e bacon. Grande R$ 59,90 · Média R$ 49,90 · Gigante R$ 74,90.",
+          "priceCents": 5990,
+          "active": true
+        },
+        {
+          "id": "vegetariana",
+          "name": "24. Vegetariana",
+          "description": "Mussarela, palmito, milho, azeitona, champignon, cebola e pimentão. Grande R$ 39,90 · Média R$ 29,90 · Gigante R$ 49,90.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "pizza-de-minas",
+          "name": "25. Pizza de Minas",
+          "description": "Mussarela, presunto, calabresa, pimentão, cebola e azeitona. Grande R$ 49,90 · Média R$ 39,90 · Gigante R$ 59,90.",
+          "priceCents": 4990,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "acrescimos",
+      "name": "Acréscimos",
+      "items": [
+        {
+          "id": "borda-recheada-grande",
+          "name": "Borda de Catupiry ou Cheddar (Grande)",
+          "description": "Diga o recheio nas observações. Média R$ 9,90 · Gigante R$ 14,90.",
+          "priceCents": 1290,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "massas",
+      "name": "Lasanhas e Macarrão",
+      "items": [
+        {
+          "id": "lasanha-bolonhesa-750g",
+          "name": "Lasanha Bolonhesa 750 g",
+          "description": "Lasanha ao molho bolonhesa.",
+          "priceCents": 2990,
+          "active": true
+        },
+        {
+          "id": "lasanha-bolonhesa-950g",
+          "name": "Lasanha Bolonhesa 950 g",
+          "description": "Lasanha ao molho bolonhesa.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "lasanha-frango-750g",
+          "name": "Lasanha de Frango 750 g",
+          "description": "Lasanha de frango.",
+          "priceCents": 2990,
+          "active": true
+        },
+        {
+          "id": "lasanha-frango-950g",
+          "name": "Lasanha de Frango 950 g",
+          "description": "Lasanha de frango.",
+          "priceCents": 3990,
+          "active": true
+        },
+        {
+          "id": "macarrao-chapa-750g",
+          "name": "Macarrão na Chapa 750 g",
+          "description": "Macarrão salteado na chapa.",
+          "priceCents": 2990,
+          "active": true
+        },
+        {
+          "id": "macarrao-chapa-950g",
+          "name": "Macarrão na Chapa 950 g",
+          "description": "Macarrão salteado na chapa.",
+          "priceCents": 3990,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "promocao",
+      "name": "Promoção",
+      "items": [
+        {
+          "id": "fatia-refri",
+          "name": "Pizza fatia + Refri 200 ml",
+          "description": "Uma fatia de pizza com refrigerante de 200 ml.",
+          "priceCents": 990,
+          "active": true
+        }
+      ]
+    }
+  ]
+}

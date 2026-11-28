@@ -8,6 +8,8 @@ import * as engine from '../src/publication-engine.mjs';
 import { ALLOWED_TEMPLATES, createInitialDraftContent } from '../src/portal-validation.mjs';
 import { StorefrontRenderer } from '../web/assets/storefront-renderer.mjs';
 import { heroPhotoDraft } from './fixtures/hero-photo-storefront.mjs';
+import { staticStorefrontLimits } from '../src/static-storefronts.mjs';
+import { STOREFRONT_PALETTES_CSS } from '../web/assets/storefront-palettes.mjs';
 
 const { compilePublicStorefront, renderStorefrontHtml } = engine;
 
@@ -114,7 +116,9 @@ function auditStorefrontHtml(html, { fragment = false } = {}) {
     const scripts = tagsOf(clean, 'script').filter(({ attrs }) => attrs.src);
     const modules = scripts.filter(({ attrs }) => attrs.type === 'module');
     const classic = scripts.filter(({ attrs }) => attrs.type !== 'module');
-    const stylesheets = tagsOf(clean, 'link').filter(({ attrs }) => /\bstylesheet\b/i.test(attrs.rel ?? ''));
+    // A folha das paletas só entra em vitrines com paleta não padrão e não conta no limite.
+    const stylesheets = tagsOf(clean, 'link').filter(({ attrs }) =>
+      /\bstylesheet\b/i.test(attrs.rel ?? '') && attrs.href !== STOREFRONT_PALETTES_CSS);
     if (modules.length > STOREFRONT_BUDGET.maxModuleEntries) {
       violations.push(`${modules.length} módulos JS de entrada (máximo ${STOREFRONT_BUDGET.maxModuleEntries})`);
     }
@@ -517,7 +521,8 @@ async function exampleStorefronts() {
   for (const candidate of candidates) {
     const { menu } = await compilePublicStorefront(candidate.draft, candidate.site, {
       revision: 1,
-      publishedAt: '2026-11-14T00:00:00.000Z'
+      publishedAt: '2026-11-14T00:00:00.000Z',
+      ...staticStorefrontLimits(candidate.draft.slug)
     });
     storefronts.push({ ...candidate, menu });
   }

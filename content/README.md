@@ -27,7 +27,10 @@ autorização pendente ou com o marcador `[a preencher com o conteúdo autorizad
 # Vitrines de exemplo
 
 `vitrines/*.json` são rascunhos no formato do painel, cobertos pelo orçamento da
-vitrine pública (`test/storefront-budget.test.mjs`). O build publica só `loja1`;
+vitrine pública (`test/storefront-budget.test.mjs`). O build publica `loja1` e
+`forno-de-minas` (lista e limites de plano em `src/static-storefronts.mjs`);
+`forno-de-minas.json` é o cardápio real da Pizzaria Forno de Minas, montado como
+demonstração para a própria pizzaria com os preços do cardápio impresso;
 `rascunho-guavira-fotos.json` é demonstração fictícia da issue #124 e não vai para
 `dist/` (roteiro em `docs/aquisicao/guavira-piloto.md`).
 
