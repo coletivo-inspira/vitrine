@@ -70,6 +70,25 @@ A cota de patrocínio é negociada por contrato, fora do sistema. Depois de assi
 
 Atribuir e retirar ficam na auditoria da plataforma (`sponsor_granted`, `sponsor_revoked`). Uma conta que já é operadora da plataforma não muda de papel por aqui.
 
+### 2.5 Hierarquia da administração, licenças e cupons (spec 022, ADR 0018 proposta)
+
+Papéis da plataforma: **Dono da plataforma** (uma só conta, todo o acesso), **Administrador** (opera usuários, processos, licenças, cupons, limites, CMS e modelos, mas não mexe em administradores) e **Gestor de licenças** (só licenças, cupons e limites por vitrine). A matriz completa está em `specs/022-administracao-hierarquia/data-model.md`.
+
+**Definir o Dono (passo humano, uma vez, depois de aplicar a migração `20261128001000`):**
+
+1. A pessoa entra uma vez no painel com a conta que será a dona.
+2. No SQL Editor do Supabase (projeto `qawlpsrfewosxsfgmmpm`), rode `select private.bootstrap_platform_owner('<e-mail da conta>');`. A função recusa (`PLATFORM_OWNER_EXISTS`) se já houver Dono e não pode ser chamada pelo painel.
+3. Para trocar de Dono: `update public.platform_operators set role = 'platform_admin' where role = 'platform_owner';` e depois o passo 2 com o novo e-mail.
+
+Nenhum e-mail fica no repositório. Depois disso:
+
+- **Equipe da plataforma**: o Dono dá e retira Administrador; Administradores dão e retiram Gestor de licenças. Copie o identificador da conta na aba **Usuários**.
+- **Licença** (aba Usuários › vitrine › **Conceder licença**): plano pago por 1 a 36 meses, sem cobrança e sem mexer na assinatura. Vale o maior plano entre a assinatura válida e as licenças vigentes. Licenças do mesmo plano somam meses.
+- **Cupom** (aba **Licenças e cupons**): plano, meses, número de usos e validade opcional. A proprietária digita o código em **Plano e cobrança › Tenho um cupom**; cada organização usa um cupom uma vez e cada conta tem até 10 tentativas por hora. O relatório mostra resgates, meses e o valor concedido (preço mensal do plano × meses).
+- **Limites da vitrine**: itens ativos (1 a 100) e blocos de itens (1 a 5) por cima do plano; **Voltar aos limites do plano** desfaz.
+
+Tudo fica na auditoria (`platform_role_*`, `license_*`, `coupon_*`, `site_limits_*`).
+
 ---
 
 ## 3. Planos, Cobrança Recorrente e Ciclo de 7 Dias de Tolerância (ADR 0013, issue #114)

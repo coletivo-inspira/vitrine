@@ -7,6 +7,7 @@ import { createLocationPicker } from './br-locations.js';
 import { initAuctionsPanel, loadAuctionsPanel, selectAuctionSite } from './auctions-panel.js';
 import { loadBillingNotice } from './billing-notice.mjs';
 import { initBillingPanel, loadBillingPanel } from './billing-panel.mjs';
+import { initCouponRedeem, refreshCouponRedeem } from './coupon-redeem.mjs';
 import { loadDemoInvitations } from './linktree-import.js';
 import {
   activeSites,
@@ -388,6 +389,7 @@ globalThis.document?.addEventListener('DOMContentLoaded', async () => {
   setupInsightsControls();
   initAuctionsPanel({ getSites: () => sites, isOnline: () => isOnline });
   initBillingPanel({ getSites: () => sites, isOnline: () => isOnline, publicOrigin: () => PUBLIC_SITE_ORIGIN });
+  initCouponRedeem({ getSites: () => sites, isOnline: () => isOnline, onRedeemed: () => void loadBillingPanel() });
   setupHashRouting();
   await checkSession();
   if (currentUser) {
@@ -1224,6 +1226,7 @@ export function showSection(section) {
 
   if (section === 'plano') {
     void loadBillingPanel();
+    refreshCouponRedeem();
   }
 
   if (previous && previous !== 'auth' && previous !== section) {

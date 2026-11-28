@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="./portal.css">
   <link rel="stylesheet" href="./site-lifecycle.css">
   <link rel="stylesheet" href="./billing.css">
+  <link rel="stylesheet" href="./platform-admin.css">
   <link rel="stylesheet" href="./item-page-fields.css">
   <link rel="stylesheet" href="./payment-link-field.css">
   <link rel="stylesheet" href="./insights-origin.css">
@@ -307,28 +308,32 @@
           </div>
         </section>
 
-        <!-- Section 2B: Administração da plataforma (somente platform_admin) -->
+        <!-- Section 2B: Administração da plataforma (Dono, Administrador e Gestor de licenças; abas por capacidade) -->
         <section id="platform-cms-section" class="shell-section admin-platform" aria-labelledby="platform-admin-title" hidden>
           <div class="section-header">
             <div class="card-eyebrow">Somente operadores</div>
             <h1 id="platform-admin-title" class="display-title" tabindex="-1">Administração da plataforma</h1>
-            <p class="section-desc">Acompanhe a operação, repasse pedidos que chegam pela Mila, ajuste os modelos de vitrine e publique o site institucional.</p>
+            <p class="section-desc">Gerencie usuários, licenças, cupons e limites das vitrines, acompanhe os processos e, conforme o seu papel, a operação da plataforma.</p>
+            <p id="platform-role-line" class="admin-role-line" hidden></p>
           </div>
 
-          <ul id="platform-overview" class="admin-kpi-grid" aria-label="Indicadores da plataforma"></ul>
-          <div class="admin-status-row">
+          <ul id="platform-overview" class="admin-kpi-grid" aria-label="Indicadores da plataforma" data-capability="platform.operate"></ul>
+          <div id="platform-operations-row" class="admin-status-row" data-capability="platform.operate">
             <p id="platform-operations-status" class="admin-status" role="status"></p>
             <button id="platform-operations-retry" class="button button-small button-secondary button-pill" type="button" hidden>Tentar novamente</button>
           </div>
 
           <div class="admin-tabs" role="tablist" aria-label="Áreas da administração">
-            <button type="button" role="tab" id="platform-tab-overview" class="admin-tab" aria-controls="platform-operations" aria-selected="true">Visão geral</button>
-            <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1">Pedidos pela Mila</button>
-            <button type="button" role="tab" id="platform-tab-linktree" class="admin-tab" aria-controls="platform-linktree" aria-selected="false" tabindex="-1">Importar do Linktree</button>
-            <button type="button" role="tab" id="platform-tab-sponsors" class="admin-tab" aria-controls="platform-sponsors" aria-selected="false" tabindex="-1">Patrocinadores</button>
-            <button type="button" role="tab" id="platform-tab-auto-reply" class="admin-tab" aria-controls="platform-auto-reply" aria-selected="false" tabindex="-1">Resposta automática</button>
-            <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1">Modelos de vitrine</button>
-            <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1">Site institucional</button>
+            <button type="button" role="tab" id="platform-tab-overview" class="admin-tab" aria-controls="platform-operations" aria-selected="true" data-capability="platform.operate">Processos</button>
+            <button type="button" role="tab" id="platform-tab-users" class="admin-tab" aria-controls="platform-users" aria-selected="false" tabindex="-1" data-capability="users.read">Usuários</button>
+            <button type="button" role="tab" id="platform-tab-licenses" class="admin-tab" aria-controls="platform-licenses" aria-selected="false" tabindex="-1" data-capability="licenses.manage">Licenças e cupons</button>
+            <button type="button" role="tab" id="platform-tab-team" class="admin-tab" aria-controls="platform-team" aria-selected="false" tabindex="-1" data-capability="staff.manage">Equipe da plataforma</button>
+            <button type="button" role="tab" id="platform-tab-mila" class="admin-tab" aria-controls="platform-mila" aria-selected="false" tabindex="-1" data-capability="platform.operate">Pedidos pela Mila</button>
+            <button type="button" role="tab" id="platform-tab-linktree" class="admin-tab" aria-controls="platform-linktree" aria-selected="false" tabindex="-1" data-capability="platform.operate">Importar do Linktree</button>
+            <button type="button" role="tab" id="platform-tab-sponsors" class="admin-tab" aria-controls="platform-sponsors" aria-selected="false" tabindex="-1" data-capability="platform.operate">Patrocinadores</button>
+            <button type="button" role="tab" id="platform-tab-auto-reply" class="admin-tab" aria-controls="platform-auto-reply" aria-selected="false" tabindex="-1" data-capability="platform.operate">Resposta automática</button>
+            <button type="button" role="tab" id="platform-tab-templates" class="admin-tab" aria-controls="platform-templates" aria-selected="false" tabindex="-1" data-capability="platform.operate">Modelos de vitrine</button>
+            <button type="button" role="tab" id="platform-tab-site" class="admin-tab" aria-controls="platform-site" aria-selected="false" tabindex="-1" data-capability="platform.operate">Site institucional</button>
           </div>
 
           <div id="platform-operations" class="admin-panel admin-overview-grid" role="tabpanel" aria-labelledby="platform-tab-overview" tabindex="0">
@@ -341,6 +346,98 @@
               <h2>Atividade recente</h2>
               <p class="admin-card-desc">Últimas ações registradas na auditoria da plataforma.</p>
               <ul id="platform-audit" class="admin-list admin-list-compact"></ul>
+            </article>
+          </div>
+
+          <div id="platform-users" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-users" tabindex="0" hidden>
+            <div class="admin-users-layout">
+              <article class="portal-card admin-card">
+                <h2>Usuários</h2>
+                <p class="admin-card-desc">Procure por e-mail, nome, nome do negócio, endereço da vitrine ou identificador da conta.</p>
+                <form id="platform-users-form" class="admin-search-form" role="search" novalidate>
+                  <label class="visually-hidden" for="platform-users-search">Buscar usuários</label>
+                  <input type="search" id="platform-users-search" class="item-input input-styled-height" autocomplete="off" spellcheck="false" maxlength="120" placeholder="rita@exemplo.com ou doces-da-rita">
+                  <button type="submit" class="button button-small button-pill">Buscar</button>
+                </form>
+                <p id="platform-users-status" class="form-help" role="status"></p>
+                <ul id="platform-users-list" class="admin-list admin-user-list" aria-label="Usuários encontrados"></ul>
+                <button id="platform-users-more" class="button button-small button-secondary button-pill" type="button" hidden>Carregar mais</button>
+              </article>
+              <article id="platform-user-detail" class="portal-card admin-card admin-user-detail" aria-live="polite" hidden></article>
+            </div>
+          </div>
+
+          <div id="platform-licenses" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-licenses" tabindex="0" hidden>
+            <ul id="platform-coupon-report" class="admin-kpi-grid" aria-label="Relatório de cupons e licenças"></ul>
+            <div class="admin-overview-grid">
+              <article class="portal-card admin-card">
+                <h2>Criar cupom</h2>
+                <p class="admin-card-desc">Quem resgata o código em "Plano e cobrança" ganha uma licença do plano pelo número de meses do cupom, sem cobrança. Cada organização usa um cupom uma vez. Licenças para uma vitrine específica ficam em Usuários.</p>
+                <form id="platform-coupon-form" class="form-flex-col admin-coupon-form" novalidate>
+                  <div class="admin-form-grid">
+                    <div class="form-group">
+                      <label for="platform-coupon-plan">Plano</label>
+                      <select id="platform-coupon-plan" class="select-styled">
+                        <option value="essencial">Essencial</option>
+                        <option value="profissional" selected>Profissional</option>
+                        <option value="equipe">Equipe/Multi-Vitrine</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="platform-coupon-months">Meses</label>
+                      <input type="number" id="platform-coupon-months" class="item-input input-styled-height" min="1" max="36" value="12" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="platform-coupon-max">Número de usos</label>
+                      <input type="number" id="platform-coupon-max" class="item-input input-styled-height" min="1" max="1000" value="1" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="platform-coupon-expires">Válido até (opcional)</label>
+                      <input type="date" id="platform-coupon-expires" class="item-input input-styled-height">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="platform-coupon-code">Código (opcional)</label>
+                    <input type="text" id="platform-coupon-code" class="item-input input-styled-height" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="Em branco, geramos um código" aria-describedby="platform-coupon-code-help">
+                    <p id="platform-coupon-code-help" class="form-help">De 6 a 24 letras, números e hífens. Ex.: FEIRA-2027.</p>
+                  </div>
+                  <div class="form-group">
+                    <label for="platform-coupon-note">Observação (opcional)</label>
+                    <input type="text" id="platform-coupon-note" class="item-input input-styled-height" maxlength="280" placeholder="Ex.: Feira de novembro">
+                  </div>
+                  <button type="submit" class="button button-pill">Criar cupom</button>
+                </form>
+                <p id="platform-coupon-status" class="form-help" role="status"></p>
+                <div id="platform-coupon-created" class="admin-coupon-created" hidden></div>
+              </article>
+              <article class="portal-card admin-card">
+                <h2>Cupons</h2>
+                <p class="admin-card-desc">Usos, validade e valor concedido (preço mensal do plano × meses de cada resgate).</p>
+                <ul id="platform-coupon-list" class="admin-list" aria-label="Cupons criados"></ul>
+              </article>
+            </div>
+          </div>
+
+          <div id="platform-team" class="admin-panel" role="tabpanel" aria-labelledby="platform-tab-team" tabindex="0" hidden>
+            <article class="portal-card admin-card">
+              <h2>Equipe da plataforma</h2>
+              <p id="platform-team-desc" class="admin-card-desc">O Dono da plataforma dá e retira o papel de Administrador. Administradores dão e retiram o papel de Gestor de licenças. Ninguém muda o próprio papel.</p>
+              <form id="platform-team-form" class="form-flex-col sponsor-admin-form" novalidate>
+                <div class="admin-form-grid">
+                  <div class="form-group">
+                    <label for="platform-team-user">Conta (identificador)</label>
+                    <input type="text" id="platform-team-user" class="item-input input-styled-height" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" placeholder="00000000-0000-0000-0000-000000000000" aria-describedby="platform-team-user-help">
+                    <p id="platform-team-user-help" class="form-help">Copie o identificador na aba Usuários. A pessoa precisa ter entrado no painel uma vez.</p>
+                  </div>
+                  <div class="form-group">
+                    <label for="platform-team-role">Papel</label>
+                    <select id="platform-team-role" class="select-styled"></select>
+                  </div>
+                </div>
+                <button type="submit" class="button button-pill sponsor-admin-submit">Dar papel</button>
+              </form>
+              <p id="platform-team-status" class="form-help" role="status"></p>
+              <ul id="platform-team-list" class="admin-list sponsor-admin-list" aria-label="Equipe da plataforma"></ul>
             </article>
           </div>
 
@@ -524,6 +621,22 @@
           </div>
           <div id="billing-panel-message" class="billing-panel-message" hidden></div>
           <div id="billing-panel-body" class="billing-panel-body"></div>
+          <article id="billing-coupon" class="portal-card billing-coupon" aria-labelledby="billing-coupon-title" hidden>
+            <h2 id="billing-coupon-title">Tenho um cupom</h2>
+            <p class="section-desc">O cupom libera um plano por alguns meses, sem cobrança. Ao fim, a vitrine continua no ar com os limites do plano que valer.</p>
+            <form id="billing-coupon-form" class="billing-coupon-form" novalidate>
+              <div class="form-group" id="billing-coupon-site-group">
+                <label for="billing-coupon-site">Vitrine</label>
+                <select id="billing-coupon-site" class="select-styled"></select>
+              </div>
+              <div class="form-group">
+                <label for="billing-coupon-code">Código do cupom</label>
+                <input type="text" id="billing-coupon-code" class="item-input input-styled-height" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="ABCD-EFGH-JKLM">
+              </div>
+              <button type="submit" class="button button-pill">Usar cupom</button>
+            </form>
+            <p id="billing-coupon-status" class="form-help" role="status" aria-live="polite"></p>
+          </article>
           <p class="billing-pricing"><a id="billing-pricing-link" class="text-link" href="https://vitrine.inspira.dev.br/planos/" target="_blank" rel="noopener noreferrer">Ver todos os planos, limites e preços <span class="visually-hidden">(abre em nova aba)</span><span aria-hidden="true">↗</span></a></p>
 
           <dialog id="billing-change-dialog" class="portal-dialog billing-dialog" aria-labelledby="billing-change-title" aria-describedby="billing-change-summary">
