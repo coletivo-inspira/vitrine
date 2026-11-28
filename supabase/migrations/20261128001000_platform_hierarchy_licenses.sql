@@ -1,4 +1,4 @@
--- Spec 021 (ADR 0018, proposta): hierarquia da administração, licenças, cupons e limites por vitrine.
+-- Spec 022 (ADR 0018, proposta): hierarquia da administração, licenças, cupons e limites por vitrine.
 -- Papéis: platform_owner (um só), platform_admin, license_manager, support_operator, sponsor.
 -- A matriz de capacidades espelha src/admin/platform-roles.mjs; o teste de banco compara as duas.
 -- Funções que leem colunas de auth.users além de id são plpgsql: as colunas são resolvidas na

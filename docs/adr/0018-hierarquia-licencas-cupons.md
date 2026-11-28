@@ -6,7 +6,7 @@ status: proposed
 Relaciona-se com as ADRs [0002](0002-site-access-boundary.md) (acesso por vitrine),
 [0005](0005-zero-cost-mvp.md) (custo zero), [0013](0013-plans-and-recurring-billing.md) (planos e
 assinatura) e [0016](0016-convite-demonstracao-e-cortesia.md) (cortesia, proposta).
-Origem: [`specs/021-administracao-hierarquia`](../../specs/021-administracao-hierarquia/plan.md).
+Origem: [`specs/022-administracao-hierarquia`](../../specs/022-administracao-hierarquia/plan.md).
 
 ## Contexto e Problema
 

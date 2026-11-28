@@ -1,4 +1,4 @@
-// Rotas da hierarquia da administração, licenças, cupons e limites por vitrine (spec 021).
+// Rotas da hierarquia da administração, licenças, cupons e limites por vitrine (spec 022).
 // O Worker confere a capacidade antes de chamar o banco; o banco confere de novo em cada função.
 import { PortalValidationError } from '../portal-validation.mjs';
 import { PLAN_CODES } from '../plans.mjs';

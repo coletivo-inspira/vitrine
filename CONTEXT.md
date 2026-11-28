@@ -74,7 +74,7 @@ _Evitar_: trial, período de teste.
 
 **Patrocinador**: Pessoa ou entidade que financia o plano Gratuito/Social por cota negociada fora do sistema. No painel tem só a tela Impacto, atribuída por um Operador Inspira; não abre vitrines, rascunhos nem a administração.
 
-**Dono da plataforma**: A única conta com todo o acesso à administração (papel `platform_owner`), inclusive dar e retirar o papel de Administrador. É definida fora do painel, no SQL Editor (spec `021-administracao-hierarquia`).
+**Dono da plataforma**: A única conta com todo o acesso à administração (papel `platform_owner`), inclusive dar e retirar o papel de Administrador. É definida fora do painel, no SQL Editor (spec `022-administracao-hierarquia`).
 
 **Administrador da plataforma**: Operador Inspira (papel `platform_admin`) que opera usuários, processos, licenças, cupons, limites, CMS e modelos, mas não mexe em outros administradores nem no Dono. Não confundir com o Administrador da equipe de uma vitrine (`admin` em `site_memberships`).
 

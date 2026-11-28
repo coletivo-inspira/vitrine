@@ -1,4 +1,4 @@
-// Aba "Licenças e cupons" da Administração (spec 021): relatório, criação, lista e
+// Aba "Licenças e cupons" da Administração (spec 022): relatório, criação, lista e
 // desativação de cupons. Licenças para uma vitrine específica ficam na aba Usuários.
 import { PLAN_NAMES, actionButton, adminRequest, copyText, element, formatDay, formatMoney } from './platform-access.mjs';
 

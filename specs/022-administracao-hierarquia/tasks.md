@@ -4,13 +4,13 @@ description: "Tarefas da hierarquia da administração, licenças, cupons e limi
 
 # Tasks: Hierarquia da administração, licenças, cupons e limites
 
-**Input**: `specs/021-administracao-hierarquia/` (spec, plan, data-model, contracts, quickstart)
+**Input**: `specs/022-administracao-hierarquia/` (spec, plan, data-model, contracts, quickstart)
 
 **Tests**: obrigatórios para permissões no banco, rotas por papel e abas por capacidade (Princípios II e V).
 
 ## Phase 1: Setup
 
-- [x] T001 Criar `specs/021-administracao-hierarquia/` com spec, plan, data-model, contracts, quickstart e tasks.
+- [x] T001 Criar `specs/022-administracao-hierarquia/` com spec, plan, data-model, contracts, quickstart e tasks.
 - [x] T002 Propor o ADR `docs/adr/0018-hierarquia-licencas-cupons.md`.
 - [x] T003 Atualizar `AGENTS.md`, `.specify/feature.json` e `CONTEXT.md`.
 

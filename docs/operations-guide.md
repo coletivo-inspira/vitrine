@@ -70,9 +70,9 @@ A cota de patrocínio é negociada por contrato, fora do sistema. Depois de assi
 
 Atribuir e retirar ficam na auditoria da plataforma (`sponsor_granted`, `sponsor_revoked`). Uma conta que já é operadora da plataforma não muda de papel por aqui.
 
-### 2.5 Hierarquia da administração, licenças e cupons (spec 021, ADR 0018 proposta)
+### 2.5 Hierarquia da administração, licenças e cupons (spec 022, ADR 0018 proposta)
 
-Papéis da plataforma: **Dono da plataforma** (uma só conta, todo o acesso), **Administrador** (opera usuários, processos, licenças, cupons, limites, CMS e modelos, mas não mexe em administradores) e **Gestor de licenças** (só licenças, cupons e limites por vitrine). A matriz completa está em `specs/021-administracao-hierarquia/data-model.md`.
+Papéis da plataforma: **Dono da plataforma** (uma só conta, todo o acesso), **Administrador** (opera usuários, processos, licenças, cupons, limites, CMS e modelos, mas não mexe em administradores) e **Gestor de licenças** (só licenças, cupons e limites por vitrine). A matriz completa está em `specs/022-administracao-hierarquia/data-model.md`.
 
 **Definir o Dono (passo humano, uma vez, depois de aplicar a migração `20261128001000`):**
 

@@ -1,4 +1,4 @@
-// Papel e capacidades na administração (spec 021). O servidor decide em GET /api/admin/me;
+// Papel e capacidades na administração (spec 022). O servidor decide em GET /api/admin/me;
 // aqui só escolhemos o que mostrar. A matriz completa fica em src/admin/platform-roles.mjs.
 export const ROLE_LABELS = Object.freeze({
   platform_owner: 'Dono da plataforma',

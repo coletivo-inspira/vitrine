@@ -1,4 +1,4 @@
-// Aba "Equipe da plataforma" (spec 021). O Dono dá e retira Administrador; Administradores
+// Aba "Equipe da plataforma" (spec 022). O Dono dá e retira Administrador; Administradores
 // dão e retiram Gestor de licenças e Suporte. O banco confere a mesma regra.
 import { ROLE_LABELS, actionButton, adminRequest, canManageRole, element, manageableRoles } from './platform-access.mjs';
 

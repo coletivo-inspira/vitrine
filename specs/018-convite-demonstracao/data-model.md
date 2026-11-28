@@ -53,7 +53,7 @@ Restrições e índices:
 
 Cortesia do Profissional, separada da assinatura (research R6).
 
-> Nota (spec 021, 2026-11-28): a tabela `public.license_grants` da migração `20261128001000_platform_hierarchy_licenses.sql` já aceita `source = 'courtesy'` e já é lida por `private.site_entitlements`. Ao implementar esta especificação, prefira gravar a cortesia como licença dessa origem (90 dias do Profissional) em vez de criar `private.courtesy_grants`; a regra "uma cortesia por conta" passa a ser uma checagem em `license_grants`.
+> Nota (spec 022, 2026-11-28): a tabela `public.license_grants` da migração `20261128001000_platform_hierarchy_licenses.sql` já aceita `source = 'courtesy'` e já é lida por `private.site_entitlements`. Ao implementar esta especificação, prefira gravar a cortesia como licença dessa origem (90 dias do Profissional) em vez de criar `private.courtesy_grants`; a regra "uma cortesia por conta" passa a ser uma checagem em `license_grants`.
 
 | Coluna | Tipo | Regra |
 |---|---|---|

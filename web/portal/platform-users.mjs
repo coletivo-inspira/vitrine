@@ -1,4 +1,4 @@
-// Aba "Usuários" da Administração (spec 021): busca, detalhe com vitrines, plano em vigor,
+// Aba "Usuários" da Administração (spec 022): busca, detalhe com vitrines, plano em vigor,
 // licenças e limites. Conceder e retirar licença e ajustar limites exigem licenses.manage.
 import {
   LICENSE_SOURCES, PLAN_NAMES, ROLE_LABELS, actionButton, adminRequest, can, copyText, element, formatDay

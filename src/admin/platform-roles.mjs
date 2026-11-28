@@ -1,4 +1,4 @@
-// Matriz de capacidades da administração (spec 021). Espelhada em
+// Matriz de capacidades da administração (spec 022). Espelhada em
 // private.platform_capabilities(); test/database/platform-hierarchy.test.mjs compara as duas.
 export const PLATFORM_ROLES = ['platform_owner', 'platform_admin', 'license_manager', 'support_operator', 'sponsor'];
 

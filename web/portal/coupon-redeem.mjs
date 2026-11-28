@@ -1,4 +1,4 @@
-// "Tenho um cupom" em Plano e cobrança (spec 021). Só a proprietária resgata; o banco
+// "Tenho um cupom" em Plano e cobrança (spec 022). Só a proprietária resgata; o banco
 // confere de novo, limita a 10 tentativas por hora e cria a licença.
 const doc = () => globalThis.document;
 const byId = id => doc()?.getElementById(id) ?? null;
