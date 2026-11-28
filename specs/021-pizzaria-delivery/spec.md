@@ -60,6 +60,17 @@ Como pizzaria, quero colar na aba Pedidos a mensagem do pedido que chegou no Wha
 1. **Given** uma mensagem no formato da vitrine, **When** colada, **Then** o painel mostra endereço, total e pagamento extraídos e a mensagem pronta.
 2. **Given** um entregador escolhido, **When** a pessoa toca em "Abrir no WhatsApp do entregador", **Then** abre `wa.me/<número>` com o texto; nada é enviado ao servidor.
 
+### User Story 5 - Endereço com mapa (`021-US5`) (Priority: P2)
+
+Como cliente, quero digitar o endereço e escolher numa lista, ou usar a localização do aparelho, e conferir o ponto num mapa, arrastando até o pino ficar no lugar exato, para o motoboy chegar sem ligar.
+
+**Acceptance Scenarios**:
+
+1. **Given** a vitrine com "Endereço com mapa" ligado, **When** a pessoa digita 3 ou mais letras do endereço, **Then** aparecem até 5 endereços do Brasil para escolher.
+2. **Given** um endereço escolhido ou a localização do aparelho, **When** o mapa aparece, **Then** o pino fica no centro e a pessoa arrasta o mapa (ou usa as setas e o zoom) para ajustar o ponto.
+3. **Given** um ponto marcado e entrega escolhida, **When** a mensagem é montada, **Then** ela traz `Localização: https://maps.google.com/?q=<lat>,<lon>` logo abaixo do endereço, e o despacho usa esse link como mapa do motoboy.
+4. **Given** a busca fora do ar, **When** a pessoa digita, **Then** o campo continua aceitando o endereço escrito à mão.
+
 ### Edge Cases
 
 - Item com meio a meio sem outro sabor compatível no tamanho escolhido: a opção fica sem alternativas e o preço é o do próprio sabor.
@@ -81,6 +92,9 @@ Como pizzaria, quero colar na aba Pedidos a mensagem do pedido que chegou no Wha
 - **FR-010 (Entregadores)**: `deliveryCouriers`, até 20 `{ id, name (até 60), whatsapp }` com o mesmo formato do WhatsApp da vitrine.
 - **FR-011 (Despacho)**: módulo puro que extrai do texto colado nome, endereço, total, pagamento e observações e monta a mensagem e o link `wa.me` do entregador; sem rede.
 - **FR-012 (Privacidade)**: `deliveryCouriers` fica fora da projeção pública e é tratado como chave privada pelo verificador de vazamento.
+- **FR-013 (Endereço com mapa)**: `orderFields.addressMap: true` liga sugestões de endereço, "Usar minha localização" e o mapa com pino ajustável; o ponto vira link do Google Maps na mensagem, sem chave nem API paga.
+- **FR-014 (Proxy do mapa)**: `/api/geo/search`, `/api/geo/reverse` e `/api/geo/tile/:z/:x/:y.png` no Worker, com User-Agent próprio, recusa de pedidos de outros sites, busca restrita ao Brasil e sem cache, e blocos do OpenStreetMap em cache por 7 dias. A CSP da vitrine continua `img-src 'self'; connect-src 'self'`.
+- **FR-015 (Geolocalização)**: só as páginas da vitrine recebem `Permissions-Policy: geolocation=(self)`, e a localização só é pedida no toque em "Usar minha localização".
 
 ## Success Criteria
 

@@ -135,4 +135,6 @@ _Evitar_: robô, bot de atendimento, disparo.
 
 **Despachar entrega**: Na aba Pedidos, colar a mensagem do pedido recebida no WhatsApp, escolher o entregador e abrir a conversa dele com endereço, mapa, valor a cobrar e o pedido. Nada é salvo no servidor.
 
+**Endereço com mapa**: Campo de endereço da vitrine com sugestões, "Usar minha localização" e um mapa em que a pessoa arrasta até o pino ficar no ponto da entrega; o ponto vai na mensagem como link do Google Maps. Usa OpenStreetMap pelo Worker, sem chave.
+
 **Plataformas de delivery**: Links da loja do negócio no iFood e no 99Food, mostrados como "Também estamos no". Não há integração com as plataformas.

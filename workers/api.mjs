@@ -1,4 +1,5 @@
 import { CloudflareHostnames, createDomainChallenge, validateCustomHostname, verifyDomainDns } from '../src/custom-domains.mjs';
+import { handleGeoRequest } from '../src/geo-proxy.mjs';
 import { assertPublishableSocialProof, resolveShowcaseManifest, extractShowcaseOverrides } from '../src/showcase-structure.mjs';
 import { R2StorageProvider, SupabaseStorageProvider } from '../src/storage-adapter.mjs';
 import { validateCmsSection } from '../src/platform-cms.mjs';
@@ -146,6 +147,8 @@ const WIDGET_FRAME_CSP = `; frame-src https://${SANDBOX_HOST}`;
 export const STOREFRONT_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
+// A vitrine pede a localização só quando a pessoa toca em "Usar minha localização" no endereço com mapa.
+export const STOREFRONT_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(self)';
 const PUBLIC_SECURITY_HEADERS = Object.freeze({
   'content-security-policy': STRICT_CSP_HEADER,
   'x-content-type-options': 'nosniff',
@@ -3762,6 +3765,7 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
         status: 200,
         headers: {
           ...PUBLIC_SECURITY_HEADERS,
+          'permissions-policy': STOREFRONT_PERMISSIONS_POLICY,
           'content-security-policy': (hasExternalStorageImages ? STOREFRONT_STORAGE_CSP_HEADER : STRICT_CSP_HEADER) +
             (pub.menu.structure ? WIDGET_FRAME_CSP : ''),
           'content-type': 'text/html; charset=utf-8',
@@ -3781,6 +3785,7 @@ async function handlePublicStorefrontOrMenuRequest(request, pathname, method, st
           status: 200,
           headers: {
             ...PUBLIC_SECURITY_HEADERS,
+            'permissions-policy': STOREFRONT_PERMISSIONS_POLICY,
             'content-type': 'text/html; charset=utf-8',
             'cache-control': STOREFRONT_CACHE_CONTROL
           }
@@ -4141,6 +4146,10 @@ export function createApiHandler(deps = {}) {
     const assetsFetcher = env?.ASSETS ?? deps?.assets;
 
     if (url.hostname === SANDBOX_HOST) return handleSandboxPage(request, url, store);
+
+    if (pathname.startsWith('/api/geo/')) {
+      return handleGeoRequest(request, url, { fetchImpl: deps.geoFetch ?? globalThis.fetch, cache: deps.geoCache ?? globalThis.caches?.default });
+    }
 
     const isItemLikesRoute = pathname === '/api/likes' || pathname === '/api/likes/';
     const isLeadsRoute = LEADS_PATH.test(pathname);

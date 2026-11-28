@@ -242,7 +242,8 @@ const ALLOWED_ORDER_FIELD_KEYS = Object.freeze([
   'customerName',
   'notes',
   'deliveryFeeCents',
-  'payment'
+  'payment',
+  'addressMap'
 ]);
 const ALLOWED_MESSAGE_KEYS = Object.freeze([
   'heroTitle',

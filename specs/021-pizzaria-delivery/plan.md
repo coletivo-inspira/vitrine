@@ -13,7 +13,7 @@ Opções de item (tamanhos, meio a meio e adicionais), taxa de entrega, forma de
 - **Vitrine**: `web/assets/storefront-renderer.mjs` (cartão, carrinho, passo dos dados e mensagem), `web/vitrine/vitrine.css`.
 - **Painel**: `web/portal/item-options-field.mjs` (cartão do item), `web/portal/delivery-panel.mjs` (Configurações > Delivery), `web/portal/dispatch.mjs` e `web/portal/dispatch-panel.mjs` (aba Pedidos).
 - **Banco**: nenhuma migração. Tudo fica no rascunho (`draft_content`), que só a equipe da vitrine lê.
-- **Custo**: zero; nenhuma API externa, nenhum envio de mensagem.
+- **Custo**: zero; nenhuma API paga, nenhum envio de mensagem. O endereço com mapa usa o Photon (busca, uso justo) e os blocos do OpenStreetMap, sempre pelo Worker, com User-Agent próprio e cache só dos blocos.
 
 ## Constitution Check
 

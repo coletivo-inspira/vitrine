@@ -25,7 +25,13 @@
 - [x] T031 [P] [US4] `web/portal/dispatch.mjs` (extração e mensagem) + `test/dispatch.test.mjs`.
 - [x] T032 [US4] `web/portal/dispatch-panel.mjs` na aba Pedidos.
 
-## Fase 5 - Demonstração e QA
+## Fase 5 - Endereço com mapa (US5)
+
+- [x] T050 [P] [US5] `web/assets/geo.mjs` (projeção, link do Maps e resultado do Photon) e `src/geo-proxy.mjs` (rotas `/api/geo/`) + `test/address-map.test.mjs`.
+- [x] T051 [US5] `web/assets/address-map.mjs` no campo de endereço da vitrine, link do ponto na mensagem e no despacho, opção em Configurações > Delivery e `Permissions-Policy` da vitrine.
+- [x] T052 [US5] Política de privacidade: busca de endereço pelo Photon e mapa do OpenStreetMap.
+
+## Fase 6 - Demonstração e QA
 
 - [x] T040 Vitrine da Forno de Minas com tamanhos, meio a meio, borda, taxa e pagamento.
 - [x] T041 `npm test` e capturas em 1280 e 375 px.

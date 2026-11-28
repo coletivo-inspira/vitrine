@@ -11,13 +11,16 @@ export const MAX_DELIVERY_COURIERS = 20;
 export const COURIER_NAME_MAX = 60;
 export const PAYMENT_CHANGE_MAX_CENTS = 100000;
 
+// Ícones de traço em 24×24, no mesmo desenho dos ícones de destaques.
 export const PAYMENT_METHODS = Object.freeze([
-  Object.freeze({ id: 'pix', label: 'Pix' }),
-  Object.freeze({ id: 'card', label: 'Cartão na entrega' }),
-  Object.freeze({ id: 'cash', label: 'Dinheiro' })
+  Object.freeze({ id: 'pix', label: 'Pix', icon: 'M12 3l9 9-9 9-9-9 9-9ZM12 8.5l3.5 3.5-3.5 3.5L8.5 12 12 8.5Z' }),
+  Object.freeze({ id: 'card', label: 'Cartão na entrega', icon: 'M3 6h18v12H3ZM3 10h18M7 15h4' }),
+  Object.freeze({ id: 'cash', label: 'Dinheiro', icon: 'M2 7h20v10H2ZM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM6 10v4M18 10v4' })
 ]);
 
 const WHATSAPP_PATTERN = /^[1-9]\d{9,14}$/;
+const UF_PATTERN = /^[A-Z]{2}$/;
+export const DELIVERY_CITY_MAX = 60;
 const COURIER_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const URL_MAX = 500;
 
@@ -63,6 +66,25 @@ export function projectPublicDeliveryPlatforms(content) {
   return links.length ? { deliveryPlatforms: Object.fromEntries(links.map((link) => [link.id, link.url])) } : {};
 }
 
+/** Cidade das entregas (`{ city, uf }`), usada para orientar a busca do endereço com mapa. */
+export function normalizeDeliveryArea(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const city = typeof value.city === 'string' ? value.city.replace(/\s+/g, ' ').trim() : '';
+  const uf = typeof value.uf === 'string' ? value.uf.trim().toUpperCase() : '';
+  if (city.length < 2 || city.length > DELIVERY_CITY_MAX || /[<>{}]/.test(city) || !UF_PATTERN.test(uf)) return null;
+  return { city, uf };
+}
+
+export function projectPublicDeliveryArea(content) {
+  const area = normalizeDeliveryArea(content?.deliveryArea);
+  return area ? { deliveryArea: area } : {};
+}
+
+/** Referência de cidade para a busca: a cidade das entregas ou a do endereço público. */
+export function deliverySearchArea(menu) {
+  return normalizeDeliveryArea(menu?.deliveryArea) ?? normalizeDeliveryArea(menu?.publicAddress);
+}
+
 export function normalizeCourierWhatsapp(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   return WHATSAPP_PATTERN.test(digits) ? digits : null;
@@ -100,6 +122,10 @@ export function deliveryDraftErrors(content) {
         }
       }
     }
+  }
+
+  if (content?.deliveryArea !== undefined && content.deliveryArea !== null && !normalizeDeliveryArea(content.deliveryArea)) {
+    errors.push({ field: 'deliveryArea', code: 'INVALID_DELIVERY_AREA', message: `Informe a cidade das entregas (até ${DELIVERY_CITY_MAX} caracteres) e a UF, como Belo Horizonte e MG.` });
   }
 
   const couriers = content?.deliveryCouriers;

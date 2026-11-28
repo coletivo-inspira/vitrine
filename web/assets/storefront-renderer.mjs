@@ -33,7 +33,9 @@ import {
 } from './item-availability.mjs';
 import { PAYMENT_LINK_ICON_PATH, PAYMENT_LINK_NOTICE, publicPaymentLink } from './payment-link.mjs';
 import { storefrontPaletteOf } from './storefront-palettes.mjs';
-import { PAYMENT_METHODS, deliveryFeeFor, deliveryPlatformLinks, describePayment } from './delivery.mjs';
+import { PAYMENT_METHODS, deliveryFeeFor, deliveryPlatformLinks, deliverySearchArea, describePayment } from './delivery.mjs';
+import { renderAddressMap } from './address-map.mjs';
+import { mapsPointLink } from './geo.mjs';
 import {
   defaultItemChoice,
   describeItemChoice,
@@ -144,7 +146,9 @@ export class StorefrontRenderer {
       customerName: '',
       notes: '',
       paymentMethod: '',
-      changeFor: ''
+      changeFor: '',
+      location: null,
+      mapZoom: 0
     };
   }
 
@@ -183,6 +187,13 @@ export class StorefrontRenderer {
   /** Total do pedido: itens de preço fixo mais a taxa de entrega. */
   getOrderTotal() {
     return this.getCartTotal() + this.getDeliveryFee();
+  }
+
+  /** Link do ponto marcado no mapa, só na entrega. */
+  getDeliveryPointLink() {
+    const location = this.customerDetails.location;
+    if (!this.getResolvedOrderFields().addressMap || this.customerDetails.deliveryOrPickup !== 'delivery' || !location) return '';
+    return mapsPointLink(location.lat, location.lon);
   }
 
   getPaymentText() {
@@ -2080,7 +2091,23 @@ export class StorefrontRenderer {
       const chosen = this.customerDetails.paymentMethod === method.id;
       btn.className = chosen ? 'sf-slot-pill is-selected' : 'sf-slot-pill';
       btn.setAttribute('aria-pressed', chosen ? 'true' : 'false');
-      btn.textContent = method.label;
+      if (typeof document.createElementNS === 'function') {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const icon = document.createElementNS(svgNs, 'svg');
+        icon.setAttribute('class', 'sf-pay-icon');
+        icon.setAttribute('width', '20');
+        icon.setAttribute('height', '20');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.setAttribute('focusable', 'false');
+        const path = document.createElementNS(svgNs, 'path');
+        path.setAttribute('d', method.icon);
+        icon.appendChild(path);
+        btn.appendChild(icon);
+      }
+      const text = document.createElement('span');
+      text.textContent = method.label;
+      btn.appendChild(text);
       btn.addEventListener('click', () => {
         this.customerDetails.paymentMethod = method.id;
         this.render();
@@ -2433,6 +2460,7 @@ export class StorefrontRenderer {
 
       addrGroup.appendChild(addrLabel);
       addrGroup.appendChild(addrInput);
+      if (resolvedFields.addressMap) renderAddressMap(this, addrGroup, addrInput, { area: deliverySearchArea(this.menu) });
       group.appendChild(addrGroup);
       this.renderPlatformLinks(group);
       form.appendChild(group);
@@ -2613,9 +2641,10 @@ export class StorefrontRenderer {
           ? `${this.getCartTotalDuration()} min`
           : 'Sob orçamento';
 
+    const pointLink = this.getDeliveryPointLink();
     const enderecoStr = resolvedFields.deliveryOrPickup
       ? this.customerDetails.deliveryOrPickup === 'delivery'
-        ? `Entrega: ${this.customerDetails.address.trim()}`
+        ? `Entrega: ${this.customerDetails.address.trim()}${pointLink ? `\nLocalização: ${pointLink}` : ''}`
         : 'Retirada no local'
       : '';
 
@@ -2881,6 +2910,8 @@ export class StorefrontRenderer {
           : 'Retirada no local'
       ]);
     }
+    const reviewPointLink = this.getDeliveryPointLink();
+    if (reviewPointLink) detailPairs.push(['Ponto no mapa', reviewPointLink]);
     const paymentText = this.getPaymentText();
     if (paymentText) detailPairs.push(['Pagamento', paymentText]);
     if (resolvedFields.notes && this.customerDetails.notes.trim()) {
